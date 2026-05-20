@@ -1,0 +1,58 @@
+{
+  "name": "liquid-web",
+  "version": "1.1.1",
+  "description": "Modern JavaScript library for easy creation of liquid glass effect for Vue, React, VanillaJS",
+  "type": "module",
+  "main": "./liquid-core.mjs",
+  "module": "./liquid-core.mjs",
+  "types": "./types/index.d.ts",
+  "typesVersions": {
+    "*": {
+      ".": ["./types/index.d.ts"],
+      "core": ["./types/core.d.ts"],
+      "ui": ["./types/index.d.ts"],
+      "react": ["./types/react.d.ts"],
+      "vue": ["./types/vue.d.ts"]
+    }
+  },
+
+  "exports": {
+    ".": {
+      "types": "./types/index.d.ts",
+      "import": "./liquid-core.mjs"
+    },
+
+    "./react": {
+      "types": "./types/react.d.ts",
+      "import": "./react/index.mjs"
+    },
+    
+    "./vue": {
+      "types": "./types/vue.d.ts",
+      "import": "./vue/index.mjs"
+    }
+  },
+
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/koirodev/liquid-web.git"
+  },
+  
+  "keywords": [
+    "liquid glass",
+    "liquid web",
+    "ios 26",
+    "html",
+    "css",
+    "vue",
+    "react",
+    "Vanila JS",
+    "ui components"
+  ],
+  "author": "Vitaly Koiro",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/koirodev/liquid-web/issues"
+  },
+  "homepage": "https://liquid.prismify.in"
+}

@@ -1,0 +1,191 @@
+/* Home.css - Enhanced Responsive Styles */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  overflow-x: hidden;
+  overflow-y: auto;
+  height: 100%;
+  width: 100vw;
+  margin: 0;
+  padding: 0;
+}
+
+.hero-root {
+  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Smooth transitions for background changes */
+.hero-root {
+  transition: background-image 0.5s ease-in-out;
+}
+
+/* Prevent text selection on interactive elements */
+.hero-root button,
+.hero-root img {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+/* Navigation link hover effects */
+header nav a {
+  position: relative;
+  transition: color 0.2s ease;
+}
+
+header nav a:hover {
+  color: rgba(255, 255, 255, 1) !important;
+}
+
+header nav a::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: white;
+  transition: width 0.3s ease;
+}
+
+header nav a:hover::after {
+  width: 100%;
+}
+
+/* Button hover animations */
+button {
+  touch-action: manipulation;
+}
+
+/* Smooth image rendering */
+img {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+}
+
+/* Scrollbar styles removed - page is non-scrollable */
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  /* Ensure touch targets are at least 44x44px */
+  button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* Improve text readability on mobile */
+  .hero-root {
+    font-size: 16px;
+    line-height: 1.5;
+  }
+
+  /* Optimize for mobile performance */
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* Tablet optimization */
+@media (min-width: 769px) and (max-width: 1024px) {
+  header {
+    padding: 20px !important;
+  }
+}
+
+/* Desktop large screens */
+@media (min-width: 1440px) {
+  .hero-root main {
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+}
+
+/* Animation performance optimization */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  button {
+    border: 2px solid white !important;
+  }
+}
+
+/* Dark mode preparation (for future use) */
+@media (prefers-color-scheme: dark) {
+  /* Add dark mode styles here if needed */
+}
+
+/* Landscape mobile orientation */
+@media (max-width: 768px) and (orientation: landscape) {
+  .hero-root header {
+    padding: 12px 16px !important;
+  }
+  
+  .hero-root main {
+    padding: 20px 0 !important;
+  }
+
+  body {
+    overflow-y: auto;
+  }
+}
+
+/* Loading state styles */
+.loading {
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+/* Focus styles for accessibility */
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.8);
+  outline-offset: 4px;
+}
+
+/* Prevent layout shift */
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Safe area for devices with notches */
+@supports (padding: max(0px)) {
+  .hero-root header,
+  .hero-root main,
+  .hero-root footer {
+    padding-left: max(20px, env(safe-area-inset-left));
+    padding-right: max(20px, env(safe-area-inset-right));
+  }
+}
+
+/* Print styles */
+@media print {
+  .hero-root {
+    background: white !important;
+    color: black !important;
+  }
+  
+  button,
+  nav {
+    display: none !important;
+  }
+}
