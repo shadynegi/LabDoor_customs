@@ -105,6 +105,8 @@ CREATE TABLE IF NOT EXISTS customers (
   last_order_date TIMESTAMP WITH TIME ZONE,
   first_order_date TIMESTAMP WITH TIME ZONE,
   addresses JSONB DEFAULT '[]',
+  is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+  deleted_at TIMESTAMP WITH TIME ZONE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -167,6 +169,7 @@ CREATE INDEX IF NOT EXISTS idx_admin_sessions_token ON admin_sessions(token);
 CREATE INDEX IF NOT EXISTS idx_admin_sessions_expires ON admin_sessions(expires_at);
 
 CREATE INDEX IF NOT EXISTS idx_customers_email ON customers(email);
+CREATE INDEX IF NOT EXISTS idx_customers_is_deleted ON customers(is_deleted);
 CREATE INDEX IF NOT EXISTS idx_customers_total_orders ON customers(total_orders);
 CREATE INDEX IF NOT EXISTS idx_customers_total_spent ON customers(total_spent);
 

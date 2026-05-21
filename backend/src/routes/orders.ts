@@ -1,6 +1,7 @@
 // backend/src/routes/orders.ts
 import { Router, Request, Response } from 'express';
 import sql from '../lib/db';
+import { upsertCustomerFromOrder } from '../lib/customers';
 import { emailService } from '../lib/email';
 import { parsePagination, paginationMeta } from '../lib/pagination';
 import { verifyAdmin } from './admin';
@@ -327,6 +328,16 @@ const parsedResult: Order = {
     ? JSON.parse(dbOrder.shipping_address)
     : dbOrder.shipping_address,
 };
+
+    try {
+      await upsertCustomerFromOrder(
+        orderData.customer_email,
+        orderData.customer_name,
+        parseFloat(orderData.total?.toString() || '0')
+      );
+    } catch (customerSyncError) {
+      console.error('Customer sync error (order still created):', customerSyncError);
+    }
 
     // Update inventory - decrement stock for all ordered items
     try {

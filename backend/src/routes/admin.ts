@@ -2,6 +2,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import sql, { runInChunks } from '../lib/db';
 import { invalidateProductCaches } from '../lib/cacheKeys';
+import { parsePagination, paginationMeta } from '../lib/pagination';
 import crypto from 'crypto';
 import bcrypt from 'bcrypt';
 
@@ -498,9 +499,10 @@ router.get('/analytics', verifyAdmin, async (req: Request, res: Response) => {
     // Get customer stats
     const customerStats = await sql`
       SELECT 
-        COUNT(DISTINCT customer_email) as total_customers,
-        COUNT(DISTINCT CASE WHEN created_at >= NOW() - INTERVAL '30 days' THEN customer_email END) as new_customers_30_days
-      FROM orders
+        COUNT(*) as total_customers,
+        COUNT(CASE WHEN first_order_date >= NOW() - INTERVAL '30 days' THEN 1 END) as new_customers_30_days
+      FROM customers
+      WHERE is_deleted = FALSE
     `;
 
     res.json({
@@ -538,60 +540,123 @@ router.get('/analytics', verifyAdmin, async (req: Request, res: Response) => {
   }
 });
 
-// GET /admin/customers - Get customer list with history
-router.get('/customers', verifyAdmin, async (req: Request, res: Response) => {
+// POST /admin/customers/:id/restore — restore soft-deleted customer
+router.post('/customers/:id/restore', verifyAdmin, async (req: Request, res: Response) => {
   try {
-    const { limit = 50, offset = 0, search } = req.query;
+    const { id } = req.params;
 
-    let customers;
-    if (search) {
-      customers = await sql`
-        SELECT 
-          customer_email as email,
-          MAX(customer_name) as name,
-          COUNT(*) as total_orders,
-          COALESCE(SUM(total), 0) as total_spent,
-          MAX(created_at) as last_order_date,
-          MIN(created_at) as first_order_date
-        FROM orders
-        WHERE customer_email ILIKE ${`%${search}%`} OR customer_name ILIKE ${`%${search}%`}
-        GROUP BY customer_email
-        ORDER BY total_spent DESC
-        LIMIT ${Number(limit)} OFFSET ${Number(offset)}
-      `;
-    } else {
-      customers = await sql`
-        SELECT 
-          customer_email as email,
-          MAX(customer_name) as name,
-          COUNT(*) as total_orders,
-          COALESCE(SUM(total), 0) as total_spent,
-          MAX(created_at) as last_order_date,
-          MIN(created_at) as first_order_date
-        FROM orders
-        GROUP BY customer_email
-        ORDER BY total_spent DESC
-        LIMIT ${Number(limit)} OFFSET ${Number(offset)}
-      `;
-    }
-
-    const countResult = await sql`
-      SELECT COUNT(DISTINCT customer_email) as total FROM orders
+    const result = await sql`
+      UPDATE customers
+      SET is_deleted = FALSE, deleted_at = NULL, updated_at = NOW()
+      WHERE id = ${id}::uuid
+      RETURNING id, email, name, is_deleted, deleted_at
     `;
+
+    if (!result.length) {
+      return res.status(404).json({
+        success: false,
+        error: 'Customer not found',
+      });
+    }
 
     res.json({
       success: true,
-      data: customers.map((c: any) => ({
-        ...c,
-        total_spent: parseFloat(c.total_spent),
-      })),
-      total: parseInt(countResult[0].total),
+      message: 'Customer restored',
+      data: result[0],
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    console.error('Restore customer error:', error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to restore customer',
+    });
+  }
+});
+
+// DELETE /admin/customers/:id — soft-delete (no hard DELETE)
+router.delete('/customers/:id', verifyAdmin, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const result = await sql`
+      UPDATE customers
+      SET is_deleted = TRUE, deleted_at = NOW(), updated_at = NOW()
+      WHERE id = ${id}::uuid AND is_deleted = FALSE
+      RETURNING id, email, is_deleted, deleted_at
+    `;
+
+    if (!result.length) {
+      const existing = await sql`
+        SELECT id, is_deleted FROM customers WHERE id = ${id}::uuid LIMIT 1
+      `;
+      if (!existing.length) {
+        return res.status(404).json({ success: false, error: 'Customer not found' });
+      }
+      return res.status(409).json({
+        success: false,
+        error: 'Customer is already deleted',
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Customer deleted',
+      data: result[0],
+    });
+  } catch (error: unknown) {
+    console.error('Soft-delete customer error:', error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to delete customer',
+    });
+  }
+});
+
+// GET /admin/customers — list from customers table (active only by default)
+router.get('/customers', verifyAdmin, async (req: Request, res: Response) => {
+  try {
+    const parsed = parsePagination(req.query);
+    if (!parsed.ok) {
+      return res.status(parsed.status).json({ success: false, error: parsed.error });
+    }
+    const { limit, offset } = parsed.params;
+    const { search, include_deleted } = req.query;
+    const showDeleted = include_deleted === 'true';
+
+    const searchPattern = search ? `%${String(search)}%` : null;
+
+    const [customers, countResult] = await Promise.all([
+      sql`
+        SELECT id, email, name, phone, total_orders, total_spent,
+               last_order_date, first_order_date, is_deleted, deleted_at, created_at
+        FROM customers
+        WHERE ${showDeleted ? sql`TRUE` : sql`is_deleted = FALSE`}
+        ${searchPattern ? sql`AND (email ILIKE ${searchPattern} OR name ILIKE ${searchPattern})` : sql``}
+        ORDER BY total_spent DESC
+        LIMIT ${limit} OFFSET ${offset}
+      `,
+      sql`
+        SELECT COUNT(*) as total FROM customers
+        WHERE ${showDeleted ? sql`TRUE` : sql`is_deleted = FALSE`}
+        ${searchPattern ? sql`AND (email ILIKE ${searchPattern} OR name ILIKE ${searchPattern})` : sql``}
+      `,
+    ]);
+
+    const total = parseInt(countResult[0]?.total || '0');
+
+    res.json({
+      success: true,
+      data: customers.map((c) => ({
+        ...c,
+        total_spent: parseFloat(String(c.total_spent)),
+      })),
+      pagination: paginationMeta(total, parsed.params),
+    });
+  } catch (error: unknown) {
     console.error('Customers error:', error);
     res.status(500).json({
       success: false,
-      error: error.message || 'Failed to fetch customers',
+      error: error instanceof Error ? error.message : 'Failed to fetch customers',
     });
   }
 });
@@ -600,6 +665,13 @@ router.get('/customers', verifyAdmin, async (req: Request, res: Response) => {
 router.get('/customers/:email', verifyAdmin, async (req: Request, res: Response) => {
   try {
     const { email } = req.params;
+
+    const customerRow = await sql`
+      SELECT id, email, name, is_deleted, deleted_at
+      FROM customers
+      WHERE email = ${email.toLowerCase()}
+      LIMIT 1
+    `;
 
     const orders = await sql`
       SELECT *
@@ -622,6 +694,7 @@ router.get('/customers/:email', verifyAdmin, async (req: Request, res: Response)
       success: true,
       data: {
         email,
+        customer: customerRow[0] || null,
         summary: {
           ...summary[0],
           total_spent: parseFloat(summary[0].total_spent),
