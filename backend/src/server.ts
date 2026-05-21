@@ -84,18 +84,17 @@ const getSSLConfig = () => {
   }
 };
 
-// HTTP to HTTPS redirect middleware (for production behind reverse proxy)
+/** Production: redirect plain HTTP requests behind Railway/proxy (x-forwarded-proto). */
 const enforceHttps = (req: Request, res: Response, next: NextFunction) => {
-  // Check if behind a reverse proxy (common in production)
-  const forwardedProto = req.headers['x-forwarded-proto'];
-  const isHttps = req.secure || forwardedProto === 'https';
-  
-  if (isProduction && !isHttps) {
-    // Redirect to HTTPS
-    const httpsUrl = `https://${req.headers.host}${req.url}`;
-    return res.redirect(301, httpsUrl);
+  const forwardedProto = (req.headers['x-forwarded-proto'] as string | undefined)
+    ?.split(',')[0]
+    ?.trim();
+
+  if (isProduction && forwardedProto === 'http') {
+    const host = req.headers.host || process.env.PUBLIC_HOST || '';
+    return res.redirect(301, `https://${host}${req.url}`);
   }
-  
+
   next();
 };
 
@@ -106,44 +105,46 @@ if (isProduction) {
   app.use(enforceHttps);
 }
 
-// Security Headers with Helmet
+const frontendOrigin = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+const helmetCommon = {
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://www.paypal.com", "https://www.paypalobjects.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      imgSrc: ["'self'", "data:", "https:", "blob:"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      connectSrc: ["'self'", "https://api-m.paypal.com", "https://api-m.sandbox.paypal.com", frontendOrigin],
+      frameSrc: ["'self'", "https://www.paypal.com", "https://www.sandbox.paypal.com"],
+      objectSrc: ["'none'"],
+      upgradeInsecureRequests: isProduction ? [] : null,
+    },
+  },
+  frameguard: { action: 'deny' as const },
+  noSniff: true,
+  xssFilter: true,
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' as const },
+  hidePoweredBy: true,
+};
+
+// HSTS only in production (avoids pinning localhost during dev)
 app.use(
-  helmet({
-    // Content Security Policy
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "https://www.paypal.com", "https://www.paypalobjects.com"],
-        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-        imgSrc: ["'self'", "data:", "https:", "blob:"],
-        fontSrc: ["'self'", "https://fonts.gstatic.com"],
-        connectSrc: ["'self'", "https://api-m.paypal.com", "https://api-m.sandbox.paypal.com", process.env.FRONTEND_URL || "http://localhost:5173"],
-        frameSrc: ["'self'", "https://www.paypal.com", "https://www.sandbox.paypal.com"],
-        objectSrc: ["'none'"],
-        upgradeInsecureRequests: process.env.NODE_ENV === 'production' ? [] : null,
-      },
-    },
-    // HTTP Strict Transport Security
-    hsts: {
-      maxAge: 31536000, // 1 year
-      includeSubDomains: true,
-      preload: true,
-    },
-    // Prevent clickjacking
-    frameguard: {
-      action: 'deny',
-    },
-    // Prevent MIME type sniffing
-    noSniff: true,
-    // XSS Protection (legacy browsers)
-    xssFilter: true,
-    // Referrer Policy
-    referrerPolicy: {
-      policy: 'strict-origin-when-cross-origin',
-    },
-    // Don't advertise Express
-    hidePoweredBy: true,
-  })
+  helmet(
+    isProduction
+      ? {
+          ...helmetCommon,
+          hsts: {
+            maxAge: 31536000,
+            includeSubDomains: true,
+            preload: true,
+          },
+        }
+      : {
+          ...helmetCommon,
+          hsts: false,
+        }
+  )
 );
 
 // CORS with origin validation

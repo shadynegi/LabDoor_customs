@@ -3,6 +3,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
+import { csrfCookieOptions } from '../lib/cookies';
 
 // Configuration
 const CSRF_COOKIE_NAME = 'csrf_token';
@@ -24,13 +25,7 @@ export const csrfTokenSetter = (req: Request, res: Response, next: NextFunction)
     token = generateCsrfToken();
     
     // Set cookie with security options
-    res.cookie(CSRF_COOKIE_NAME, token, {
-      httpOnly: false, // Must be readable by JavaScript
-      secure: process.env.NODE_ENV === 'production', // HTTPS only in production
-      sameSite: 'strict', // Prevent CSRF from other sites
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      path: '/',
-    });
+    res.cookie(CSRF_COOKIE_NAME, token, csrfCookieOptions);
   }
   
   // Attach token to request for use in templates/responses
@@ -94,13 +89,7 @@ export const getCsrfTokenHandler = (req: Request, res: Response) => {
   if (!token) {
     // Generate and set new token
     const newToken = generateCsrfToken();
-    res.cookie(CSRF_COOKIE_NAME, newToken, {
-      httpOnly: false,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 24 * 60 * 60 * 1000,
-      path: '/',
-    });
+    res.cookie(CSRF_COOKIE_NAME, newToken, csrfCookieOptions);
     
     return res.json({
       success: true,
