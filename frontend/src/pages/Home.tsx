@@ -1,16 +1,18 @@
 //Home.tsx  
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, lazy, Suspense } from "react";
 import { motion, AnimatePresence, type Variants } from "framer-motion";
 import { ChevronLeft, ChevronRight, ShoppingCart, Check, X, HelpCircle, AlertTriangle } from "lucide-react";
 import { useCart, type SizeSystem } from "./CartContext";
 import { useNavigate } from "react-router-dom";
 import { useProducts, type Product } from "../hooks/useProducts";
 import ErrorMessage from "../components/ErrorMessage";
-import ProductCarousel from "../components/ProductCarousel";
 import LiquidButton from "../components/LiquidButton";
 import LiquidModal from "../components/LiquidModal";
 import { trackProductView, trackAddToCart } from "../utils/activityTracker";
 import { HomePageSkeleton } from "../components/Skeletons";
+import { optimizeImageUrl } from "../utils/imageUrl";
+
+const ProductCarousel = lazy(() => import("../components/ProductCarousel"));
 
 import logoHomePageText from "../assets/Logo/LogoHomePageText.png";
 import logoHomePage from "../assets/Logo/LogoAllPages.png";
@@ -113,6 +115,23 @@ export default function Home() {
       trackProductView(products[index].id, products[index].name);
     }
   }, [index, products]);
+
+  const heroImageSrc =
+    products[index]?.image
+      ? optimizeImageUrl(products[index].image, { width: isMobile ? 560 : 900 })
+      : '';
+
+  useEffect(() => {
+    if (!heroImageSrc || loading) return;
+    const link = document.createElement('link');
+    link.rel = 'preload';
+    link.as = 'image';
+    link.href = heroImageSrc;
+    document.head.appendChild(link);
+    return () => {
+      document.head.removeChild(link);
+    };
+  }, [heroImageSrc, loading]);
 
   // Show loading state with skeleton
   if (loading) {
@@ -254,7 +273,11 @@ export default function Home() {
         }}>
           <img 
             src={logoHomePage} 
-            alt="Lab Door Customs" 
+            alt="Lab Door Customs"
+            width={135}
+            height={68}
+            loading="lazy"
+            decoding="async"
             style={{ 
               height: isMobile ? 50.625 : 67.5,
               width: "auto",
@@ -274,7 +297,11 @@ export default function Home() {
         <a href="/" style={{ display: "flex", alignItems: "center" }}>
           <img 
             src={logoHomePageText} 
-            alt="Lab Door Customs" 
+            alt="Lab Door Customs"
+            width={200}
+            height={68}
+            loading="lazy"
+            decoding="async"
             style={{ 
               height: isMobile ? 50.625 : 67.5,
               width: "auto",
@@ -490,8 +517,12 @@ export default function Home() {
                 }}
               >
                 <motion.img
-                  src={current.image}
+                  src={heroImageSrc}
                   alt={current.name}
+                  width={isMobile ? 350 : 562}
+                  height={isMobile ? 350 : 562}
+                  loading="eager"
+                  decoding="async"
                   style={{
                     width: isMobile ? "350px" : "562px",
                     height: "auto",
@@ -691,7 +722,9 @@ export default function Home() {
       </main>
 
       {/* Product Carousel */}
-      <ProductCarousel products={products} />
+      <Suspense fallback={null}>
+        <ProductCarousel products={products} />
+      </Suspense>
 
       {/* Size Selection Modal */}
       <LiquidModal

@@ -2,6 +2,7 @@
 // Lazy loading image component with placeholder and blur-up effect
 
 import React, { useState, useRef, useEffect } from 'react';
+import { optimizeImageUrl } from '../utils/imageUrl';
 
 interface LazyImageProps {
   src: string;
@@ -31,6 +32,8 @@ export default function LazyImage({
   onLoad,
   onError,
 }: LazyImageProps) {
+  const numericWidth = typeof width === 'number' ? width : undefined;
+  const optimizedSrc = optimizeImageUrl(src, { width: numericWidth ?? 640 });
   const [isLoaded, setIsLoaded] = useState(false);
   const [isInView, setIsInView] = useState(false);
   const [hasError, setHasError] = useState(false);
@@ -138,8 +141,10 @@ export default function LazyImage({
       {/* Actual image (only loads when in view) */}
       {isInView && !hasError && (
         <img
-          src={src}
+          src={optimizedSrc}
           alt={alt}
+          width={typeof width === 'number' ? width : undefined}
+          height={typeof height === 'number' ? height : undefined}
           onLoad={handleLoad}
           onError={handleError}
           loading="lazy"

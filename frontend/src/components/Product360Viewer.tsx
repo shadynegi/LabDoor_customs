@@ -2,6 +2,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RotateCcw, Play, Pause, Maximize2, X, Hand } from 'lucide-react';
+import { optimizeImageUrl } from '../utils/imageUrl';
 
 interface Product360ViewerProps {
   // Array of image URLs for different angles (ideally 8-36 images)
@@ -257,8 +258,12 @@ export function Product360Viewer({
         {images.map((src, index) => (
           <img
             key={index}
-            src={src}
+            src={optimizeImageUrl(src, { width: 720 })}
             alt={`${productName} - angle ${index + 1}`}
+            width={720}
+            height={720}
+            loading={index === currentIndex ? 'eager' : 'lazy'}
+            decoding="async"
             className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-75 ${
               index === currentIndex ? 'opacity-100' : 'opacity-0'
             }`}
@@ -390,8 +395,12 @@ export function Product360ViewerFallback({
   return (
     <div className={`relative ${sizeClasses[size]} flex items-center justify-center`}>
       <img
-        src={image}
+        src={optimizeImageUrl(image, { width: 720 })}
         alt={productName}
+        width={720}
+        height={720}
+        loading="lazy"
+        decoding="async"
         className="w-full h-full object-contain"
       />
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-xs text-white/50 bg-black/50 px-3 py-1 rounded-full">

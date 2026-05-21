@@ -169,7 +169,11 @@ function Navigation() {
       >
         <img 
           src={logoAllPages} 
-          alt="Lab Door Customs Logo" 
+          alt="Lab Door Customs Logo"
+          width={50}
+          height={50}
+          loading="lazy"
+          decoding="async"
           style={{ 
             height: isSmallMobile ? 36 : (isMobile ? 40 : 50),
             width: "auto",
@@ -199,7 +203,11 @@ function Navigation() {
         >
           <img 
             src={logoAllPagesText} 
-            alt="Lab Door Customs" 
+            alt="Lab Door Customs"
+            width={160}
+            height={48}
+            loading="lazy"
+            decoding="async"
             style={{ 
               height: isMobile ? 36 : 48,
               width: "auto",

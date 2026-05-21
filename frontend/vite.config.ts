@@ -26,28 +26,10 @@ export default defineConfig({
     // Code splitting configuration
     rollupOptions: {
       output: {
-        manualChunks: (id) => {
-          // React core
-          if (id.includes('node_modules/react/') || 
-              id.includes('node_modules/react-dom/') || 
-              id.includes('node_modules/react-router-dom/') ||
-              id.includes('node_modules/scheduler/')) {
-            return 'react-vendor';
-          }
-          // Animation & UI
-          if (id.includes('node_modules/framer-motion/')) {
-            return 'animation';
-          }
-          // Icons - separate chunk since it's large
-          if (id.includes('node_modules/lucide-react/')) {
-            return 'icons';
-          }
-          // Utilities
-          if (id.includes('node_modules/sonner/') ||
-              id.includes('node_modules/react-select/') ||
-              id.includes('node_modules/country-list/')) {
-            return 'utils';
-          }
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom', 'react-router-dom', 'scheduler'],
+          'framer-motion': ['framer-motion'],
+          'liquid-web': ['liquid-web'],
         },
       },
     },

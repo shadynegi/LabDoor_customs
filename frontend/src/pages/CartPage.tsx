@@ -4,6 +4,7 @@ import { useCart } from "./CartContext";
 import { Link, useNavigate } from "react-router-dom";
 import { Trash2, Plus, Minus, ShoppingBag } from "lucide-react";
 import { calculatePricing, FREE_SHIPPING_MESSAGE } from "../utils/pricing";
+import { optimizeImageUrl } from "../utils/imageUrl";
 
 export default function CartPage() {
   const { state, incrementQuantity, decrementQuantity, removeFromCart } = useCart();
@@ -89,10 +90,13 @@ export default function CartPage() {
                     width: isMobile ? "100%" : "auto"
                   }}>
                     <img 
-                      src={item.image} 
-                      alt={item.name} 
+                      src={optimizeImageUrl(item.image, { width: 180 })} 
+                      alt={item.name}
+                      width={isMobile ? 70 : 90}
+                      height={isMobile ? 70 : 90}
+                      loading="lazy"
+                      decoding="async"
                       onError={(e) => {
-                        // Fallback: hide broken image icon
                         e.currentTarget.style.display = 'none';
                       }}
                       style={{ 

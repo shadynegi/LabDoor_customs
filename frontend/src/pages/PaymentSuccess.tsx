@@ -9,23 +9,6 @@ import { calculatePricing } from '../utils/pricing';
 import { toast } from 'sonner';
 import { getFriendlyError } from '../utils/errorMessages';
 
-to do
-4. frontend/src/pages/PaymentSuccess.tsx
-Subtotal: Compute from order.items (e.g. order.items.reduce((s, i) => s + (Number(i.price) || 0) * (i.quantity || 0), 0)), then call calculatePricing(subtotal) so shipping is $25 or $0 by the same rule.
-Total: Use subtotal − discount + shipping (no tax):
-total = subtotal - (order.discount || 0) + shipping.
-When saving the order (e.g. POST to /api/orders), send:
-subtotal, shipping_cost: shipping, tax: 0, and the computed total.
-Remove or avoid showing any tax line in the success UI.
-So:
-pricing = calculatePricing(computedSubtotal).
-orderDetails.total and the body you send to the backend use:
-pricing.subtotal - (order.discount || 0) + pricing.shipping, and tax: 0.
-5. Backend
-Coupons: Keep only 10%, 20%, 25% (your SAVE10/SAVE20/SAVE25). Ensure the discount is computed on subtotal only (your current validate logic likely already does).
-Orders: Accept tax: 0 or omit tax; store shipping_cost as 25 or 0 per rule. No need to add a new “tax” component anywhere.
-please explain to me in what file, what code i need to change/modify with what, simply tell me the current code snippet and new/replacement code snippets
-
 // Payment progress steps
 type PaymentStep = 'verifying' | 'capturing' | 'saving' | 'complete' | 'error';
 

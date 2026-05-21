@@ -9,6 +9,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
 import ProductFilters from '../components/ProductFilters';
 import { ProductGridSkeleton, SkeletonStyles } from '../components/Skeletons';
+import { optimizeImageUrl } from '../utils/imageUrl';
 
 const ProductsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -478,8 +479,12 @@ const ProductsPage: React.FC = () => {
                 background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
               }}>
                 <img
-                  src={product.image}
+                  src={optimizeImageUrl(product.image, { width: 480 })}
                   alt={product.name}
+                  width={480}
+                  height={480}
+                  loading="lazy"
+                  decoding="async"
                   style={{
                     position: 'absolute',
                     top: 0,

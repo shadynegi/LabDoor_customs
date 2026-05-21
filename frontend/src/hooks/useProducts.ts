@@ -69,7 +69,9 @@ export const useProducts = (): UseProductsResult => {
       setLoading(true);
       setError(null);
 
-      const response = await apiFetch('/products');
+      const response = await apiFetch('/products', {
+        retry: { count: 2, on: [502, 503, 504] },
+      });
       
       if (!response.ok) {
         throw new Error('Failed to fetch products');

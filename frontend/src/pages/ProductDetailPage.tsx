@@ -1,5 +1,5 @@
 // ProductDetailPage - Individual product page with full details
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, ShoppingCart, Package, Shield, Truck, Check, RotateCcw, Image } from 'lucide-react';
@@ -9,9 +9,13 @@ import { useCart, type SizeSystem } from './CartContext';
 import StarRating from '../components/StarRating';
 import ErrorMessage from '../components/ErrorMessage';
 import LiquidButton from '../components/LiquidButton';
-import { Product360Viewer, Product360ViewerFallback } from '../components/Product360Viewer';
 import { getProduct360Config, generatePlaceholder360Images } from '../utils/product360Images';
-import ProductReviews from '../components/ProductReviews';
+import { optimizeImageUrl } from '../utils/imageUrl';
+
+const Product360Viewer = lazy(() =>
+  import('../components/Product360Viewer').then((m) => ({ default: m.Product360Viewer }))
+);
+const ProductReviews = lazy(() => import('../components/ProductReviews'));
 import { ProductDetailSkeleton } from '../components/Skeletons';
 
 // Import actual product images
@@ -312,14 +316,16 @@ const ProductDetailPage: React.FC = () => {
                     padding: 20,
                   }}
                 >
-                  <Product360Viewer
-                    images={generatePlaceholder360Images(product.image, 8)}
-                    productName={product.name}
-                    size={isMobile ? 'md' : 'lg'}
-                    autoRotate={false}
-                    showControls={true}
-                    enableFullscreen={true}
-                  />
+                  <Suspense fallback={<div style={{ padding: 40, color: '#fff' }}>Loading 360° view…</div>}>
+                    <Product360Viewer
+                      images={generatePlaceholder360Images(product.image, 8)}
+                      productName={product.name}
+                      size={isMobile ? 'md' : 'lg'}
+                      autoRotate={false}
+                      showControls={true}
+                      enableFullscreen={true}
+                    />
+                  </Suspense>
                 </motion.div>
               ) : (
                 <motion.img
@@ -327,8 +333,12 @@ const ProductDetailPage: React.FC = () => {
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.95 }}
-                  src={product.image}
+                  src={optimizeImageUrl(product.image, { width: isMobile ? 640 : 960 })}
                   alt={product.name}
+                  width={isMobile ? 320 : 480}
+                  height={isMobile ? 320 : 480}
+                  loading="lazy"
+                  decoding="async"
                   style={{
                     width: '80%',
                     height: 'auto',
@@ -578,10 +588,12 @@ const ProductDetailPage: React.FC = () => {
         </div>
 
         {/* Customer Reviews Section */}
-        <ProductReviews 
-          productId={product.id} 
-          productName={product.name}
-        />
+        <Suspense fallback={<div style={{ padding: 24 }}>Loading reviews…</div>}>
+          <ProductReviews 
+            productId={product.id} 
+            productName={product.name}
+          />
+        </Suspense>
       </div>
     </div>
   );

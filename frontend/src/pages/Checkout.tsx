@@ -4,6 +4,7 @@ import { useCart } from "./CartContext";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { apiFetch } from "../config";
+import { optimizeImageUrl } from "../utils/imageUrl";
 import Select, { type StylesConfig } from "react-select";
 import { getNames } from "country-list";
 import { calculatePricing, FREE_SHIPPING_MESSAGE } from "../utils/pricing";
@@ -763,8 +764,12 @@ export default function Checkout() {
                       }}
                     >
                       <img
-                        src={item.image}
+                        src={optimizeImageUrl(item.image, { width: 160 })}
                         alt={item.name}
+                        width={80}
+                        height={80}
+                        loading="lazy"
+                        decoding="async"
                         style={{
                           width: "100%",
                           height: "100%",
