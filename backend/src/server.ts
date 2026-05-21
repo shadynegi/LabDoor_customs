@@ -11,7 +11,7 @@ import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import compression from "compression";
 import { emailService } from './lib/email';
-import sql from './lib/db';
+import sql, { withRetry } from './lib/db';
 import { csrfTokenSetter, csrfProtection, getCsrfTokenHandler } from './middleware/csrf';
 
 // Import routes
@@ -99,12 +99,10 @@ const enforceHttps = (req: Request, res: Response, next: NextFunction) => {
   next();
 };
 
-// Trust proxy for secure cookies and accurate IP addresses behind reverse proxy
+// Trust first proxy (Railway, nginx, load balancer) for rate limits & x-forwarded-proto
+app.set('trust proxy', 1);
+
 if (isProduction) {
-  // Trust first proxy (nginx, load balancer, etc.)
-  app.set('trust proxy', 1);
-  
-  // Enforce HTTPS in production
   app.use(enforceHttps);
 }
 
@@ -194,39 +192,22 @@ app.use(compression({
   threshold: 1024, // Only compress responses larger than 1KB
 }));
 
-// Request timeout middleware (30 seconds default, 60 for payments)
-const REQUEST_TIMEOUT = 30000; // 30 seconds
-const PAYMENT_TIMEOUT = 60000; // 60 seconds for payment operations
+const REQUEST_TIMEOUT_MS = parseInt(process.env.REQUEST_TIMEOUT_MS || '15000', 10);
 
 app.use((req: Request, res: Response, next: NextFunction) => {
-  // Set longer timeout for payment-related endpoints
-  const isPaymentEndpoint = req.path.includes('/paypal') || req.path.includes('/payment');
-  const timeout = isPaymentEndpoint ? PAYMENT_TIMEOUT : REQUEST_TIMEOUT;
-  
-  // Set the timeout
-  req.setTimeout(timeout, () => {
+  const sendTimeout = () => {
     if (!res.headersSent) {
       console.error(`Request timeout: ${req.method} ${req.path}`);
-      res.status(408).json({
+      res.status(504).json({
         success: false,
-        error: 'Request timeout',
+        error: 'Gateway Timeout',
         message: 'The request took too long to process. Please try again.',
       });
     }
-  });
-  
-  // Also set response timeout
-  res.setTimeout(timeout, () => {
-    if (!res.headersSent) {
-      console.error(`Response timeout: ${req.method} ${req.path}`);
-      res.status(408).json({
-        success: false,
-        error: 'Response timeout',
-        message: 'The server took too long to respond. Please try again.',
-      });
-    }
-  });
-  
+  };
+
+  req.setTimeout(REQUEST_TIMEOUT_MS, sendTimeout);
+  res.setTimeout(REQUEST_TIMEOUT_MS, sendTimeout);
   next();
 });
 
@@ -239,10 +220,10 @@ app.use(csrfProtection);
 // CSRF token endpoint for SPA initialization
 app.get('/api/csrf-token', getCsrfTokenHandler);
 
-// Rate limiting for high concurrency protection (1000+ users)
+// Tiered rate limits: global 300/15m · admin login 10/15m · PayPal 30/15m · contact 5/h
 const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100,                  // Limit each IP to 100 requests per window
+  windowMs: 15 * 60 * 1000,
+  max: 300,
   standardHeaders: true,     // Return rate limit info in headers
   legacyHeaders: false,      // Disable deprecated X-RateLimit headers
   message: {
@@ -267,10 +248,9 @@ const authLimiter = rateLimit({
   },
 });
 
-// Rate limiting for payment endpoints (prevent abuse)
 const paymentLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,  // 1 hour
-  max: 20,                    // Limit each IP to 20 payment attempts per hour
+  windowMs: 15 * 60 * 1000,
+  max: 30,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -279,10 +259,9 @@ const paymentLimiter = rateLimit({
   },
 });
 
-// Rate limiting for contact form (prevent spam)
 const contactLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,  // 1 hour
-  max: 10,                    // Limit each IP to 10 contact submissions per hour
+  windowMs: 60 * 60 * 1000,
+  max: 5,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -303,12 +282,9 @@ const orderLimiter = rateLimit({
   },
 });
 
-// Apply rate limiting
 app.use('/api/', apiLimiter);
-// Apply rate limiters to specific endpoints
 app.use('/api/admin/login', authLimiter);
-app.use('/api/paypal/create-payment', paymentLimiter);
-app.use('/api/paypal/capture-payment', paymentLimiter);
+app.use('/api/paypal', paymentLimiter);
 app.use('/api/contact', contactLimiter);
 app.post('/api/orders', orderLimiter);
 
@@ -323,6 +299,27 @@ const PAYPAL_API =
   process.env.PAYPAL_MODE === "live"
     ? "https://api-m.paypal.com"
     : "https://api-m.sandbox.paypal.com";
+
+const PAYPAL_HTTP_TIMEOUT_MS = parseInt(process.env.PAYPAL_HTTP_TIMEOUT_MS || '10000', 10);
+
+/** PayPal HTTP with AbortController timeout (10s default). */
+async function paypalFetch(
+  url: string,
+  init: RequestInit = {}
+): Promise<globalThis.Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), PAYPAL_HTTP_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (error: unknown) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('PayPal request timed out');
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
 
 // Types
 interface PayPalItem {
@@ -394,58 +391,43 @@ async function parseJson<T = any>(res: globalThis.Response): Promise<T> {
 // Token cache for PayPal access tokens (reduces API calls for 1000+ users)
 let cachedPayPalToken: { token: string; expiresAt: number } | null = null;
 
+async function fetchPayPalAccessToken(): Promise<string> {
+  const clientId = process.env.PAYPAL_CLIENT_ID || "";
+  const secret = process.env.PAYPAL_SECRET || "";
+  const auth = Buffer.from(`${clientId}:${secret}`).toString("base64");
+
+  const response = await paypalFetch(`${PAYPAL_API}/v1/oauth2/token`, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${auth}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: "grant_type=client_credentials",
+  });
+
+  if (!response.ok) {
+    const errorData = await response.text();
+    console.error("PayPal Auth Error:", errorData);
+    throw new Error(`PayPal Auth Failed: ${response.status}`);
+  }
+
+  const data = await parseJson<PayPalAuthResponse>(response);
+  if (!data.access_token) throw new Error("No access token returned from PayPal");
+
+  cachedPayPalToken = {
+    token: data.access_token,
+    expiresAt: Date.now() + (data.expires_in || 32400) * 1000,
+  };
+
+  return data.access_token;
+}
+
 async function getPayPalAccessToken(): Promise<string> {
-  // Return cached token if still valid (with 5 minute buffer)
   if (cachedPayPalToken && cachedPayPalToken.expiresAt > Date.now() + 5 * 60 * 1000) {
     return cachedPayPalToken.token;
   }
 
-  const clientId = process.env.PAYPAL_CLIENT_ID || "";
-  const secret = process.env.PAYPAL_SECRET || "";
-
-  const auth = Buffer.from(`${clientId}:${secret}`).toString("base64");
-
-  try {
-    // Add timeout for external API calls
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
-
-    const response = await fetch(`${PAYPAL_API}/v1/oauth2/token`, {
-      method: "POST",
-      headers: {
-        Authorization: `Basic ${auth}`,
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: "grant_type=client_credentials",
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      const errorData = await response.text();
-      console.error("PayPal Auth Error:", errorData);
-      throw new Error(`PayPal Auth Failed: ${response.status}`);
-    }
-
-    const data = (await parseJson<PayPalAuthResponse>(response)) as PayPalAuthResponse;
-    if (!data.access_token) throw new Error("No access token returned from PayPal");
-    
-    // Cache the token (PayPal tokens typically last 9 hours)
-    cachedPayPalToken = {
-      token: data.access_token,
-      expiresAt: Date.now() + (data.expires_in || 32400) * 1000, // Default 9 hours
-    };
-    
-    return data.access_token;
-  } catch (error: any) {
-    if (error.name === 'AbortError') {
-      console.error("PayPal token request timed out");
-      throw new Error("PayPal authentication timed out");
-    }
-    console.error("Error getting PayPal access token:", error);
-    throw new Error("Failed to authenticate with PayPal");
-  }
+  return withRetry(fetchPayPalAccessToken, { retries: 3, baseMs: 200 });
 }
 
 // API Routes
@@ -636,7 +618,7 @@ app.post("/api/paypal/create-payment", async (req: Request, res: Response) => {
     }, null, 2));
 
     // Create order with PayPal
-    const response = await fetch(`${PAYPAL_API}/v2/checkout/orders`, {
+    const response = await paypalFetch(`${PAYPAL_API}/v2/checkout/orders`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -670,44 +652,6 @@ app.post("/api/paypal/create-payment", async (req: Request, res: Response) => {
     });
   }
 });
-
-// Retry helper with exponential backoff
-async function withRetry<T>(
-  fn: () => Promise<T>,
-  options: { maxRetries?: number; baseDelay?: number; maxDelay?: number } = {}
-): Promise<T> {
-  const { maxRetries = 3, baseDelay = 1000, maxDelay = 10000 } = options;
-  let lastError: Error | undefined;
-
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      return await fn();
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error));
-      
-      // Don't retry on final attempt
-      if (attempt === maxRetries) break;
-      
-      // Check if error is retryable (network errors, 5xx errors)
-      const isRetryable = 
-        error instanceof Error && 
-        (error.message.includes('ETIMEDOUT') ||
-         error.message.includes('ECONNRESET') ||
-         error.message.includes('502') ||
-         error.message.includes('503') ||
-         error.message.includes('504'));
-      
-      if (!isRetryable) throw error;
-      
-      // Calculate delay with jitter
-      const delay = Math.min(baseDelay * Math.pow(2, attempt) + Math.random() * 100, maxDelay);
-      console.log(`Retry attempt ${attempt + 1}/${maxRetries} after ${delay}ms`);
-      await new Promise(resolve => setTimeout(resolve, delay));
-    }
-  }
-
-  throw lastError || new Error('Operation failed after retries');
-}
 
 // Idempotency tracking for captures (prevent duplicate captures)
 const captureAttempts = new Map<string, { status: string; timestamp: number; captureId?: string }>();
@@ -762,18 +706,15 @@ app.post("/api/paypal/capture-payment/:orderId", async (req: Request, res: Respo
 
     console.log("Capturing PayPal payment:", orderId);
 
-    // Capture with retry logic
     const data = await withRetry(async () => {
-      // Get access token
       const accessToken = await getPayPalAccessToken();
 
-      // Capture the order
-      const response = await fetch(`${PAYPAL_API}/v2/checkout/orders/${orderId}/capture`, {
+      const response = await paypalFetch(`${PAYPAL_API}/v2/checkout/orders/${orderId}/capture`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${accessToken}`,
           "Content-Type": "application/json",
-          "PayPal-Request-Id": idempotencyKey, // PayPal's idempotency header
+          "PayPal-Request-Id": idempotencyKey,
         },
       });
 
@@ -799,7 +740,7 @@ app.post("/api/paypal/capture-payment/:orderId", async (req: Request, res: Respo
       }
 
       return await parseJson<PayPalCaptureResponse>(response);
-    }, { maxRetries: 2 });
+    }, { retries: 3, baseMs: 200 });
 
     // Mark as completed
     captureAttempts.set(idempotencyKey, { 
@@ -846,7 +787,7 @@ app.get("/api/paypal/order/:orderId", async (req: Request, res: Response) => {
     // Get access token
     const accessToken = await getPayPalAccessToken();
 
-    const response = await fetch(`${PAYPAL_API}/v2/checkout/orders/${orderId}`, {
+    const response = await paypalFetch(`${PAYPAL_API}/v2/checkout/orders/${orderId}`, {
       method: "GET",
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -898,7 +839,7 @@ app.post("/api/paypal/refund/:captureId", async (req: Request, res: Response) =>
       };
     }
 
-    const response = await fetch(`${PAYPAL_API}/v2/payments/captures/${captureId}/refund`, {
+    const response = await paypalFetch(`${PAYPAL_API}/v2/payments/captures/${captureId}/refund`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -953,7 +894,7 @@ async function verifyPayPalWebhook(
     }
 
     // Verify the webhook signature with PayPal
-    const verifyResponse = await fetch(`${PAYPAL_API}/v1/notifications/verify-webhook-signature`, {
+    const verifyResponse = await paypalFetch(`${PAYPAL_API}/v1/notifications/verify-webhook-signature`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

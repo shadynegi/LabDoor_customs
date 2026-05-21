@@ -1,6 +1,6 @@
 // backend/src/routes/admin.ts - Admin authentication and management
 import { Router, Request, Response, NextFunction } from 'express';
-import sql from '../lib/db';
+import sql, { runInChunks } from '../lib/db';
 import crypto from 'crypto';
 import bcrypt from 'bcrypt';
 
@@ -664,20 +664,26 @@ router.post('/products/bulk-update', verifyAdmin, async (req: Request, res: Resp
       });
     }
 
-    // Use a single batch update query for better performance (1000+ users)
     const isOutOfStock = updates.is_out_of_stock !== undefined ? updates.is_out_of_stock : null;
     const stock = updates.stock !== undefined ? updates.stock : null;
 
-    const result = await sql`
-      UPDATE products SET
-        is_out_of_stock = COALESCE(${isOutOfStock}, is_out_of_stock),
-        stock = COALESCE(${stock}, stock),
-        updated_at = NOW()
-      WHERE id = ANY(${productIds})
-      RETURNING id
-    `;
+    // Chunk large ID lists (10 per txn) — avoids oversized ANY() payloads on huge bulk jobs
+    const BULK_CHUNK = 10;
+    const chunkResults = await runInChunks(productIds, BULK_CHUNK, async (chunk) =>
+      sql.begin(async (txn) => {
+        const rows = await txn`
+          UPDATE products SET
+            is_out_of_stock = COALESCE(${isOutOfStock}, is_out_of_stock),
+            stock = COALESCE(${stock}, stock),
+            updated_at = NOW()
+          WHERE id = ANY(${chunk})
+          RETURNING id
+        `;
+        return rows;
+      })
+    );
 
-    const updatedCount = result.length;
+    const updatedCount = chunkResults.reduce((sum, rows) => sum + rows.length, 0);
 
     res.json({
       success: true,
@@ -705,20 +711,25 @@ router.post('/orders/bulk-update', verifyAdmin, async (req: Request, res: Respon
       });
     }
 
-    // Use a single batch update query for better performance (1000+ users)
     const status = updates.status !== undefined ? updates.status : null;
     const paymentStatus = updates.payment_status !== undefined ? updates.payment_status : null;
 
-    const result = await sql`
-      UPDATE orders SET
-        status = COALESCE(${status}, status),
-        payment_status = COALESCE(${paymentStatus}, payment_status),
-        updated_at = NOW()
-      WHERE id = ANY(${orderIds}::uuid[])
-      RETURNING id
-    `;
+    const BULK_CHUNK = 10;
+    const chunkResults = await runInChunks(orderIds, BULK_CHUNK, async (chunk) =>
+      sql.begin(async (txn) => {
+        const rows = await txn`
+          UPDATE orders SET
+            status = COALESCE(${status}, status),
+            payment_status = COALESCE(${paymentStatus}, payment_status),
+            updated_at = NOW()
+          WHERE id = ANY(${chunk}::uuid[])
+          RETURNING id
+        `;
+        return rows;
+      })
+    );
 
-    const updatedCount = result.length;
+    const updatedCount = chunkResults.reduce((sum, rows) => sum + rows.length, 0);
 
     res.json({
       success: true,
@@ -746,18 +757,23 @@ router.post('/messages/bulk-update', verifyAdmin, async (req: Request, res: Resp
       });
     }
 
-    // Use a single batch update query for better performance (1000+ users)
     const status = updates.status !== undefined ? updates.status : null;
 
-    const result = await sql`
-      UPDATE contact_messages SET
-        status = COALESCE(${status}, status),
-        updated_at = NOW()
-      WHERE id = ANY(${messageIds}::uuid[])
-      RETURNING id
-    `;
+    const BULK_CHUNK = 10;
+    const chunkResults = await runInChunks(messageIds, BULK_CHUNK, async (chunk) =>
+      sql.begin(async (txn) => {
+        const rows = await txn`
+          UPDATE contact_messages SET
+            status = COALESCE(${status}, status),
+            updated_at = NOW()
+          WHERE id = ANY(${chunk}::uuid[])
+          RETURNING id
+        `;
+        return rows;
+      })
+    );
 
-    const updatedCount = result.length;
+    const updatedCount = chunkResults.reduce((sum, rows) => sum + rows.length, 0);
 
     res.json({
       success: true,

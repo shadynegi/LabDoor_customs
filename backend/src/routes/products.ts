@@ -71,36 +71,26 @@ router.get('/', async (req: Request, res: Response) => {
 // GET available filter options (categories, sizes, colors, price range)
 router.get('/filters', async (_req: Request, res: Response) => {
   try {
-    // Get distinct categories
-    const categories = await sql`
-      SELECT DISTINCT category FROM products 
-      WHERE category IS NOT NULL 
-      ORDER BY category ASC
-    `;
-
-    // Get distinct sizes
-    const sizes = await sql`
-      SELECT DISTINCT size FROM products 
-      WHERE size IS NOT NULL 
-      ORDER BY size ASC
-    `;
-
-    // Get price range
-    const priceRange = await sql`
-      SELECT 
-        MIN(price) as min_price, 
-        MAX(price) as max_price 
-      FROM products
-    `;
-
-    // Get rating distribution
-    const ratingStats = await sql`
-      SELECT 
-        MIN(rating) as min_rating,
-        MAX(rating) as max_rating,
-        AVG(rating) as avg_rating
-      FROM products
-    `;
+    // Parallel filter queries (independent reads) — chunked via Promise.all, not sequential
+    const [categories, sizes, priceRange, ratingStats] = await Promise.all([
+      sql`
+        SELECT DISTINCT category FROM products 
+        WHERE category IS NOT NULL 
+        ORDER BY category ASC
+      `,
+      sql`
+        SELECT DISTINCT size FROM products 
+        WHERE size IS NOT NULL 
+        ORDER BY size ASC
+      `,
+      sql`
+        SELECT MIN(price) as min_price, MAX(price) as max_price FROM products
+      `,
+      sql`
+        SELECT MIN(rating) as min_rating, MAX(rating) as max_rating, AVG(rating) as avg_rating
+        FROM products
+      `,
+    ]);
 
     res.json({
       success: true,

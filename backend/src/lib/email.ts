@@ -1,6 +1,14 @@
 import { Resend } from 'resend';
+import { withRetry } from './db';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
+
+async function sendResendEmail(payload: Parameters<typeof resend.emails.send>[0]) {
+  return withRetry(
+    () => resend.emails.send(payload),
+    { retries: 2, baseMs: 200 }
+  );
+}
 
 interface OrderItem {
   product_name: string;
@@ -68,7 +76,7 @@ export class EmailService {
     try {
       const emailHtml = this.generateOrderConfirmationHTML(data);
       
-      const { data: emailData, error } = await resend.emails.send({
+      const { data: emailData, error } = await sendResendEmail({
         from: `${this.companyName} <${this.senderEmail}>`,
         to: data.customerEmail,
         subject: `Order Confirmation - ${data.orderNumber}`,
@@ -95,7 +103,7 @@ export class EmailService {
     try {
       const emailHtml = this.generateShippingNotificationHTML(data);
       
-      const { data: emailData, error } = await resend.emails.send({
+      const { data: emailData, error } = await sendResendEmail({
         from: `${this.companyName} <${this.senderEmail}>`,
         to: data.customerEmail,
         subject: `Your Order Has Shipped - ${data.orderNumber}`,
@@ -122,7 +130,7 @@ export class EmailService {
     try {
       const emailHtml = this.generateContactReplyHTML(name, subject);
       
-      const { data: emailData, error } = await resend.emails.send({
+      const { data: emailData, error } = await sendResendEmail({
         from: `${this.companyName} <${this.senderEmail}>`,
         to: email,
         subject: `We received your message - ${subject}`,
