@@ -2,6 +2,7 @@
 import { Router, Request, Response } from 'express';
 import sql from '../lib/db';
 import { emailService } from '../lib/email';
+import { parsePagination, paginationMeta } from '../lib/pagination';
 import { verifyAdmin } from './admin';
 import { sanitizeOrderData, sanitizeString } from '../utils/sanitize';
 
@@ -399,16 +400,18 @@ const parsedResult: Order = {
 // GET all orders (Admin only)
 router.get('/', verifyAdmin, async (req: Request, res: Response) => {
   try {
-    const { status, payment_status, limit = 50, offset = 0 } = req.query;
+    const parsed = parsePagination(req.query);
+    if (!parsed.ok) {
+      return res.status(parsed.status).json({ success: false, error: parsed.error });
+    }
+    const { limit: limitNum, offset: offsetNum } = parsed.params;
+    const { status, payment_status } = req.query;
 
     let orders;
     let countResult;
 
-    // Build query based on filters - Convert to string for type safety
     const statusStr = String(status || '');
     const paymentStatusStr = String(payment_status || '');
-    const limitNum = Number(limit);
-    const offsetNum = Number(offset);
 
     if (status && payment_status) {
       orders = await sql`
@@ -459,11 +462,7 @@ router.get('/', verifyAdmin, async (req: Request, res: Response) => {
       success: true,
       data: parsedOrders || [],
       count: totalCount,
-      pagination: {
-        limit: Number(limit),
-        offset: Number(offset),
-        total: totalCount,
-      },
+      pagination: paginationMeta(totalCount, parsed.params),
     });
   } catch (error: any) {
     console.error('Error fetching orders:', error);
@@ -474,40 +473,40 @@ router.get('/', verifyAdmin, async (req: Request, res: Response) => {
   }
 });
 
-// GET order by ID
-router.get('/:id', async (req: Request, res: Response) => {
+// GET order statistics (Admin dashboard) — before /:id
+router.get('/stats/summary', verifyAdmin, async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
-
-    const order = await sql`
-      SELECT * FROM orders 
-      WHERE id = ${id}
-      LIMIT 1
+    const stats = await sql`
+      SELECT 
+        COUNT(*) as total_orders,
+        COALESCE(SUM(total), 0) as total_revenue,
+        COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_orders,
+        COUNT(CASE WHEN payment_status = 'completed' THEN 1 END) as completed_orders,
+        COALESCE(SUM(CASE WHEN payment_status = 'completed' THEN total END), 0) as revenue_completed,
+        COALESCE(SUM(CASE WHEN payment_status = 'pending' THEN total END), 0) as revenue_pending
+      FROM orders
     `;
 
-    if (!order || order.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: 'Order not found',
-      });
-    }
-
-    // Parse JSON fields if they are strings
-    const parsedOrder = {
-      ...order[0],
-      items: typeof order[0].items === 'string' ? JSON.parse(order[0].items) : order[0].items,
-      shipping_address: typeof order[0].shipping_address === 'string' ? JSON.parse(order[0].shipping_address) : order[0].shipping_address,
-    };
+    const result = stats[0];
 
     res.json({
       success: true,
-      data: parsedOrder,
+      data: {
+        total_orders: parseInt(result.total_orders) || 0,
+        total_revenue: parseFloat(result.total_revenue) || 0,
+        pending_orders: parseInt(result.pending_orders) || 0,
+        completed_orders: parseInt(result.completed_orders) || 0,
+        revenue_by_status: {
+          completed: parseFloat(result.revenue_completed) || 0,
+          pending: parseFloat(result.revenue_pending) || 0,
+        },
+      },
     });
   } catch (error: any) {
-    console.error('Error fetching order:', error);
+    console.error('Error fetching order stats:', error);
     res.status(500).json({
       success: false,
-      error: error.message || 'Failed to fetch order',
+      error: error.message || 'Failed to fetch order statistics',
     });
   }
 });
@@ -554,11 +553,18 @@ router.get('/number/:orderNumber', async (req: Request, res: Response) => {
 router.get('/customer/:email', async (req: Request, res: Response) => {
   try {
     const { email } = req.params;
+    const parsed = parsePagination(req.query);
+    if (!parsed.ok) {
+      return res.status(parsed.status).json({ success: false, error: parsed.error });
+    }
+    const { limit, offset } = parsed.params;
 
     const orders = await sql`
       SELECT * FROM orders 
       WHERE customer_email = ${email}
       ORDER BY created_at DESC
+      LIMIT ${limit}
+      OFFSET ${offset}
     `;
 
     // Parse JSON fields if they are strings
@@ -568,16 +574,59 @@ router.get('/customer/:email', async (req: Request, res: Response) => {
       shipping_address: typeof order.shipping_address === 'string' ? JSON.parse(order.shipping_address) : order.shipping_address,
     }));
 
+    const countResult = await sql`
+      SELECT COUNT(*) as total FROM orders WHERE customer_email = ${email}
+    `;
+    const total = parseInt(countResult[0]?.total || '0');
+
     res.json({
       success: true,
       data: parsedOrders || [],
       count: parsedOrders?.length || 0,
+      pagination: paginationMeta(total, parsed.params),
     });
   } catch (error: any) {
     console.error('Error fetching customer orders:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to fetch orders',
+    });
+  }
+});
+
+// GET order by ID (UUID)
+router.get('/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const order = await sql`
+      SELECT * FROM orders 
+      WHERE id = ${id}
+      LIMIT 1
+    `;
+
+    if (!order || order.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Order not found',
+      });
+    }
+
+    const parsedOrder = {
+      ...order[0],
+      items: typeof order[0].items === 'string' ? JSON.parse(order[0].items) : order[0].items,
+      shipping_address: typeof order[0].shipping_address === 'string' ? JSON.parse(order[0].shipping_address) : order[0].shipping_address,
+    };
+
+    res.json({
+      success: true,
+      data: parsedOrder,
+    });
+  } catch (error: any) {
+    console.error('Error fetching order:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to fetch order',
     });
   }
 });
@@ -1051,46 +1100,6 @@ router.delete('/:id', verifyAdmin, async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to delete order',
-    });
-  }
-});
-
-// GET order statistics (Admin dashboard)
-router.get('/stats/summary', verifyAdmin, async (req: Request, res: Response) => {
-  try {
-    // Use SQL aggregation instead of loading all orders into memory
-    // This is much more efficient for high concurrency (1000+ users)
-    const stats = await sql`
-      SELECT 
-        COUNT(*) as total_orders,
-        COALESCE(SUM(total), 0) as total_revenue,
-        COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_orders,
-        COUNT(CASE WHEN payment_status = 'completed' THEN 1 END) as completed_orders,
-        COALESCE(SUM(CASE WHEN payment_status = 'completed' THEN total END), 0) as revenue_completed,
-        COALESCE(SUM(CASE WHEN payment_status = 'pending' THEN total END), 0) as revenue_pending
-      FROM orders
-    `;
-
-    const result = stats[0];
-
-    res.json({
-      success: true,
-      data: {
-        total_orders: parseInt(result.total_orders) || 0,
-        total_revenue: parseFloat(result.total_revenue) || 0,
-        pending_orders: parseInt(result.pending_orders) || 0,
-        completed_orders: parseInt(result.completed_orders) || 0,
-        revenue_by_status: {
-          completed: parseFloat(result.revenue_completed) || 0,
-          pending: parseFloat(result.revenue_pending) || 0,
-        },
-      },
-    });
-  } catch (error: any) {
-    console.error('Error fetching order stats:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to fetch order statistics',
     });
   }
 });

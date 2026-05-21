@@ -1,6 +1,7 @@
 // backend/src/routes/admin.ts - Admin authentication and management
 import { Router, Request, Response, NextFunction } from 'express';
 import sql, { runInChunks } from '../lib/db';
+import { invalidateProductCaches } from '../lib/cacheKeys';
 import crypto from 'crypto';
 import bcrypt from 'bcrypt';
 
@@ -684,6 +685,7 @@ router.post('/products/bulk-update', verifyAdmin, async (req: Request, res: Resp
     );
 
     const updatedCount = chunkResults.reduce((sum, rows) => sum + rows.length, 0);
+    invalidateProductCaches();
 
     res.json({
       success: true,

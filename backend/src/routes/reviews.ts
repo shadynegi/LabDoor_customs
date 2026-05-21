@@ -1,6 +1,7 @@
 // backend/src/routes/reviews.ts - Customer Reviews API
 import { Router, Request, Response } from 'express';
 import sql from '../lib/db';
+import { parsePagination, paginationMeta } from '../lib/pagination';
 import { verifyAdmin } from './admin';
 import { sanitizeString } from '../utils/sanitize';
 
@@ -50,17 +51,13 @@ const checkVerifiedPurchase = async (email: string, productId: number): Promise<
 router.get('/product/:productId', async (req: Request, res: Response) => {
   try {
     const { productId } = req.params;
-    const { 
-      rating, 
-      verified_only, 
-      sort_by = 'newest',
-      page = '1',
-      limit = '10'
-    } = req.query;
+    const { rating, verified_only, sort_by = 'newest' } = req.query;
 
-    const pageNum = Math.max(1, parseInt(page as string) || 1);
-    const limitNum = Math.min(50, Math.max(1, parseInt(limit as string) || 10));
-    const offset = (pageNum - 1) * limitNum;
+    const parsed = parsePagination(req.query);
+    if (!parsed.ok) {
+      return res.status(parsed.status).json({ success: false, error: parsed.error });
+    }
+    const { page: pageNum, limit: limitNum, offset } = parsed.params;
 
     // Build dynamic query conditions
     let reviews;
@@ -141,12 +138,10 @@ router.get('/product/:productId', async (req: Request, res: Response) => {
       data: {
         reviews,
         stats: stats[0],
-        pagination: {
-          page: pageNum,
-          limit: limitNum,
-          total: parseInt(stats[0].total_reviews as string) || 0,
-          totalPages: Math.ceil((parseInt(stats[0].total_reviews as string) || 0) / limitNum)
-        }
+        pagination: paginationMeta(
+          parseInt(stats[0].total_reviews as string) || 0,
+          parsed.params
+        )
       }
     });
   } catch (error: any) {
@@ -371,19 +366,17 @@ router.post('/:id/vote', async (req: Request, res: Response) => {
 // GET all reviews (Admin only)
 router.get('/', verifyAdmin, async (req: Request, res: Response) => {
   try {
-    const { 
-      status, 
-      product_id,
-      page = '1',
-      limit = '20'
-    } = req.query;
+    const { status, product_id } = req.query;
+
+    const parsed = parsePagination(req.query);
+    if (!parsed.ok) {
+      return res.status(parsed.status).json({ success: false, error: parsed.error });
+    }
+    const { limit: limitNum, offset } = parsed.params;
 
     const statusStr = status as string | undefined;
-const productIdStr = product_id as string | undefined;
-const productIdNum = productIdStr ? parseInt(productIdStr, 10) : undefined;
-    const pageNum = Math.max(1, parseInt(page as string) || 1);
-    const limitNum = Math.min(100, Math.max(1, parseInt(limit as string) || 20));
-    const offset = (pageNum - 1) * limitNum;
+    const productIdStr = product_id as string | undefined;
+    const productIdNum = productIdStr ? parseInt(productIdStr, 10) : undefined;
 
     let reviews;
     let countResult;
@@ -452,12 +445,10 @@ const productIdNum = productIdStr ? parseInt(productIdStr, 10) : undefined;
       success: true,
       data: reviews,
       stats: stats[0],
-      pagination: {
-        page: pageNum,
-        limit: limitNum,
-        total: parseInt(countResult[0].total as string) || 0,
-        totalPages: Math.ceil((parseInt(countResult[0].total as string) || 0) / limitNum)
-      }
+      pagination: paginationMeta(
+        parseInt(countResult[0].total as string) || 0,
+        parsed.params
+      )
     });
   } catch (error: any) {
     console.error('Error fetching reviews:', error);

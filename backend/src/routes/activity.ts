@@ -2,6 +2,7 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import sql from '../lib/db';
+import { parsePagination, paginationMeta } from '../lib/pagination';
 import { verifyAdmin } from './admin';
 
 // Anonymize IP address for GDPR compliance
@@ -148,87 +149,104 @@ router.post('/batch', async (req: Request, res: Response) => {
   }
 });
 
-// GET /activity/logs - Get activity logs (admin only)
+// GET /activity/export - Stream activity logs as NDJSON (admin only, postgres cursor)
+router.get('/export', verifyAdmin, async (req: Request, res: Response) => {
+  const { actionType, entityType, userEmail, startDate, endDate } = req.query;
+  const action = actionType ? String(actionType) : null;
+  const entity = entityType ? String(entityType) : null;
+  const email = userEmail ? String(userEmail) : null;
+  const start = startDate ? String(startDate) : null;
+  const end = endDate ? String(endDate) : null;
+
+  res.setHeader('Content-Type', 'application/x-ndjson');
+  res.setHeader('Content-Disposition', 'attachment; filename="activity-export.ndjson"');
+  res.setHeader('Cache-Control', 'no-store');
+
+  try {
+    const cursor = sql`
+      SELECT id, session_id, user_email, action_type, entity_type, entity_id,
+             entity_name, metadata, ip_address, user_agent, page_url, referrer, created_at
+      FROM activity_logs
+      WHERE 1=1
+      ${action ? sql`AND action_type = ${action}` : sql``}
+      ${entity ? sql`AND entity_type = ${entity}` : sql``}
+      ${email ? sql`AND user_email = ${email}` : sql``}
+      ${start ? sql`AND created_at >= ${start}::timestamptz` : sql``}
+      ${end ? sql`AND created_at <= ${end}::timestamptz` : sql``}
+      ORDER BY created_at DESC
+    `.cursor(50);
+
+    for await (const batch of cursor) {
+      for (const row of batch) {
+        res.write(`${JSON.stringify(row)}\n`);
+      }
+    }
+    res.end();
+  } catch (error: unknown) {
+    console.error('Activity export error:', error);
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to export activity logs',
+      });
+    } else {
+      res.end();
+    }
+  }
+});
+
+// GET /activity/logs - Get activity logs (admin only, paginated)
 router.get('/logs', verifyAdmin, async (req: Request, res: Response) => {
   try {
-    const { 
-      actionType, 
-      entityType, 
-      userEmail, 
-      startDate, 
-      endDate,
-      limit = 100, 
-      offset = 0 
-    } = req.query;
-
-    let logs;
-    let countResult;
-
-    // Build query based on filters
-    if (actionType && entityType) {
-      logs = await sql`
-        SELECT * FROM activity_logs 
-        WHERE action_type = ${String(actionType)} AND entity_type = ${String(entityType)}
-        ORDER BY created_at DESC
-        LIMIT ${Number(limit)} OFFSET ${Number(offset)}
-      `;
-      countResult = await sql`
-        SELECT COUNT(*) as count FROM activity_logs 
-        WHERE action_type = ${String(actionType)} AND entity_type = ${String(entityType)}
-      `;
-    } else if (actionType) {
-      logs = await sql`
-        SELECT * FROM activity_logs 
-        WHERE action_type = ${String(actionType)}
-        ORDER BY created_at DESC
-        LIMIT ${Number(limit)} OFFSET ${Number(offset)}
-      `;
-      countResult = await sql`
-        SELECT COUNT(*) as count FROM activity_logs WHERE action_type = ${String(actionType)}
-      `;
-    } else if (entityType) {
-      logs = await sql`
-        SELECT * FROM activity_logs 
-        WHERE entity_type = ${String(entityType)}
-        ORDER BY created_at DESC
-        LIMIT ${Number(limit)} OFFSET ${Number(offset)}
-      `;
-      countResult = await sql`
-        SELECT COUNT(*) as count FROM activity_logs WHERE entity_type = ${String(entityType)}
-      `;
-    } else if (userEmail) {
-      logs = await sql`
-        SELECT * FROM activity_logs 
-        WHERE user_email = ${String(userEmail)}
-        ORDER BY created_at DESC
-        LIMIT ${Number(limit)} OFFSET ${Number(offset)}
-      `;
-      countResult = await sql`
-        SELECT COUNT(*) as count FROM activity_logs WHERE user_email = ${String(userEmail)}
-      `;
-    } else {
-      logs = await sql`
-        SELECT * FROM activity_logs 
-        ORDER BY created_at DESC
-        LIMIT ${Number(limit)} OFFSET ${Number(offset)}
-      `;
-      countResult = await sql`SELECT COUNT(*) as count FROM activity_logs`;
+    const parsed = parsePagination(req.query);
+    if (!parsed.ok) {
+      return res.status(parsed.status).json({ success: false, error: parsed.error });
     }
+    const { limit, offset } = parsed.params;
+    const { actionType, entityType, userEmail, startDate, endDate } = req.query;
+
+    const action = actionType ? String(actionType) : null;
+    const entity = entityType ? String(entityType) : null;
+    const email = userEmail ? String(userEmail) : null;
+    const start = startDate ? String(startDate) : null;
+    const end = endDate ? String(endDate) : null;
+
+    const [logs, countResult] = await Promise.all([
+      sql`
+        SELECT * FROM activity_logs
+        WHERE 1=1
+        ${action ? sql`AND action_type = ${action}` : sql``}
+        ${entity ? sql`AND entity_type = ${entity}` : sql``}
+        ${email ? sql`AND user_email = ${email}` : sql``}
+        ${start ? sql`AND created_at >= ${start}::timestamptz` : sql``}
+        ${end ? sql`AND created_at <= ${end}::timestamptz` : sql``}
+        ORDER BY created_at DESC
+        LIMIT ${limit} OFFSET ${offset}
+      `,
+      sql`
+        SELECT COUNT(*) as count FROM activity_logs
+        WHERE 1=1
+        ${action ? sql`AND action_type = ${action}` : sql``}
+        ${entity ? sql`AND entity_type = ${entity}` : sql``}
+        ${email ? sql`AND user_email = ${email}` : sql``}
+        ${start ? sql`AND created_at >= ${start}::timestamptz` : sql``}
+        ${end ? sql`AND created_at <= ${end}::timestamptz` : sql``}
+      `,
+    ]);
+
+    const total = parseInt(countResult[0]?.count || '0');
 
     res.json({
       success: true,
       data: logs,
-      total: parseInt(countResult[0].count),
-      pagination: {
-        limit: Number(limit),
-        offset: Number(offset),
-      },
+      total,
+      pagination: paginationMeta(total, parsed.params),
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Get activity logs error:', error);
     res.status(500).json({
       success: false,
-      error: error.message || 'Failed to fetch activity logs',
+      error: error instanceof Error ? error.message : 'Failed to fetch activity logs',
     });
   }
 });

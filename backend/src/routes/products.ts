@@ -1,6 +1,9 @@
 // backend/src/routes/products.ts
 import { Router, Request, Response } from 'express';
 import sql from '../lib/db';
+import { cached } from '../lib/cache';
+import { CACHE, TTL, invalidateProductCaches } from '../lib/cacheKeys';
+import { parsePagination, paginationMeta } from '../lib/pagination';
 import { verifyAdmin } from './admin';
 import { sanitizeSearchQuery, sanitizeString } from '../utils/sanitize';
 
@@ -30,33 +33,37 @@ interface Product {
 // GET all products with pagination
 router.get('/', async (req: Request, res: Response) => {
   try {
-    // Pagination parameters
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 10;
-    const offset = (page - 1) * limit;
+    const parsed = parsePagination(req.query);
+    if (!parsed.ok) {
+      return res.status(parsed.status).json({ success: false, error: parsed.error });
+    }
+    const { page, limit, offset } = parsed.params;
 
-    // Get total count
-    const countResult = await sql`SELECT COUNT(*) as total FROM products`;
-    const total = parseInt(countResult[0]?.total || '0');
+    res.setHeader('Cache-Control', 'public, max-age=60');
 
-    // Get paginated products
-    const products = await sql`
-      SELECT * FROM products 
-      ORDER BY id ASC
-      LIMIT ${limit}
-      OFFSET ${offset}
-    `;
+    const payload = await cached(
+      CACHE.productsList(page, limit),
+      TTL.productsList,
+      async () => {
+        const countResult = await sql`SELECT COUNT(*) as total FROM products`;
+        const total = parseInt(countResult[0]?.total || '0');
+        const products = await sql`
+          SELECT * FROM products 
+          ORDER BY id ASC
+          LIMIT ${limit}
+          OFFSET ${offset}
+        `;
+        return {
+          data: products || [],
+          pagination: paginationMeta(total, parsed.params),
+        };
+      }
+    );
 
     res.json({
       success: true,
-      data: products || [],
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-        hasMore: page < Math.ceil(total / limit)
-      }
+      data: payload.data,
+      pagination: payload.pagination,
     });
   } catch (error: any) {
     console.error('Error fetching products:', error);
@@ -125,18 +132,58 @@ router.get('/filters', async (_req: Request, res: Response) => {
   }
 });
 
+// GET products by category (must be registered before /:id)
+router.get('/category/:category', async (req: Request, res: Response) => {
+  try {
+    const { category } = req.params;
+    const parsed = parsePagination(req.query);
+    if (!parsed.ok) {
+      return res.status(parsed.status).json({ success: false, error: parsed.error });
+    }
+    const { limit, offset } = parsed.params;
+
+    const [products, countResult] = await Promise.all([
+      sql`
+        SELECT * FROM products 
+        WHERE category = ${category}
+        ORDER BY id ASC
+        LIMIT ${limit}
+        OFFSET ${offset}
+      `,
+      sql`SELECT COUNT(*) as total FROM products WHERE category = ${category}`,
+    ]);
+    const total = parseInt(countResult[0]?.total || '0');
+
+    res.json({
+      success: true,
+      data: products || [],
+      count: products?.length || 0,
+      pagination: paginationMeta(total, parsed.params),
+    });
+  } catch (error: any) {
+    console.error('Error fetching products by category:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to fetch products',
+    });
+  }
+});
+
 // GET single product by ID
 router.get('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    const product = await sql`
-      SELECT * FROM products 
-      WHERE id = ${id}
-      LIMIT 1
-    `;
+    const row = await cached(CACHE.productSingle(id), TTL.productSingle, async () => {
+      const product = await sql`
+        SELECT * FROM products 
+        WHERE id = ${id}
+        LIMIT 1
+      `;
+      return product[0] ?? null;
+    });
 
-    if (!product || product.length === 0) {
+    if (!row) {
       return res.status(404).json({
         success: false,
         error: 'Product not found',
@@ -146,7 +193,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 
     res.json({
       success: true,
-      data: product[0],
+      data: row,
     });
   } catch (error: any) {
     console.error('Error fetching product:', error);
@@ -205,6 +252,8 @@ router.post('/', verifyAdmin, async (req: Request, res: Response) => {
       RETURNING *
     `;
 
+    invalidateProductCaches();
+
     res.status(201).json({
       success: true,
       data: result[0],
@@ -254,6 +303,8 @@ router.put('/:id', verifyAdmin, async (req: Request, res: Response) => {
       });
     }
 
+    invalidateProductCaches(id);
+
     res.json({
       success: true,
       data: result[0],
@@ -286,6 +337,8 @@ router.delete('/:id', verifyAdmin, async (req: Request, res: Response) => {
       });
     }
 
+    invalidateProductCaches(id);
+
     res.json({
       success: true,
       message: 'Product deleted successfully',
@@ -295,31 +348,6 @@ router.delete('/:id', verifyAdmin, async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to delete product',
-    });
-  }
-});
-
-// GET products by category
-router.get('/category/:category', async (req: Request, res: Response) => {
-  try {
-    const { category } = req.params;
-
-    const products = await sql`
-      SELECT * FROM products 
-      WHERE category = ${category}
-      ORDER BY id ASC
-    `;
-
-    res.json({
-      success: true,
-      data: products || [],
-      count: products?.length || 0,
-    });
-  } catch (error: any) {
-    console.error('Error fetching products by category:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to fetch products',
     });
   }
 });
@@ -335,8 +363,21 @@ router.post('/search', async (req: Request, res: Response) => {
       size,
       color,
       minRating,
-      sortBy = 'default' // default, price_asc, price_desc, rating_desc, newest, oldest
+      sortBy = 'default',
+      page = 1,
+      limit: bodyLimit = 20,
     } = req.body;
+
+    const limitRaw = parseInt(String(bodyLimit), 10);
+    if (Number.isNaN(limitRaw) || limitRaw < 1) {
+      return res.status(400).json({ success: false, error: 'Invalid limit' });
+    }
+    if (limitRaw > 100) {
+      return res.status(400).json({ success: false, error: 'limit must not exceed 100' });
+    }
+    const limit = limitRaw;
+    const pageNum = Math.max(1, parseInt(String(page), 10) || 1);
+    const offset = (pageNum - 1) * limit;
 
     // Sanitize inputs
     const sanitizedQuery = query ? sanitizeSearchQuery(query) : '';
@@ -378,14 +419,14 @@ router.post('/search', async (req: Request, res: Response) => {
     const hasPriceRange = priceMin !== null || priceMax !== null;
     const hasRating = ratingMin !== null;
 
-    // If no filters, return all products sorted
     if (!hasSearchQuery && !hasCategory && !hasSize && !hasColor && !hasPriceRange && !hasRating) {
       products = await sql`
         SELECT * FROM products 
         ${getSortOrder()}
+        LIMIT ${limit}
+        OFFSET ${offset}
       `;
     } else {
-      // Build query with all applicable filters
       products = await sql`
         SELECT * FROM products 
         WHERE 1=1
@@ -397,6 +438,8 @@ router.post('/search', async (req: Request, res: Response) => {
         ${priceMax !== null ? sql`AND price <= ${priceMax}` : sql``}
         ${hasRating ? sql`AND rating >= ${ratingMin}` : sql``}
         ${getSortOrder()}
+        LIMIT ${limit}
+        OFFSET ${offset}
       `;
     }
 
@@ -404,6 +447,12 @@ router.post('/search', async (req: Request, res: Response) => {
       success: true,
       data: products || [],
       count: products?.length || 0,
+      pagination: {
+        page: pageNum,
+        limit,
+        offset,
+        hasMore: (products?.length || 0) === limit,
+      },
       filters: {
         query: sanitizedQuery || null,
         category: sanitizedCategory,

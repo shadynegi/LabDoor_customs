@@ -1,6 +1,8 @@
 // backend/src/routes/coupons.ts
 import { Router, Request, Response } from 'express';
 import sql from '../lib/db';
+import { cached } from '../lib/cache';
+import { CACHE, TTL, invalidateCouponCaches } from '../lib/cacheKeys';
 import { verifyAdmin } from './admin';
 
 const router = Router();
@@ -68,127 +70,122 @@ router.post('/validate', async (req: Request, res: Response) => {
       });
     }
 
-    // Find coupon by code (case-insensitive)
-    const coupons = await sql`
-      SELECT * FROM coupons 
-      WHERE UPPER(code) = UPPER(${code.trim()})
-      LIMIT 1
-    `;
+    const emailKey = (customer_email || '').toLowerCase();
+    const cacheKey = CACHE.couponValidate(code.trim(), subtotal, emailKey);
 
-    if (!coupons || coupons.length === 0) {
-      return res.json({
-        success: true,
-        valid: false,
-        message: 'Invalid coupon code',
-        error_code: 'INVALID_CODE',
-      });
-    }
-
-    const coupon = coupons[0] as Coupon;
-
-    // Check if coupon is active
-    if (!coupon.is_active) {
-      return res.json({
-        success: true,
-        valid: false,
-        message: 'This coupon is no longer active',
-        error_code: 'INACTIVE',
-      });
-    }
-
-    // Check validity dates
-    const now = new Date();
-    if (coupon.valid_from && new Date(coupon.valid_from) > now) {
-      return res.json({
-        success: true,
-        valid: false,
-        message: 'This coupon is not yet valid',
-        error_code: 'NOT_YET_VALID',
-      });
-    }
-
-    if (coupon.valid_until && new Date(coupon.valid_until) < now) {
-      return res.json({
-        success: true,
-        valid: false,
-        message: 'This coupon has expired',
-        error_code: 'EXPIRED',
-      });
-    }
-
-   // Check max uses
-if (coupon.max_uses != null && coupon.used_count != null && coupon.used_count >= coupon.max_uses) {
-  return res.json({
-    success: true,
-    valid: false,
-    message: 'This coupon has reached its usage limit',
-    error_code: 'MAX_USES_REACHED',
-  });
-}
-
-    // Check minimum order amount
-    if (coupon.minimum_order && subtotal < coupon.minimum_order) {
-      return res.json({
-        success: true,
-        valid: false,
-        message: `Minimum order of $${coupon.minimum_order.toFixed(2)} required for this coupon`,
-        error_code: 'MINIMUM_NOT_MET',
-        minimum_order: coupon.minimum_order,
-      });
-    }
-
-    // Check per-customer usage limit
-    if (customer_email && coupon.id && coupon.max_uses_per_customer != null) {
-      const couponId = coupon.id; // now guaranteed string
-    
-      const usageCount = await sql`
-        SELECT COUNT(*) as count FROM coupon_usage 
-        WHERE coupon_id = ${coupon.id} AND customer_email = ${customer_email}
+    const result = await cached(cacheKey, TTL.couponValidate, async () => {
+      const coupons = await sql`
+        SELECT * FROM coupons 
+        WHERE UPPER(code) = UPPER(${code.trim()})
+        LIMIT 1
       `;
-      
-      if (parseInt(usageCount[0].count) >= coupon.max_uses_per_customer) {
-        return res.json({
+
+      if (!coupons || coupons.length === 0) {
+        return {
           success: true,
           valid: false,
-          message: 'You have already used this coupon the maximum number of times',
-          error_code: 'CUSTOMER_LIMIT_REACHED',
-        });
+          message: 'Invalid coupon code',
+          error_code: 'INVALID_CODE',
+        };
       }
-    }
 
-    // Calculate discount
-    let discount_amount = 0;
-    if (coupon.discount_type === 'percentage') {
-      discount_amount = (subtotal * coupon.discount_value) / 100;
-      // Apply maximum discount cap if set
-      if (coupon.maximum_discount && discount_amount > coupon.maximum_discount) {
-        discount_amount = coupon.maximum_discount;
+      const coupon = coupons[0] as Coupon;
+
+      if (!coupon.is_active) {
+        return {
+          success: true,
+          valid: false,
+          message: 'This coupon is no longer active',
+          error_code: 'INACTIVE',
+        };
       }
-    } else {
-      // Fixed discount
-      discount_amount = Math.min(coupon.discount_value, subtotal);
-    }
 
-    // Round to 2 decimal places
-    discount_amount = Math.round(discount_amount * 100) / 100;
+      const now = new Date();
+      if (coupon.valid_from && new Date(coupon.valid_from) > now) {
+        return {
+          success: true,
+          valid: false,
+          message: 'This coupon is not yet valid',
+          error_code: 'NOT_YET_VALID',
+        };
+      }
 
-    res.json({
-      success: true,
-      valid: true,
-      coupon: {
-        id: coupon.id,
-        code: coupon.code,
-        description: coupon.description,
-        discount_type: coupon.discount_type,
-        discount_value: coupon.discount_value,
-        minimum_order: coupon.minimum_order,
-        maximum_discount: coupon.maximum_discount,
-      },
-      discount_amount,
-      message: coupon.discount_type === 'percentage'
-        ? `${coupon.discount_value}% discount applied!`
-        : `$${coupon.discount_value.toFixed(2)} discount applied!`,
+      if (coupon.valid_until && new Date(coupon.valid_until) < now) {
+        return {
+          success: true,
+          valid: false,
+          message: 'This coupon has expired',
+          error_code: 'EXPIRED',
+        };
+      }
+
+      if (coupon.max_uses != null && coupon.used_count != null && coupon.used_count >= coupon.max_uses) {
+        return {
+          success: true,
+          valid: false,
+          message: 'This coupon has reached its usage limit',
+          error_code: 'MAX_USES_REACHED',
+        };
+      }
+
+      if (coupon.minimum_order && subtotal < coupon.minimum_order) {
+        return {
+          success: true,
+          valid: false,
+          message: `Minimum order of $${coupon.minimum_order.toFixed(2)} required for this coupon`,
+          error_code: 'MINIMUM_NOT_MET',
+          minimum_order: coupon.minimum_order,
+        };
+      }
+
+      if (customer_email && coupon.id && coupon.max_uses_per_customer != null) {
+        const usageCount = await sql`
+          SELECT COUNT(*) as count FROM coupon_usage 
+          WHERE coupon_id = ${coupon.id} AND customer_email = ${customer_email}
+        `;
+
+        if (parseInt(usageCount[0].count) >= coupon.max_uses_per_customer) {
+          return {
+            success: true,
+            valid: false,
+            message: 'You have already used this coupon the maximum number of times',
+            error_code: 'CUSTOMER_LIMIT_REACHED',
+          };
+        }
+      }
+
+      let discount_amount = 0;
+      if (coupon.discount_type === 'percentage') {
+        discount_amount = (subtotal * coupon.discount_value) / 100;
+        if (coupon.maximum_discount && discount_amount > coupon.maximum_discount) {
+          discount_amount = coupon.maximum_discount;
+        }
+      } else {
+        discount_amount = Math.min(coupon.discount_value, subtotal);
+      }
+
+      discount_amount = Math.round(discount_amount * 100) / 100;
+
+      return {
+        success: true,
+        valid: true,
+        coupon: {
+          id: coupon.id,
+          code: coupon.code,
+          description: coupon.description,
+          discount_type: coupon.discount_type,
+          discount_value: coupon.discount_value,
+          minimum_order: coupon.minimum_order,
+          maximum_discount: coupon.maximum_discount,
+        },
+        discount_amount,
+        message: coupon.discount_type === 'percentage'
+          ? `${coupon.discount_value}% discount applied!`
+          : `$${coupon.discount_value.toFixed(2)} discount applied!`,
+      };
     });
+
+    res.json(result);
   } catch (error: any) {
     console.error('Error validating coupon:', error);
     res.status(500).json({
@@ -224,6 +221,8 @@ router.post('/use', async (req: Request, res: Response) => {
       SET used_count = used_count + 1, updated_at = NOW()
       WHERE id = ${coupon_id}
     `;
+
+    invalidateCouponCaches();
 
     res.json({
       success: true,
@@ -395,6 +394,10 @@ router.post('/', verifyAdmin, async (req: Request, res: Response) => {
       RETURNING *
     `;
 
+    invalidateCouponCaches();
+
+    invalidateCouponCaches();
+
     res.status(201).json({
       success: true,
       data: result[0],
@@ -456,6 +459,8 @@ router.put('/:id', verifyAdmin, async (req: Request, res: Response) => {
       RETURNING *
     `;
 
+    invalidateCouponCaches();
+
     res.json({
       success: true,
       data: result[0],
@@ -490,6 +495,8 @@ router.patch('/:id/toggle', verifyAdmin, async (req: Request, res: Response) => 
       });
     }
 
+    invalidateCouponCaches();
+
     res.json({
       success: true,
       data: result[0],
@@ -520,6 +527,8 @@ router.delete('/:id', verifyAdmin, async (req: Request, res: Response) => {
         error: 'Coupon not found',
       });
     }
+
+    invalidateCouponCaches();
 
     res.json({
       success: true,
