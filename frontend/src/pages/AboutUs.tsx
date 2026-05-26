@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Heart, Award, Truck, Shield, Users, MapPin } from "lucide-react";
+import MetaTags from "../components/MetaTags";
 
 export default function AboutUs() {
   const [isMobile, setIsMobile] = useState(false);
@@ -19,6 +20,11 @@ export default function AboutUs() {
         background: "linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)",
       }}
     >
+      <MetaTags
+        title="About Us — Lab Door Customs"
+        description="Learn about Lab Door Customs — our story, craftsmanship, and commitment to premium custom footwear."
+        path="/about"
+      />
       {/* Hero Section */}
       <motion.div
         initial={{ opacity: 0 }}

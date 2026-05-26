@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Mail, Phone, MapPin, Send } from "lucide-react";
 import { toast } from "sonner";
+import MetaTags from "../components/MetaTags";
 
 export default function ContactUs() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -80,6 +81,11 @@ export default function ContactUs() {
       padding: isMobile ? "40px 20px" : "60px 40px",
       paddingBottom: isMobile ? "max(40px, env(safe-area-inset-bottom))" : "40px"
     }}>
+      <MetaTags
+        title="Contact Us — Lab Door Customs"
+        description="Get in touch with Lab Door Customs for orders, custom requests, and support."
+        path="/contact"
+      />
       <div style={{
         maxWidth: 1200,
         margin: "0 auto",

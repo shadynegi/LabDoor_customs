@@ -7,7 +7,8 @@ import RouteLoader from "./components/RouteLoader";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { Toaster } from "sonner";
 import { trackPageView } from "./utils/activityTracker";
-import CookieConsent from "./components/CookieConsent";
+import CookieConsent, { openCookiePreferences } from "./components/CookieConsent";
+import { trackGaPageView } from "./lib/analytics";
 import { apiFetch } from "./config";
 import logoAllPagesText from "./assets/Logo/LogoAllPagesText.png";
 import logoAllPages from "./assets/Logo/LogoAllPages.png";
@@ -112,8 +113,8 @@ function PageViewTracker() {
   const location = useLocation();
 
   useEffect(() => {
-    // Track page view on route change
     trackPageView(location.pathname);
+    trackGaPageView(location.pathname);
   }, [location.pathname]);
 
   return null;
@@ -401,6 +402,21 @@ export default function App() {
               <p style={{ margin: 0 }}>
                 © {new Date().getFullYear()} Lab Door Customs. All rights reserved.
               </p>
+              <button
+                type="button"
+                onClick={openCookiePreferences}
+                style={{
+                  marginTop: 8,
+                  background: 'none',
+                  border: 'none',
+                  color: '#667eea',
+                  fontSize: 13,
+                  cursor: 'pointer',
+                  textDecoration: 'underline',
+                }}
+              >
+                Cookie preferences
+              </button>
             </footer>
           </div>
         </RouteLoader>

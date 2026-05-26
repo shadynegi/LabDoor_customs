@@ -45,6 +45,23 @@ export default function CookieConsent() {
     }
   }, []);
 
+  useEffect(() => {
+    const openPreferences = () => {
+      const savedPrefs = localStorage.getItem(COOKIE_PREFERENCES_KEY);
+      if (savedPrefs) {
+        try {
+          setPreferences(JSON.parse(savedPrefs));
+        } catch {
+          /* ignore */
+        }
+      }
+      setShowPreferences(true);
+      setIsVisible(true);
+    };
+    window.addEventListener('openCookiePreferences', openPreferences);
+    return () => window.removeEventListener('openCookiePreferences', openPreferences);
+  }, []);
+
   const handleAcceptAll = () => {
     const allAccepted: CookiePreferences = {
       essential: true,
@@ -406,4 +423,9 @@ export function useCookieConsent(): CookiePreferences | null {
   }, []);
 
   return preferences;
+}
+
+/** Re-open the cookie banner (e.g. footer "Cookie preferences" link). */
+export function openCookiePreferences(): void {
+  window.dispatchEvent(new Event('openCookiePreferences'));
 }

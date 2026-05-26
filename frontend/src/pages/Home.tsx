@@ -11,6 +11,8 @@ import LiquidModal from "../components/LiquidModal";
 import { trackProductView, trackAddToCart } from "../utils/activityTracker";
 import { HomePageSkeleton } from "../components/Skeletons";
 import { optimizeImageUrl } from "../utils/imageUrl";
+import MetaTags from "../components/MetaTags";
+import { DEFAULT_META } from "../lib/site";
 
 const ProductCarousel = lazy(() => import("../components/ProductCarousel"));
 
@@ -226,6 +228,11 @@ export default function Home() {
         overflow: "hidden"
       }}
     >
+      <MetaTags
+        title={DEFAULT_META.title}
+        description={DEFAULT_META.description}
+        path="/"
+      />
       {/* Animated Background Layer */}
       <AnimatePresence mode="wait">
         <motion.div

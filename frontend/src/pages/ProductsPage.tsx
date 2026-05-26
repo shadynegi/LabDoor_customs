@@ -10,6 +10,7 @@ import ErrorMessage from '../components/ErrorMessage';
 import ProductFilters from '../components/ProductFilters';
 import { ProductGridSkeleton, SkeletonStyles } from '../components/Skeletons';
 import { optimizeImageUrl } from '../utils/imageUrl';
+import MetaTags from '../components/MetaTags';
 
 const ProductsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -153,6 +154,11 @@ const ProductsPage: React.FC = () => {
       background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
       padding: isMobile ? '20px' : '40px 60px',
     }}>
+      <MetaTags
+        title="Shop Custom Shoes — Lab Door Customs"
+        description="Browse our collection of premium custom footwear. Filter by style, size, and price."
+        path="/products"
+      />
       {/* Page Header */}
       <div style={{ 
         maxWidth: 1400, 

@@ -11,6 +11,8 @@ import ErrorMessage from '../components/ErrorMessage';
 import LiquidButton from '../components/LiquidButton';
 import { getProduct360Config, generatePlaceholder360Images } from '../utils/product360Images';
 import { optimizeImageUrl } from '../utils/imageUrl';
+import MetaTags from '../components/MetaTags';
+import ProductJsonLd from '../components/ProductJsonLd';
 
 const Product360Viewer = lazy(() =>
   import('../components/Product360Viewer').then((m) => ({ default: m.Product360Viewer }))
@@ -175,11 +177,35 @@ const ProductDetailPage: React.FC = () => {
     );
   }
 
+  const productImage = product.image
+    ? optimizeImageUrl(product.image, { width: 1200 })
+    : undefined;
+
   return (
     <div style={{
       minHeight: '100vh',
       background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
     }}>
+      <MetaTags
+        title={`${product.name} — Lab Door Customs`}
+        description={
+          product.description ||
+          `Shop ${product.name} — premium custom footwear from Lab Door Customs.`
+        }
+        path={`/product/${product.id}`}
+        image={productImage}
+        type="product"
+      />
+      <ProductJsonLd
+        id={product.id}
+        name={product.name}
+        description={product.description}
+        image={productImage}
+        price={product.price}
+        inStock={!product.is_out_of_stock}
+        rating={product.rating}
+        reviewCount={product.review_count}
+      />
       {/* Back Button */}
       <div style={{ 
         padding: isMobile ? '16px 20px' : '24px 60px',
