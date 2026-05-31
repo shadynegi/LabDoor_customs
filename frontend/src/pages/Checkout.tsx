@@ -7,7 +7,12 @@ import { apiFetch } from "../config";
 import { optimizeImageUrl } from "../utils/imageUrl";
 import Select, { type StylesConfig } from "react-select";
 import { getNames } from "country-list";
-import { calculatePricing, FREE_SHIPPING_MESSAGE } from "../utils/pricing";
+import {
+  calculateCheckoutPricing,
+  FREE_SHIPPING_MESSAGE,
+  PROMO_COUPON_MESSAGE,
+  VOLUME_DISCOUNT_INFO,
+} from "../utils/pricing";
 import { toast } from "sonner";
 import { getFriendlyError } from "../utils/errorMessages";
 import { logError } from "../lib/logger";
@@ -196,13 +201,22 @@ export default function Checkout() {
     setCouponLoading(true);
     setCouponError("");
 
+    const itemCount = state.items.reduce((sum, item) => sum + item.quantity, 0);
+    const volumeAmount = calculateCheckoutPricing(subtotal, itemCount, 0).volumeDiscount;
+    const couponSubtotal = Math.max(0, subtotal - volumeAmount);
+
     try {
       const response = await apiFetch('/coupons/validate', {
         method: 'POST',
         body: JSON.stringify({
           code: couponCode.trim(),
-          subtotal: subtotal,
+          subtotal: couponSubtotal,
           customer_email: formData.email || undefined,
+          items: state.items.map((item) => ({
+            product_id: item.id,
+            quantity: item.quantity,
+            price: item.price,
+          })),
         }),
       });
 
@@ -285,12 +299,14 @@ export default function Checkout() {
   }), [errors.country]);
 
   // Calculate totals using shared utility
-  const pricing = calculatePricing(state.total);
-  const { subtotal, shipping } = pricing;
-  
-  // Calculate discount and final total
-  const discountAmount = appliedCoupon?.discount_amount || 0;
-  const total = Math.max(0, subtotal - discountAmount + shipping);
+  const totalItemCount = state.items.reduce((sum, item) => sum + item.quantity, 0);
+  const subtotal = state.total;
+  const pricing = calculateCheckoutPricing(
+    subtotal,
+    totalItemCount,
+    appliedCoupon?.discount_amount || 0
+  );
+  const { shipping, volumeDiscount, volumeDiscountPercent, couponDiscount, total } = pricing;
 
   const validateForm = (): { isValid: boolean; errors: FormErrors } => {
     const newErrors: FormErrors = {};
@@ -424,7 +440,7 @@ export default function Checkout() {
           accessToken: data.access_token,
           paypalOrderId: data.orderId,
           idempotencyKey: paymentIdempotencyKey.current,
-          discount: discountAmount,
+          discount: pricing.discount,
           coupon: appliedCoupon ? {
             id: data.couponId || appliedCoupon.id,
             code: appliedCoupon.code,
@@ -919,10 +935,46 @@ export default function Checkout() {
                     {couponError}
                   </p>
                 )}
+
+                {!appliedCoupon && (
+                  <p
+                    style={{
+                      fontSize: 13,
+                      color: "#6b7280",
+                      marginTop: 10,
+                      marginBottom: 0,
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    {PROMO_COUPON_MESSAGE}
+                  </p>
+                )}
               </div>
 
               {/* Price Breakdown */}
               <div style={{ marginBottom: 20 }}>
+                <div
+                  style={{
+                    fontSize: 13,
+                    color: "#6b7280",
+                    marginBottom: 12,
+                    lineHeight: 1.5,
+                    padding: "10px 12px",
+                    background: "#f9fafb",
+                    borderRadius: 8,
+                    border: "1px solid #e5e7eb",
+                  }}
+                >
+                  <div>{VOLUME_DISCOUNT_INFO.twoPlus}</div>
+                  <div style={{ marginTop: 4 }}>{VOLUME_DISCOUNT_INFO.fivePlus}</div>
+                  {volumeDiscount > 0 && (
+                    <div style={{ marginTop: 8, color: "#059669", fontWeight: 600 }}>
+                      {volumeDiscountPercent}% multi-item discount applied (
+                      {totalItemCount} items) — saves ${volumeDiscount.toFixed(2)}
+                    </div>
+                  )}
+                </div>
+
                 <div
                   style={{
                     display: "flex",
@@ -935,6 +987,21 @@ export default function Checkout() {
                   <span>Subtotal</span>
                   <span>${subtotal.toFixed(2)}</span>
                 </div>
+                {volumeDiscount > 0 && (
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      marginBottom: 12,
+                      fontSize: 14,
+                      color: "#10b981",
+                      fontWeight: 600,
+                    }}
+                  >
+                    <span>Multi-item discount ({volumeDiscountPercent}%)</span>
+                    <span>-${volumeDiscount.toFixed(2)}</span>
+                  </div>
+                )}
                 <div
                   style={{
                     display: "flex",
@@ -953,7 +1020,6 @@ export default function Checkout() {
   </div>
 )}
 
-                {/* Discount line */}
                 {appliedCoupon && (
                   <div
                     style={{
@@ -965,8 +1031,8 @@ export default function Checkout() {
                       fontWeight: 600,
                     }}
                   >
-                    <span>Discount ({appliedCoupon.code})</span>
-                    <span>-${discountAmount.toFixed(2)}</span>
+                    <span>Coupon ({appliedCoupon.code})</span>
+                    <span>-${couponDiscount.toFixed(2)}</span>
                   </div>
                 )}
                 

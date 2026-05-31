@@ -1,39 +1,99 @@
 import { describe, it, expect } from 'vitest';
 import {
+  calculateCheckoutPricing,
   calculatePricing,
+  calculateVolumeDiscount,
   amountsMatch,
   extractPayPalCaptureAmount,
   validateCartItems,
+  FREE_SHIPPING_THRESHOLD,
+  SHIPPING_COST,
 } from '../../src/lib/paypalCheckout';
 import { sqlMock } from '../setup';
 
 describe('checkoutPricing', () => {
-  it('calculates shipping and free shipping threshold', () => {
-    expect(calculatePricing(100)).toEqual({
+  it('charges fixed shipping below free-shipping threshold', () => {
+    expect(calculateCheckoutPricing(100, 1)).toEqual({
       subtotal: 100,
-      shipping: 25,
+      shipping: SHIPPING_COST,
       tax: 0,
+      volumeDiscount: 0,
+      volumeDiscountPercent: 0,
+      couponDiscount: 0,
       discount: 0,
-      total: 125,
-    });
-
-    expect(calculatePricing(250)).toEqual({
-      subtotal: 250,
-      shipping: 0,
-      tax: 0,
-      discount: 0,
-      total: 250,
+      total: 100 + SHIPPING_COST,
     });
   });
 
-  it('applies coupon discount before shipping', () => {
+  it('offers free shipping at threshold', () => {
+    expect(calculateCheckoutPricing(FREE_SHIPPING_THRESHOLD, 1)).toEqual({
+      subtotal: FREE_SHIPPING_THRESHOLD,
+      shipping: 0,
+      tax: 0,
+      volumeDiscount: 0,
+      volumeDiscountPercent: 0,
+      couponDiscount: 0,
+      discount: 0,
+      total: FREE_SHIPPING_THRESHOLD,
+    });
+  });
+
+  it('applies 10% volume discount for 2+ items', () => {
+    expect(calculateCheckoutPricing(200, 2)).toEqual({
+      subtotal: 200,
+      shipping: SHIPPING_COST,
+      tax: 0,
+      volumeDiscount: 20,
+      volumeDiscountPercent: 10,
+      couponDiscount: 0,
+      discount: 20,
+      total: 180 + SHIPPING_COST,
+    });
+  });
+
+  it('applies 20% volume discount for 5+ items', () => {
+    expect(calculateCheckoutPricing(200, 5)).toEqual({
+      subtotal: 200,
+      shipping: SHIPPING_COST,
+      tax: 0,
+      volumeDiscount: 40,
+      volumeDiscountPercent: 20,
+      couponDiscount: 0,
+      discount: 40,
+      total: 160 + SHIPPING_COST,
+    });
+  });
+
+  it('stacks coupon discount after volume discount', () => {
+    expect(calculateCheckoutPricing(100, 2, 9)).toEqual({
+      subtotal: 100,
+      shipping: SHIPPING_COST,
+      tax: 0,
+      volumeDiscount: 10,
+      volumeDiscountPercent: 10,
+      couponDiscount: 9,
+      discount: 19,
+      total: 81 + SHIPPING_COST,
+    });
+  });
+
+  it('legacy calculatePricing applies coupon-only discount without volume tiers', () => {
     expect(calculatePricing(100, 20)).toEqual({
       subtotal: 100,
-      shipping: 25,
+      shipping: SHIPPING_COST,
       tax: 0,
+      volumeDiscount: 0,
+      volumeDiscountPercent: 0,
+      couponDiscount: 20,
       discount: 20,
       total: 105,
     });
+  });
+
+  it('calculateVolumeDiscount tiers', () => {
+    expect(calculateVolumeDiscount(100, 1)).toEqual({ percent: 0, amount: 0 });
+    expect(calculateVolumeDiscount(100, 2)).toEqual({ percent: 10, amount: 10 });
+    expect(calculateVolumeDiscount(100, 5)).toEqual({ percent: 20, amount: 20 });
   });
 
   it('compares amounts within tolerance', () => {

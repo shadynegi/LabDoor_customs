@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useCart } from "./CartContext";
 import { Link, useNavigate } from "react-router-dom";
 import { Trash2, Plus, Minus, ShoppingBag } from "lucide-react";
-import { calculatePricing, FREE_SHIPPING_MESSAGE } from "../utils/pricing";
+import { calculateCheckoutPricing, FREE_SHIPPING_MESSAGE, VOLUME_DISCOUNT_INFO } from "../utils/pricing";
 import { optimizeImageUrl } from "../utils/imageUrl";
 
 export default function CartPage() {
@@ -19,8 +19,9 @@ export default function CartPage() {
   }, []);
   
   // Calculate totals using shared utility
-  const pricing = calculatePricing(state.total);
-  const { subtotal, shipping, total } = pricing;
+  const totalItemCount = state.items.reduce((sum, item) => sum + item.quantity, 0);
+  const pricing = calculateCheckoutPricing(state.total, totalItemCount, 0);
+  const { subtotal, shipping, total, volumeDiscount, volumeDiscountPercent } = pricing;
 
   return (
     <div style={{ 
@@ -275,6 +276,22 @@ export default function CartPage() {
               <span>Subtotal:</span>
               <span style={{ fontWeight: 600, color: "#374151" }}>${subtotal.toFixed(2)}</span>
             </div>
+            {volumeDiscount > 0 && (
+              <div style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginBottom: 12,
+                fontSize: isMobile ? 14 : 15,
+                color: "#10b981",
+                fontWeight: 600,
+              }}>
+                <span>Multi-item discount ({volumeDiscountPercent}%)</span>
+                <span>-${volumeDiscount.toFixed(2)}</span>
+              </div>
+            )}
+            <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 12px", lineHeight: 1.5 }}>
+              {VOLUME_DISCOUNT_INFO.twoPlus}. {VOLUME_DISCOUNT_INFO.fivePlus}.
+            </p>
             <div style={{ 
               display: "flex", 
               justifyContent: "space-between", 

@@ -71,4 +71,24 @@ VALUES
   )
 ;
 
+INSERT INTO coupons (
+  code,
+  description,
+  discount_type,
+  discount_value,
+  minimum_order,
+  is_active,
+  applies_to
+)
+VALUES (
+  'LDCOFF10',
+  '10% off your order when applied at checkout',
+  'percentage',
+  10,
+  0,
+  TRUE,
+  'all'
+)
+ON CONFLICT (code) DO NOTHING;
+
 -- Image paths match frontend/src/hooks/useProducts.ts imageMap keys.

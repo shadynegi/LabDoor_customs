@@ -14,7 +14,8 @@ import sql, { withRetry, getPoolStats } from './lib/db';
 import {
   validateCartItems,
   resolveCouponDiscount,
-  calculatePricing,
+  calculateCheckoutPricing,
+  calculateVolumeDiscount,
   createPendingPayPalOrder,
   cancelPendingOrderAndRestoreStock,
   extractPayPalCaptureAmount,
@@ -530,13 +531,16 @@ app.post("/api/paypal/create-payment", async (req: Request, res: Response) => {
 
     const lineItems = cartValidation.lineItems;
     const rawSubtotal = lineItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const totalItemCount = lineItems.reduce((sum, item) => sum + item.quantity, 0);
+    const volumePreview = calculateVolumeDiscount(rawSubtotal, totalItemCount);
+    const couponSubtotal = Math.max(0, rawSubtotal - volumePreview.amount);
 
-    let discount = 0;
+    let couponDiscount = 0;
     let couponId: string | undefined;
     try {
       const couponResult = await resolveCouponDiscount(
         coupon_code,
-        rawSubtotal,
+        couponSubtotal,
         customerInfo.email,
         lineItems.map((item) => ({
           product_id: item.product_id,
@@ -544,7 +548,7 @@ app.post("/api/paypal/create-payment", async (req: Request, res: Response) => {
           quantity: item.quantity,
         }))
       );
-      discount = couponResult.discount;
+      couponDiscount = couponResult.discount;
       couponId = couponResult.couponId;
     } catch (couponError: any) {
       return res.status(400).json({
@@ -553,7 +557,7 @@ app.post("/api/paypal/create-payment", async (req: Request, res: Response) => {
       });
     }
 
-    const pricing = calculatePricing(rawSubtotal, discount);
+    const pricing = calculateCheckoutPricing(rawSubtotal, totalItemCount, couponDiscount);
 
     if (body.amount) {
       const clientTotal = parseFloat(body.amount);
@@ -604,13 +608,13 @@ app.post("/api/paypal/create-payment", async (req: Request, res: Response) => {
     });
     createdServerOrderId = pending.order.id as string;
 
-    if (couponId && discount > 0) {
+    if (couponId && pricing.couponDiscount > 0) {
       try {
         await reserveCouponForOrder(
           couponId,
           pending.order.id as string,
           customerInfo.email,
-          discount
+          pricing.couponDiscount
         );
       } catch (couponReserveError: unknown) {
         await cancelPendingOrderAndRestoreStock(createdServerOrderId).catch((err) =>
@@ -662,11 +666,11 @@ app.post("/api/paypal/create-payment", async (req: Request, res: Response) => {
                 currency_code: currency,
                 value: tax.toFixed(2),
               },
-              ...(discount > 0
+              ...(pricing.discount > 0
                 ? {
                     discount: {
                       currency_code: currency,
-                      value: discount.toFixed(2),
+                      value: pricing.discount.toFixed(2),
                     },
                   }
                 : {}),
