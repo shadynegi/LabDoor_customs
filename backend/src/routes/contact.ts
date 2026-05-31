@@ -1,9 +1,11 @@
 // backend/src/routes/contact.ts
+import { logger } from '../lib/logger';
 import { Router, Request, Response } from 'express';
 import sql from '../lib/db';
 import { emailService } from '../lib/email';
 import { verifyAdmin } from './admin';
 import { sanitizeContactForm } from '../utils/sanitize';
+import { parsePagination, paginationMeta } from '../lib/pagination';
 
 const router = Router();
 
@@ -119,7 +121,7 @@ router.post('/', async (req: Request, res: Response) => {
       contactData.email,
       contactData.subject
     ).catch(err => {
-      console.error('Email sending failed (non-critical):', err);
+      logger.error('Email sending failed (non-critical):', err);
     });
 
     res.status(201).json({
@@ -128,7 +130,7 @@ router.post('/', async (req: Request, res: Response) => {
       message: 'Thank you for contacting us. We will get back to you soon.',
     });
   } catch (error: any) {
-    console.error('Error submitting contact form:', error);
+    logger.error('Error submitting contact form:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to submit message',
@@ -140,28 +142,31 @@ router.post('/', async (req: Request, res: Response) => {
 // GET all contact messages (Admin only - add auth middleware in production)
 router.get('/', verifyAdmin, async (req: Request, res: Response) => {
   try {
-    const { status, limit = 50, offset = 0 } = req.query;
+    const parsed = parsePagination(req.query);
+    if (!parsed.ok) {
+      return res.status(parsed.status).json({ success: false, error: parsed.error });
+    }
+
+    const { limit, offset } = parsed.params;
+    const { status } = req.query;
 
     let messages;
     let countResult;
 
-    const statusStr = String(status || '');
-    const limitNum = Number(limit);
-    const offsetNum = Number(offset);
-
     if (status) {
+      const statusStr = String(status);
       messages = await sql`
         SELECT * FROM contact_messages 
         WHERE status = ${statusStr}
         ORDER BY created_at DESC
-        LIMIT ${limitNum} OFFSET ${offsetNum}
+        LIMIT ${limit} OFFSET ${offset}
       `;
       countResult = await sql`SELECT COUNT(*) as count FROM contact_messages WHERE status = ${statusStr}`;
     } else {
       messages = await sql`
         SELECT * FROM contact_messages 
         ORDER BY created_at DESC
-        LIMIT ${limitNum} OFFSET ${offsetNum}
+        LIMIT ${limit} OFFSET ${offset}
       `;
       countResult = await sql`SELECT COUNT(*) as count FROM contact_messages`;
     }
@@ -172,17 +177,42 @@ router.get('/', verifyAdmin, async (req: Request, res: Response) => {
       success: true,
       data: messages || [],
       count: totalCount,
-      pagination: {
-        limit: Number(limit),
-        offset: Number(offset),
-        total: totalCount,
-      },
+      pagination: paginationMeta(totalCount, parsed.params),
     });
   } catch (error: any) {
-    console.error('Error fetching contact messages:', error);
+    logger.error('Error fetching contact messages:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to fetch contact messages',
+    });
+  }
+});
+
+// GET contact statistics (Admin dashboard) — must be before /:id
+router.get('/stats/summary', verifyAdmin, async (req: Request, res: Response) => {
+  try {
+    const messages = await sql`
+      SELECT status, created_at 
+      FROM contact_messages
+    `;
+
+    const stats = {
+      total: messages?.length || 0,
+      new: messages?.filter((m: any) => m.status === 'new').length || 0,
+      read: messages?.filter((m: any) => m.status === 'read').length || 0,
+      replied: messages?.filter((m: any) => m.status === 'replied').length || 0,
+      archived: messages?.filter((m: any) => m.status === 'archived').length || 0,
+    };
+
+    res.json({
+      success: true,
+      data: stats,
+    });
+  } catch (error: any) {
+    logger.error('Error fetching contact stats:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to fetch contact statistics',
     });
   }
 });
@@ -222,7 +252,7 @@ router.get('/:id', verifyAdmin, async (req: Request, res: Response) => {
       data,
     });
   } catch (error: any) {
-    console.error('Error fetching contact message:', error);
+    logger.error('Error fetching contact message:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to fetch contact message',
@@ -271,7 +301,7 @@ router.patch('/:id/status', verifyAdmin, async (req: Request, res: Response) => 
       message: 'Status updated successfully',
     });
   } catch (error: any) {
-    console.error('Error updating contact message status:', error);
+    logger.error('Error updating contact message status:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to update status',
@@ -302,39 +332,10 @@ router.delete('/:id', verifyAdmin, async (req: Request, res: Response) => {
       message: 'Contact message deleted successfully',
     });
   } catch (error: any) {
-    console.error('Error deleting contact message:', error);
+    logger.error('Error deleting contact message:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to delete contact message',
-    });
-  }
-});
-
-// GET contact statistics (Admin dashboard)
-router.get('/stats/summary', verifyAdmin, async (req: Request, res: Response) => {
-  try {
-    const messages = await sql`
-      SELECT status, created_at 
-      FROM contact_messages
-    `;
-
-    const stats = {
-      total: messages?.length || 0,
-      new: messages?.filter((m: any) => m.status === 'new').length || 0,
-      read: messages?.filter((m: any) => m.status === 'read').length || 0,
-      replied: messages?.filter((m: any) => m.status === 'replied').length || 0,
-      archived: messages?.filter((m: any) => m.status === 'archived').length || 0,
-    };
-
-    res.json({
-      success: true,
-      data: stats,
-    });
-  } catch (error: any) {
-    console.error('Error fetching contact stats:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to fetch contact statistics',
     });
   }
 });

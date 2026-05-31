@@ -1,111 +1,37 @@
-# 🔗 Get Your DATABASE_URL from Supabase
+# Get Database URL
 
-## 📍 **How to Find It:**
+Find your Supabase PostgreSQL connection string.
 
-### **Step 1: Open Supabase Dashboard**
-1. Go to: https://app.supabase.com/
-2. Select your project: `uinyqoeohwguhitohxyv`
-
-### **Step 2: Navigate to Database Settings**
-1. Click **Settings** (gear icon) in left sidebar
-2. Click **Database**
-
-### **Step 3: Copy Connection String**
-
-Scroll down to **"Connection string"** section.
-
-You'll see different formats:
-
-#### **Use "URI" format:**
-Click on **"URI"** tab (or "Connection string")
-
-You'll see something like:
-```
-postgresql://postgres:[YOUR-PASSWORD]@db.uinyqoeohwguhitohxyv.supabase.co:5432/postgres
-```
-
-**Important:** Replace `[YOUR-PASSWORD]` with your actual database password!
+**Full reference:** [`../info.md`](../info.md)
 
 ---
 
-## 🔑 **Add to .env File**
+## Steps
 
-Open `backend/.env` and add:
-
-```env
-# Existing Supabase config
-SUPABASE_URL=https://uinyqoeohwguhitohxyv.supabase.co
-SUPABASE_KEY=eyJhbGciOiJIUzI1NiIs...
-
-# Add this new line for direct PostgreSQL connection
-DATABASE_URL=postgresql://postgres:YOUR_ACTUAL_PASSWORD@db.uinyqoeohwguhitohxyv.supabase.co:5432/postgres
-
-# Your existing PayPal config
-PORT=5000
-FRONTEND_URL=http://localhost:5173
-...
-```
+1. Open [supabase.com](https://supabase.com) → your project.
+2. Go to **Settings → Database**.
+3. Copy the connection string.
 
 ---
 
-## 🔐 **What's Your Database Password?**
+## For the app (recommended)
 
-If you don't remember your database password:
+Use the **Connection pooling** URI with port **6543**:
 
-### **Option 1: Use Pooler Connection (Recommended)**
-
-In Supabase Database settings, find **"Connection pooling"**:
-- Enable connection pooling
-- Use the **"Transaction"** mode connection string
-- This doesn't require the password!
-
-Format:
 ```
-postgresql://postgres.uinyqoeohwguhitohxyv:[YOUR-POOLER-PASSWORD]@aws-0-us-east-1.pooler.supabase.com:6543/postgres
+postgresql://postgres.[ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres
 ```
 
-### **Option 2: Reset Database Password**
-
-1. In Supabase → Settings → Database
-2. Scroll to **"Database password"**
-3. Click **"Reset database password"**
-4. Copy the new password
-5. Update your connection string
+Set as `DATABASE_URL` in backend environment.
 
 ---
 
-## ✅ **Test the Connection**
+## For migrations
 
-After adding DATABASE_URL to .env:
-
-```bash
-cd backend
-node -e "import('postgres').then(m => { const sql = m.default(process.env.DATABASE_URL); sql\`SELECT 1\`.then(() => console.log('✅ Connected!')).catch(console.error); })"
-```
+Use the **Direct connection** URI with port **5432** for running SQL scripts.
 
 ---
 
-## 📊 **Now You Have Two Connection Methods:**
+## GitHub keep-alive
 
-### **1. Supabase JS Client** (backend/src/lib/supabase.ts)
-```typescript
-import { supabase } from './lib/supabase';
-const { data } = await supabase.from('products').select('*');
-```
-- ✅ Easy to use
-- ✅ Works with RLS policies
-- ✅ Built-in features
-
-### **2. Direct PostgreSQL** (backend/src/lib/db.ts)
-```typescript
-import sql from './lib/db';
-const products = await sql`SELECT * FROM products`;
-```
-- ✅ Direct SQL queries
-- ✅ Better performance
-- ✅ More control
-
----
-
-**You can use both in your project!**
-
+Set the pooler URL as `DATABASE_URL` secret for the keep-alive workflow.

@@ -6,24 +6,74 @@ import fs from "fs";
 import path from "path";
 import cors from "cors";
 import dotenv from "dotenv";
-import rateLimit from "express-rate-limit";
 import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import compression from "compression";
 import { emailService } from './lib/email';
-import sql, { withRetry } from './lib/db';
+import sql, { withRetry, getPoolStats } from './lib/db';
+import {
+  validateCartItems,
+  resolveCouponDiscount,
+  calculatePricing,
+  createPendingPayPalOrder,
+  cancelPendingOrderAndRestoreStock,
+  extractPayPalCaptureAmount,
+  amountsMatch,
+  type CheckoutCartItemInput,
+} from './lib/paypalCheckout';
 import { csrfTokenSetter, csrfProtection, getCsrfTokenHandler } from './middleware/csrf';
+import { requireCloudflareProxy } from './middleware/cloudflare';
+import { getClientIp } from './lib/clientIp';
+import { logger } from './lib/logger';
+import { initSentry, captureException } from './lib/sentry';
+import { requestIdMiddleware } from './middleware/requestId';
+import {
+  buildCreatePaymentKey,
+  claimIdempotencyKey,
+  completeIdempotencyKey,
+  failIdempotencyKey,
+  ensureIdempotencyTable,
+  reclaimFailedIdempotencyKey,
+} from './lib/paymentIdempotency';
+import { warmCaches } from './lib/cacheWarm';
+import { connectRedis, isRedisEnabled, getRedisClient } from './lib/redis';
+import { mountRateLimits } from './middleware/rateLimits';
+import { startMaintenanceJobs } from './lib/maintenanceJobs';
+import { syncOrderAfterRefund, isFullRefundAmount, validateAdminRefundAmount } from './lib/refundSync';
+import { buildPayPalRefundDedupeKey } from './lib/refundIdempotency';
+import {
+  reserveCouponForOrder,
+  getCouponForOrder,
+} from './lib/couponReservation';
+import {
+  completeOrderPaymentCapture,
+  revertCaptureAmountMismatch,
+} from './lib/paymentReconciliation';
+import { createPayPalWebhookHandler } from './lib/paypalWebhookHandler';
+import { ensureOrderPaymentSchema } from './lib/orderSchemaMigrations';
+import {
+  PAYPAL_API,
+  paypalFetch,
+  getPayPalAccessToken,
+  parseJson,
+} from './lib/paypalClient';
+import {
+  orderAccessMatches,
+  getOrderAccessTokenFromRequest,
+} from './lib/orderTokens';
+import { parseCaptureFromPayPalOrder } from './lib/paypalWebhookUtils';
 
 // Import routes
 import productsRouter from "./routes/products";
 import ordersRouter from "./routes/orders";
 import contactRouter from "./routes/contact";
-import adminRouter from "./routes/admin";
+import adminRouter, { verifyAdmin } from "./routes/admin";
 import activityRouter from "./routes/activity";
 import reviewsRouter from "./routes/reviews";
 import couponsRouter from "./routes/coupons";
 
 dotenv.config();
+initSentry();
 
 // Validate required environment variables at startup
 const validateEnvVars = () => {
@@ -34,18 +84,44 @@ const validateEnvVars = () => {
   const missingRecommended = recommended.filter(v => !process.env[v]);
   
   if (missing.length > 0) {
-    console.error('❌ Missing required environment variables:', missing.join(', '));
+    logger.error({ missing }, 'Missing required environment variables');
     process.exit(1);
   }
-  
+
   if (missingRecommended.length > 0) {
-    console.warn('⚠️  Missing recommended environment variables:', missingRecommended.join(', '));
-    console.warn('   Some features (admin auth, email notifications) may not work properly.');
+    logger.warn({ missing: missingRecommended }, 'Missing recommended environment variables');
   }
-  
-  // Validate JWT_SECRET length if provided
+
+  if (process.env.NODE_ENV === 'production' && !process.env.PAYPAL_WEBHOOK_ID) {
+    logger.error('PAYPAL_WEBHOOK_ID is required when NODE_ENV=production');
+    process.exit(1);
+  }
+
+  if (process.env.NODE_ENV === 'production') {
+    if (!process.env.FRONTEND_URL) {
+      logger.error('FRONTEND_URL is required when NODE_ENV=production');
+      process.exit(1);
+    }
+    if (!process.env.ADMIN_PASSWORD_HASH) {
+      logger.error('ADMIN_PASSWORD_HASH is required when NODE_ENV=production');
+      process.exit(1);
+    }
+    if (process.env.TRUST_CLOUDFLARE !== 'true') {
+      logger.error('TRUST_CLOUDFLARE=true is required when NODE_ENV=production');
+      process.exit(1);
+    }
+    if (!process.env.REDIS_URL?.trim()) {
+      logger.error('REDIS_URL is required when NODE_ENV=production (distributed cache + rate limits)');
+      process.exit(1);
+    }
+    if (!process.env.SENTRY_DSN?.trim()) {
+      logger.error('SENTRY_DSN is required when NODE_ENV=production');
+      process.exit(1);
+    }
+  }
+
   if (process.env.JWT_SECRET && process.env.JWT_SECRET.length < 32) {
-    console.warn('⚠️  JWT_SECRET should be at least 32 characters for security');
+    logger.warn('JWT_SECRET should be at least 32 characters for security');
   }
 };
 
@@ -53,6 +129,8 @@ validateEnvVars();
 
 const app = express();
 const isProduction = process.env.NODE_ENV === 'production';
+
+app.use(requestIdMiddleware);
 
 // HTTPS/SSL Configuration
 const getSSLConfig = () => {
@@ -76,10 +154,10 @@ const getSSLConfig = () => {
       options.ca = fs.readFileSync(path.resolve(sslCaPath));
     }
     
-    console.log('✅ SSL certificates loaded successfully');
+    logger.info('SSL certificates loaded successfully');
     return options;
   } catch (error) {
-    console.error('❌ Failed to load SSL certificates:', error);
+    logger.error({ err: error }, 'Failed to load SSL certificates');
     return null;
   }
 };
@@ -104,6 +182,9 @@ app.set('trust proxy', 1);
 if (isProduction) {
   app.use(enforceHttps);
 }
+
+// Block direct Railway access when Cloudflare proxy is enabled (see TRUST_CLOUDFLARE)
+app.use(requireCloudflareProxy);
 
 const frontendOrigin = process.env.FRONTEND_URL || 'http://localhost:5173';
 
@@ -147,7 +228,7 @@ app.use(
   )
 );
 
-// CORS with origin validation
+// CORS with origin validation (per-request so no-origin rules can use req.path)
 const allowedOrigins = [
   process.env.FRONTEND_URL || "http://localhost:5173",
   "http://localhost:5173",
@@ -155,28 +236,51 @@ const allowedOrigins = [
   // Add production domains here
 ].filter(Boolean);
 
-app.use(
+const corsBaseOptions = {
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'] as string[],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'X-Order-Access-Token'],
+};
+
+/** Server-to-server paths allowed without Origin in production (health, webhooks). */
+const NO_ORIGIN_ALLOWED_PREFIXES = [
+  '/api/health',
+  '/health',
+  '/api/paypal/webhook',
+];
+
+app.use((req: Request, res: Response, next: NextFunction) => {
   cors({
+    ...corsBaseOptions,
     origin: (origin, callback) => {
-      // Allow requests with no origin (mobile apps, curl, etc.)
       if (!origin) {
-        return callback(null, true);
+        if (
+          process.env.NODE_ENV !== 'production' ||
+          NO_ORIGIN_ALLOWED_PREFIXES.some((p) => req.path.startsWith(p))
+        ) {
+          return callback(null, true);
+        }
+        logger.warn({ path: req.path }, 'CORS blocked request with no origin');
+        return callback(new Error('Not allowed by CORS'));
       }
-      
-      // Check if origin is in allowed list
+
       if (allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
-      
-      // Log rejected origins for debugging
-      console.warn(`CORS blocked origin: ${origin}`);
+
+      logger.warn({ origin }, 'CORS blocked origin');
       callback(new Error('Not allowed by CORS'));
     },
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
-  })
+  })(req, res, next);
+});
+
+// PayPal webhooks must use raw JSON body for signature verification (before express.json)
+app.post(
+  '/api/paypal/webhook',
+  express.raw({ type: 'application/json', limit: '1mb' }),
+  createPayPalWebhookHandler(isProduction)
 );
+
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(cookieParser());
@@ -198,7 +302,7 @@ const REQUEST_TIMEOUT_MS = parseInt(process.env.REQUEST_TIMEOUT_MS || '15000', 1
 app.use((req: Request, res: Response, next: NextFunction) => {
   const sendTimeout = () => {
     if (!res.headersSent) {
-      console.error(`Request timeout: ${req.method} ${req.path}`);
+      req.log?.warn({ method: req.method, path: req.path }, 'Request timeout');
       res.status(504).json({
         success: false,
         error: 'Gateway Timeout',
@@ -221,106 +325,13 @@ app.use(csrfProtection);
 // CSRF token endpoint for SPA initialization
 app.get('/api/csrf-token', getCsrfTokenHandler);
 
-// Tiered rate limits: global 300/15m · admin login 10/15m · PayPal 30/15m · contact 5/h
-const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 300,
-  standardHeaders: true,     // Return rate limit info in headers
-  legacyHeaders: false,      // Disable deprecated X-RateLimit headers
-  message: {
-    success: false,
-    error: 'Too many requests, please try again later.',
-  },
-  skip: (req) => {
-    // Skip rate limiting for health checks
-    return req.path === '/api/health';
-  },
-});
-
-// Stricter rate limiting for auth endpoints
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10,                   // Limit each IP to 10 login attempts per window
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    success: false,
-    error: 'Too many login attempts, please try again later.',
-  },
-});
-
-const paymentLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 30,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    success: false,
-    error: 'Too many payment attempts, please try again later.',
-  },
-});
-
-const contactLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,
-  max: 5,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    success: false,
-    error: 'Too many messages sent, please try again later.',
-  },
-});
-
-// Rate limiting for order creation
-const orderLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,  // 1 hour
-  max: 30,                    // Limit each IP to 30 orders per hour
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    success: false,
-    error: 'Too many orders, please try again later.',
-  },
-});
-
-app.use('/api/', apiLimiter);
-app.use('/api/admin/login', authLimiter);
-app.use('/api/paypal', paymentLimiter);
-app.use('/api/contact', contactLimiter);
-app.post('/api/orders', orderLimiter);
+mountRateLimits(app);
 
 // Request logging middleware
 app.use((req: Request, res: Response, next: NextFunction) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+  req.log?.info({ method: req.method, path: req.path }, 'Incoming request');
   next();
 });
-
-// PayPal API Configuration
-const PAYPAL_API =
-  process.env.PAYPAL_MODE === "live"
-    ? "https://api-m.paypal.com"
-    : "https://api-m.sandbox.paypal.com";
-
-const PAYPAL_HTTP_TIMEOUT_MS = parseInt(process.env.PAYPAL_HTTP_TIMEOUT_MS || '10000', 10);
-
-/** PayPal HTTP with AbortController timeout (10s default). */
-async function paypalFetch(
-  url: string,
-  init: RequestInit = {}
-): Promise<globalThis.Response> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), PAYPAL_HTTP_TIMEOUT_MS);
-  try {
-    return await fetch(url, { ...init, signal: controller.signal });
-  } catch (error: unknown) {
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error('PayPal request timed out');
-    }
-    throw error;
-  } finally {
-    clearTimeout(timeoutId);
-  }
-}
 
 // Types
 interface PayPalItem {
@@ -330,9 +341,9 @@ interface PayPalItem {
 }
 
 interface CreatePaymentRequest {
-  amount: string;
   currency: string;
-  description: string;
+  description?: string;
+  coupon_code?: string;
   customerInfo: {
     fullName: string;
     email: string;
@@ -343,12 +354,14 @@ interface CreatePaymentRequest {
     zipCode?: string;
     country?: string;
   };
+  items: CheckoutCartItemInput[];
+  /** Ignored — totals are calculated server-side from DB prices. */
+  amount?: string;
   breakdown?: {
     subtotal: string;
     shipping: string;
     tax: string;
   };
-  items: PayPalItem[];
 }
 
 /**
@@ -380,55 +393,28 @@ interface PayPalCaptureResponse {
 interface PayPalRefundResponse {
   id?: string;
   status?: string;
+  amount?: { value?: string; currency_code?: string };
   [k: string]: any;
 }
 
-// Helper: typed JSON parser
-async function parseJson<T = any>(res: globalThis.Response): Promise<T> {
-  return (await res.json()) as T;
-}
-
-// Get PayPal Access Token
-// Token cache for PayPal access tokens (reduces API calls for 1000+ users)
-let cachedPayPalToken: { token: string; expiresAt: number } | null = null;
-
-async function fetchPayPalAccessToken(): Promise<string> {
-  const clientId = process.env.PAYPAL_CLIENT_ID || "";
-  const secret = process.env.PAYPAL_SECRET || "";
-  const auth = Buffer.from(`${clientId}:${secret}`).toString("base64");
-
-  const response = await paypalFetch(`${PAYPAL_API}/v1/oauth2/token`, {
-    method: "POST",
+/** Fetch real capture ID and amount when PayPal reports ORDER_ALREADY_CAPTURED. */
+async function fetchPayPalOrderCaptureDetails(paypalOrderId: string) {
+  const accessToken = await getPayPalAccessToken();
+  const response = await paypalFetch(`${PAYPAL_API}/v2/checkout/orders/${paypalOrderId}`, {
+    method: 'GET',
     headers: {
-      Authorization: `Basic ${auth}`,
-      "Content-Type": "application/x-www-form-urlencoded",
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
     },
-    body: "grant_type=client_credentials",
   });
 
   if (!response.ok) {
-    const errorData = await response.text();
-    console.error("PayPal Auth Error:", errorData);
-    throw new Error(`PayPal Auth Failed: ${response.status}`);
+    throw new Error(`Failed to fetch PayPal order details: ${response.status}`);
   }
 
-  const data = await parseJson<PayPalAuthResponse>(response);
-  if (!data.access_token) throw new Error("No access token returned from PayPal");
-
-  cachedPayPalToken = {
-    token: data.access_token,
-    expiresAt: Date.now() + (data.expires_in || 32400) * 1000,
-  };
-
-  return data.access_token;
-}
-
-async function getPayPalAccessToken(): Promise<string> {
-  if (cachedPayPalToken && cachedPayPalToken.expiresAt > Date.now() + 5 * 60 * 1000) {
-    return cachedPayPalToken.token;
-  }
-
-  return withRetry(fetchPayPalAccessToken, { retries: 3, baseMs: 200 });
+  const data = await parseJson<Record<string, unknown>>(response);
+  const { captureId, capturedAmount } = parseCaptureFromPayPalOrder(data);
+  return { data, captureId, capturedAmount };
 }
 
 // API Routes
@@ -455,7 +441,7 @@ app.get("/api/health", async (req: Request, res: Response) => {
     dbStatus = "connected";
   } catch (error) {
     dbStatus = "disconnected";
-    console.error("Health check - DB error:", error);
+    logger.error("Health check - DB error:", error);
   }
   
   const isHealthy = dbStatus === "connected";
@@ -470,18 +456,23 @@ app.get("/api/health", async (req: Request, res: Response) => {
       database: {
         status: dbStatus,
         latency_ms: dbLatency,
+        ...getPoolStats(),
       },
       paypal: {
         mode: process.env.PAYPAL_MODE || "sandbox",
         api: PAYPAL_API,
+      },
+      redis: {
+        enabled: isRedisEnabled(),
+        connected: Boolean(getRedisClient()),
       },
     },
     responseTime_ms: Date.now() - startTime,
   });
 });
 
-// Test PayPal connection
-app.get("/api/paypal/test", async (req: Request, res: Response) => {
+// Test PayPal connection (admin only)
+app.get("/api/paypal/test", verifyAdmin, async (req: Request, res: Response) => {
   try {
     const accessToken = await getPayPalAccessToken();
     res.json({
@@ -497,82 +488,164 @@ app.get("/api/paypal/test", async (req: Request, res: Response) => {
   }
 });
 
-// Create PayPal Payment
+// Create PayPal Payment (server-validated cart + pending order binding)
 app.post("/api/paypal/create-payment", async (req: Request, res: Response) => {
+  let idempotencyKey: string | undefined;
+  let createdServerOrderId: string | undefined;
+
   try {
     const body = req.body as CreatePaymentRequest;
+    const { currency = 'USD', description, customerInfo, items, coupon_code } = body;
 
-    const { amount, currency, description, customerInfo, breakdown, items } = body;
-
-    // Validation
-    if (!amount || !currency || !items || items.length === 0) {
+    if (!items || items.length === 0) {
       return res.status(400).json({
         success: false,
-        error: "Missing required fields: amount, currency, items",
+        error: "Missing required fields: items",
       });
     }
 
-    if (!customerInfo || !customerInfo.email) {
+    if (!customerInfo?.email || !customerInfo?.fullName) {
       return res.status(400).json({
         success: false,
-        error: "Customer information is required",
+        error: "Customer name and email are required",
       });
     }
 
-    console.log("Creating PayPal payment:", {
-      amount,
-      currency,
-      itemCount: items.length,
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(customerInfo.email)) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid email format",
+      });
+    }
+
+    const cartValidation = await validateCartItems(items);
+    if (!cartValidation.ok) {
+      return res.status(400).json({
+        success: false,
+        error: cartValidation.error,
+        message: cartValidation.message,
+      });
+    }
+
+    const lineItems = cartValidation.lineItems;
+    const rawSubtotal = lineItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+    let discount = 0;
+    let couponId: string | undefined;
+    try {
+      const couponResult = await resolveCouponDiscount(
+        coupon_code,
+        rawSubtotal,
+        customerInfo.email,
+        lineItems.map((item) => ({
+          product_id: item.product_id,
+          price: item.price,
+          quantity: item.quantity,
+        }))
+      );
+      discount = couponResult.discount;
+      couponId = couponResult.couponId;
+    } catch (couponError: any) {
+      return res.status(400).json({
+        success: false,
+        error: couponError.message || 'Invalid coupon',
+      });
+    }
+
+    const pricing = calculatePricing(rawSubtotal, discount);
+
+    if (body.amount) {
+      const clientTotal = parseFloat(body.amount);
+      if (!amountsMatch(pricing.total, clientTotal)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Amount mismatch',
+          message: `Server total (${pricing.total.toFixed(2)}) does not match client total (${clientTotal.toFixed(2)})`,
+        });
+      }
+    }
+
+    idempotencyKey = buildCreatePaymentKey(
+      req.headers['x-idempotency-key'] as string | undefined,
+      customerInfo.email,
+      items.map((item) => ({ product_id: item.product_id, quantity: item.quantity })),
+      coupon_code
+    );
+
+    const claim = await claimIdempotencyKey(idempotencyKey, 'create_payment');
+    if (claim.type === 'completed') {
+      logger.info(`Returning cached create-payment result for ${idempotencyKey}`);
+      return res.json({ ...claim.response, cached: true });
+    }
+    if (claim.type === 'in_progress') {
+      return res.status(409).json({
+        success: false,
+        error: 'Payment creation already in progress',
+        message: 'A duplicate payment request was detected. Please wait.',
+      });
+    }
+    if (claim.type === 'failed') {
+      const reclaimed = await reclaimFailedIdempotencyKey(idempotencyKey, 30);
+      if (!reclaimed) {
+        return res.status(409).json({
+          success: false,
+          error: 'Previous payment attempt failed',
+          message: claim.error,
+        });
+      }
+    }
+
+    const pending = await createPendingPayPalOrder({
+      customerInfo,
+      lineItems,
+      pricing,
+      couponId,
+    });
+    createdServerOrderId = pending.order.id as string;
+
+    if (couponId && discount > 0) {
+      try {
+        await reserveCouponForOrder(
+          couponId,
+          pending.order.id as string,
+          customerInfo.email,
+          discount
+        );
+      } catch (couponReserveError: unknown) {
+        await cancelPendingOrderAndRestoreStock(createdServerOrderId).catch((err) =>
+          logger.error('Rollback after coupon reservation failure:', err)
+        );
+        const message =
+          couponReserveError instanceof Error ? couponReserveError.message : 'Coupon unavailable';
+        return res.status(400).json({
+          success: false,
+          error: message,
+        });
+      }
+    }
+
+    logger.info("Creating PayPal payment for bound order:", {
+      serverOrderId: pending.order.id,
+      orderNumber: pending.orderNumber,
+      total: pricing.total,
+      itemCount: lineItems.length,
       email: customerInfo.email,
-      breakdown: breakdown || "calculated",
     });
 
-    // Get access token
     const accessToken = await getPayPalAccessToken();
+    const subtotal = pricing.subtotal;
+    const shipping = pricing.shipping;
+    const tax = pricing.tax;
+    const amount = pricing.total.toFixed(2);
 
-    // Use breakdown from frontend if provided, otherwise calculate
-    let subtotal: number, shipping: number, tax: number;
-    
-    if (breakdown) {
-      // Use the breakdown sent from frontend (ensures consistency)
-      subtotal = parseFloat(breakdown.subtotal);
-      shipping = parseFloat(breakdown.shipping);
-      tax = parseFloat(breakdown.tax);
-      
-      console.log("✅ Using frontend breakdown:", { subtotal, shipping, tax });
-    } else {
-      // Fallback: Calculate breakdown (for backwards compatibility)
-      subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-      shipping = subtotal > 1000 ? 0 : 50;
-      tax = subtotal * 0.18;
-      
-      console.log("⚠️ Calculated breakdown (no frontend data):", { subtotal, shipping, tax });
-    }
-
-    // Verify amount matches breakdown (prevent mismatch errors)
-    const calculatedTotal = subtotal + shipping + tax;
-    const providedTotal = parseFloat(amount);
-    const difference = Math.abs(calculatedTotal - providedTotal);
-    
-    if (difference > 0.01) {
-      console.error("❌ Amount mismatch detected:", {
-        provided: providedTotal,
-        calculated: calculatedTotal,
-        difference: difference,
-      });
-      return res.status(400).json({
-        success: false,
-        error: "Amount mismatch",
-        message: `Total amount (${providedTotal}) doesn't match breakdown (${calculatedTotal.toFixed(2)})`,
-      });
-    }
-
-    // Create order payload
     const orderPayload = {
       intent: "CAPTURE",
       purchase_units: [
         {
-          description: description || "Order from Lab Door Customs",
+          reference_id: pending.order.id,
+          custom_id: pending.order.id,
+          description: description || `Order ${pending.orderNumber}`,
           amount: {
             currency_code: currency,
             value: amount,
@@ -589,10 +662,18 @@ app.post("/api/paypal/create-payment", async (req: Request, res: Response) => {
                 currency_code: currency,
                 value: tax.toFixed(2),
               },
+              ...(discount > 0
+                ? {
+                    discount: {
+                      currency_code: currency,
+                      value: discount.toFixed(2),
+                    },
+                  }
+                : {}),
             },
           },
-          items: items.map((item) => ({
-            name: item.name,
+          items: lineItems.map((item) => ({
+            name: item.product_name,
             unit_amount: {
               currency_code: currency,
               value: item.price.toFixed(2),
@@ -603,7 +684,7 @@ app.post("/api/paypal/create-payment", async (req: Request, res: Response) => {
         },
       ],
       application_context: {
-        return_url: `${process.env.FRONTEND_URL}/payment/success`,
+        return_url: `${process.env.FRONTEND_URL}/payment/success?aid=${encodeURIComponent(pending.accessToken)}`,
         cancel_url: `${process.env.FRONTEND_URL}/payment/cancel`,
         brand_name: "Lab Door Customs",
         landing_page: "BILLING",
@@ -612,13 +693,6 @@ app.post("/api/paypal/create-payment", async (req: Request, res: Response) => {
       },
     };
 
-    // Log payload being sent to PayPal for verification
-    console.log("📤 Sending to PayPal sandbox:", JSON.stringify({
-      amount: orderPayload.purchase_units[0].amount,
-      items: orderPayload.purchase_units[0].items,
-    }, null, 2));
-
-    // Create order with PayPal
     const response = await paypalFetch(`${PAYPAL_API}/v2/checkout/orders`, {
       method: "POST",
       headers: {
@@ -630,23 +704,70 @@ app.post("/api/paypal/create-payment", async (req: Request, res: Response) => {
 
     if (!response.ok) {
       const errorData = await parseJson<any>(response);
-      console.error("PayPal API Error:", errorData);
+      logger.error("PayPal API Error:", errorData);
+      await cancelPendingOrderAndRestoreStock(createdServerOrderId).catch((err) =>
+        logger.error('Rollback after PayPal create failure:', err)
+      );
       throw new Error(`PayPal API Error: ${response.status} - ${JSON.stringify(errorData)}`);
     }
 
     const data = await parseJson<PayPalOrderResponse>(response);
 
-    console.log("✅ PayPal order created:", data?.id);
+    const duplicatePayPalOrder = await sql`
+      SELECT id FROM orders
+      WHERE paypal_order_id = ${data.id} AND id != ${pending.order.id}
+      LIMIT 1
+    `;
+    if (duplicatePayPalOrder.length) {
+      await cancelPendingOrderAndRestoreStock(createdServerOrderId!).catch((err) =>
+        logger.error('Rollback after duplicate PayPal order ID:', err)
+      );
+      await failIdempotencyKey(idempotencyKey).catch(() => {});
+      return res.status(409).json({
+        success: false,
+        error: 'PayPal order ID conflict',
+        message: 'This payment could not be linked. Please try checkout again.',
+      });
+    }
 
-    // Return approval URL to frontend
-    res.json({
+    await sql`
+      UPDATE orders
+      SET paypal_order_id = ${data.id}, updated_at = NOW()
+      WHERE id = ${pending.order.id}
+    `;
+
+    logger.info("✅ PayPal order created and bound:", data?.id, "→", pending.order.id);
+
+    const responsePayload = {
       success: true,
       orderId: data.id,
+      serverOrderId: pending.order.id,
+      orderNumber: pending.orderNumber,
+      access_token: pending.accessToken,
+      total: pricing.total,
       links: data.links,
       status: data.status,
+      couponId,
+      discount,
+      idempotencyKey,
+    };
+
+    await completeIdempotencyKey(idempotencyKey, responsePayload, {
+      serverOrderId: pending.order.id,
+      paypalOrderId: data.id,
     });
+
+    res.json(responsePayload);
   } catch (error: any) {
-    console.error("❌ Create payment error:", error);
+    logger.error("❌ Create payment error:", error);
+    if (createdServerOrderId) {
+      await cancelPendingOrderAndRestoreStock(createdServerOrderId).catch((err) =>
+        logger.error('Rollback after create-payment error:', err)
+      );
+    }
+    if (idempotencyKey) {
+      await failIdempotencyKey(idempotencyKey).catch(() => {});
+    }
     res.status(500).json({
       success: false,
       error: error.message || "Failed to create payment",
@@ -654,118 +775,312 @@ app.post("/api/paypal/create-payment", async (req: Request, res: Response) => {
   }
 });
 
-// Idempotency tracking for captures (prevent duplicate captures)
-const captureAttempts = new Map<string, { status: string; timestamp: number; captureId?: string }>();
-const CAPTURE_TIMEOUT = 5 * 60 * 1000; // 5 minutes
-
-// Clean old capture attempts periodically
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, value] of captureAttempts.entries()) {
-    if (now - value.timestamp > CAPTURE_TIMEOUT) {
-      captureAttempts.delete(key);
-    }
-  }
-}, 60000); // Every minute
-
-// Capture PayPal Payment (after user approves) - with retry and idempotency
+// Capture PayPal Payment (after user approves) - bound to server order + amount validation
 app.post("/api/paypal/capture-payment/:orderId", async (req: Request, res: Response) => {
   try {
-    const { orderId } = req.params;
-    const idempotencyKey = req.headers['x-idempotency-key'] as string || orderId;
+    const { orderId: paypalOrderId } = req.params;
+    const {
+      serverOrderId,
+      accessToken,
+      couponId,
+      discount_amount,
+    } = req.body as {
+      serverOrderId?: string;
+      accessToken?: string;
+      couponId?: string;
+      discount_amount?: number;
+    };
+    const idempotencyKey = req.headers['x-idempotency-key'] as string || paypalOrderId;
 
-    if (!orderId) {
+    if (!paypalOrderId) {
       return res.status(400).json({
         success: false,
         error: "Order ID is required",
       });
     }
 
-    // Check for duplicate capture attempt
-    const existingAttempt = captureAttempts.get(idempotencyKey);
-    if (existingAttempt) {
-      if (existingAttempt.status === 'processing') {
+    if (!serverOrderId) {
+      return res.status(400).json({
+        success: false,
+        error: "serverOrderId is required",
+        message: "Payment must be tied to a server-created order",
+      });
+    }
+
+    if (!accessToken) {
+      return res.status(401).json({
+        success: false,
+        error: "Token required",
+        message: "Order access token is required to capture payment",
+      });
+    }
+
+    const boundOrders = await sql`
+      SELECT * FROM orders
+      WHERE id = ${serverOrderId}
+      AND paypal_order_id = ${paypalOrderId}
+      LIMIT 1
+    `;
+
+    if (!boundOrders || boundOrders.length === 0) {
+      return res.status(403).json({
+        success: false,
+        error: "Order binding mismatch",
+        message: "PayPal order is not linked to the provided server order",
+      });
+    }
+
+    const boundOrder = boundOrders[0];
+
+    if (!orderAccessMatches(boundOrder.access_token_hash as string, accessToken)) {
+      return res.status(403).json({
+        success: false,
+        error: "Invalid order access token",
+      });
+    }
+
+    if (boundOrder.payment_status === 'completed') {
+      return res.json({
+        success: true,
+        captureId: boundOrder.paypal_capture_id,
+        status: 'COMPLETED',
+        serverOrderId,
+        orderNumber: boundOrder.order_number,
+        cached: true,
+      });
+    }
+
+    if (boundOrder.payment_status !== 'pending') {
+      return res.status(409).json({
+        success: false,
+        error: "Order is not awaiting payment",
+      });
+    }
+
+    const captureClaim = await claimIdempotencyKey(idempotencyKey, 'capture_payment', 15);
+    if (captureClaim.type === 'completed') {
+      logger.info(`Returning cached capture result for ${idempotencyKey}`);
+      return res.json({ ...captureClaim.response, cached: true });
+    }
+    if (captureClaim.type === 'in_progress') {
+      return res.status(409).json({
+        success: false,
+        error: "Payment capture already in progress",
+        message: "Please wait for the current capture to complete",
+      });
+    }
+    if (captureClaim.type === 'failed') {
+      if (boundOrder.payment_status === 'pending') {
+        const reclaimed = await reclaimFailedIdempotencyKey(idempotencyKey, 15);
+        if (!reclaimed) {
+          return res.status(409).json({
+            success: false,
+            error: "Previous capture attempt failed",
+            message: captureClaim.error,
+          });
+        }
+      } else {
         return res.status(409).json({
           success: false,
-          error: "Payment capture already in progress",
-          message: "Please wait for the current capture to complete",
-        });
-      }
-      if (existingAttempt.status === 'completed' && existingAttempt.captureId) {
-        console.log(`Returning cached capture result for ${idempotencyKey}`);
-        return res.json({
-          success: true,
-          captureId: existingAttempt.captureId,
-          status: 'COMPLETED',
-          cached: true,
+          error: "Previous capture attempt failed",
+          message: captureClaim.error,
         });
       }
     }
 
-    // Mark as processing
-    captureAttempts.set(idempotencyKey, { status: 'processing', timestamp: Date.now() });
+    logger.info("Capturing PayPal payment:", paypalOrderId, "for server order:", serverOrderId);
 
-    console.log("Capturing PayPal payment:", orderId);
+    type ResolvedCaptureDetails = Awaited<ReturnType<typeof fetchPayPalOrderCaptureDetails>>;
 
-    const data = await withRetry(async () => {
-      const accessToken = await getPayPalAccessToken();
+    const captureResult = await withRetry(async () => {
+      const accessTokenPayPal = await getPayPalAccessToken();
 
-      const response = await paypalFetch(`${PAYPAL_API}/v2/checkout/orders/${orderId}/capture`, {
+      const response = await paypalFetch(`${PAYPAL_API}/v2/checkout/orders/${paypalOrderId}/capture`, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${accessToken}`,
+          Authorization: `Bearer ${accessTokenPayPal}`,
           "Content-Type": "application/json",
           "PayPal-Request-Id": idempotencyKey,
         },
       });
 
-      // Handle specific PayPal errors
       if (response.status === 422) {
-        // Order already captured or invalid state
         const errorData = await parseJson<any>(response);
         const issue = errorData?.details?.[0]?.issue;
-        
+
         if (issue === 'ORDER_ALREADY_CAPTURED') {
-          // Return success for already captured orders
-          console.log(`Order ${orderId} was already captured`);
-          return { id: orderId, status: 'COMPLETED', alreadyCaptured: true };
+          logger.info(`Order ${paypalOrderId} was already captured — resolving capture details`);
+          const resolved = await fetchPayPalOrderCaptureDetails(paypalOrderId);
+          if (!resolved.captureId) {
+            throw new Error('Order already captured but capture ID could not be resolved');
+          }
+          return {
+            data: {
+              ...resolved.data,
+              status: 'COMPLETED',
+              alreadyCaptured: true,
+            },
+            resolved,
+          };
         }
-        
+
         throw new Error(`PayPal Error: ${issue || 'Unprocessable Entity'}`);
       }
 
       if (!response.ok) {
         const errorData = await parseJson<any>(response);
-        console.error("PayPal Capture Error:", errorData);
+        logger.error("PayPal Capture Error:", errorData);
         throw new Error(`PayPal Capture Error: ${response.status} - ${JSON.stringify(errorData)}`);
       }
 
-      return await parseJson<PayPalCaptureResponse>(response);
+      return {
+        data: await parseJson<PayPalCaptureResponse>(response),
+        resolved: null as ResolvedCaptureDetails | null,
+      };
     }, { retries: 3, baseMs: 200 });
 
-    // Mark as completed
-    captureAttempts.set(idempotencyKey, { 
-      status: 'completed', 
-      timestamp: Date.now(),
-      captureId: data.id,
-    });
+    const data = captureResult.data;
+    const resolvedAlreadyCaptured = captureResult.resolved;
 
-    console.log("✅ Payment captured:", data?.id);
+    const capturedAmount =
+      resolvedAlreadyCaptured?.capturedAmount ??
+      extractPayPalCaptureAmount(data as Record<string, any>);
+    const expectedTotal = parseFloat(boundOrder.total?.toString() || '0');
 
-    res.json({
+    if (capturedAmount != null && !amountsMatch(expectedTotal, capturedAmount)) {
+      logger.error("❌ PayPal capture amount mismatch:", {
+        expected: expectedTotal,
+        captured: capturedAmount,
+        serverOrderId,
+        paypalOrderId,
+      });
+
+      const mismatchCaptureId =
+        resolvedAlreadyCaptured?.captureId ||
+        (data as any).purchase_units?.[0]?.payments?.captures?.[0]?.id ||
+        (data as any).id ||
+        null;
+
+      if (mismatchCaptureId) {
+        await revertCaptureAmountMismatch(serverOrderId, mismatchCaptureId);
+      } else {
+        await cancelPendingOrderAndRestoreStock(serverOrderId).catch(() => {});
+      }
+
+      await failIdempotencyKey(idempotencyKey).catch(() => {});
+      return res.status(400).json({
+        success: false,
+        error: "Payment amount mismatch",
+        message: "Payment was reversed because the captured amount did not match your order total",
+      });
+    }
+
+    const captureId =
+      resolvedAlreadyCaptured?.captureId ||
+      (data as any).purchase_units?.[0]?.payments?.captures?.[0]?.id ||
+      (data as any).id ||
+      null;
+
+    const { updated, order: updatedOrder } = await completeOrderPaymentCapture(
+      serverOrderId,
+      captureId
+    );
+
+    if (!updatedOrder) {
+      await failIdempotencyKey(idempotencyKey).catch(() => {});
+      return res.status(500).json({
+        success: false,
+        error: "Order not found after capture",
+      });
+    }
+
+    if (!updated && updatedOrder.payment_status === 'completed') {
+      const cachedResponse = {
+        success: true,
+        captureId: updatedOrder.paypal_capture_id,
+        status: 'COMPLETED',
+        serverOrderId,
+        orderNumber: updatedOrder.order_number,
+        cached: true,
+      };
+      await completeIdempotencyKey(idempotencyKey, cachedResponse, {
+        serverOrderId,
+        paypalOrderId,
+      });
+      return res.json(cachedResponse);
+    }
+
+    const items =
+      typeof updatedOrder.items === 'string' ? JSON.parse(updatedOrder.items) : updatedOrder.items;
+    const shippingAddress =
+      typeof updatedOrder.shipping_address === 'string'
+        ? JSON.parse(updatedOrder.shipping_address)
+        : updatedOrder.shipping_address;
+
+    const reservedCoupon = await getCouponForOrder(serverOrderId);
+    if (reservedCoupon && couponId && couponId !== reservedCoupon.coupon_id) {
+      logger.warn('Capture couponId does not match reserved coupon; using reservation', {
+        serverOrderId,
+      });
+    }
+
+    const orderRecord = updatedOrder as Record<string, unknown>;
+
+    if (accessToken) {
+      emailService.sendOrderConfirmation({
+        customerName: String(orderRecord.customer_name),
+        customerEmail: String(orderRecord.customer_email),
+        orderNumber: String(orderRecord.order_number),
+        items: items.map((item: any) => ({
+          product_name: item.product_name,
+          product_image: item.product_image || item.image,
+          quantity: item.quantity,
+          price: parseFloat(item.price?.toString() || '0'),
+          size_value: item.size_value,
+          size_system: item.size_system,
+        })),
+        subtotal: parseFloat(String(orderRecord.subtotal ?? '0')),
+        shipping_cost: parseFloat(String(orderRecord.shipping_cost ?? '0')),
+        tax: parseFloat(String(orderRecord.tax ?? '0')),
+        total: parseFloat(String(orderRecord.total ?? '0')),
+        shippingAddress,
+        orderDate: new Date().toISOString(),
+        accessToken,
+      }).catch((err) => logger.error('Confirmation email error after capture:', err));
+    }
+
+    logger.info("✅ Payment captured and order updated:", captureId);
+
+    const captureResponse = {
       success: true,
-      captureId: data.id,
-      status: data.status,
+      captureId,
+      status: data.status || 'COMPLETED',
+      serverOrderId,
+      orderNumber: updatedOrder.order_number,
+      order: {
+        id: updatedOrder.id,
+        order_number: updatedOrder.order_number,
+        total: parseFloat(updatedOrder.total?.toString() || '0'),
+        status: updatedOrder.status,
+        payment_status: updatedOrder.payment_status,
+        items,
+        shipping_address: shippingAddress,
+      },
       payer: (data as any).payer,
-      purchase_units: (data as any).purchase_units,
+    };
+
+    await completeIdempotencyKey(idempotencyKey, captureResponse, {
+      serverOrderId,
+      paypalOrderId,
     });
+
+    res.json(captureResponse);
   } catch (error: any) {
-    console.error("❌ Capture payment error:", error);
-    
-    // Remove from processing state on error
-    const idempotencyKey = req.headers['x-idempotency-key'] as string || req.params.orderId;
-    captureAttempts.delete(idempotencyKey);
-    
+    logger.error("❌ Capture payment error:", error);
+
+    const failedKey = req.headers['x-idempotency-key'] as string || req.params.orderId;
+    await failIdempotencyKey(failedKey).catch(() => {});
+
     res.status(500).json({
       success: false,
       error: error.message || "Failed to capture payment",
@@ -773,8 +1088,72 @@ app.post("/api/paypal/capture-payment/:orderId", async (req: Request, res: Respo
   }
 });
 
-// Get Order Details
-app.get("/api/paypal/order/:orderId", async (req: Request, res: Response) => {
+// Recover checkout context after PayPal redirect (when localStorage is unavailable)
+app.get("/api/paypal/checkout-context/:paypalOrderId", async (req: Request, res: Response) => {
+  try {
+    const { paypalOrderId } = req.params;
+    const accessToken = getOrderAccessTokenFromRequest(req);
+
+    if (!paypalOrderId) {
+      return res.status(400).json({ success: false, error: 'PayPal order ID is required' });
+    }
+
+    if (!accessToken) {
+      return res.status(401).json({
+        success: false,
+        error: 'Token required',
+        message: 'Order access token is required',
+      });
+    }
+
+    const rows = await sql`
+      SELECT id, order_number, payment_status, total, paypal_order_id, access_token_hash
+      FROM orders
+      WHERE paypal_order_id = ${paypalOrderId}
+      LIMIT 1
+    `;
+
+    if (!rows.length) {
+      return res.status(404).json({ success: false, error: 'Order not found' });
+    }
+
+    const order = rows[0];
+
+    if (!orderAccessMatches(order.access_token_hash as string, accessToken)) {
+      return res.status(403).json({ success: false, error: 'Invalid order access token' });
+    }
+
+    if (order.payment_status === 'completed') {
+      return res.json({
+        success: true,
+        alreadyCompleted: true,
+        serverOrderId: order.id,
+        orderNumber: order.order_number,
+      });
+    }
+
+    const coupon = await getCouponForOrder(order.id as string);
+
+    res.json({
+      success: true,
+      serverOrderId: order.id,
+      orderNumber: order.order_number,
+      total: parseFloat(order.total?.toString() || '0'),
+      paypalOrderId: order.paypal_order_id,
+      couponId: coupon?.coupon_id,
+      discount_amount: coupon?.discount_amount,
+    });
+  } catch (error: unknown) {
+    logger.error('Checkout context error:', error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to load checkout context',
+    });
+  }
+});
+
+// Get Order Details (admin only)
+app.get("/api/paypal/order/:orderId", verifyAdmin, async (req: Request, res: Response) => {
   try {
     const { orderId } = req.params;
 
@@ -807,7 +1186,7 @@ app.get("/api/paypal/order/:orderId", async (req: Request, res: Response) => {
       order: data,
     });
   } catch (error: any) {
-    console.error("Get order error:", error);
+    logger.error("Get order error:", error);
     res.status(500).json({
       success: false,
       error: error.message || "Failed to get order details",
@@ -815,11 +1194,11 @@ app.get("/api/paypal/order/:orderId", async (req: Request, res: Response) => {
   }
 });
 
-// Refund Payment
-app.post("/api/paypal/refund/:captureId", async (req: Request, res: Response) => {
+// Refund Payment (admin only — unauthenticated access allowed refunds for any capture ID)
+app.post("/api/paypal/refund/:captureId", verifyAdmin, async (req: Request, res: Response) => {
   try {
     const { captureId } = req.params;
-    const { amount, currency } = req.body;
+    const { amount, currency = 'USD' } = req.body;
 
     if (!captureId) {
       return res.status(400).json({
@@ -828,294 +1207,72 @@ app.post("/api/paypal/refund/:captureId", async (req: Request, res: Response) =>
       });
     }
 
-    // Get access token
-    const accessToken = await getPayPalAccessToken();
+    const headerKey = (req.headers['x-idempotency-key'] as string | undefined)?.trim();
+    const idempotencyKey =
+      headerKey && headerKey.length >= 8
+        ? headerKey
+        : `admin-refund-${captureId}-${amount || 'remaining'}`;
 
-    const refundPayload: any = {};
-
-    if (amount && currency) {
-      refundPayload.amount = {
-        currency_code: currency,
-        value: amount,
-      };
+    const validation = await validateAdminRefundAmount(captureId, amount, currency);
+    if (!validation.ok) {
+      return res.status(validation.status).json({
+        success: false,
+        error: validation.error,
+        message: validation.message,
+      });
     }
+
+    const { refundAmount, orderTotal, priorRefunded } = validation.data;
+    const accessToken = await getPayPalAccessToken();
 
     const response = await paypalFetch(`${PAYPAL_API}/v2/payments/captures/${captureId}/refund`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
+        "PayPal-Request-Id": idempotencyKey,
       },
-      body: JSON.stringify(refundPayload),
+      body: JSON.stringify({
+        amount: {
+          currency_code: currency,
+          value: refundAmount,
+        },
+      }),
     });
 
     if (!response.ok) {
       const errorData = await parseJson<any>(response);
-      console.error("Refund Error:", errorData);
+      logger.error("Refund Error:", errorData);
       throw new Error(`Refund failed: ${response.status}`);
     }
 
     const data = await parseJson<PayPalRefundResponse>(response);
 
-    console.log("✅ Refund processed:", data?.id);
+    logger.info("✅ Refund processed:", data?.id);
+
+    const resolvedRefundAmount = data.amount?.value || refundAmount;
+    const cumulativeAfter = priorRefunded + parseFloat(resolvedRefundAmount);
+    const fullRefund = isFullRefundAmount(orderTotal, cumulativeAfter.toFixed(2));
+
+    const orderSync = await syncOrderAfterRefund(captureId, {
+      fullRefund,
+      refundAmount: resolvedRefundAmount,
+      dedupeKey: data.id ? buildPayPalRefundDedupeKey(data.id) : undefined,
+      source: 'admin_api',
+    });
 
     res.json({
       success: true,
       refundId: data.id,
       status: data.status,
+      order: orderSync,
     });
   } catch (error: any) {
-    console.error("Refund error:", error);
+    logger.error("Refund error:", error);
     res.status(500).json({
       success: false,
       error: error.message || "Failed to process refund",
     });
-  }
-});
-
-// PayPal Webhook Signature Verification
-async function verifyPayPalWebhook(
-  req: Request,
-  webhookId: string
-): Promise<{ verified: boolean; error?: string }> {
-  try {
-    const accessToken = await getPayPalAccessToken();
-    
-    // Get PayPal headers for verification
-    const transmissionId = req.headers['paypal-transmission-id'] as string;
-    const transmissionTime = req.headers['paypal-transmission-time'] as string;
-    const certUrl = req.headers['paypal-cert-url'] as string;
-    const authAlgo = req.headers['paypal-auth-algo'] as string;
-    const transmissionSig = req.headers['paypal-transmission-sig'] as string;
-
-    // Check if all required headers are present
-    if (!transmissionId || !transmissionTime || !certUrl || !authAlgo || !transmissionSig) {
-      console.warn("⚠️ Missing PayPal webhook headers");
-      return { verified: false, error: "Missing required PayPal headers" };
-    }
-
-    // Verify the webhook signature with PayPal
-    const verifyResponse = await paypalFetch(`${PAYPAL_API}/v1/notifications/verify-webhook-signature`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify({
-        auth_algo: authAlgo,
-        cert_url: certUrl,
-        transmission_id: transmissionId,
-        transmission_sig: transmissionSig,
-        transmission_time: transmissionTime,
-        webhook_id: webhookId,
-        webhook_event: req.body,
-      }),
-    });
-
-    if (!verifyResponse.ok) {
-      const errorText = await verifyResponse.text();
-      console.error("PayPal verification API error:", errorText);
-      return { verified: false, error: "PayPal verification API error" };
-    }
-
-    const verifyResult = await verifyResponse.json() as { verification_status: string };
-    
-    if (verifyResult.verification_status === "SUCCESS") {
-      console.log("✅ PayPal webhook signature verified");
-      return { verified: true };
-    } else {
-      console.warn("⚠️ PayPal webhook verification failed:", verifyResult.verification_status);
-      return { verified: false, error: `Verification status: ${verifyResult.verification_status}` };
-    }
-  } catch (error: any) {
-    console.error("Webhook verification error:", error);
-    return { verified: false, error: error.message };
-  }
-}
-
-// Webhook endpoint for PayPal notifications
-app.post("/api/paypal/webhook", async (req: Request, res: Response) => {
-  try {
-    const webhookId = process.env.PAYPAL_WEBHOOK_ID;
-    const webhookEvent = req.body;
-
-    console.log("📨 PayPal Webhook Event:", webhookEvent?.event_type);
-
-    // Verify webhook signature if PAYPAL_WEBHOOK_ID is configured
-    if (webhookId) {
-      const verification = await verifyPayPalWebhook(req, webhookId);
-      
-      if (!verification.verified) {
-        console.error("❌ Webhook verification failed:", verification.error);
-        // Return 200 to prevent PayPal from retrying, but log the issue
-        // In production, you might want to alert on this
-        return res.status(401).json({ 
-          error: "Webhook verification failed",
-          message: verification.error 
-        });
-      }
-    } else {
-      // Log warning if webhook ID is not configured (development mode)
-      console.warn("⚠️ PAYPAL_WEBHOOK_ID not configured - skipping signature verification");
-      console.warn("⚠️ This is a security risk in production!");
-    }
-
-    // Handle different webhook events
-    switch (webhookEvent?.event_type) {
-      case "PAYMENT.CAPTURE.COMPLETED": {
-        console.log("✅ Payment completed:", webhookEvent.resource?.id);
-        const captureId = webhookEvent.resource?.id;
-        const orderId = webhookEvent.resource?.supplementary_data?.related_ids?.order_id;
-        
-        if (orderId) {
-          try {
-            // Check if order exists
-            const existingOrder = await sql`
-              SELECT id, status, items FROM orders WHERE paypal_order_id = ${orderId}
-            `;
-            
-            if (existingOrder && existingOrder.length > 0) {
-              // Update order status - use 'processing' as valid status
-              await sql`
-                UPDATE orders 
-                SET payment_status = 'completed', 
-                    status = CASE WHEN status = 'pending' THEN 'processing' ELSE status END,
-                    paypal_capture_id = ${captureId},
-                    updated_at = NOW()
-                WHERE paypal_order_id = ${orderId}
-              `;
-              console.log(`📦 Order ${orderId} payment completed, status updated to processing`);
-            } else {
-              console.warn(`⚠️ Order not found for PayPal order ID: ${orderId}`);
-            }
-          } catch (dbError) {
-            console.error("Database update error:", dbError);
-          }
-        }
-        break;
-      }
-
-      case "PAYMENT.CAPTURE.DENIED": {
-        console.log("❌ Payment denied:", webhookEvent.resource?.id);
-        const deniedOrderId = webhookEvent.resource?.supplementary_data?.related_ids?.order_id;
-        
-        if (deniedOrderId) {
-          try {
-            // Check if order exists and get items for inventory restore
-            const existingOrder = await sql`
-              SELECT id, status, items FROM orders WHERE paypal_order_id = ${deniedOrderId}
-            `;
-            
-            if (existingOrder && existingOrder.length > 0) {
-              const order = existingOrder[0];
-              const items = typeof order.items === 'string' ? JSON.parse(order.items) : order.items;
-              
-              // Restore inventory since payment failed
-              for (const item of items) {
-                await sql`
-                  UPDATE products 
-                  SET stock = stock + ${item.quantity},
-                      is_out_of_stock = FALSE,
-                      updated_at = NOW()
-                  WHERE id = ${item.product_id}
-                `;
-              }
-              console.log(`📦 Inventory restored for denied order ${deniedOrderId}`);
-              
-              await sql`
-                UPDATE orders 
-                SET payment_status = 'failed', 
-                    status = 'cancelled',
-                    updated_at = NOW()
-                WHERE paypal_order_id = ${deniedOrderId}
-              `;
-              console.log(`📦 Order ${deniedOrderId} marked as failed/cancelled`);
-            } else {
-              console.warn(`⚠️ Order not found for PayPal order ID: ${deniedOrderId}`);
-            }
-          } catch (dbError) {
-            console.error("Database update error:", dbError);
-          }
-        }
-        break;
-      }
-
-      case "PAYMENT.CAPTURE.REFUNDED": {
-        console.log("💰 Payment refunded:", webhookEvent.resource?.id);
-        const refundedOrderId = webhookEvent.resource?.supplementary_data?.related_ids?.order_id;
-        
-        if (refundedOrderId) {
-          try {
-            // Check if order exists
-            const existingOrder = await sql`
-              SELECT id, status, items FROM orders WHERE paypal_order_id = ${refundedOrderId}
-            `;
-            
-            if (existingOrder && existingOrder.length > 0) {
-              const order = existingOrder[0];
-              const items = typeof order.items === 'string' ? JSON.parse(order.items) : order.items;
-              
-              // Restore inventory on refund (if not already cancelled)
-              if (order.status !== 'cancelled') {
-                for (const item of items) {
-                  await sql`
-                    UPDATE products 
-                    SET stock = stock + ${item.quantity},
-                        is_out_of_stock = FALSE,
-                        updated_at = NOW()
-                    WHERE id = ${item.product_id}
-                  `;
-                }
-                console.log(`📦 Inventory restored for refunded order ${refundedOrderId}`);
-              }
-              
-              // Update payment_status to refunded, keep status as cancelled (valid state)
-              await sql`
-                UPDATE orders 
-                SET payment_status = 'refunded', 
-                    status = 'cancelled',
-                    updated_at = NOW()
-                WHERE paypal_order_id = ${refundedOrderId}
-              `;
-              console.log(`📦 Order ${refundedOrderId} marked as refunded`);
-            } else {
-              console.warn(`⚠️ Order not found for PayPal order ID: ${refundedOrderId}`);
-            }
-          } catch (dbError) {
-            console.error("Database update error:", dbError);
-          }
-        }
-        break;
-      }
-
-      case "CHECKOUT.ORDER.APPROVED": {
-        console.log("👍 Checkout approved:", webhookEvent.resource?.id);
-        const approvedOrderId = webhookEvent.resource?.id;
-        
-        // Log for tracking - actual capture happens on frontend callback
-        if (approvedOrderId) {
-          console.log(`📦 Checkout approved for PayPal order: ${approvedOrderId}, awaiting capture`);
-        }
-        break;
-      }
-
-      case "CHECKOUT.ORDER.COMPLETED": {
-        console.log("✅ Checkout completed:", webhookEvent.resource?.id);
-        // This event indicates the full checkout flow is complete
-        // Order should already be updated by PAYMENT.CAPTURE.COMPLETED
-        break;
-      }
-
-      default:
-        console.log("ℹ️ Unhandled event type:", webhookEvent?.event_type);
-    }
-
-    res.status(200).json({ received: true });
-  } catch (error: any) {
-    console.error("Webhook error:", error);
-    // Return 200 to prevent PayPal from retrying failed webhooks
-    // Log the error for investigation
-    res.status(200).json({ received: true, error: "Processing error logged" });
   }
 });
 
@@ -1130,7 +1287,12 @@ app.use((req: Request, res: Response) => {
 
 // Error handling middleware - MUST have 4 parameters
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
-  console.error("💥 Server error:", err);
+  logger.error({ err }, 'Unhandled server error');
+  captureException(err, {
+    requestId: req.requestId,
+    method: req.method,
+    path: req.path,
+  });
 
   res.status(500).json({
     success: false,
@@ -1140,95 +1302,91 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   });
 });
 
-// Start server
-const PORT = process.env.PORT || 5000;
-const HTTPS_PORT = process.env.HTTPS_PORT || 443;
-const sslConfig = getSSLConfig();
+// Start server only when run directly (not when imported by tests)
+export { app };
 
-// Create appropriate server based on SSL configuration
-let server: ReturnType<typeof app.listen>;
+let server: ReturnType<typeof app.listen> | undefined;
 
-if (sslConfig && isProduction) {
-  // HTTPS server for production with SSL certificates
-  server = https.createServer(sslConfig, app).listen(HTTPS_PORT, () => {
-    console.log("╔════════════════════════════════════════╗");
-    console.log("║   🔒 HTTPS Server Running!            ║");
-    console.log("╚════════════════════════════════════════╝");
-    console.log(`📍 HTTPS Port: ${HTTPS_PORT}`);
-    console.log(`🔐 SSL: Enabled`);
-    console.log(`🌍 Frontend: ${process.env.FRONTEND_URL || "https://localhost"}`);
-    console.log(`💳 PayPal Mode: ${process.env.PAYPAL_MODE || "sandbox"}`);
-    console.log(`🔗 PayPal API: ${PAYPAL_API}`);
-    console.log(`⏰ Started: ${new Date().toLocaleString()}`);
-  });
-  
-  // Also start HTTP server to redirect to HTTPS
-  app.listen(PORT, () => {
-    console.log(`📍 HTTP Port: ${PORT} (redirecting to HTTPS)`);
-  });
-} else {
-  // HTTP server for development or when SSL is not configured
-  server = app.listen(PORT, () => {
-    console.log("╔════════════════════════════════════════╗");
-    console.log("║   🚀 Server Running Successfully!     ║");
-    console.log("╚════════════════════════════════════════╝");
-    console.log(`📍 Port: ${PORT}`);
-    if (isProduction && !sslConfig) {
-      console.log(`⚠️  WARNING: Running in production without SSL!`);
-      console.log(`   Set SSL_KEY_PATH and SSL_CERT_PATH for HTTPS`);
+if (require.main === module) {
+  bootstrap()
+    .then(() => {
+      startMaintenanceJobs();
+      server = startHttpServer();
+      registerGracefulShutdown(server);
+    })
+    .catch((err) => {
+      logger.error('Startup failed:', err);
+      process.exit(1);
+    });
+}
+
+async function bootstrap(): Promise<void> {
+  if (process.env.REDIS_URL?.trim()) {
+    try {
+      await connectRedis();
+    } catch (err) {
+      if (isProduction) {
+        logger.error('Redis connection failed in production:', err);
+        throw err;
+      }
+      logger.warn('Redis connection failed (cache/rate limits use fallback):', err);
     }
-    console.log(`🌍 Frontend: ${process.env.FRONTEND_URL || "http://localhost:5173"}`);
-    console.log(`💳 PayPal Mode: ${process.env.PAYPAL_MODE || "sandbox"}`);
-    console.log(`🔗 PayPal API: ${PAYPAL_API}`);
-    console.log(`⏰ Started: ${new Date().toLocaleString()}`);
-    console.log("");
-    console.log("📋 Available endpoints:");
-    console.log("   GET  /api/health");
-    console.log("");
-    console.log("   💳 PayPal Endpoints:");
-    console.log("   GET  /api/paypal/test");
-    console.log("   POST /api/paypal/create-payment");
-    console.log("   POST /api/paypal/capture-payment/:orderId");
-    console.log("   GET  /api/paypal/order/:orderId");
-    console.log("   POST /api/paypal/refund/:captureId");
-    console.log("   POST /api/paypal/webhook");
-    console.log("");
-    console.log("   📦 Product Endpoints:");
-    console.log("   GET    /api/products");
-    console.log("   GET    /api/products/:id");
-    console.log("   POST   /api/products");
-    console.log("   PUT    /api/products/:id");
-    console.log("   DELETE /api/products/:id");
-    console.log("");
-    console.log("   📋 Order Endpoints:");
-    console.log("   GET    /api/orders");
-    console.log("   POST   /api/orders");
-    console.log("   GET    /api/orders/:id");
-    console.log("   PUT    /api/orders/:id");
-    console.log("   PATCH  /api/orders/:id/status");
-    console.log("");
-    console.log("   📧 Contact Endpoints:");
-    console.log("   GET    /api/contact");
-    console.log("   POST   /api/contact");
-    console.log("   GET    /api/contact/:id");
-    console.log("");
-    console.log("✅ Ready to accept connections!");
-    console.log("════════════════════════════════════════");
+  }
+  await ensureIdempotencyTable();
+  await ensureOrderPaymentSchema();
+  await warmCaches();
+}
+
+function startHttpServer() {
+  const PORT = process.env.PORT || 5000;
+  const HTTPS_PORT = process.env.HTTPS_PORT || 443;
+  const sslConfig = getSSLConfig();
+
+  if (sslConfig && isProduction) {
+    const httpsServer = https.createServer(sslConfig, app).listen(HTTPS_PORT, () => {
+      logServerBanner('HTTPS', HTTPS_PORT, true);
+    });
+    app.listen(PORT, () => {
+      logger.info(`📍 HTTP Port: ${PORT} (redirecting to HTTPS)`);
+    });
+    return httpsServer;
+  }
+
+  return app.listen(PORT, () => {
+    logServerBanner('HTTP', PORT, false);
   });
 }
 
-// Graceful shutdown
-process.on("SIGTERM", () => {
-  console.log("SIGTERM signal received: closing HTTP server");
-  server.close(() => {
-    console.log("HTTP server closed");
-  });
-});
+function logServerBanner(mode: string, port: number | string, sslEnabled: boolean) {
+  const title = sslEnabled ? '🔒 HTTPS Server Running!' : '🚀 Server Running Successfully!';
+  logger.info('╔════════════════════════════════════════╗');
+  logger.info(`║   ${title.padEnd(36)}║`);
+  logger.info('╚════════════════════════════════════════╝');
+  logger.info(`📍 ${mode} Port: ${port}`);
+  if (isProduction && !sslEnabled && mode === 'HTTP') {
+    logger.info('⚠️  WARNING: Running in production without SSL!');
+  }
+  logger.info(`🌍 Frontend: ${process.env.FRONTEND_URL || 'http://localhost:5173'}`);
+  logger.info(`💳 PayPal Mode: ${process.env.PAYPAL_MODE || 'sandbox'}`);
+  logger.info(`🔗 PayPal API: ${PAYPAL_API}`);
+  logger.info(`⏰ Started: ${new Date().toLocaleString()}`);
+}
 
-process.on("SIGINT", () => {
-  console.log("SIGINT signal received: closing HTTP server");
-  server.close(() => {
-    console.log("HTTP server closed");
+function registerGracefulShutdown(httpServer: ReturnType<typeof app.listen>) {
+  const closeServer = () => {
+    httpServer.close(() => {
+      logger.info('HTTP server closed');
+    });
+  };
+
+  process.on('SIGTERM', () => {
+    logger.info('SIGTERM signal received: closing HTTP server');
+    closeServer();
+  });
+
+  process.on('SIGINT', () => {
+    logger.info('SIGINT signal received: closing HTTP server');
+    closeServer();
     process.exit(0);
   });
-});
+}

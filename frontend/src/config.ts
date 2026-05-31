@@ -1,4 +1,4 @@
-import { getCsrfToken, initCsrfToken } from './utils/csrf';
+import { getCsrfToken, initCsrfToken, resetCsrfSession, setCsrfToken, fetchCsrfToken } from './utils/csrf';
 
 export const config = {
   apiBaseUrl: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api',
@@ -18,6 +18,12 @@ export interface ApiFetchOptions extends RequestInit {
 }
 
 let csrfInitialized = false;
+
+export const resetCsrfInitialization = (): void => {
+  resetCsrfSession();
+  csrfInitialized = false;
+};
+
 export const ensureCsrfToken = async (): Promise<void> => {
   if (!csrfInitialized) {
     await initCsrfToken(config.apiBaseUrl);
@@ -60,8 +66,28 @@ async function fetchWithTimeout(
   }
 }
 
+async function isCsrfForbidden(response: Response): Promise<boolean> {
+  if (response.status !== 403) return false;
+  try {
+    const data = await response.clone().json();
+    const errorText = String(data.error || data.message || '').toLowerCase();
+    return errorText.includes('csrf');
+  } catch {
+    return false;
+  }
+}
+
+async function refreshCsrfToken(): Promise<void> {
+  resetCsrfInitialization();
+  const token = await fetchCsrfToken(config.apiBaseUrl);
+  if (token) {
+    setCsrfToken(token);
+  }
+  csrfInitialized = true;
+}
+
 /**
- * API fetch with CSRF, 15s default timeout, and optional retry on gateway errors.
+ * API fetch with CSRF, 15s default timeout, optional gateway retry, and CSRF 403 refresh.
  */
 export const apiFetch = async (
   endpoint: string,
@@ -71,19 +97,28 @@ export const apiFetch = async (
 
   const { timeoutMs = config.apiTimeoutMs, retry, ...fetchOptions } = options;
   const url = endpoint.startsWith('http') ? endpoint : `${config.apiBaseUrl}${endpoint}`;
-  const init: RequestInit = {
+
+  const buildInit = (): RequestInit => ({
     ...fetchOptions,
     headers: getApiHeaders(fetchOptions.headers as Record<string, string>),
     credentials: 'include',
-  };
+  });
 
   const retryCount = retry?.count ?? 0;
   const retryOn = retry?.on ?? DEFAULT_RETRY_STATUSES;
   let lastError: Error | undefined;
+  let csrfRetried = false;
 
   for (let attempt = 0; attempt <= retryCount; attempt++) {
     try {
+      const init = buildInit();
       const response = await fetchWithTimeout(url, init, timeoutMs);
+
+      if (!csrfRetried && (await isCsrfForbidden(response))) {
+        csrfRetried = true;
+        await refreshCsrfToken();
+        return fetchWithTimeout(url, buildInit(), timeoutMs);
+      }
 
       if (
         retry &&

@@ -1,10 +1,12 @@
 //Home.tsx  
-import React, { useState, useRef, useEffect, lazy, Suspense } from "react";
+import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { motion, AnimatePresence, type Variants } from "framer-motion";
-import { ChevronLeft, ChevronRight, ShoppingCart, Check, X, HelpCircle, AlertTriangle } from "lucide-react";
+import { ChevronLeft, ChevronRight, ShoppingCart, Check, X, HelpCircle, AlertTriangle, Search } from "lucide-react";
 import { useCart, type SizeSystem } from "./CartContext";
 import { useNavigate } from "react-router-dom";
-import { useProducts, type Product } from "../hooks/useProducts";
+import { useProducts } from "../hooks/useProducts";
+import { useProductSearchSuggestions } from "../hooks/useProductSearchSuggestions";
+import ProductSearchBar from "../components/ProductSearchBar";
 import ErrorMessage from "../components/ErrorMessage";
 import LiquidButton from "../components/LiquidButton";
 import LiquidModal from "../components/LiquidModal";
@@ -66,6 +68,13 @@ export default function Home() {
   const startX = useRef<number | null>(null);
   const startY = useRef<number | null>(null);
   const navigate = useNavigate();
+  const {
+    searchQuery,
+    setSearchQuery,
+    suggestions,
+    loading: searchLoading,
+    clearSearch,
+  } = useProductSearchSuggestions();
 
   useEffect(() => {
     const checkLayout = () => {
@@ -393,6 +402,37 @@ export default function Home() {
           </a>
         )}
       </header>
+
+      {/* Unified product search (Fuse.js — same catalog as /products) */}
+      <div
+        style={{
+          position: 'relative',
+          zIndex: 10,
+          padding: isMobile ? '0 16px 12px' : '0 24px 16px',
+          maxWidth: 560,
+          margin: '0 auto',
+          width: '100%',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+          <Search size={16} color="rgba(255,255,255,0.75)" aria-hidden />
+          <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.75)', fontWeight: 500 }}>
+            Search our collection
+          </span>
+        </div>
+        <ProductSearchBar
+          variant="hero"
+          isMobile={isMobile}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          suggestions={suggestions}
+          loading={searchLoading}
+          clearSearch={clearSearch}
+          placeholder="Search shoes, colors, styles..."
+        />
+      </div>
+
+      {/* Hero / carousel section continues below */}
 
       {/* Main Content */}
       <main

@@ -1,11 +1,28 @@
 // frontend/src/utils/csrf.ts - CSRF Token Management for Frontend
 // Handles CSRF token retrieval and inclusion in API requests
 
+import { logError } from '../lib/logger';
+
 const CSRF_COOKIE_NAME = 'csrf_token';
 const CSRF_HEADER_NAME = 'X-CSRF-Token';
 
-// Get CSRF token from cookie
+/** In-memory token for cross-origin API setups (cookie lives on API host). */
+let memoryCsrfToken: string | null = null;
+
+export const setCsrfToken = (token: string | null): void => {
+  memoryCsrfToken = token;
+};
+
+export const resetCsrfSession = (): void => {
+  memoryCsrfToken = null;
+};
+
+// Get CSRF token from memory or same-origin cookie
 export const getCsrfToken = (): string | null => {
+  if (memoryCsrfToken) {
+    return memoryCsrfToken;
+  }
+
   const cookies = document.cookie.split(';');
   for (const cookie of cookies) {
     const [name, value] = cookie.trim().split('=');
@@ -29,19 +46,20 @@ export const fetchCsrfToken = async (apiBaseUrl: string): Promise<string | null>
       return data.csrfToken;
     }
   } catch (error) {
-    console.error('Failed to fetch CSRF token:', error);
+    logError('Failed to fetch CSRF token:', error);
   }
   return null;
 };
 
 // Initialize CSRF token (call on app load)
 export const initCsrfToken = async (apiBaseUrl: string): Promise<string | null> => {
-  // Check if token exists in cookie first
   let token = getCsrfToken();
   
   if (!token) {
-    // Fetch from server
     token = await fetchCsrfToken(apiBaseUrl);
+    if (token) {
+      setCsrfToken(token);
+    }
   }
   
   return token;
@@ -83,6 +101,7 @@ export const csrfFetch = async (
 
 export default {
   getCsrfToken,
+  setCsrfToken,
   fetchCsrfToken,
   initCsrfToken,
   getCsrfHeaders,

@@ -19,3 +19,11 @@ export const csrfCookieOptions = {
   maxAge: 24 * 60 * 60 * 1000,
   path: '/',
 };
+
+/** HttpOnly admin session cookie — set on login, cleared on logout. */
+export const ADMIN_SESSION_COOKIE = 'admin_session';
+
+export const adminSessionCookieOptions = {
+  ...secureCookieDefaults,
+  maxAge: 24 * 60 * 60 * 1000,
+};

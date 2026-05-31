@@ -1,4 +1,5 @@
 // backend/src/routes/products.ts
+import { logger } from '../lib/logger';
 import { Router, Request, Response } from 'express';
 import sql from '../lib/db';
 import { cached } from '../lib/cache';
@@ -66,7 +67,7 @@ router.get('/', async (req: Request, res: Response) => {
       pagination: payload.pagination,
     });
   } catch (error: any) {
-    console.error('Error fetching products:', error);
+    logger.error('Error fetching products:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to load products',
@@ -124,11 +125,40 @@ router.get('/filters', async (_req: Request, res: Response) => {
       }
     });
   } catch (error: any) {
-    console.error('Error fetching filter options:', error);
+    logger.error('Error fetching filter options:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to fetch filter options',
     });
+  }
+});
+
+// GET product paths for sitemap (must be registered before /:id)
+router.get('/sitemap-urls', async (_req: Request, res: Response) => {
+  try {
+    res.setHeader('Cache-Control', 'public, max-age=300');
+
+    const payload = await cached('products:sitemap-urls', 300_000, async () => {
+      const rows = await sql`
+        SELECT id, updated_at
+        FROM products
+        ORDER BY id ASC
+      `;
+      return (rows as unknown as Array<{ id: number; updated_at?: string }>).map((p) => ({
+        id: p.id,
+        path: `/product/${p.id}`,
+        updated_at: p.updated_at,
+      }));
+    });
+
+    res.json({
+      success: true,
+      data: payload,
+      count: payload.length,
+    });
+  } catch (error: any) {
+    logger.error('Error fetching sitemap URLs:', error);
+    res.status(500).json({ success: false, error: 'Failed to load sitemap URLs' });
   }
 });
 
@@ -161,7 +191,7 @@ router.get('/category/:category', async (req: Request, res: Response) => {
       pagination: paginationMeta(total, parsed.params),
     });
   } catch (error: any) {
-    console.error('Error fetching products by category:', error);
+    logger.error('Error fetching products by category:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to fetch products',
@@ -196,7 +226,7 @@ router.get('/:id', async (req: Request, res: Response) => {
       data: row,
     });
   } catch (error: any) {
-    console.error('Error fetching product:', error);
+    logger.error('Error fetching product:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to fetch product',
@@ -260,7 +290,7 @@ router.post('/', verifyAdmin, async (req: Request, res: Response) => {
       message: 'Product created successfully',
     });
   } catch (error: any) {
-    console.error('Error creating product:', error);
+    logger.error('Error creating product:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to create product',
@@ -311,7 +341,7 @@ router.put('/:id', verifyAdmin, async (req: Request, res: Response) => {
       message: 'Product updated successfully',
     });
   } catch (error: any) {
-    console.error('Error updating product:', error);
+    logger.error('Error updating product:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to update product',
@@ -344,7 +374,7 @@ router.delete('/:id', verifyAdmin, async (req: Request, res: Response) => {
       message: 'Product deleted successfully',
     });
   } catch (error: any) {
-    console.error('Error deleting product:', error);
+    logger.error('Error deleting product:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to delete product',
@@ -465,7 +495,7 @@ router.post('/search', async (req: Request, res: Response) => {
       }
     });
   } catch (error: any) {
-    console.error('Error searching products:', error);
+    logger.error('Error searching products:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to search products',

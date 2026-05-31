@@ -1,5 +1,7 @@
 // product360Images.ts - Utility for 360° product image management
 
+import { logWarn } from '../lib/logger';
+
 // Standard angles for 360° product photography
 export const STANDARD_ANGLES = [
   'front',
@@ -44,7 +46,7 @@ export const get360ImagePaths = (
 ): string[] => {
   const folder = PRODUCT_FOLDERS[productSlug];
   if (!folder) {
-    console.warn(`No folder mapping found for product: ${productSlug}`);
+    logWarn(`No folder mapping found for product: ${productSlug}`);
     return [];
   }
 

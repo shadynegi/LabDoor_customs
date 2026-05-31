@@ -1,63 +1,26 @@
-// Custom hook for searching and filtering products with debouncing
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+// Custom hook for client-side product search (Fuse.js) and filters
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { apiFetch } from '../config';
 import type { Product } from './useProducts';
+import { getProductCatalog } from '../lib/productCatalogCache';
+import {
+  createProductFuse,
+  fuseSearchProducts,
+  searchProductCatalog,
+  SUGGESTION_LIMIT,
+} from '../lib/productFuseSearch';
+import type { SearchFilters, FilterOptions, SortOption } from '../types/productSearch';
+import { logError } from '../lib/logger';
 
-// Import actual product images
-import blueNikeImg from "../assets/Shoe_Design/blue nike.png";
-import goldBlackNikeImg from "../assets/Shoe_Design/gold black nike.png";
-import pinkNikeImg from "../assets/Shoe_Design/pink nike.png";
-import blackBrownNikeImg from "../assets/Shoe_Design/black and brown nike.png";
-import brownPinkNikeImg from "../assets/Shoe_Design/brown pink nike.png";
-import blueBg from "../assets/Backgrounds/blue.png";
-import goldBg from "../assets/Backgrounds/gold.png";
-import pinkBg from "../assets/Backgrounds/pink.png";
-import brownBg from "../assets/Backgrounds/brown.png";
-import brownPinkBg from "../assets/Backgrounds/brown pink.png";
-
-// Map database image references to actual imported images
-const imageMap: Record<string, string> = {
-  '/assets/blue-nike.png': blueNikeImg,
-  '/assets/gold-black-nike.png': goldBlackNikeImg,
-  '/assets/pink-nike.png': pinkNikeImg,
-  '/assets/black-brown-nike.png': blackBrownNikeImg,
-  '/assets/brown-pink-nike.png': brownPinkNikeImg,
-};
-
-const backgroundMap: Record<string, string> = {
-  '/assets/blue-bg.png': blueBg,
-  '/assets/gold-bg.png': goldBg,
-  '/assets/pink-bg.png': pinkBg,
-  '/assets/brown-bg.png': brownBg,
-  '/assets/brown-pink-bg.png': brownPinkBg,
-};
-
-export type SortOption = 'default' | 'price_asc' | 'price_desc' | 'rating_desc' | 'newest' | 'oldest';
-
-export interface SearchFilters {
-  minPrice?: number;
-  maxPrice?: number;
-  category?: string;
-  size?: string;
-  color?: string;
-  minRating?: number;
-  sortBy?: SortOption;
-}
-
-export interface FilterOptions {
-  categories: string[];
-  sizes: string[];
-  colors: string[];
-  priceRange: { min: number; max: number };
-  ratingRange: { min: number; max: number; avg: number };
-  sortOptions: { value: SortOption; label: string }[];
-}
+export type { SearchFilters, FilterOptions, SortOption };
 
 interface UseProductSearchResult {
   searchQuery: string;
   setSearchQuery: (query: string) => void;
   results: Product[];
+  suggestions: Product[];
   loading: boolean;
+  catalogLoading: boolean;
   error: string | null;
   isSearching: boolean;
   isFiltering: boolean;
@@ -75,21 +38,22 @@ interface UseProductSearchResult {
 const DEFAULT_FILTERS: SearchFilters = {};
 
 /**
- * Hook to search and filter products with debouncing
- * Calls the backend search API after a delay to avoid excessive requests
+ * Client-side product search with Fuse.js typo tolerance.
+ * Catalog is fetched once and cached in localStorage for 15 minutes.
  */
 export const useProductSearch = (debounceMs: number = 300): UseProductSearchResult => {
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [catalog, setCatalog] = useState<Product[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(true);
   const [results, setResults] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<SearchFilters>(DEFAULT_FILTERS);
   const [filterOptions, setFilterOptions] = useState<FilterOptions | null>(null);
   const [loadingFilterOptions, setLoadingFilterOptions] = useState(false);
-  const abortControllerRef = useRef<AbortController | null>(null);
+  const fuseRef = useRef<ReturnType<typeof createProductFuse> | null>(null);
 
-  // Calculate active filter count (excluding sortBy which is always present)
   const activeFilterCount = useMemo(() => {
     let count = 0;
     if (filters.minPrice !== undefined) count++;
@@ -101,16 +65,43 @@ export const useProductSearch = (debounceMs: number = 300): UseProductSearchResu
     return count;
   }, [filters]);
 
-  // Check if any filters are active
-  const isFiltering = activeFilterCount > 0 || (filters.sortBy && filters.sortBy !== 'default');
+  const isFiltering = activeFilterCount > 0 || (filters.sortBy !== undefined && filters.sortBy !== 'default');
 
-  // Fetch available filter options on mount
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadCatalog = async () => {
+      try {
+        setCatalogLoading(true);
+        setError(null);
+        const products = await getProductCatalog();
+        if (!cancelled) {
+          setCatalog(products);
+          fuseRef.current = createProductFuse(products);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Failed to load products');
+          setCatalog([]);
+          fuseRef.current = null;
+        }
+      } finally {
+        if (!cancelled) setCatalogLoading(false);
+      }
+    };
+
+    loadCatalog();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   useEffect(() => {
     const fetchFilterOptions = async () => {
       try {
         setLoadingFilterOptions(true);
         const response = await apiFetch('/products/filters');
-        
+
         if (!response.ok) {
           throw new Error('Failed to fetch filter options');
         }
@@ -120,8 +111,7 @@ export const useProductSearch = (debounceMs: number = 300): UseProductSearchResu
           setFilterOptions(data.data);
         }
       } catch (err) {
-        console.error('Error fetching filter options:', err);
-        // Set default filter options on error
+        logError('Error fetching filter options:', err);
         setFilterOptions({
           categories: [],
           sizes: [],
@@ -134,8 +124,8 @@ export const useProductSearch = (debounceMs: number = 300): UseProductSearchResu
             { value: 'price_desc', label: 'Price: High to Low' },
             { value: 'rating_desc', label: 'Highest Rated' },
             { value: 'newest', label: 'Newest First' },
-            { value: 'oldest', label: 'Oldest First' }
-          ]
+            { value: 'oldest', label: 'Oldest First' },
+          ],
         });
       } finally {
         setLoadingFilterOptions(false);
@@ -145,7 +135,6 @@ export const useProductSearch = (debounceMs: number = 300): UseProductSearchResu
     fetchFilterOptions();
   }, []);
 
-  // Debounce the search query
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedQuery(searchQuery);
@@ -154,103 +143,65 @@ export const useProductSearch = (debounceMs: number = 300): UseProductSearchResu
     return () => clearTimeout(timer);
   }, [searchQuery, debounceMs]);
 
-  // Perform search when debounced query or filters change
+  const suggestions = useMemo(() => {
+    if (!searchQuery.trim() || !fuseRef.current) return [];
+    return fuseSearchProducts(fuseRef.current, searchQuery, SUGGESTION_LIMIT);
+  }, [searchQuery, catalog]);
+
   useEffect(() => {
-    const performSearch = async () => {
-      // If no query and no filters, clear results
-      const hasQuery = debouncedQuery.trim().length > 0;
-      const hasFilters = isFiltering;
-      
-      if (!hasQuery && !hasFilters) {
-        setResults([]);
-        setError(null);
-        return;
-      }
+    const hasQuery = debouncedQuery.trim().length > 0;
+    const hasFilters = isFiltering;
 
-      // Cancel any pending request
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
+    if (!hasQuery && !hasFilters) {
+      setResults([]);
+      setError(null);
+      setLoading(false);
+      return;
+    }
 
-      // Create new abort controller for this request
-      abortControllerRef.current = new AbortController();
+    if (catalogLoading) {
+      setLoading(true);
+      return;
+    }
 
-      try {
-        setLoading(true);
-        setError(null);
+    if (catalog.length === 0) {
+      setResults([]);
+      setLoading(false);
+      return;
+    }
 
-        const response = await apiFetch('/products/search', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            query: debouncedQuery || undefined,
-            ...filters,
-          }),
-          signal: abortControllerRef.current.signal,
-        });
+    setLoading(true);
+    setError(null);
 
-        if (!response.ok) {
-          throw new Error('Failed to search products');
-        }
+    try {
+      const nextResults = searchProductCatalog(
+        catalog,
+        debouncedQuery,
+        filters,
+        hasFilters
+      );
+      setResults(nextResults);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Search failed');
+      setResults([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [debouncedQuery, filters, isFiltering, catalog, catalogLoading]);
 
-        const data = await response.json();
-
-        if (data.success && data.data) {
-          // Map database image paths to actual imported images and convert price to number
-          const productsWithImages = data.data.map((product: Product) => ({
-            ...product,
-            price: typeof product.price === 'string' ? parseFloat(product.price) : product.price,
-            rating: typeof product.rating === 'string' ? parseFloat(product.rating) : (product.rating || 0),
-            review_count: typeof product.review_count === 'string' ? parseInt(String(product.review_count)) : (product.review_count || 0),
-            image: imageMap[product.image] || product.image,
-            background: product.background ? (backgroundMap[product.background] || product.background) : undefined,
-          }));
-          setResults(productsWithImages);
-        } else {
-          setResults([]);
-        }
-      } catch (err) {
-        // Ignore abort errors
-        if (err instanceof Error && err.name === 'AbortError') {
-          return;
-        }
-        console.error('Error searching products:', err);
-        setError(err instanceof Error ? err.message : 'Search failed');
-        setResults([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    performSearch();
-
-    // Cleanup: abort request on unmount or query change
-    return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-    };
-  }, [debouncedQuery, filters, isFiltering]);
-
-  // Update a single filter
   const updateFilter = useCallback(<K extends keyof SearchFilters>(key: K, value: SearchFilters[K]) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
+    setFilters((prev) => ({ ...prev, [key]: value }));
   }, []);
 
-  // Clear only search query
   const clearSearch = useCallback(() => {
     setSearchQuery('');
     setDebouncedQuery('');
   }, []);
 
-  // Clear only filters
   const clearFilters = useCallback(() => {
     setFilters(DEFAULT_FILTERS);
   }, []);
 
-  // Clear both search and filters
   const clearAll = useCallback(() => {
     setSearchQuery('');
     setDebouncedQuery('');
@@ -263,7 +214,9 @@ export const useProductSearch = (debounceMs: number = 300): UseProductSearchResu
     searchQuery,
     setSearchQuery,
     results,
-    loading,
+    suggestions,
+    loading: loading || catalogLoading,
+    catalogLoading,
     error,
     isSearching: searchQuery.trim().length > 0,
     isFiltering,

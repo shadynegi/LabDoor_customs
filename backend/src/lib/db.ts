@@ -1,6 +1,9 @@
+import fs from 'fs';
+import path from 'path';
 import postgres from 'postgres';
 import type { Sql } from 'postgres';
 import dotenv from 'dotenv';
+import { logger } from './logger';
 
 dotenv.config();
 
@@ -20,10 +23,10 @@ const RETRYABLE_PG_CODES = new Set([
 ]);
 
 const isProduction = process.env.NODE_ENV === 'production';
-const maxConnections = parseInt(process.env.DB_POOL_MAX || '10', 10);
 
 /** Supabase pooler (PgBouncer) requires prepared statements disabled. */
 function usePoolerMode(url: string): boolean {
+  if (process.env.DB_USE_POOLER === 'true') return true;
   try {
     const parsed = new URL(url.replace(/^postgres(ql)?:\/\//, 'http://'));
     const host = parsed.hostname.toLowerCase();
@@ -35,6 +38,37 @@ function usePoolerMode(url: string): boolean {
 }
 
 const poolerMode = usePoolerMode(connectionString);
+const defaultPoolMax = poolerMode ? 5 : 10;
+const maxConnections = parseInt(process.env.DB_POOL_MAX || String(defaultPoolMax), 10);
+
+if (poolerMode) {
+  logger.info(
+    `[DB] PgBouncer pooler mode enabled (prepare=false, max=${maxConnections}). ` +
+      'Use Supabase pooler URL port 6543 or set DB_USE_POOLER=true.'
+  );
+}
+
+function buildSslConfig(): false | { rejectUnauthorized: boolean; ca?: string } {
+  if (!isProduction) return false;
+
+  const rejectUnauthorized = process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false';
+  const caPath = process.env.DB_SSL_CA_PATH;
+
+  if (caPath) {
+    try {
+      const resolved = path.resolve(caPath);
+      return {
+        rejectUnauthorized: true,
+        ca: fs.readFileSync(resolved, 'utf8'),
+      };
+    } catch (error) {
+      logger.error(`Failed to read DB_SSL_CA_PATH (${caPath}):`, error);
+      process.exit(1);
+    }
+  }
+
+  return { rejectUnauthorized };
+}
 
 const sql: Sql = postgres(connectionString, {
   max: maxConnections,
@@ -49,10 +83,10 @@ const sql: Sql = postgres(connectionString, {
   debug:
     process.env.DB_DEBUG === 'true'
       ? (_connection, query) => {
-          console.log(`[DB Query] ${query.slice(0, 100)}...`);
+          logger.info(`[DB Query] ${query.slice(0, 100)}...`);
         }
       : undefined,
-  ssl: isProduction ? { rejectUnauthorized: false } : false,
+  ssl: buildSslConfig(),
   prepare: !poolerMode,
 });
 
@@ -104,7 +138,7 @@ export async function withRetry<T>(
       }
 
       const delay = baseMs * Math.pow(2, attempt) + Math.random() * baseMs;
-      console.warn(
+      logger.warn(
         `[withRetry] attempt ${attempt + 1}/${retries} failed, retrying in ${Math.round(delay)}ms:`,
         lastError.message
       );
@@ -154,19 +188,19 @@ export async function query<T>(queryFn: () => Promise<T>, label?: string): Promi
     activeConnections--;
     const duration = Date.now() - startTime;
     if (isProduction && duration > 1000) {
-      console.warn(`[Slow Query] ${label || 'Unknown'}: ${duration}ms`);
+      logger.warn(`[Slow Query] ${label || 'Unknown'}: ${duration}ms`);
     }
   }
 }
 
 process.on('SIGTERM', async () => {
-  console.log('Closing database connections...');
+  logger.info('Closing database connections...');
   await sql.end();
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
-  console.log('Closing database connections...');
+  logger.info('Closing database connections...');
   await sql.end();
   process.exit(0);
 });

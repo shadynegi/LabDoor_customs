@@ -1,0 +1,40 @@
+name: Keep Supabase Alive
+
+on:
+  schedule:
+    # Runs at 09:00 UTC every 6 days
+    - cron: '0 9 */6 * *'
+
+  workflow_dispatch:
+
+jobs:
+  ping-supabase:
+    name: Ping Supabase Database
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install minimal dependencies
+        working-directory: backend
+        run: npm ci --omit=dev --prefer-offline --no-audit --no-fund
+
+      - name: Run keep-alive ping
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: node scripts/keep-alive.js
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "::error title=Supabase Keep-Alive Failed::The keep-alive ping failed. Your Supabase project may be paused. Check the logs and restore it manually if needed."

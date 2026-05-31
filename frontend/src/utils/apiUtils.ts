@@ -1,7 +1,8 @@
 // utils/apiUtils.ts
 // API utilities for request deduplication, caching, and graceful degradation
 
-import { getFriendlyError, isRetryableError, isNetworkError } from './errorMessages';
+import { isRetryableError } from './errorMessages';
+import { logWarn, logDebug } from '../lib/logger';
 
 // ============================================
 // REQUEST DEDUPLICATION
@@ -91,7 +92,7 @@ export async function withRetry<T>(
         opts.maxDelay
       );
 
-      console.log(`Retry attempt ${attempt + 1}/${opts.maxRetries} after ${delay}ms`);
+      logDebug(`Retry attempt ${attempt + 1}/${opts.maxRetries} after ${delay}ms`);
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
@@ -155,13 +156,13 @@ export async function fetchWithFallback<T>(
   } catch (error) {
     // On failure, try to return stale cache
     if (cached) {
-      console.warn(`Returning stale cache for ${key} due to error:`, error);
+      logWarn(`Returning stale cache for ${key} due to error:`, error);
       return cached.data;
     }
 
     // Try fallback
     if (fallback !== undefined) {
-      console.warn(`Using fallback for ${key} due to error:`, error);
+      logWarn(`Using fallback for ${key} due to error:`, error);
       return fallback;
     }
 

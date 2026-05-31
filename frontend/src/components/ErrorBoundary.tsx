@@ -1,4 +1,6 @@
-import React, { Component, ReactNode } from 'react';
+import { Component, type ReactNode } from 'react';
+import { captureException } from '../lib/sentry';
+import { logError } from '../lib/logger';
 
 interface Props {
   children: ReactNode;
@@ -26,7 +28,8 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('Error Boundary caught an error:', error, errorInfo);
+    logError('Error Boundary caught an error:', error);
+    captureException(error, { componentStack: errorInfo.componentStack });
   }
 
   handleReset = () => {
@@ -92,7 +95,7 @@ class ErrorBoundary extends Component<Props, State> {
             >
               We encountered an unexpected error. Don't worry, your cart is safe.
             </p>
-            {process.env.NODE_ENV === 'development' && this.state.error && (
+            {import.meta.env.DEV && this.state.error && (
               <div
                 style={{
                   background: '#fef2f2',

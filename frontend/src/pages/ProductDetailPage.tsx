@@ -1,5 +1,5 @@
 // ProductDetailPage - Individual product page with full details
-import React, { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, ShoppingCart, Package, Shield, Truck, Check, RotateCcw, Image } from 'lucide-react';
@@ -8,11 +8,11 @@ import type { Product } from '../hooks/useProducts';
 import { useCart, type SizeSystem } from './CartContext';
 import StarRating from '../components/StarRating';
 import ErrorMessage from '../components/ErrorMessage';
-import LiquidButton from '../components/LiquidButton';
-import { getProduct360Config, generatePlaceholder360Images } from '../utils/product360Images';
+import { generatePlaceholder360Images } from '../utils/product360Images';
 import { optimizeImageUrl } from '../utils/imageUrl';
 import MetaTags from '../components/MetaTags';
 import ProductJsonLd from '../components/ProductJsonLd';
+import { logError } from '../lib/logger';
 
 const Product360Viewer = lazy(() =>
   import('../components/Product360Viewer').then((m) => ({ default: m.Product360Viewer }))
@@ -64,7 +64,6 @@ const ProductDetailPage: React.FC = () => {
   const [addedToCart, setAddedToCart] = useState(false);
   const [sizeError, setSizeError] = useState<string | null>(null);
   const [show360View, setShow360View] = useState(false);
-  const [has360Images, setHas360Images] = useState(false);
 
   const sizeOptions = {
     UK: ["5", "5.5", "6", "6.5", "7", "7.5", "8", "8.5", "9", "9.5", "10", "10.5", "11", "11.5", "12"],
@@ -107,7 +106,7 @@ const ProductDetailPage: React.FC = () => {
           throw new Error('Product not found');
         }
       } catch (err) {
-        console.error('Error fetching product:', err);
+        logError('Error fetching product:', err);
         const errorMsg = err instanceof Error ? err.message : 'Failed to load product';
         setError(errorMsg);
       } finally {
@@ -119,18 +118,6 @@ const ProductDetailPage: React.FC = () => {
       fetchProduct();
     }
   }, [id]);
-
-  // Check for 360° assets when product loads
-  useEffect(() => {
-    if (product?.name) {
-      // Convert product name to slug for folder lookup
-      const slug = product.name.toLowerCase().replace(/\s+/g, '-');
-      const config = getProduct360Config(slug, product.name, product.image);
-      // For now, use placeholder images from the main product image
-      // When real 360° photos are added, this will use actual multi-angle images
-      setHas360Images(config.images.length > 0);
-    }
-  }, [product]);
 
   const handleAddToCart = () => {
     if (!selectedSize) {

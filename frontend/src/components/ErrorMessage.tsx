@@ -1,5 +1,4 @@
 // Error message component
-import React from 'react';
 import { motion } from 'framer-motion';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 

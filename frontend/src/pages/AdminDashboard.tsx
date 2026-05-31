@@ -1,21 +1,12 @@
 // AdminDashboard.tsx - Enhanced Admin panel with analytics, bulk actions, and product management
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
   Package,
   DollarSign,
   TrendingUp,
-  Clock,
-  CheckCircle,
-  XCircle,
   Search,
-  ChevronDown,
-  ExternalLink,
-  User,
   Mail,
-  Phone,
-  MapPin,
   Truck,
   Eye,
   RefreshCw,
@@ -26,18 +17,14 @@ import {
   Users,
   Globe,
   AlertTriangle,
-  Check,
   X,
-  Archive,
-  Trash2,
-  Edit2,
   MapPinned,
 } from 'lucide-react';
 import { apiFetch } from '../config';
 import { toast } from 'sonner';
 import LiquidModal from '../components/LiquidModal';
-import LiquidButton from '../components/LiquidButton';
-import { DashboardSkeleton } from '../components/Skeletons';
+import { DashboardSkeleton, SkeletonStyles } from '../components/Skeletons';
+import { logError } from '../lib/logger';
 
 // Types
 interface Order {
@@ -109,6 +96,10 @@ interface Analytics {
   dailyTrend: any[];
   messages: any;
   customers: any;
+  integrations?: {
+    ga4?: { configured: boolean; measurementId: string | null; consoleUrl: string };
+    searchConsole?: { configured: boolean; siteUrl: string | null; consoleUrl: string };
+  };
 }
 
 type Tab = 'analytics' | 'products' | 'orders' | 'messages' | 'customers';
@@ -143,11 +134,6 @@ export default function AdminDashboard() {
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
   const [selectedProducts, setSelectedProducts] = useState<Set<number>>(new Set());
   const [selectedMessages, setSelectedMessages] = useState<Set<string>>(new Set());
-
-  const getAuthHeaders = () => ({
-    'Authorization': `Bearer ${localStorage.getItem('adminToken')}`,
-    'Content-Type': 'application/json',
-  });
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
@@ -187,21 +173,19 @@ export default function AdminDashboard() {
   const fetchAnalytics = async () => {
     try {
       const response = await apiFetch('/admin/analytics', {
-        headers: getAuthHeaders(),
       });
       const data = await response.json();
       if (data.success) {
         setAnalytics(data.data);
       }
     } catch (error) {
-      console.error('Error fetching analytics:', error);
+      logError('Error fetching analytics:', error);
     }
   };
 
   const fetchOrders = async () => {
     try {
       const response = await apiFetch('/orders', {
-        headers: getAuthHeaders(),
       });
       const data = await response.json();
       if (data.success) {
@@ -216,7 +200,7 @@ export default function AdminDashboard() {
         setOrders(parsed);
       }
     } catch (error) {
-      console.error('Error fetching orders:', error);
+      logError('Error fetching orders:', error);
     }
   };
 
@@ -233,55 +217,55 @@ export default function AdminDashboard() {
         setProducts(parsed);
       }
     } catch (error) {
-      console.error('Error fetching products:', error);
+      logError('Error fetching products:', error);
     }
   };
 
   const fetchMessages = async () => {
     try {
       const response = await apiFetch('/contact', {
-        headers: getAuthHeaders(),
       });
       const data = await response.json();
       if (data.success) {
         setMessages(data.data || []);
       }
     } catch (error) {
-      console.error('Error fetching messages:', error);
+      logError('Error fetching messages:', error);
     }
   };
 
   const fetchCustomers = async () => {
     try {
       const response = await apiFetch('/admin/customers', {
-        headers: getAuthHeaders(),
       });
       const data = await response.json();
       if (data.success) {
         setCustomers(data.data || []);
       }
     } catch (error) {
-      console.error('Error fetching customers:', error);
+      logError('Error fetching customers:', error);
     }
   };
 
   const fetchCustomerHistory = async (email: string) => {
     try {
       const response = await apiFetch(`/admin/customers/${encodeURIComponent(email)}`, {
-        headers: getAuthHeaders(),
       });
       const data = await response.json();
       if (data.success) {
         setCustomerOrders(data.data.orders || []);
       }
     } catch (error) {
-      console.error('Error fetching customer history:', error);
+      logError('Error fetching customer history:', error);
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('adminToken');
-    localStorage.removeItem('adminTokenExpires');
+  const handleLogout = async () => {
+    try {
+      await apiFetch('/admin/logout', { method: 'POST' });
+    } catch {
+      // Continue with client redirect even if logout request fails
+    }
     toast.success('Logged out successfully');
     navigate('/admin/login');
   };
@@ -295,7 +279,6 @@ export default function AdminDashboard() {
     try {
       const response = await apiFetch('/admin/products/bulk-update', {
         method: 'POST',
-        headers: getAuthHeaders(),
         body: JSON.stringify({ productIds: Array.from(selectedProducts), updates }),
       });
       const data = await response.json();
@@ -319,7 +302,6 @@ export default function AdminDashboard() {
     try {
       const response = await apiFetch('/admin/orders/bulk-update', {
         method: 'POST',
-        headers: getAuthHeaders(),
         body: JSON.stringify({ orderIds: Array.from(selectedOrders), updates }),
       });
       const data = await response.json();
@@ -343,7 +325,6 @@ export default function AdminDashboard() {
     try {
       const response = await apiFetch('/admin/messages/bulk-update', {
         method: 'POST',
-        headers: getAuthHeaders(),
         body: JSON.stringify({ messageIds: Array.from(selectedMessages), updates: { status } }),
       });
       const data = await response.json();
@@ -363,7 +344,6 @@ export default function AdminDashboard() {
     try {
       const response = await apiFetch(`/products/${productId}`, {
         method: 'PUT',
-        headers: getAuthHeaders(),
         body: JSON.stringify({ is_out_of_stock: !currentStatus }),
       });
       const data = await response.json();
@@ -430,7 +410,14 @@ export default function AdminDashboard() {
   );
 
   const renderAnalytics = () => {
-    if (!analytics) return <div style={{ textAlign: 'center', padding: 60 }}>Loading analytics...</div>;
+    if (!analytics) {
+      return (
+        <>
+          <SkeletonStyles />
+          <DashboardSkeleton isMobile={isMobile} />
+        </>
+      );
+    }
 
     return (
       <div>
@@ -491,6 +478,47 @@ export default function AdminDashboard() {
             ))}
           </div>
         </div>
+
+        {/* External analytics integrations */}
+        {analytics.integrations && (
+          <div style={{ background: 'white', borderRadius: 16, padding: 24, border: '1px solid #e5e7eb' }}>
+            <h3 style={{ margin: 0, marginBottom: 16, fontSize: 18, fontWeight: 700 }}>External Analytics</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16 }}>
+              <div style={{ background: '#f9fafb', padding: 16, borderRadius: 12 }}>
+                <div style={{ fontWeight: 600, marginBottom: 8 }}>Google Analytics 4</div>
+                <div style={{ fontSize: 14, color: analytics.integrations.ga4?.configured ? '#059669' : '#6b7280', marginBottom: 12 }}>
+                  {analytics.integrations.ga4?.configured
+                    ? `Configured (${analytics.integrations.ga4.measurementId})`
+                    : 'Not configured — set VITE_GA4_MEASUREMENT_ID and GA4_MEASUREMENT_ID'}
+                </div>
+                <a
+                  href={analytics.integrations.ga4?.consoleUrl || 'https://analytics.google.com/'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: '#667eea', fontWeight: 600, fontSize: 14 }}
+                >
+                  Open GA4 Console →
+                </a>
+              </div>
+              <div style={{ background: '#f9fafb', padding: 16, borderRadius: 12 }}>
+                <div style={{ fontWeight: 600, marginBottom: 8 }}>Google Search Console</div>
+                <div style={{ fontSize: 14, color: analytics.integrations.searchConsole?.configured ? '#059669' : '#6b7280', marginBottom: 12 }}>
+                  {analytics.integrations.searchConsole?.configured
+                    ? `Site: ${analytics.integrations.searchConsole.siteUrl}`
+                    : 'Set VITE_GSC_VERIFICATION and GSC_SITE_URL'}
+                </div>
+                <a
+                  href={analytics.integrations.searchConsole?.consoleUrl || 'https://search.google.com/search-console'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: '#667eea', fontWeight: 600, fontSize: 14 }}
+                >
+                  Open Search Console →
+                </a>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   };
@@ -790,84 +818,10 @@ export default function AdminDashboard() {
       {/* Content */}
       <div style={{ maxWidth: 1400, margin: '0 auto', padding: isMobile ? 16 : 32 }}>
         {loading ? (
-          <div style={{ 
-            background: 'white', 
-            borderRadius: 16, 
-            padding: 24, 
-            boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-          }}>
-            {/* Stats Skeleton */}
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', 
-              gap: 16, 
-              marginBottom: 24 
-            }}>
-              {[1, 2, 3, 4].map((i) => (
-                <div key={i} style={{
-                  background: '#f9fafb',
-                  borderRadius: 12,
-                  padding: 20,
-                }}>
-                  <div style={{
-                    width: 40,
-                    height: 40,
-                    background: 'linear-gradient(90deg, #e0e0e0 25%, #f0f0f0 50%, #e0e0e0 75%)',
-                    backgroundSize: '200% 100%',
-                    animation: 'shimmer 1.5s infinite',
-                    borderRadius: 10,
-                    marginBottom: 12,
-                  }} />
-                  <div style={{
-                    width: '60%',
-                    height: 14,
-                    background: 'linear-gradient(90deg, #e0e0e0 25%, #f0f0f0 50%, #e0e0e0 75%)',
-                    backgroundSize: '200% 100%',
-                    animation: 'shimmer 1.5s infinite',
-                    borderRadius: 4,
-                    marginBottom: 8,
-                  }} />
-                  <div style={{
-                    width: '40%',
-                    height: 28,
-                    background: 'linear-gradient(90deg, #e0e0e0 25%, #f0f0f0 50%, #e0e0e0 75%)',
-                    backgroundSize: '200% 100%',
-                    animation: 'shimmer 1.5s infinite',
-                    borderRadius: 4,
-                  }} />
-                </div>
-              ))}
-            </div>
-            
-            {/* Table Skeleton */}
-            <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 24 }}>
-              {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} style={{
-                  display: 'grid',
-                  gridTemplateColumns: isMobile ? '1fr 1fr' : '2fr 1fr 1fr 1fr 1fr',
-                  gap: 16,
-                  padding: '16px 0',
-                  borderBottom: i < 4 ? '1px solid #f3f4f6' : 'none',
-                }}>
-                  {[1, 2, 3, 4, 5].slice(0, isMobile ? 2 : 5).map((j) => (
-                    <div key={j} style={{
-                      height: 20,
-                      background: 'linear-gradient(90deg, #e0e0e0 25%, #f0f0f0 50%, #e0e0e0 75%)',
-                      backgroundSize: '200% 100%',
-                      animation: 'shimmer 1.5s infinite',
-                      borderRadius: 4,
-                    }} />
-                  ))}
-                </div>
-              ))}
-            </div>
-            <style>{`
-              @keyframes shimmer {
-                0% { background-position: 200% 0; }
-                100% { background-position: -200% 0; }
-              }
-            `}</style>
-          </div>
+          <>
+            <SkeletonStyles />
+            <DashboardSkeleton isMobile={isMobile} />
+          </>
         ) : (
           <>
             {activeTab === 'analytics' && renderAnalytics()}

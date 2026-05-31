@@ -1,4 +1,9 @@
 {
+  "name": "labdoor-customs",
+  "private": true,
+  "scripts": {
+    "links:check": "node scripts/link-check.mjs"
+  },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0"
   }

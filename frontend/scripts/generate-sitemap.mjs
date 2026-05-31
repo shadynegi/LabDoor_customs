@@ -1,6 +1,8 @@
 /**
  * Build-time sitemap + robots.txt generator.
  * Usage: VITE_SITE_URL=https://www.example.com node scripts/generate-sitemap.mjs
+ *
+ * Set SITEMAP_REQUIRE_PRODUCTS=true in CI/deploy to fail when the API returns no products.
  */
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -11,6 +13,13 @@ const publicDir = join(__dirname, '..', 'public');
 
 const SITE_URL = (process.env.VITE_SITE_URL || 'https://www.labdoorcustoms.com').replace(/\/$/, '');
 const API_BASE = (process.env.VITE_API_BASE_URL || 'http://localhost:5000/api').replace(/\/$/, '');
+const isStrictBuild =
+  process.env.NODE_ENV === 'production' ||
+  process.env.CI === 'true' ||
+  process.env.VITE_STRICT_ENV === 'true';
+const REQUIRE_PRODUCTS =
+  process.env.SITEMAP_REQUIRE_PRODUCTS === 'true' ||
+  (isStrictBuild && process.env.SITEMAP_REQUIRE_PRODUCTS !== 'false');
 
 const STATIC_ROUTES = [
   { path: '/', changefreq: 'daily', priority: '1.0' },
@@ -26,27 +35,59 @@ const STATIC_ROUTES = [
 
 async function fetchProductPaths() {
   try {
-    const res = await fetch(`${API_BASE}/products?limit=100&page=1`);
-    if (!res.ok) return [];
-    const json = await res.json();
-    const products = json.data || [];
-    return products.map((p) => ({
-      path: `/product/${p.id}`,
-      changefreq: 'weekly',
-      priority: '0.8',
-    }));
-  } catch {
-    console.warn('Sitemap: could not fetch products from API (using static routes only).');
+    const sitemapRes = await fetch(`${API_BASE}/products/sitemap-urls`, {
+      signal: AbortSignal.timeout(15000),
+    });
+
+    if (sitemapRes.ok) {
+      const json = await sitemapRes.json();
+      const rows = json.data || [];
+      return rows.map((p) => ({
+        path: p.path || `/product/${p.id}`,
+        changefreq: 'weekly',
+        priority: '0.8',
+        lastmod: p.updated_at ? String(p.updated_at).split('T')[0] : undefined,
+      }));
+    }
+
+    const all = [];
+    let page = 1;
+    let totalPages = 1;
+
+    while (page <= totalPages) {
+      const res = await fetch(`${API_BASE}/products?limit=100&page=${page}`, {
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!res.ok) break;
+
+      const json = await res.json();
+      const products = json.data || [];
+      totalPages = json.pagination?.totalPages || 1;
+
+      all.push(
+        ...products.map((p) => ({
+          path: `/product/${p.id}`,
+          changefreq: 'weekly',
+          priority: '0.8',
+        }))
+      );
+
+      page += 1;
+    }
+
+    return all;
+  } catch (error) {
+    console.warn('Sitemap: could not fetch products from API (using static routes only).', error?.message || error);
     return [];
   }
 }
 
-function buildUrlEntry({ path, changefreq, priority }) {
+function buildUrlEntry({ path, changefreq, priority, lastmod }) {
   const loc = `${SITE_URL}${path}`;
-  const lastmod = new Date().toISOString().split('T')[0];
+  const mod = lastmod || new Date().toISOString().split('T')[0];
   return `  <url>
     <loc>${loc}</loc>
-    <lastmod>${lastmod}</lastmod>
+    <lastmod>${mod}</lastmod>
     <changefreq>${changefreq}</changefreq>
     <priority>${priority}</priority>
   </url>`;
@@ -56,6 +97,12 @@ async function main() {
   mkdirSync(publicDir, { recursive: true });
 
   const productRoutes = await fetchProductPaths();
+
+  if (REQUIRE_PRODUCTS && productRoutes.length === 0) {
+    console.error('Sitemap: SITEMAP_REQUIRE_PRODUCTS=true but no product URLs were fetched.');
+    process.exit(1);
+  }
+
   const allRoutes = [...STATIC_ROUTES, ...productRoutes];
 
   const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
@@ -79,7 +126,7 @@ Sitemap: ${SITE_URL}/sitemap.xml
   writeFileSync(join(publicDir, 'sitemap.xml'), sitemap.trim() + '\n');
   writeFileSync(join(publicDir, 'robots.txt'), robots.trim() + '\n');
 
-  console.log(`Wrote ${allRoutes.length} URLs to public/sitemap.xml`);
+  console.log(`Wrote ${allRoutes.length} URLs (${productRoutes.length} products) to public/sitemap.xml`);
   console.log(`Wrote public/robots.txt (Sitemap: ${SITE_URL}/sitemap.xml)`);
 }
 

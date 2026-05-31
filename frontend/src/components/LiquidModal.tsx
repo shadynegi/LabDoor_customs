@@ -1,5 +1,5 @@
 // LiquidModal - A modal wrapper with liquid glass effect
-import React, { ReactNode, CSSProperties } from 'react';
+import { type ReactNode, type CSSProperties } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LiquidWeb } from 'liquid-web/react';
 

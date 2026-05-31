@@ -1,0 +1,252 @@
+import sql from './db';
+import { InsufficientStockError } from './inventory';
+
+export const FREE_SHIPPING_THRESHOLD = 200;
+export const SHIPPING_COST = 25;
+
+export interface PricingBreakdown {
+  subtotal: number;
+  shipping: number;
+  tax: number;
+  discount: number;
+  total: number;
+}
+
+export interface CheckoutCartItemInput {
+  product_id: number;
+  quantity: number;
+  size_system?: string;
+  size_value?: string;
+}
+
+export interface ValidatedLineItem {
+  product_id: number;
+  product_name: string;
+  product_image?: string;
+  quantity: number;
+  price: number;
+  size_system?: string;
+  size_value?: string;
+}
+
+export type { PendingPayPalOrderInput } from './orderLifecycle';
+export { createPendingPayPalOrderAtomic as createPendingPayPalOrder, cancelPendingOrderAndRestoreStock } from './orderLifecycle';
+
+export function calculatePricing(subtotal: number, discount = 0): PricingBreakdown {
+  const shipping = subtotal > FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_COST;
+  const discountedSubtotal = Math.max(0, subtotal - discount);
+  const total = discountedSubtotal + shipping;
+
+  return {
+    subtotal: Number(subtotal.toFixed(2)),
+    shipping: Number(shipping.toFixed(2)),
+    tax: 0,
+    discount: Number(discount.toFixed(2)),
+    total: Number(total.toFixed(2)),
+  };
+}
+
+export async function validateCartItems(
+  items: CheckoutCartItemInput[]
+): Promise<{ ok: true; lineItems: ValidatedLineItem[] } | { ok: false; error: string; message: string }> {
+  if (!items || items.length === 0) {
+    return { ok: false, error: 'Empty cart', message: 'Your cart is empty' };
+  }
+
+  const lineItems: ValidatedLineItem[] = [];
+
+  for (const item of items) {
+    if (!item.product_id || !item.quantity || item.quantity < 1) {
+      return { ok: false, error: 'Invalid item', message: 'Each cart item must include product_id and quantity' };
+    }
+
+    const result = await sql`
+      SELECT id, name, price, image, stock, is_out_of_stock
+      FROM products
+      WHERE id = ${item.product_id}
+    `;
+
+    if (!result || result.length === 0) {
+      return { ok: false, error: 'Product not found', message: `Product ${item.product_id} was not found` };
+    }
+
+    const product = result[0];
+    if (product.is_out_of_stock || product.stock < item.quantity) {
+      return {
+        ok: false,
+        error: 'Insufficient stock',
+        message: `${product.name} is out of stock or has insufficient quantity`,
+      };
+    }
+
+    lineItems.push({
+      product_id: product.id,
+      product_name: product.name,
+      product_image: product.image || undefined,
+      quantity: item.quantity,
+      price: parseFloat(product.price?.toString() || '0'),
+      size_system: item.size_system,
+      size_value: item.size_value,
+    });
+  }
+
+  return { ok: true, lineItems };
+}
+
+export interface CouponCartLineItem {
+  product_id: number;
+  price: number;
+  quantity: number;
+}
+
+async function computeEligibleSubtotal(
+  coupon: Record<string, unknown>,
+  lineItems: CouponCartLineItem[]
+): Promise<number> {
+  const appliesTo = (coupon.applies_to as string) || 'all';
+  const appliesToIds = (coupon.applies_to_ids as number[] | null) || [];
+
+  if (appliesTo === 'all') {
+    if (lineItems.length > 0) {
+      return lineItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    }
+    return 0;
+  }
+
+  if (appliesToIds.length === 0) {
+    throw new Error('This coupon is not configured correctly');
+  }
+
+  if (lineItems.length === 0) {
+    throw new Error('Cart items are required to validate this coupon');
+  }
+
+  if (appliesTo === 'product') {
+    const eligible = lineItems.filter((item) => appliesToIds.includes(item.product_id));
+    if (eligible.length === 0) {
+      throw new Error('This coupon does not apply to items in your cart');
+    }
+    return eligible.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  }
+
+  if (appliesTo === 'category') {
+    const seedProducts = await sql`
+      SELECT DISTINCT category FROM products WHERE id = ANY(${appliesToIds}::int[])
+    `;
+    const allowedCategories = new Set(
+      seedProducts.map((row) => row.category).filter((cat): cat is string => Boolean(cat))
+    );
+
+    if (allowedCategories.size === 0) {
+      throw new Error('This coupon is not configured correctly');
+    }
+
+    const cartProductIds = lineItems.map((item) => item.product_id);
+    const cartProducts = await sql`
+      SELECT id, category FROM products WHERE id = ANY(${cartProductIds}::int[])
+    `;
+    const categoryByProduct = new Map<number, string | null>(
+      cartProducts.map((row) => [row.id as number, (row.category as string) || null])
+    );
+
+    const eligible = lineItems.filter((item) => {
+      const category = categoryByProduct.get(item.product_id);
+      return category != null && allowedCategories.has(category);
+    });
+
+    if (eligible.length === 0) {
+      throw new Error('This coupon does not apply to items in your cart');
+    }
+
+    return eligible.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  }
+
+  return 0;
+}
+
+export async function resolveCouponDiscount(
+  couponCode: string | undefined,
+  subtotal: number,
+  customerEmail: string,
+  lineItems: CouponCartLineItem[] = []
+): Promise<{ discount: number; couponId?: string; couponCode?: string }> {
+  if (!couponCode?.trim()) {
+    return { discount: 0 };
+  }
+
+  const coupons = await sql`
+    SELECT * FROM coupons
+    WHERE UPPER(code) = UPPER(${couponCode.trim()})
+    LIMIT 1
+  `;
+
+  if (!coupons || coupons.length === 0) {
+    throw new Error('Invalid coupon code');
+  }
+
+  const coupon = coupons[0];
+  if (!coupon.is_active) throw new Error('This coupon is no longer active');
+
+  const now = new Date();
+  if (coupon.valid_from && new Date(coupon.valid_from) > now) throw new Error('This coupon is not yet valid');
+  if (coupon.valid_until && new Date(coupon.valid_until) < now) throw new Error('This coupon has expired');
+  if (coupon.max_uses != null && coupon.used_count >= coupon.max_uses) {
+    throw new Error('This coupon has reached its usage limit');
+  }
+  if (coupon.minimum_order && subtotal < parseFloat(coupon.minimum_order.toString())) {
+    throw new Error(`Minimum order of $${parseFloat(coupon.minimum_order.toString()).toFixed(2)} required`);
+  }
+
+  const eligibleSubtotal =
+    lineItems.length > 0
+      ? await computeEligibleSubtotal(coupon, lineItems)
+      : subtotal;
+
+  if (coupon.applies_to && coupon.applies_to !== 'all' && eligibleSubtotal <= 0) {
+    throw new Error('This coupon does not apply to items in your cart');
+  }
+
+  if (coupon.minimum_order && eligibleSubtotal < parseFloat(coupon.minimum_order.toString())) {
+    throw new Error(`Minimum order of $${parseFloat(coupon.minimum_order.toString()).toFixed(2)} required for eligible items`);
+  }
+
+  if (customerEmail && coupon.id && coupon.max_uses_per_customer != null) {
+    const usageCount = await sql`
+      SELECT COUNT(*) as count FROM coupon_usage
+      WHERE coupon_id = ${coupon.id} AND customer_email = ${customerEmail}
+    `;
+    if (parseInt(usageCount[0].count) >= coupon.max_uses_per_customer) {
+      throw new Error('You have already used this coupon the maximum number of times');
+    }
+  }
+
+  let discount = 0;
+  if (coupon.discount_type === 'percentage') {
+    discount = (eligibleSubtotal * parseFloat(coupon.discount_value.toString())) / 100;
+    if (coupon.maximum_discount && discount > parseFloat(coupon.maximum_discount.toString())) {
+      discount = parseFloat(coupon.maximum_discount.toString());
+    }
+  } else {
+    discount = Math.min(parseFloat(coupon.discount_value.toString()), eligibleSubtotal);
+  }
+
+  return {
+    discount: Math.round(discount * 100) / 100,
+    couponId: coupon.id,
+    couponCode: coupon.code,
+  };
+}
+
+export { InsufficientStockError };
+
+export function extractPayPalCaptureAmount(captureData: Record<string, any>): number | null {
+  const unit = captureData?.purchase_units?.[0];
+  const capture = unit?.payments?.captures?.[0];
+  const value = capture?.amount?.value ?? captureData?.amount?.value;
+  if (value == null) return null;
+  return parseFloat(String(value));
+}
+
+export function amountsMatch(expected: number, actual: number, tolerance = 0.01): boolean {
+  return Math.abs(expected - actual) <= tolerance;
+}

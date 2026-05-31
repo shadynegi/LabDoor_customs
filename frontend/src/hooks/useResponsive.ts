@@ -53,7 +53,7 @@ export function useResponsive(): ResponsiveState {
     };
 
     // Debounce resize handler for performance
-    let timeoutId: NodeJS.Timeout;
+    let timeoutId: ReturnType<typeof setTimeout>;
     const debouncedResize = () => {
       clearTimeout(timeoutId);
       timeoutId = setTimeout(handleResize, 100);

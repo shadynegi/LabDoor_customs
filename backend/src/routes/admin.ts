@@ -1,10 +1,17 @@
 // backend/src/routes/admin.ts - Admin authentication and management
+import { logger } from '../lib/logger';
 import { Router, Request, Response, NextFunction } from 'express';
 import sql, { runInChunks } from '../lib/db';
 import { invalidateProductCaches } from '../lib/cacheKeys';
 import { parsePagination, paginationMeta } from '../lib/pagination';
 import crypto from 'crypto';
 import bcrypt from 'bcrypt';
+import { getClientIp } from '../lib/clientIp';
+import {
+  ADMIN_SESSION_COOKIE,
+  adminSessionCookieOptions,
+  secureCookieDefaults,
+} from '../lib/cookies';
 
 const router = Router();
 
@@ -38,15 +45,15 @@ const validateJwtSecretComplexity = (secret: string): { valid: boolean; issues: 
 const getJwtSecret = (): string => {
   const secret = process.env.JWT_SECRET;
   if (!secret) {
-    console.error('ERROR: JWT_SECRET must be set');
+    logger.error('ERROR: JWT_SECRET must be set');
     throw new Error('Invalid JWT_SECRET configuration');
   }
   
   const validation = validateJwtSecretComplexity(secret);
   if (!validation.valid) {
-    console.error('ERROR: JWT_SECRET does not meet complexity requirements:');
-    validation.issues.forEach(issue => console.error(`  - ${issue}`));
-    console.error('Generate a secure secret with: openssl rand -base64 48');
+    logger.error('ERROR: JWT_SECRET does not meet complexity requirements:');
+    validation.issues.forEach(issue => logger.error(`  - ${issue}`));
+    logger.error('Generate a secure secret with: openssl rand -base64 48');
     throw new Error('Invalid JWT_SECRET configuration');
   }
   
@@ -59,18 +66,23 @@ const getAdminCredentials = (): { username: string; passwordHash: string; plainP
   const plainPassword = process.env.ADMIN_PASSWORD; // Fallback for migration
   
   if (!username) {
-    console.error('ERROR: ADMIN_USERNAME must be set');
+    logger.error('ERROR: ADMIN_USERNAME must be set');
     throw new Error('Invalid admin credentials configuration');
   }
   
+  if (process.env.NODE_ENV === 'production' && !passwordHash) {
+    logger.error('ERROR: ADMIN_PASSWORD_HASH must be set in production');
+    throw new Error('Invalid admin credentials configuration');
+  }
+
   if (!passwordHash && !plainPassword) {
-    console.error('ERROR: Either ADMIN_PASSWORD_HASH or ADMIN_PASSWORD must be set');
+    logger.error('ERROR: Either ADMIN_PASSWORD_HASH or ADMIN_PASSWORD must be set');
     throw new Error('Invalid admin credentials configuration');
   }
   
-  // Warn if using plaintext password (insecure)
+  // Warn if using plaintext password (insecure, dev only)
   if (!passwordHash && plainPassword) {
-    console.warn('⚠️  WARNING: Using plaintext ADMIN_PASSWORD. Generate a hash using /api/admin/generate-hash for better security.');
+    logger.warn('⚠️  WARNING: Using plaintext ADMIN_PASSWORD. Generate a hash using /api/admin/generate-hash for better security.');
   }
   
   return { username, passwordHash: passwordHash || '', plainPassword };
@@ -106,11 +118,11 @@ const cleanupExpiredSessions = async (): Promise<{ deleted: number }> => {
     `;
     const deleted = result.length;
     if (deleted > 0) {
-      console.log(`🧹 Cleaned up ${deleted} expired admin session(s)`);
+      logger.info(`🧹 Cleaned up ${deleted} expired admin session(s)`);
     }
     return { deleted };
   } catch (error) {
-    console.error('Session cleanup error:', error);
+    logger.error('Session cleanup error:', error);
     return { deleted: 0 };
   }
 };
@@ -130,7 +142,7 @@ const cleanupUserSessions = async (username: string, keepCount: number = 5): Pro
       )
     `;
   } catch (error) {
-    console.error('User session cleanup error:', error);
+    logger.error('User session cleanup error:', error);
   }
 };
 
@@ -150,7 +162,7 @@ const generateToken = (username: string): string => {
   return `${token}.${signature}`;
 };
 
-// Verify token
+// Verify token signature and expiry (does not check admin_sessions table)
 const verifyToken = (token: string): { valid: boolean; username?: string } => {
   try {
     const [payloadBase64, signature] = token.split('.');
@@ -172,18 +184,68 @@ const verifyToken = (token: string): { valid: boolean; username?: string } => {
   }
 };
 
-// Middleware to verify admin authentication
-export const verifyAdmin = (req: Request, res: Response, next: NextFunction) => {
+/** Validates HMAC token AND active row in admin_sessions (expires_at > NOW()). */
+async function validateAdminSession(
+  token: string
+): Promise<{ valid: boolean; username?: string }> {
+  const signatureResult = verifyToken(token);
+  if (!signatureResult.valid || !signatureResult.username) {
+    return { valid: false };
+  }
+
+  try {
+    const sessions = await sql`
+      SELECT username FROM admin_sessions
+      WHERE token = ${token}
+      AND expires_at > NOW()
+      LIMIT 1
+    `;
+
+    if (!sessions || sessions.length === 0) {
+      return { valid: false };
+    }
+
+    return { valid: true, username: sessions[0].username as string };
+  } catch (error) {
+    logger.error('Admin session validation error:', error);
+    return { valid: false };
+  }
+}
+
+/** Read admin session from HttpOnly cookie (preferred) or Authorization bearer (legacy). */
+export function extractAdminToken(req: Request): string | null {
+  const cookieToken = req.cookies?.[ADMIN_SESSION_COOKIE];
+  if (typeof cookieToken === 'string' && cookieToken.length > 0) {
+    return cookieToken;
+  }
+
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  if (authHeader?.startsWith('Bearer ')) {
+    return authHeader.substring(7);
+  }
+
+  return null;
+}
+
+/** Returns true when session token is valid and present in admin_sessions. */
+export async function isAdminAuthenticated(req: Request): Promise<boolean> {
+  const token = extractAdminToken(req);
+  if (!token) return false;
+  const result = await validateAdminSession(token);
+  return result.valid;
+}
+
+// Middleware to verify admin authentication
+export const verifyAdmin = async (req: Request, res: Response, next: NextFunction) => {
+  const token = extractAdminToken(req);
+  if (!token) {
     return res.status(401).json({
       success: false,
-      error: 'No authentication token provided',
+      error: 'Not authenticated',
     });
   }
 
-  const token = authHeader.substring(7);
-  const result = verifyToken(token);
+  const result = await validateAdminSession(token);
 
   if (!result.valid) {
     return res.status(401).json({
@@ -210,7 +272,7 @@ router.post('/login', async (req: Request, res: Response) => {
 
     const adminCreds = getAdminCredentials();
 
-    const ipAddress = req.ip || req.headers['x-forwarded-for']?.toString() || 'unknown';
+    const ipAddress = getClientIp(req);
     const userAgent = req.get('user-agent') || 'unknown';
 
     // Verify username and password using bcrypt
@@ -242,7 +304,7 @@ router.post('/login', async (req: Request, res: Response) => {
     await sql`
       INSERT INTO admin_sessions (token, username, ip_address, user_agent, expires_at)
       VALUES (${token}, ${username}, ${ipAddress}, ${userAgent}, ${expiresAt})
-    `.catch(() => {}); // Don't fail if session storage fails
+    `;
 
     // Log successful login
     await sql`
@@ -250,14 +312,15 @@ router.post('/login', async (req: Request, res: Response) => {
       VALUES ('admin_login_success', ${JSON.stringify({ username })}, ${ipAddress}, ${userAgent})
     `.catch(() => {});
 
+    res.cookie(ADMIN_SESSION_COOKIE, token, adminSessionCookieOptions);
+
     res.json({
       success: true,
-      token,
       expiresAt: expiresAt.toISOString(),
       message: 'Login successful',
     });
   } catch (error: any) {
-    console.error('Admin login error:', error);
+    logger.error('Admin login error:', error);
     res.status(500).json({
       success: false,
       error: 'Login failed',
@@ -310,12 +373,18 @@ router.post('/generate-hash', async (req: Request, res: Response) => {
 // POST /admin/logout - Admin logout
 router.post('/logout', verifyAdmin, async (req: Request, res: Response) => {
   try {
-    const authHeader = req.headers.authorization;
-    const token = authHeader?.substring(7);
+    const token = extractAdminToken(req);
 
     if (token) {
       await sql`DELETE FROM admin_sessions WHERE token = ${token}`.catch(() => {});
     }
+
+    res.clearCookie(ADMIN_SESSION_COOKIE, {
+      path: secureCookieDefaults.path,
+      httpOnly: secureCookieDefaults.httpOnly,
+      secure: secureCookieDefaults.secure,
+      sameSite: secureCookieDefaults.sameSite,
+    });
 
     res.json({
       success: true,
@@ -529,10 +598,22 @@ router.get('/analytics', verifyAdmin, async (req: Request, res: Response) => {
         })),
         messages: messageStats[0],
         customers: customerStats[0],
+        integrations: {
+          ga4: {
+            configured: Boolean(process.env.GA4_MEASUREMENT_ID),
+            measurementId: process.env.GA4_MEASUREMENT_ID || null,
+            consoleUrl: 'https://analytics.google.com/',
+          },
+          searchConsole: {
+            configured: Boolean(process.env.GSC_SITE_URL),
+            siteUrl: process.env.GSC_SITE_URL || null,
+            consoleUrl: 'https://search.google.com/search-console',
+          },
+        },
       },
     });
   } catch (error: any) {
-    console.error('Analytics error:', error);
+    logger.error('Analytics error:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to fetch analytics',
@@ -565,7 +646,7 @@ router.post('/customers/:id/restore', verifyAdmin, async (req: Request, res: Res
       data: result[0],
     });
   } catch (error: unknown) {
-    console.error('Restore customer error:', error);
+    logger.error('Restore customer error:', error);
     res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Failed to restore customer',
@@ -604,7 +685,7 @@ router.delete('/customers/:id', verifyAdmin, async (req: Request, res: Response)
       data: result[0],
     });
   } catch (error: unknown) {
-    console.error('Soft-delete customer error:', error);
+    logger.error('Soft-delete customer error:', error);
     res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Failed to delete customer',
@@ -653,7 +734,7 @@ router.get('/customers', verifyAdmin, async (req: Request, res: Response) => {
       pagination: paginationMeta(total, parsed.params),
     });
   } catch (error: unknown) {
-    console.error('Customers error:', error);
+    logger.error('Customers error:', error);
     res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Failed to fetch customers',
@@ -711,7 +792,7 @@ router.get('/customers/:email', verifyAdmin, async (req: Request, res: Response)
       },
     });
   } catch (error: any) {
-    console.error('Customer history error:', error);
+    logger.error('Customer history error:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to fetch customer history',
@@ -766,7 +847,7 @@ router.post('/products/bulk-update', verifyAdmin, async (req: Request, res: Resp
       updatedCount,
     });
   } catch (error: any) {
-    console.error('Bulk update error:', error);
+    logger.error('Bulk update error:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Bulk update failed',
@@ -788,6 +869,20 @@ router.post('/orders/bulk-update', verifyAdmin, async (req: Request, res: Respon
 
     const status = updates.status !== undefined ? updates.status : null;
     const paymentStatus = updates.payment_status !== undefined ? updates.payment_status : null;
+
+    if (status === 'cancelled') {
+      return res.status(400).json({
+        success: false,
+        error: 'Use POST /api/orders/:id/cancel for order cancellation',
+      });
+    }
+
+    if (paymentStatus === 'refunded' || paymentStatus === 'failed') {
+      return res.status(400).json({
+        success: false,
+        error: 'Payment lifecycle changes must use cancel/refund endpoints',
+      });
+    }
 
     const BULK_CHUNK = 10;
     const chunkResults = await runInChunks(orderIds, BULK_CHUNK, async (chunk) =>
@@ -812,7 +907,7 @@ router.post('/orders/bulk-update', verifyAdmin, async (req: Request, res: Respon
       updatedCount,
     });
   } catch (error: any) {
-    console.error('Bulk update error:', error);
+    logger.error('Bulk update error:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Bulk update failed',
@@ -856,7 +951,7 @@ router.post('/messages/bulk-update', verifyAdmin, async (req: Request, res: Resp
       updatedCount,
     });
   } catch (error: any) {
-    console.error('Bulk update error:', error);
+    logger.error('Bulk update error:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Bulk update failed',

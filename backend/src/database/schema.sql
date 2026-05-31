@@ -42,6 +42,8 @@ CREATE TABLE IF NOT EXISTS orders (
   payment_id VARCHAR(255),
   paypal_order_id VARCHAR(255),
   paypal_capture_id VARCHAR(255),
+  refunded_amount DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  access_token_hash VARCHAR(64),
   status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'shipped', 'delivered', 'cancelled')),
   tracking_number VARCHAR(100),
   tracking_url TEXT,
@@ -154,6 +156,8 @@ CREATE INDEX IF NOT EXISTS idx_orders_payment_status ON orders(payment_status);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at);
 CREATE INDEX IF NOT EXISTS idx_orders_paypal_order_id ON orders(paypal_order_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_paypal_order_id_unique ON orders(paypal_order_id) WHERE paypal_order_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_paypal_capture_id_unique ON orders(paypal_capture_id) WHERE paypal_capture_id IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_contact_status ON contact_messages(status);
 CREATE INDEX IF NOT EXISTS idx_contact_created_at ON contact_messages(created_at);

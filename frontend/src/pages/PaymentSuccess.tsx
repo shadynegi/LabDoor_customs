@@ -1,16 +1,27 @@
 // src/pages/PaymentSuccess.tsx
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { CheckCircle2, Package, Truck, Mail, Download, ArrowRight, CreditCard, ShieldCheck, Loader2 } from 'lucide-react';
 import { useCart } from './CartContext';
-import { config } from '../config';
-import { calculatePricing } from '../utils/pricing';
+import { apiFetch } from '../config';
 import { toast } from 'sonner';
 import { getFriendlyError } from '../utils/errorMessages';
+import { logError } from '../lib/logger';
 
 // Payment progress steps
 type PaymentStep = 'verifying' | 'capturing' | 'saving' | 'complete' | 'error';
+
+interface PendingOrderContext {
+  serverOrderId?: string;
+  orderNumber?: string;
+  accessToken?: string;
+  idempotencyKey?: string;
+  total?: number;
+  items?: unknown;
+  formData?: unknown;
+  coupon?: { id?: string; discount_amount?: number } | null;
+}
 
 const PAYMENT_STEPS = [
   { id: 'verifying', label: 'Verifying Payment', icon: ShieldCheck },
@@ -22,7 +33,6 @@ const PAYMENT_STEPS = [
 // Payment Progress Component
 function PaymentProgress({ currentStep, isMobile }: { currentStep: PaymentStep; isMobile: boolean }) {
   const stepIndex = PAYMENT_STEPS.findIndex(s => s.id === currentStep);
-  const isError = currentStep === 'error';
 
   return (
     <motion.div
@@ -74,7 +84,6 @@ function PaymentProgress({ currentStep, isMobile }: { currentStep: PaymentStep; 
           const StepIcon = step.icon;
           const isCompleted = index < stepIndex;
           const isCurrent = step.id === currentStep;
-          const isPending = index > stepIndex;
 
           return (
             <motion.div
@@ -187,7 +196,7 @@ export default function PaymentSuccess() {
               localStorage.removeItem('lastCompletedOrder');
             }
           } catch (e) {
-            console.error('Error parsing last order:', e);
+            logError('Error parsing last order:', e);
             localStorage.removeItem('lastCompletedOrder');
           }
         }
@@ -200,119 +209,110 @@ export default function PaymentSuccess() {
         setPaymentStep('verifying');
         await new Promise(resolve => setTimeout(resolve, 500)); // Brief UI pause
 
-        // Step 2: Capturing payment
+        const pendingOrderRaw = localStorage.getItem('pendingOrder');
+        let pendingOrder: PendingOrderContext | null = pendingOrderRaw
+          ? JSON.parse(pendingOrderRaw)
+          : null;
+
+        const aidFromUrl = searchParams.get('aid');
+
+        if (!pendingOrder && token && aidFromUrl) {
+          const contextRes = await apiFetch(`/paypal/checkout-context/${token}`, {
+            headers: { 'X-Order-Access-Token': aidFromUrl },
+          });
+          const context = await contextRes.json();
+
+          if (contextRes.ok && context.alreadyCompleted) {
+            setOrderDetails({
+              orderNumber: context.orderNumber,
+              serverOrderId: context.serverOrderId,
+              completedAt: new Date().toISOString(),
+            });
+            setPaymentStep('complete');
+            setIsLoading(false);
+            return;
+          }
+
+          if (contextRes.ok && context.serverOrderId) {
+            pendingOrder = {
+              serverOrderId: context.serverOrderId,
+              orderNumber: context.orderNumber,
+              accessToken: aidFromUrl,
+              idempotencyKey: token,
+              total: context.total,
+              coupon: context.couponId
+                ? {
+                    id: context.couponId,
+                    discount_amount: context.discount_amount,
+                  }
+                : null,
+            };
+          }
+        }
+
+        if (!pendingOrder) {
+          setPaymentStep('error');
+          throw new Error('Missing pending order context');
+        }
+
+        if (!pendingOrder.serverOrderId) {
+          setPaymentStep('error');
+          throw new Error('Missing server order binding');
+        }
+
+        // Step 2: Capturing payment (bound to server order)
         setPaymentStep('capturing');
-        const response = await fetch(`${config.backendUrl}/api/paypal/capture-payment/${token}`, {
+        const response = await apiFetch(`/paypal/capture-payment/${token}`, {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
+            'X-Idempotency-Key': pendingOrder.idempotencyKey || token || '',
           },
+          body: JSON.stringify({
+            serverOrderId: pendingOrder.serverOrderId,
+            accessToken: pendingOrder.accessToken,
+            couponId: pendingOrder.coupon?.id,
+            discount_amount: pendingOrder.coupon?.discount_amount,
+          }),
         });
 
         if (!response.ok) {
           setPaymentStep('error');
-          throw new Error('Payment capture failed');
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.message || errData.error || 'Payment capture failed');
         }
 
         const data = await response.json();
 
-        // Step 3: Saving order
+        // Step 3: Order already saved server-side — use capture response
         setPaymentStep('saving');
-        
-        // Get order details from localStorage
-        const pendingOrder = localStorage.getItem('pendingOrder');
-        if (pendingOrder) {
-          const order = JSON.parse(pendingOrder);
-          
-          // Calculate correct pricing using the pricing utility
-          const pricing = calculatePricing(order.items);
-          
-          // Parse and ensure items have numeric prices
-          const itemsWithParsedPrices = order.items.map((item: any) => ({
-            ...item,
-            price: parseFloat(item.price?.toString() || '0'),
-          }));
-          
-          const orderDetails = {
-            ...data,
-            ...order,
-            items: itemsWithParsedPrices,
-            subtotal: pricing.subtotal,
-            shipping_cost: pricing.shipping,
-            tax: pricing.tax,
-            total: pricing.total,
-            orderId: data.captureId,
-            orderDate: new Date().toISOString(),
-          };
-          setOrderDetails(orderDetails);
 
-          // Save order to database
-          try {
+        const serverOrder = data.order;
+        const orderDetails = {
+          ...pendingOrder,
+          ...data,
+          orderNumber: data.orderNumber || pendingOrder.orderNumber,
+          items: serverOrder?.items || pendingOrder.items,
+          total: serverOrder?.total ?? pendingOrder.total,
+          captureId: data.captureId,
+          orderId: data.captureId,
+          orderDate: new Date().toISOString(),
+        };
+        setOrderDetails(orderDetails);
 
-            const orderResponse = await fetch(`${config.backendUrl}/api/orders`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
+        if (pendingOrder.accessToken && (data.orderNumber || pendingOrder.orderNumber)) {
+          sessionStorage.setItem(
+            'labdoor_tracked_orders',
+            JSON.stringify([
+              {
+                orderNumber: data.orderNumber || pendingOrder.orderNumber,
+                token: pendingOrder.accessToken,
               },
-              body: JSON.stringify({
-                customer_email: order.formData.email,
-                customer_name: order.formData.fullName,
-                shipping_address: order.formData,
-                items: order.items.map((item: any) => ({
-                  product_id: item.id,
-                  product_name: item.name,
-                  product_image: item.image, // Include product image for email templates
-                  quantity: item.quantity,
-                  price: item.price,
-                  size_system: item.size?.system,
-                  size_value: item.size?.value,
-                })),
-                subtotal: pricing.subtotal,
-                shipping_cost: pricing.shipping,
-                tax: pricing.tax,
-                total: order.discount ? pricing.total - order.discount : pricing.total,
-                discount: order.discount || 0,
-                coupon_code: order.coupon?.code || null,
-                payment_status: 'completed',
-                payment_method: 'PayPal',
-                paypal_order_id: token,
-                paypal_capture_id: data.captureId,
-                status: 'processing',
-              }),
-            });
-
-            if (!orderResponse.ok) {
-              throw new Error('Failed to save order to database');
-            }
-
-            const orderResult = await orderResponse.json();
-
-            // Record coupon usage if a coupon was applied
-            if (order.coupon && orderResult.data?.id) {
-              try {
-                await fetch(`${config.backendUrl}/api/coupons/use`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    coupon_id: order.coupon.id,
-                    order_id: orderResult.data.id,
-                    customer_email: order.formData.email,
-                    discount_amount: order.coupon.discount_amount,
-                  }),
-                });
-                console.log('Coupon usage recorded');
-              } catch (couponError) {
-                console.error('Failed to record coupon usage:', couponError);
-                // Don't fail the order if coupon recording fails
-              }
-            }
-          } catch (dbError) {
-            console.error('Failed to save order to database:', dbError);
-            toast.error('Order recording issue', {
-              description: `Your payment was successful! Please save this ID: ${data.captureId?.slice(-12) || 'Check email'}`,
-              duration: 10000,
-            });
-          }
+              ...JSON.parse(sessionStorage.getItem('labdoor_tracked_orders') || '[]').filter(
+                (o: { orderNumber: string }) =>
+                  o.orderNumber !== (data.orderNumber || pendingOrder.orderNumber)
+              ),
+            ])
+          );
         }
 
         // Clear cart and pending order
@@ -332,7 +332,7 @@ export default function PaymentSuccess() {
         setIsLoading(false);
       } catch (error) {
         setPaymentStep('error');
-        console.error('Payment capture error:', error);
+        logError('Payment capture error:', error);
         const friendlyError = getFriendlyError(error);
         toast.error(friendlyError.message, {
           description: friendlyError.description + ' Please contact support with your order details.',

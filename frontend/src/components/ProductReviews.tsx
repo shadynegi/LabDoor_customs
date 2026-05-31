@@ -1,7 +1,6 @@
 // ProductReviews - Complete reviews section for product pages
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X } from 'lucide-react';
 import ReviewForm from './ReviewForm';
 import ReviewList from './ReviewList';
 

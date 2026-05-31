@@ -1,8 +1,8 @@
 // MyOrders.tsx - Enhanced Order tracking page with visual timeline
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Mail, 
   Search, 
   Package, 
   Truck, 
@@ -21,11 +21,13 @@ import {
   XCircle,
   Filter,
   Hash,
-  X
+  X,
+  KeyRound
 } from 'lucide-react';
 import { apiFetch } from '../config';
 import { toast } from 'sonner';
 import { OrdersListSkeleton } from '../components/Skeletons';
+import { logError } from '../lib/logger';
 
 interface Order {
   id: string;
@@ -89,6 +91,41 @@ const TIMELINE_STEPS: TimelineStep[] = [
 
 // Auto-refresh interval (30 seconds)
 const REFRESH_INTERVAL = 30000;
+
+const TRACKED_ORDERS_KEY = 'labdoor_tracked_orders';
+
+interface TrackedOrderRef {
+  orderNumber: string;
+  token: string;
+}
+
+function getTrackedOrders(): TrackedOrderRef[] {
+  try {
+    const raw = sessionStorage.getItem(TRACKED_ORDERS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveTrackedOrder(ref: TrackedOrderRef) {
+  const existing = getTrackedOrders().filter((o) => o.orderNumber !== ref.orderNumber);
+  sessionStorage.setItem(TRACKED_ORDERS_KEY, JSON.stringify([ref, ...existing]));
+}
+
+function normalizeOrder(order: any): Order {
+  return {
+    ...order,
+    subtotal: parseFloat(order.subtotal?.toString() || '0'),
+    shipping_cost: parseFloat(order.shipping_cost?.toString() || '0'),
+    tax: parseFloat(order.tax?.toString() || '0'),
+    total: parseFloat(order.total?.toString() || '0'),
+    items: (order.items || []).map((item: any) => ({
+      ...item,
+      price: parseFloat(item.price?.toString() || '0'),
+    })),
+  };
+}
 
 // Timeline Component
 function OrderTimeline({ order, isMobile }: { order: Order; isMobile: boolean }) {
@@ -292,7 +329,9 @@ function OrderTimeline({ order, isMobile }: { order: Order; isMobile: boolean })
 }
 
 export default function MyOrders() {
-  const [email, setEmail] = useState('');
+  const [searchParams] = useSearchParams();
+  const [orderNumber, setOrderNumber] = useState('');
+  const [accessToken, setAccessToken] = useState('');
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -302,8 +341,8 @@ export default function MyOrders() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const searchedEmailRef = useRef<string>('');
+  const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const trackedOrdersRef = useRef<TrackedOrderRef[]>([]);
 
   // Filter state
   const [showFilters, setShowFilters] = useState(false);
@@ -374,9 +413,10 @@ export default function MyOrders() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Fetch orders function (reusable for refresh)
-  const fetchOrders = useCallback(async (emailToSearch: string, isRefresh = false) => {
-    if (!emailToSearch.trim()) return;
+  // Fetch orders for all saved order number + token pairs
+  const refreshTrackedOrders = useCallback(async (isRefresh = false) => {
+    const refs = trackedOrdersRef.current;
+    if (refs.length === 0) return;
 
     if (isRefresh) {
       setRefreshing(true);
@@ -387,74 +427,114 @@ export default function MyOrders() {
     }
 
     try {
-      const response = await apiFetch(`/orders/customer/${encodeURIComponent(emailToSearch)}`);
-      const data = await response.json();
+      const fetchedOrders: Order[] = [];
+      for (const ref of refs) {
+        const response = await apiFetch(
+          `/orders/number/${encodeURIComponent(ref.orderNumber)}?token=${encodeURIComponent(ref.token)}`
+        );
+        const data = await response.json();
+        if (response.ok && data.success && data.data) {
+          fetchedOrders.push(normalizeOrder(data.data));
+        }
+      }
 
-      if (data.success) {
-        const ordersWithParsedNumbers = (data.data || []).map((order: any) => ({
-          ...order,
-          subtotal: parseFloat(order.subtotal?.toString() || '0'),
-          shipping_cost: parseFloat(order.shipping_cost?.toString() || '0'),
-          tax: parseFloat(order.tax?.toString() || '0'),
-          total: parseFloat(order.total?.toString() || '0'),
-          items: (order.items || []).map((item: any) => ({
-            ...item,
-            price: parseFloat(item.price?.toString() || '0'),
-          })),
-        }));
-        
-        // Check for status changes on refresh
-        if (isRefresh && orders.length > 0) {
-          ordersWithParsedNumbers.forEach((newOrder: Order) => {
-            const oldOrder = orders.find(o => o.id === newOrder.id);
+      if (!isRefresh && fetchedOrders.length === 0) {
+        setError('No orders found. Check your order number and access token.');
+        toast.info('No orders found', {
+          description: 'Verify your order number and access token from your confirmation email.',
+          duration: 5000,
+        });
+      }
+
+      if (isRefresh) {
+        setOrders((prev) => {
+          fetchedOrders.forEach((newOrder) => {
+            const oldOrder = prev.find((o) => o.id === newOrder.id);
             if (oldOrder && oldOrder.status !== newOrder.status) {
               toast.success('Order Updated!', {
                 description: `Order #${newOrder.order_number.slice(-8)} is now ${newOrder.status}`,
               });
             }
           });
-        }
-        
-        setOrders(ordersWithParsedNumbers);
-        setLastUpdated(new Date());
-        
-        if (!isRefresh && ordersWithParsedNumbers.length === 0) {
-          toast.info('No orders found', {
-            description: `No orders found for ${emailToSearch}. Check your email or try another address.`,
-            duration: 5000,
-          });
-        }
+          return fetchedOrders;
+        });
       } else {
-        const errorMessage = data.message || data.error || 'Failed to fetch orders';
-        if (!isRefresh) {
-          setError(errorMessage);
-          toast.error('Failed to fetch orders', {
-            description: errorMessage,
-            duration: 6000,
-          });
-        }
+        setOrders(fetchedOrders);
       }
+
+      setLastUpdated(new Date());
     } catch (err) {
-      console.error('Error fetching orders:', err);
+      logError('Error fetching orders:', err);
       if (!isRefresh) {
         const errorMsg = 'Failed to connect to server. Please check your connection and try again.';
         setError(errorMsg);
-        toast.error('Connection error', {
-          description: errorMsg,
-          duration: 6000,
-        });
+        toast.error('Connection error', { description: errorMsg, duration: 6000 });
       }
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [orders]);
+  }, []);
+
+  const lookupOrder = useCallback(async (orderNum: string, token: string) => {
+    if (!orderNum.trim() || !token.trim()) return;
+
+    setLoading(true);
+    setError(null);
+    setSearched(true);
+
+    try {
+      const response = await apiFetch(
+        `/orders/number/${encodeURIComponent(orderNum.trim())}?token=${encodeURIComponent(token.trim())}`
+      );
+      const data = await response.json();
+
+      if (response.ok && data.success && data.data) {
+        const ref = { orderNumber: orderNum.trim(), token: token.trim() };
+        saveTrackedOrder(ref);
+        trackedOrdersRef.current = getTrackedOrders();
+        const normalized = normalizeOrder(data.data);
+        setOrders((prev) => {
+          const without = prev.filter((o) => o.id !== normalized.id);
+          return [normalized, ...without];
+        });
+        setLastUpdated(new Date());
+      } else {
+        const errorMessage =
+          data.message || data.error || 'Invalid order number or access token';
+        setError(errorMessage);
+        toast.error('Order not found', { description: errorMessage, duration: 6000 });
+        setOrders([]);
+      }
+    } catch (err) {
+      logError('Error fetching order:', err);
+      const errorMsg = 'Failed to connect to server. Please check your connection and try again.';
+      setError(errorMsg);
+      toast.error('Connection error', { description: errorMsg, duration: 6000 });
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    trackedOrdersRef.current = getTrackedOrders();
+    const urlOrderNumber = searchParams.get('orderNumber');
+    const urlToken = searchParams.get('token');
+
+    if (urlOrderNumber && urlToken) {
+      setOrderNumber(urlOrderNumber);
+      setAccessToken(urlToken);
+      void lookupOrder(urlOrderNumber, urlToken);
+    } else if (trackedOrdersRef.current.length > 0) {
+      void refreshTrackedOrders(false);
+    }
+  }, [searchParams, lookupOrder, refreshTrackedOrders]);
 
   // Auto-refresh effect
   useEffect(() => {
-    if (autoRefresh && searched && searchedEmailRef.current) {
+    if (autoRefresh && searched && trackedOrdersRef.current.length > 0) {
       refreshIntervalRef.current = setInterval(() => {
-        fetchOrders(searchedEmailRef.current, true);
+        void refreshTrackedOrders(true);
       }, REFRESH_INTERVAL);
     }
 
@@ -463,33 +543,31 @@ export default function MyOrders() {
         clearInterval(refreshIntervalRef.current);
       }
     };
-  }, [autoRefresh, searched, fetchOrders]);
+  }, [autoRefresh, searched, refreshTrackedOrders]);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!email.trim()) {
-      toast.error('Email required', {
-        description: 'Please enter your email address to search for orders',
+
+    if (!orderNumber.trim()) {
+      toast.error('Order number required', {
+        description: 'Enter the order number from your confirmation email',
       });
       return;
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      toast.error('Invalid email format', {
-        description: 'Please enter a valid email address (e.g., user@example.com)',
+    if (!accessToken.trim()) {
+      toast.error('Access token required', {
+        description: 'Enter the access token from your confirmation email',
       });
       return;
     }
 
-    searchedEmailRef.current = email;
-    await fetchOrders(email);
+    await lookupOrder(orderNumber, accessToken);
   };
 
   const handleManualRefresh = () => {
-    if (searchedEmailRef.current) {
-      fetchOrders(searchedEmailRef.current, true);
+    if (trackedOrdersRef.current.length > 0) {
+      void refreshTrackedOrders(true);
     }
   };
 
@@ -585,7 +663,7 @@ export default function MyOrders() {
             maxWidth: 600,
             margin: '0 auto',
           }}>
-            Enter your email to view order history and track deliveries in real-time
+            Enter your order number and access token from your confirmation email to track deliveries
           </p>
         </motion.div>
 
@@ -610,11 +688,47 @@ export default function MyOrders() {
               color: '#374151',
               marginBottom: 8,
             }}>
-              Email Address
+              Order Number
+            </label>
+            <div style={{ position: 'relative', marginBottom: 16 }}>
+              <Hash style={{
+                position: 'absolute',
+                left: 12,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: '#9ca3af',
+              }} size={20} />
+              <input
+                type="text"
+                value={orderNumber}
+                onChange={(e) => setOrderNumber(e.target.value)}
+                placeholder="GSS-1234567890-ABCDEF"
+                style={{
+                  width: '100%',
+                  padding: '12px 12px 12px 44px',
+                  border: '2px solid #e5e7eb',
+                  borderRadius: 8,
+                  fontSize: 16,
+                  outline: 'none',
+                  transition: 'border-color 0.2s ease',
+                }}
+                onFocus={(e) => e.target.style.borderColor = '#667eea'}
+                onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
+              />
+            </div>
+
+            <label style={{
+              display: 'block',
+              fontSize: 14,
+              fontWeight: 600,
+              color: '#374151',
+              marginBottom: 8,
+            }}>
+              Access Token
             </label>
             <div style={{ display: 'flex', gap: 12, flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
               <div style={{ flex: 1, position: 'relative', minWidth: isMobile ? '100%' : 'auto' }}>
-                <Mail style={{
+                <KeyRound style={{
                   position: 'absolute',
                   left: 12,
                   top: '50%',
@@ -622,10 +736,10 @@ export default function MyOrders() {
                   color: '#9ca3af',
                 }} size={20} />
                 <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="your.email@example.com"
+                  type="text"
+                  value={accessToken}
+                  onChange={(e) => setAccessToken(e.target.value)}
+                  placeholder="Paste token from confirmation email"
                   style={{
                     width: '100%',
                     padding: '12px 12px 12px 44px',
@@ -1036,7 +1150,7 @@ export default function MyOrders() {
               No Orders Found
             </h3>
             <p style={{ fontSize: 14, color: '#6b7280' }}>
-              We couldn't find any orders for <strong>{email}</strong>
+              We couldn't find an order with those credentials. Check your confirmation email.
             </p>
           </motion.div>
         )}

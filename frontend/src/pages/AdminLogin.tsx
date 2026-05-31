@@ -1,5 +1,5 @@
 // AdminLogin.tsx - Admin login page
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Lock, User, Eye, EyeOff, AlertCircle, Shield } from 'lucide-react';
@@ -15,28 +15,21 @@ export default function AdminLogin() {
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  // Check if already logged in
+  // Check if already logged in (HttpOnly session cookie)
   useEffect(() => {
-    const token = localStorage.getItem('adminToken');
-    if (token) {
-      verifyToken(token);
-    }
-  }, []);
-
-  const verifyToken = async (token: string) => {
-    try {
-      const response = await apiFetch('/admin/verify', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (response.ok) {
-        navigate('/adminshivamdashboard');
-      } else {
-        localStorage.removeItem('adminToken');
+    const verifySession = async () => {
+      try {
+        const response = await apiFetch('/admin/verify');
+        if (response.ok) {
+          navigate('/adminshivamdashboard');
+        }
+      } catch {
+        // Not logged in
       }
-    } catch {
-      localStorage.removeItem('adminToken');
-    }
-  };
+    };
+
+    verifySession();
+  }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,8 +45,6 @@ export default function AdminLogin() {
       const data = await response.json();
 
       if (data.success) {
-        localStorage.setItem('adminToken', data.token);
-        localStorage.setItem('adminTokenExpires', data.expiresAt);
         toast.success('Login successful!');
         navigate('/adminshivamdashboard');
       } else {

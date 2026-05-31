@@ -1,9 +1,11 @@
 // backend/src/routes/activity.ts - Activity logging for user tracking
+import { logger } from '../lib/logger';
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import sql from '../lib/db';
 import { parsePagination, paginationMeta } from '../lib/pagination';
 import { verifyAdmin } from './admin';
+import { getClientIp } from '../lib/clientIp';
 
 // Anonymize IP address for GDPR compliance
 // Uses one-way hash so IPs can be compared but not reversed
@@ -46,7 +48,7 @@ router.post('/log', async (req: Request, res: Response) => {
     }
 
     // Get IP (anonymized for GDPR) and user agent
-    const rawIp = req.ip || req.headers['x-forwarded-for']?.toString().split(',')[0] || 'unknown';
+    const rawIp = getClientIp(req);
     const anonymizedIp = anonymizeIp(rawIp);
     const userAgent = req.get('user-agent') || '';
 
@@ -82,7 +84,7 @@ router.post('/log', async (req: Request, res: Response) => {
 
     res.json({ success: true });
   } catch (error: any) {
-    console.error('Activity log error:', error);
+    logger.error('Activity log error:', error);
     // Don't fail the request, just log the error
     res.json({ success: true });
   }
@@ -100,7 +102,7 @@ router.post('/batch', async (req: Request, res: Response) => {
       });
     }
 
-    const ipAddress = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+    const ipAddress = getClientIp(req);
     const userAgent = req.get('user-agent') || '';
 
     // Process activities in parallel for better performance (1000+ users)
@@ -144,7 +146,7 @@ router.post('/batch', async (req: Request, res: Response) => {
 
     res.json({ success: true });
   } catch (error: any) {
-    console.error('Batch activity log error:', error);
+    logger.error('Batch activity log error:', error);
     res.json({ success: true });
   }
 });
@@ -183,7 +185,7 @@ router.get('/export', verifyAdmin, async (req: Request, res: Response) => {
     }
     res.end();
   } catch (error: unknown) {
-    console.error('Activity export error:', error);
+    logger.error('Activity export error:', error);
     if (!res.headersSent) {
       res.status(500).json({
         success: false,
@@ -243,7 +245,7 @@ router.get('/logs', verifyAdmin, async (req: Request, res: Response) => {
       pagination: paginationMeta(total, parsed.params),
     });
   } catch (error: unknown) {
-    console.error('Get activity logs error:', error);
+    logger.error('Get activity logs error:', error);
     res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Failed to fetch activity logs',
@@ -330,7 +332,7 @@ router.get('/stats', verifyAdmin, async (req: Request, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error('Activity stats error:', error);
+    logger.error('Activity stats error:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to fetch activity stats',

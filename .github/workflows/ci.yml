@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Require production API URL secret
+        env:
+          PRODUCTION_API_BASE_URL: ${{ secrets.PRODUCTION_API_BASE_URL }}
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+        run: |
+          if [ -z "$PRODUCTION_API_BASE_URL" ]; then
+            echo "PRODUCTION_API_BASE_URL GitHub secret is required for frontend CI builds"
+            exit 1
+          fi
+          if [ -z "$VITE_SENTRY_DSN" ]; then
+            echo "VITE_SENTRY_DSN GitHub secret is required for frontend CI builds"
+            exit 1
+          fi
+      - run: npm ci
+      - run: npm run build
+        env:
+          CI: true
+          NODE_ENV: production
+          VITE_API_BASE_URL: ${{ secrets.PRODUCTION_API_BASE_URL }}
+          VITE_SITE_URL: https://www.labdoorcustoms.com
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+      - run: npx playwright install chromium --with-deps
+      - run: npm run test:e2e
+        env:
+          CI: true
+
+  sitemap:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Require production API URL secret
+        env:
+          PRODUCTION_API_BASE_URL: ${{ secrets.PRODUCTION_API_BASE_URL }}
+        run: |
+          if [ -z "$PRODUCTION_API_BASE_URL" ]; then
+            echo "PRODUCTION_API_BASE_URL GitHub secret is required for sitemap CI"
+            exit 1
+          fi
+      - run: npm ci
+      - name: Generate sitemap with live API
+        run: npm run sitemap
+        env:
+          CI: true
+          VITE_SITE_URL: https://www.labdoorcustoms.com
+          VITE_API_BASE_URL: ${{ secrets.PRODUCTION_API_BASE_URL }}
+          SITEMAP_REQUIRE_PRODUCTS: 'true'
+
+  links:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm run links:check

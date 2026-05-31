@@ -47,7 +47,7 @@ export function Product360Viewer({
   const containerRef = useRef<HTMLDivElement>(null);
   const startXRef = useRef(0);
   const lastIndexRef = useRef(0);
-  const autoRotateRef = useRef<NodeJS.Timeout | null>(null);
+  const autoRotateRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const totalFrames = images.length;
   
@@ -350,7 +350,7 @@ export function Product360Viewer({
       )}
 
       {/* Frame counter (optional, for debugging) */}
-      {process.env.NODE_ENV === 'development' && (
+      {import.meta.env.DEV && (
         <div className="absolute bottom-4 right-4 text-xs text-white/50 bg-black/50 px-2 py-1 rounded">
           {currentIndex + 1}/{totalFrames}
         </div>

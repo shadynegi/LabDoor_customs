@@ -1,5 +1,5 @@
 // LiquidButton - A button wrapper with liquid glass effect
-import React, { CSSProperties, ReactNode } from 'react';
+import { type CSSProperties, type ReactNode } from 'react';
 import { LiquidWeb } from 'liquid-web/react';
 
 interface LiquidButtonProps {
@@ -29,7 +29,7 @@ const LiquidButton: React.FC<LiquidButtonProps> = ({
   children,
   style = {},
   disabled = false,
-  type = 'button',
+  type: _buttonType = 'button',
   className,
   'aria-label': ariaLabel,
   active = false,

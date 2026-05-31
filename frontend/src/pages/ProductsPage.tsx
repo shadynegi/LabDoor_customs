@@ -1,9 +1,10 @@
 // ProductsPage - Main listing page with infinite scroll pagination, search, and filters
-import React, { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePaginatedProducts } from '../hooks/usePaginatedProducts';
 import { useProductSearch } from '../hooks/useProductSearch';
+import ProductSearchBar from '../components/ProductSearchBar';
 import StarRating from '../components/StarRating';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
@@ -12,13 +13,15 @@ import { ProductGridSkeleton, SkeletonStyles } from '../components/Skeletons';
 import { optimizeImageUrl } from '../utils/imageUrl';
 import MetaTags from '../components/MetaTags';
 
-const ProductsPage: React.FC = () => {
+const ProductsPage = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { products, loading, error, hasMore, loadMore, refetch } = usePaginatedProducts(10);
   const { 
     searchQuery, 
     setSearchQuery, 
-    results: searchResults, 
+    results: searchResults,
+    suggestions,
     loading: searchLoading, 
     isSearching,
     isFiltering,
@@ -31,14 +34,21 @@ const ProductsPage: React.FC = () => {
     activeFilterCount,
   } = useProductSearch(300);
   const [isMobile, setIsMobile] = useState(false);
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
   const observerRef = useRef<HTMLDivElement>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
+  const initialQueryApplied = useRef(false);
+
+  useEffect(() => {
+    if (initialQueryApplied.current) return;
+    const q = searchParams.get('q')?.trim();
+    if (q) {
+      setSearchQuery(q);
+      initialQueryApplied.current = true;
+    }
+  }, [searchParams, setSearchQuery]);
 
   // Determine which products to display - search/filter results or all products
   const isUsingSearchOrFilters = isSearching || isFiltering;
   const displayProducts = isUsingSearchOrFilters ? searchResults : products;
-  const isLoadingProducts = isUsingSearchOrFilters ? searchLoading : loading;
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
@@ -206,168 +216,32 @@ const ProductsPage: React.FC = () => {
           padding: '0 20px',
         }}
       >
-        <div style={{
-          position: 'relative',
-          width: '100%',
-        }}>
-          {/* Search Icon */}
-          <div style={{
-            position: 'absolute',
-            left: 16,
-            top: '50%',
-            transform: 'translateY(-50%)',
-            color: isSearchFocused ? '#667eea' : '#9ca3af',
-            transition: 'color 0.2s ease',
-            pointerEvents: 'none',
-          }}>
-            <svg 
-              width={20} 
-              height={20} 
-              viewBox="0 0 24 24" 
-              fill="none" 
-              stroke="currentColor" 
-              strokeWidth={2} 
-              strokeLinecap="round" 
-              strokeLinejoin="round"
-            >
-              <circle cx="11" cy="11" r="8" />
-              <path d="m21 21-4.35-4.35" />
-            </svg>
-          </div>
+        <ProductSearchBar
+          variant="light"
+          isMobile={isMobile}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          suggestions={suggestions}
+          loading={searchLoading}
+          clearSearch={clearSearch}
+          onSubmitSearch={(q) => navigate(`/products?q=${encodeURIComponent(q)}`, { replace: true })}
+        />
 
-          {/* Search Input */}
-          <input
-            ref={searchInputRef}
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onFocus={() => setIsSearchFocused(true)}
-            onBlur={() => setIsSearchFocused(false)}
-            placeholder="Search products..."
+        {isSearching && !searchLoading && !isFiltering && (
+          <p
             style={{
-              width: '100%',
-              padding: '14px 48px 14px 48px',
-              fontSize: isMobile ? 14 : 16,
-              border: `2px solid ${isSearchFocused ? '#667eea' : '#e5e7eb'}`,
-              borderRadius: 12,
-              outline: 'none',
-              background: 'white',
-              color: '#1f2937',
-              transition: 'all 0.2s ease',
-              boxShadow: isSearchFocused 
-                ? '0 4px 12px rgba(102, 126, 234, 0.15)' 
-                : '0 2px 4px rgba(0, 0, 0, 0.05)',
+              marginTop: 12,
+              fontSize: 14,
+              color: '#6b7280',
+              textAlign: 'center',
             }}
-          />
-
-          {/* Clear Button */}
-          <AnimatePresence>
-            {searchQuery && (
-              <motion.button
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                onClick={clearSearch}
-                style={{
-                  position: 'absolute',
-                  right: 12,
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  background: '#f3f4f6',
-                  border: 'none',
-                  borderRadius: '50%',
-                  width: 28,
-                  height: 28,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  color: '#6b7280',
-                  transition: 'all 0.2s ease',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = '#e5e7eb';
-                  e.currentTarget.style.color = '#1f2937';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = '#f3f4f6';
-                  e.currentTarget.style.color = '#6b7280';
-                }}
-              >
-                <svg 
-                  width={14} 
-                  height={14} 
-                  viewBox="0 0 24 24" 
-                  fill="none" 
-                  stroke="currentColor" 
-                  strokeWidth={2.5} 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round"
-                >
-                  <path d="M18 6 6 18" />
-                  <path d="m6 6 12 12" />
-                </svg>
-              </motion.button>
-            )}
-          </AnimatePresence>
-
-          {/* Loading Indicator */}
-          <AnimatePresence>
-            {searchLoading && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                style={{
-                  position: 'absolute',
-                  right: searchQuery ? 48 : 16,
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                }}
-              >
-                <div style={{
-                  width: 20,
-                  height: 20,
-                  border: '2px solid #e5e7eb',
-                  borderTop: '2px solid #667eea',
-                  borderRadius: '50%',
-                  animation: 'spin 0.8s linear infinite',
-                }} />
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-
-        {/* Search Results Count */}
-        <AnimatePresence>
-          {isSearching && !searchLoading && !isFiltering && (
-            <motion.p
-              initial={{ opacity: 0, y: -5 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -5 }}
-              style={{
-                marginTop: 12,
-                fontSize: 14,
-                color: '#6b7280',
-                textAlign: 'center',
-              }}
-            >
-              {searchResults.length === 0 
-                ? `No products found for "${searchQuery}"` 
-                : `Found ${searchResults.length} product${searchResults.length !== 1 ? 's' : ''} for "${searchQuery}"`
-              }
-            </motion.p>
-          )}
-        </AnimatePresence>
+          >
+            {searchResults.length === 0
+              ? `No products found for "${searchQuery}"`
+              : `Found ${searchResults.length} product${searchResults.length !== 1 ? 's' : ''} for "${searchQuery}"`}
+          </p>
+        )}
       </motion.div>
-
-      {/* CSS Animation for Loading Spinner */}
-      <style>{`
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      `}</style>
 
       {/* Advanced Filters */}
       <ProductFilters

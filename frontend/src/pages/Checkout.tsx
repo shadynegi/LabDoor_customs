@@ -1,5 +1,5 @@
 // src/pages/Checkout.tsx
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useCart } from "./CartContext";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -10,6 +10,7 @@ import { getNames } from "country-list";
 import { calculatePricing, FREE_SHIPPING_MESSAGE } from "../utils/pricing";
 import { toast } from "sonner";
 import { getFriendlyError } from "../utils/errorMessages";
+import { logError } from "../lib/logger";
 import {
   CreditCard,
   User,
@@ -159,6 +160,7 @@ export default function Checkout() {
   const navigate = useNavigate();
   const [isMobile, setIsMobile] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const paymentIdempotencyKey = useRef(crypto.randomUUID());
   const [errors, setErrors] = useState<FormErrors>({});
   
   const [formData, setFormData] = useState<FormData>({
@@ -381,20 +383,18 @@ export default function Checkout() {
     try {
       const response = await apiFetch('/paypal/create-payment', {
         method: 'POST',
+        headers: { 'X-Idempotency-Key': paymentIdempotencyKey.current },
         body: JSON.stringify({
           amount: total.toFixed(2),
           currency: 'USD',
           description: `Order for ${state.items.length} items`,
+          coupon_code: appliedCoupon?.code,
           customerInfo: formData,
-          breakdown: {
-            subtotal: subtotal.toFixed(2),
-            shipping: shipping.toFixed(2),
-            tax: '0.00',   // or remove tax key if backend allows
-          },
           items: state.items.map(item => ({
-            name: item.name,
+            product_id: item.id,
             quantity: item.quantity,
-            price: item.price,
+            size_system: item.size?.system,
+            size_value: item.size?.value,
           })),
         }),
       });
@@ -416,14 +416,19 @@ export default function Checkout() {
 
       if (approvalUrl) {
         localStorage.setItem('pendingOrder', JSON.stringify({
-          formData: formData, // Save COMPLETE form data for success page
+          formData: formData,
           items: state.items,
-          total,
+          total: data.total ?? total,
+          serverOrderId: data.serverOrderId,
+          orderNumber: data.orderNumber,
+          accessToken: data.access_token,
+          paypalOrderId: data.orderId,
+          idempotencyKey: paymentIdempotencyKey.current,
           discount: discountAmount,
           coupon: appliedCoupon ? {
-            id: appliedCoupon.id,
+            id: data.couponId || appliedCoupon.id,
             code: appliedCoupon.code,
-            discount_amount: appliedCoupon.discount_amount,
+            discount_amount: data.discount ?? appliedCoupon.discount_amount,
           } : null,
           timestamp: new Date().toISOString(),
         }));
@@ -433,7 +438,8 @@ export default function Checkout() {
         throw new Error('No approval URL received from PayPal');
       }
     } catch (error) {
-      console.error('Payment error:', error);
+      logError('Payment error:', error);
+      paymentIdempotencyKey.current = crypto.randomUUID();
       if (error instanceof Error && error.message !== 'Payment creation failed') {
         const friendlyError = getFriendlyError(error);
         toast.error(friendlyError.message, {

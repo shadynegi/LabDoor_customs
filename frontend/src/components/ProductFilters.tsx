@@ -1,7 +1,7 @@
 // ProductFilters - Advanced filter panel for products
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { SearchFilters, FilterOptions, SortOption } from '../hooks/useProductSearch';
+import type { SearchFilters, FilterOptions, SortOption } from '../types/productSearch';
 
 interface ProductFiltersProps {
   filters: SearchFilters;

@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { apiFetch } from '../config';
 import { toast } from 'sonner';
+import { logError } from '../lib/logger';
 
 // Import actual product images
 import blueNikeImg from "../assets/Shoe_Design/blue nike.png";
@@ -40,6 +41,9 @@ export interface Product {
   description?: string;
   background?: string;
   category?: string;
+  size?: string;
+  color?: string;
+  created_at?: string;
   stock?: number;
   rating?: number;
   review_count?: number;
@@ -92,7 +96,7 @@ export const useProducts = (): UseProductsResult => {
         throw new Error('Invalid response format');
       }
     } catch (err) {
-      console.error('Error fetching products:', err);
+      logError('Error fetching products:', err);
       const errorMsg = err instanceof Error ? err.message : 'Failed to load products';
       setError(errorMsg);
       

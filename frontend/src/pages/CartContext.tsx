@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useReducer, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
+import { logError, logDebug } from '../lib/logger';
 
 export type SizeSystem = "UK" | "US" | "EU";
 
@@ -63,7 +64,7 @@ const loadCartFromStorage = (): CartState => {
       };
     }
   } catch (error) {
-    console.error('Error loading cart from storage:', error);
+    logError('Error loading cart from storage:', error);
   }
   return { items: [], total: 0 };
 };
@@ -196,7 +197,7 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
   try {
     localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(newState));
   } catch (error) {
-    console.error('Error saving cart to storage:', error);
+    logError('Error saving cart to storage:', error);
   }
 
   return newState;
@@ -214,7 +215,7 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     // Check if BroadcastChannel is supported
     if (typeof BroadcastChannel === 'undefined') {
-      console.log('BroadcastChannel not supported, falling back to storage events');
+      logDebug('BroadcastChannel not supported, falling back to storage events');
       
       // Fallback to storage event for older browsers
       const handleStorageChange = (e: StorageEvent) => {
@@ -223,7 +224,7 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             const newCart = JSON.parse(e.newValue);
             dispatch({ type: 'SYNC_FROM_STORAGE', payload: newCart });
           } catch (error) {
-            console.error('Error parsing cart from storage event:', error);
+            logError('Error parsing cart from storage event:', error);
           }
         }
       };

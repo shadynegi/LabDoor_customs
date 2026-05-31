@@ -3,6 +3,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
+import { logger } from '../lib/logger';
 import { csrfCookieOptions } from '../lib/cookies';
 
 // Configuration
@@ -45,8 +46,6 @@ export const csrfProtection = (req: Request, res: Response, next: NextFunction) 
   // Skip CSRF for certain paths (webhooks, public APIs)
   const skipPaths = [
     '/api/paypal/webhook',      // PayPal webhooks have their own verification
-    '/api/activity/log',        // Activity logging from frontend
-    '/api/activity/batch',      // Batch activity logging
   ];
   
   if (skipPaths.some(path => req.path.startsWith(path))) {
@@ -61,7 +60,7 @@ export const csrfProtection = (req: Request, res: Response, next: NextFunction) 
 
   // Verify both tokens exist and match
   if (!cookieToken || !headerToken) {
-    console.warn(`CSRF validation failed: Missing token - Cookie: ${!!cookieToken}, Header: ${!!headerToken}`);
+    logger.warn(`CSRF validation failed: Missing token - Cookie: ${!!cookieToken}, Header: ${!!headerToken}`);
     return res.status(403).json({
       success: false,
       error: 'CSRF token missing',
@@ -71,7 +70,7 @@ export const csrfProtection = (req: Request, res: Response, next: NextFunction) 
 
   // Constant-time comparison to prevent timing attacks
   if (!crypto.timingSafeEqual(Buffer.from(cookieToken), Buffer.from(headerToken))) {
-    console.warn('CSRF validation failed: Token mismatch');
+    logger.warn('CSRF validation failed: Token mismatch');
     return res.status(403).json({
       success: false,
       error: 'CSRF token invalid',

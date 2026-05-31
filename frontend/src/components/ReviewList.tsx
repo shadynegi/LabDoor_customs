@@ -1,9 +1,11 @@
 // ReviewList - Display product reviews with filtering and stats
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Star, ThumbsUp, ThumbsDown, CheckCircle, MessageSquare, Filter, ChevronDown } from 'lucide-react';
+import { ThumbsUp, ThumbsDown, CheckCircle, MessageSquare, Filter } from 'lucide-react';
 import { apiFetch } from '../config';
 import StarRating from './StarRating';
+import { ReviewListSkeleton } from './Skeletons';
+import { logError } from '../lib/logger';
 
 interface Review {
   id: string;
@@ -69,7 +71,7 @@ const ReviewList: React.FC<ReviewListProps> = ({ productId, onWriteReview }) => 
         setTotalPages(data.data.pagination.totalPages);
       }
     } catch (error) {
-      console.error('Error fetching reviews:', error);
+      logError('Error fetching reviews:', error);
     } finally {
       setLoading(false);
     }
@@ -93,7 +95,7 @@ const ReviewList: React.FC<ReviewListProps> = ({ productId, onWriteReview }) => 
         fetchReviews(); // Refresh to get updated counts
       }
     } catch (error) {
-      console.error('Error voting:', error);
+      logError('Error voting:', error);
     }
   };
 
@@ -285,9 +287,7 @@ const ReviewList: React.FC<ReviewListProps> = ({ productId, onWriteReview }) => 
 
       {/* Reviews List */}
       {loading ? (
-        <div style={{ textAlign: 'center', padding: 40, color: '#6b7280' }}>
-          Loading reviews...
-        </div>
+        <ReviewListSkeleton />
       ) : reviews.length === 0 ? (
         <motion.div
           initial={{ opacity: 0 }}

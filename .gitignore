@@ -1,6 +1,36 @@
-﻿node_modules/
+﻿# Dependencies
+node_modules/
+
+# Environment templates (safe to commit)
+# Note: .env files are tracked intentionally — use a private repo only.
+!.env.template
+!env.template
+
+# Build output
 dist/
-.env
-.env.local
-.DS_Store
+build/
+*.tsbuildinfo
+
+# Logs & debug
+logs/
 *.log
+npm-debug.log*
+
+# OS & editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Test / coverage
+coverage/
+.nyc_output/
+
+# Vite / tooling
+frontend/dist/
+*.local
+
+# Optional analyze output
+frontend/dist/stats.html

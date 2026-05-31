@@ -1,13 +1,52 @@
 // backend/src/routes/orders.ts
+import { logger } from '../lib/logger';
 import { Router, Request, Response } from 'express';
 import sql from '../lib/db';
 import { upsertCustomerFromOrder } from '../lib/customers';
 import { emailService } from '../lib/email';
 import { parsePagination, paginationMeta } from '../lib/pagination';
-import { verifyAdmin } from './admin';
-import { sanitizeOrderData, sanitizeString } from '../utils/sanitize';
+import {
+  getOrderAccessTokenFromRequest,
+  orderAccessMatches,
+  stripOrderSecrets,
+} from '../lib/orderTokens';
+import { isAdminAuthenticated, verifyAdmin } from './admin';
+import { restoreInventoryTransactional } from '../lib/inventory';
+import { cancelPendingOrderAndRestoreStock } from '../lib/orderLifecycle';
+import { refundPayPalCapture } from '../lib/paypalRefund';
+import { syncOrderAfterRefund, isOrderFullyRefunded } from '../lib/refundSync';
+import { buildPayPalRefundDedupeKey } from '../lib/refundIdempotency';
 
 const router = Router();
+
+function parseOrderRow(order: Record<string, unknown>) {
+  return stripOrderSecrets({
+    ...order,
+    items: typeof order.items === 'string' ? JSON.parse(order.items as string) : order.items,
+    shipping_address:
+      typeof order.shipping_address === 'string'
+        ? JSON.parse(order.shipping_address as string)
+        : order.shipping_address,
+  });
+}
+
+function unauthorizedOrderAccess(res: Response, message?: string) {
+  return res.status(401).json({
+    success: false,
+    error: 'Token required',
+    message:
+      message ||
+      'Provide the access token from your order confirmation email (?token=... or X-Order-Access-Token header).',
+  });
+}
+
+function forbiddenOrderAccess(res: Response) {
+  return res.status(401).json({
+    success: false,
+    error: 'Invalid access token',
+    message: 'The access token does not match this order.',
+  });
+}
 
 // ============================================
 // ORDER STATUS STATE MACHINE
@@ -53,128 +92,14 @@ interface StockItem {
 }
 
 /**
- * Validate stock availability for all items
- * Returns { valid: true } or { valid: false, outOfStock: [...] }
- */
-async function validateStock(items: StockItem[]): Promise<{ valid: boolean; outOfStock: Array<{ product_id: number; product_name: string; requested: number; available: number }> }> {
-  const outOfStock: Array<{ product_id: number; product_name: string; requested: number; available: number }> = [];
-  
-  for (const item of items) {
-    const result = await sql`
-      SELECT id, name, stock, is_out_of_stock 
-      FROM products 
-      WHERE id = ${item.product_id}
-    `;
-    
-    if (!result || result.length === 0) {
-      outOfStock.push({
-        product_id: item.product_id,
-        product_name: item.product_name || 'Unknown Product',
-        requested: item.quantity,
-        available: 0,
-      });
-      continue;
-    }
-    
-    const product = result[0];
-    if (product.is_out_of_stock || product.stock < item.quantity) {
-      outOfStock.push({
-        product_id: item.product_id,
-        product_name: product.name,
-        requested: item.quantity,
-        available: product.stock,
-      });
-    }
-  }
-  
-  return {
-    valid: outOfStock.length === 0,
-    outOfStock,
-  };
-}
-
-/**
- * Update inventory: decrement or restore stock
- * @param items - Array of items with product_id and quantity
- * @param operation - 'decrement' to reduce stock, 'restore' to add back
+ * @deprecated Use restoreInventoryTransactional from lib/inventory.ts
  */
 async function updateInventory(items: StockItem[], operation: 'decrement' | 'restore'): Promise<void> {
-  for (const item of items) {
-    if (operation === 'decrement') {
-      await sql`
-        UPDATE products 
-        SET 
-          stock = GREATEST(0, stock - ${item.quantity}),
-          is_out_of_stock = CASE WHEN stock - ${item.quantity} <= 0 THEN TRUE ELSE FALSE END,
-          updated_at = NOW()
-        WHERE id = ${item.product_id}
-      `;
-    } else {
-      // Restore stock
-      await sql`
-        UPDATE products 
-        SET 
-          stock = stock + ${item.quantity},
-          is_out_of_stock = FALSE,
-          updated_at = NOW()
-        WHERE id = ${item.product_id}
-      `;
-    }
+  if (operation === 'restore') {
+    await restoreInventoryTransactional(items);
+    return;
   }
-}
-
-// ============================================
-// PAYPAL REFUND HELPER
-// ============================================
-
-/**
- * Process PayPal refund for an order
- */
-async function processPayPalRefund(captureId: string): Promise<{ success: boolean; refundId?: string; error?: string }> {
-  try {
-    const clientId = process.env.PAYPAL_CLIENT_ID;
-    const clientSecret = process.env.PAYPAL_SECRET;
-    const mode = process.env.PAYPAL_MODE || 'sandbox';
-    const baseUrl = mode === 'live' 
-      ? 'https://api-m.paypal.com' 
-      : 'https://api-m.sandbox.paypal.com';
-    
-    // Get access token
-    const authResponse = await fetch(`${baseUrl}/v1/oauth2/token`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
-      },
-      body: 'grant_type=client_credentials',
-    });
-    
-    const authData = await authResponse.json() as { access_token?: string };
-    if (!authData.access_token) {
-      return { success: false, error: 'Failed to authenticate with PayPal' };
-    }
-    
-    // Process refund
-    const refundResponse = await fetch(`${baseUrl}/v2/payments/captures/${captureId}/refund`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authData.access_token}`,
-      },
-      body: JSON.stringify({}), // Full refund
-    });
-    
-    const refundData = await refundResponse.json() as { id?: string; status?: string; message?: string };
-    
-    if (refundResponse.ok && refundData.id) {
-      return { success: true, refundId: refundData.id };
-    }
-    
-    return { success: false, error: refundData.message || 'Refund failed' };
-  } catch (error: any) {
-    console.error('PayPal refund error:', error);
-    return { success: false, error: error.message || 'Refund processing error' };
-  }
+  throw new Error('Direct inventory decrement is deprecated; use PayPal checkout flow');
 }
 
 // Types
@@ -224,188 +149,14 @@ interface Order {
   updated_at?: string;
 }
 
-// POST create new order
-router.post('/', async (req: Request, res: Response) => {
-  try {
-    const orderData: Order = req.body;
-    
-    // Sanitize input to prevent XSS attacks
-    const sanitized = sanitizeOrderData(orderData);
-    orderData.customer_email = sanitized.customer_email || orderData.customer_email;
-    orderData.customer_name = sanitized.customer_name || orderData.customer_name;
-    if (sanitized.shipping_address) {
-      orderData.shipping_address = sanitized.shipping_address;
-    }
-
-    // Detailed validation
-    if (!orderData.customer_email || orderData.customer_email.trim().length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'Customer email is required',
-        message: 'Please provide a valid email address for order tracking',
-      });
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(orderData.customer_email)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid email format',
-        message: 'Please provide a valid email address',
-      });
-    }
-
-    if (!orderData.items || orderData.items.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'Order items are required',
-        message: 'Your cart is empty. Please add items before placing an order',
-      });
-    }
-
-    if (!orderData.customer_name || orderData.customer_name.trim().length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'Customer name is required',
-        message: 'Please provide your full name',
-      });
-    }
-
-    // Validate stock availability for all items
-    const stockValidation = await validateStock(
-      orderData.items.map(item => ({
-        product_id: item.product_id,
-        quantity: item.quantity,
-        product_name: item.product_name,
-      }))
-    );
-
-    if (!stockValidation.valid) {
-      const outOfStockMessages = stockValidation.outOfStock.map(
-        item => `${item.product_name}: requested ${item.requested}, available ${item.available}`
-      );
-      return res.status(400).json({
-        success: false,
-        error: 'Insufficient stock',
-        message: `Some items are out of stock or have insufficient quantity`,
-        details: {
-          outOfStock: stockValidation.outOfStock,
-          messages: outOfStockMessages,
-        },
-      });
-    }
-
-    // Generate order number
-    const orderNumber = `GSS-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
-
-    // Set defaults
-    const payment_status = orderData.payment_status || 'pending';
-    const status = orderData.status || 'pending';
-
-    const result = await sql`
-      INSERT INTO orders (
-        order_number, customer_email, customer_name, shipping_address,
-        items, subtotal, shipping_cost, tax, total,
-        payment_status, payment_method, payment_id,
-        paypal_order_id, paypal_capture_id, status
-      ) VALUES (
-        ${orderNumber}, ${orderData.customer_email}, ${orderData.customer_name},
-        ${JSON.stringify(orderData.shipping_address)}, ${JSON.stringify(orderData.items)},
-        ${orderData.subtotal}, ${orderData.shipping_cost}, ${orderData.tax}, ${orderData.total},
-        ${payment_status}, ${orderData.payment_method}, ${orderData.payment_id || null},
-        ${orderData.paypal_order_id || null}, ${orderData.paypal_capture_id || null}, ${status}
-      )
-      RETURNING *
-    `;
-
-    // Parse JSON fields if they are strings
-const dbOrder = result[0] as Order;
-
-const parsedResult: Order = {
-  ...dbOrder,
-  items: typeof dbOrder.items === 'string' ? JSON.parse(dbOrder.items) : dbOrder.items,
-  shipping_address: typeof dbOrder.shipping_address === 'string'
-    ? JSON.parse(dbOrder.shipping_address)
-    : dbOrder.shipping_address,
-};
-
-    try {
-      await upsertCustomerFromOrder(
-        orderData.customer_email,
-        orderData.customer_name,
-        parseFloat(orderData.total?.toString() || '0')
-      );
-    } catch (customerSyncError) {
-      console.error('Customer sync error (order still created):', customerSyncError);
-    }
-
-    // Update inventory - decrement stock for all ordered items
-    try {
-      await updateInventory(
-        orderData.items.map(item => ({
-          product_id: item.product_id,
-          quantity: item.quantity,
-        })),
-        'decrement'
-      );
-      console.log('✅ Inventory updated for order:', orderNumber);
-    } catch (inventoryError) {
-      console.error('❌ Error updating inventory:', inventoryError);
-      // Log but don't fail the order - inventory can be corrected manually
-    }
-
-    // Send order confirmation email automatically
-    try {
-      const emailData = {
-        customerName: orderData.customer_name,
-        customerEmail: orderData.customer_email,
-        orderNumber: orderNumber,
-        items: parsedResult.items.map((item: any) => ({
-          product_name: item.product_name,
-          product_image: item.product_image || item.image,
-          quantity: item.quantity,
-          price: parseFloat(item.price?.toString() || '0'),
-          size_value: item.size_value,
-          size_system: item.size_system,
-        })),
-        subtotal: parseFloat(orderData.subtotal?.toString() || '0'),
-        shipping_cost: parseFloat(orderData.shipping_cost?.toString() || '0'),
-        tax: parseFloat(orderData.tax?.toString() || '0'),
-        total: parseFloat(orderData.total?.toString() || '0'),
-        shippingAddress: parsedResult.shipping_address,
-        orderDate: new Date().toISOString(),
-      };
-      
-      // Send email asynchronously (don't block the response)
-      emailService.sendOrderConfirmation(emailData)
-        .then(result => {
-          if (result.success) {
-            console.log('✅ Order confirmation email sent for order:', orderNumber);
-          } else {
-            console.error('❌ Failed to send order confirmation email:', result.error);
-          }
-        })
-        .catch(err => {
-          console.error('❌ Error sending order confirmation email:', err);
-        });
-    } catch (emailError) {
-      console.error('❌ Error preparing order confirmation email:', emailError);
-      // Don't fail the order creation if email fails
-    }
-
-    res.status(201).json({
-      success: true,
-      data: parsedResult,
-      message: 'Order created successfully',
-    });
-  } catch (error: any) {
-    console.error('Error creating order:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to create order',
-      message: 'Unable to process your order. Please try again or contact support.',
-    });
-  }
+// POST create new order — deprecated; storefront uses PayPal checkout only
+router.post('/', async (_req: Request, res: Response) => {
+  return res.status(410).json({
+    success: false,
+    error: 'Direct order creation deprecated',
+    message:
+      'Orders must be placed through PayPal checkout (POST /api/paypal/create-payment). This endpoint no longer accepts public order submissions.',
+  });
 });
 
 // GET all orders (Admin only)
@@ -463,11 +214,7 @@ router.get('/', verifyAdmin, async (req: Request, res: Response) => {
     const totalCount = Number(countResult[0].count);
 
     // Parse JSON fields if they are strings
-    const parsedOrders = orders.map((order: any) => ({
-      ...order,
-      items: typeof order.items === 'string' ? JSON.parse(order.items) : order.items,
-      shipping_address: typeof order.shipping_address === 'string' ? JSON.parse(order.shipping_address) : order.shipping_address,
-    }));
+    const parsedOrders = orders.map((order: Record<string, unknown>) => parseOrderRow(order));
 
     res.json({
       success: true,
@@ -476,7 +223,7 @@ router.get('/', verifyAdmin, async (req: Request, res: Response) => {
       pagination: paginationMeta(totalCount, parsed.params),
     });
   } catch (error: any) {
-    console.error('Error fetching orders:', error);
+    logger.error('Error fetching orders:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to fetch orders',
@@ -514,7 +261,7 @@ router.get('/stats/summary', verifyAdmin, async (req: Request, res: Response) =>
       },
     });
   } catch (error: any) {
-    console.error('Error fetching order stats:', error);
+    logger.error('Error fetching order stats:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to fetch order statistics',
@@ -522,10 +269,16 @@ router.get('/stats/summary', verifyAdmin, async (req: Request, res: Response) =>
   }
 });
 
-// GET order by order number
+// GET order by order number (requires per-order access token unless admin)
 router.get('/number/:orderNumber', async (req: Request, res: Response) => {
   try {
     const { orderNumber } = req.params;
+    const isAdmin = await isAdminAuthenticated(req);
+    const accessToken = getOrderAccessTokenFromRequest(req);
+
+    if (!isAdmin && !accessToken) {
+      return unauthorizedOrderAccess(res);
+    }
 
     const order = await sql`
       SELECT * FROM orders 
@@ -540,19 +293,18 @@ router.get('/number/:orderNumber', async (req: Request, res: Response) => {
       });
     }
 
-    // Parse JSON fields if they are strings
-    const parsedOrder = {
-      ...order[0],
-      items: typeof order[0].items === 'string' ? JSON.parse(order[0].items) : order[0].items,
-      shipping_address: typeof order[0].shipping_address === 'string' ? JSON.parse(order[0].shipping_address) : order[0].shipping_address,
-    };
+    if (!isAdmin) {
+      if (!orderAccessMatches(order[0].access_token_hash, accessToken!)) {
+        return forbiddenOrderAccess(res);
+      }
+    }
 
     res.json({
       success: true,
-      data: parsedOrder,
+      data: parseOrderRow(order[0] as Record<string, unknown>),
     });
   } catch (error: any) {
-    console.error('Error fetching order:', error);
+    logger.error('Error fetching order:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to fetch order',
@@ -560,8 +312,17 @@ router.get('/number/:orderNumber', async (req: Request, res: Response) => {
   }
 });
 
-// GET orders by customer email
+// GET orders by customer email — disabled for public (use order number + access token)
 router.get('/customer/:email', async (req: Request, res: Response) => {
+  if (!(await isAdminAuthenticated(req))) {
+    return res.status(403).json({
+      success: false,
+      error: 'Access denied',
+      message:
+        'Look up a single order using your order number and access token from your confirmation email.',
+    });
+  }
+
   try {
     const { email } = req.params;
     const parsed = parsePagination(req.query);
@@ -578,12 +339,7 @@ router.get('/customer/:email', async (req: Request, res: Response) => {
       OFFSET ${offset}
     `;
 
-    // Parse JSON fields if they are strings
-    const parsedOrders = orders.map((order: any) => ({
-      ...order,
-      items: typeof order.items === 'string' ? JSON.parse(order.items) : order.items,
-      shipping_address: typeof order.shipping_address === 'string' ? JSON.parse(order.shipping_address) : order.shipping_address,
-    }));
+    const parsedOrders = orders.map((order: Record<string, unknown>) => parseOrderRow(order));
 
     const countResult = await sql`
       SELECT COUNT(*) as total FROM orders WHERE customer_email = ${email}
@@ -597,7 +353,7 @@ router.get('/customer/:email', async (req: Request, res: Response) => {
       pagination: paginationMeta(total, parsed.params),
     });
   } catch (error: any) {
-    console.error('Error fetching customer orders:', error);
+    logger.error('Error fetching customer orders:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to fetch orders',
@@ -605,10 +361,16 @@ router.get('/customer/:email', async (req: Request, res: Response) => {
   }
 });
 
-// GET order by ID (UUID)
+// GET order by ID (UUID) — requires per-order access token unless admin
 router.get('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    const isAdmin = await isAdminAuthenticated(req);
+    const accessToken = getOrderAccessTokenFromRequest(req);
+
+    if (!isAdmin && !accessToken) {
+      return unauthorizedOrderAccess(res);
+    }
 
     const order = await sql`
       SELECT * FROM orders 
@@ -623,18 +385,18 @@ router.get('/:id', async (req: Request, res: Response) => {
       });
     }
 
-    const parsedOrder = {
-      ...order[0],
-      items: typeof order[0].items === 'string' ? JSON.parse(order[0].items) : order[0].items,
-      shipping_address: typeof order[0].shipping_address === 'string' ? JSON.parse(order[0].shipping_address) : order[0].shipping_address,
-    };
+    if (!isAdmin) {
+      if (!orderAccessMatches(order[0].access_token_hash, accessToken!)) {
+        return forbiddenOrderAccess(res);
+      }
+    }
 
     res.json({
       success: true,
-      data: parsedOrder,
+      data: parseOrderRow(order[0] as Record<string, unknown>),
     });
   } catch (error: any) {
-    console.error('Error fetching order:', error);
+    logger.error('Error fetching order:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to fetch order',
@@ -677,6 +439,14 @@ router.put('/:id', verifyAdmin, async (req: Request, res: Response) => {
       }
     }
 
+    if (updates.payment_status !== undefined) {
+      return res.status(400).json({
+        success: false,
+        error: 'Payment status cannot be changed via PUT',
+        message: 'Use PATCH /payment-status, cancel, or refund endpoints',
+      });
+    }
+
     const result = await sql`
       UPDATE orders SET
         status = COALESCE(${updates.status || null}, status),
@@ -684,7 +454,6 @@ router.put('/:id', verifyAdmin, async (req: Request, res: Response) => {
         tracking_url = COALESCE(${updates.tracking_url || null}, tracking_url),
         carrier = COALESCE(${updates.carrier || null}, carrier),
         estimated_delivery = COALESCE(${updates.estimated_delivery || null}, estimated_delivery),
-        payment_status = COALESCE(${updates.payment_status || null}, payment_status),
         updated_at = NOW()
       WHERE id = ${id}
       RETURNING *
@@ -731,16 +500,16 @@ const parsedResult: Order = {
         emailService.sendShippingNotification(emailData)
           .then(result => {
             if (result.success) {
-              console.log('✅ Shipping notification email sent for order:', parsedResult.order_number);
+              logger.info('✅ Shipping notification email sent for order:', parsedResult.order_number);
             } else {
-              console.error('❌ Failed to send shipping notification email:', result.error);
+              logger.error('❌ Failed to send shipping notification email:', result.error);
             }
           })
           .catch(err => {
-            console.error('❌ Error sending shipping notification email:', err);
+            logger.error('❌ Error sending shipping notification email:', err);
           });
       } catch (emailError) {
-        console.error('❌ Error preparing shipping notification email:', emailError);
+        logger.error('❌ Error preparing shipping notification email:', emailError);
       }
     }
 
@@ -750,7 +519,7 @@ const parsedResult: Order = {
       message: 'Order updated successfully',
     });
   } catch (error: any) {
-    console.error('Error updating order:', error);
+    logger.error('Error updating order:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to update order',
@@ -863,16 +632,16 @@ const parsedResult: Order = {
         emailService.sendShippingNotification(emailData)
           .then(result => {
             if (result.success) {
-              console.log('✅ Shipping notification email sent for order:', parsedResult.order_number);
+              logger.info('✅ Shipping notification email sent for order:', parsedResult.order_number);
             } else {
-              console.error('❌ Failed to send shipping notification email:', result.error);
+              logger.error('❌ Failed to send shipping notification email:', result.error);
             }
           })
           .catch(err => {
-            console.error('❌ Error sending shipping notification email:', err);
+            logger.error('❌ Error sending shipping notification email:', err);
           });
       } catch (emailError) {
-        console.error('❌ Error preparing shipping notification email:', emailError);
+        logger.error('❌ Error preparing shipping notification email:', emailError);
       }
     }
 
@@ -882,7 +651,7 @@ const parsedResult: Order = {
       message: 'Order status updated successfully',
     });
   } catch (error: any) {
-    console.error('Error updating order status:', error);
+    logger.error('Error updating order status:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to update order status',
@@ -908,6 +677,31 @@ router.patch('/:id/payment-status', verifyAdmin, async (req: Request, res: Respo
       return res.status(400).json({
         success: false,
         error: 'Invalid payment status value',
+      });
+    }
+
+    if (payment_status === 'refunded') {
+      return res.status(400).json({
+        success: false,
+        error: 'Use the cancel/refund flow to mark orders as refunded',
+      });
+    }
+
+    const currentOrder = await sql`SELECT payment_status FROM orders WHERE id = ${id}`;
+    if (!currentOrder.length) {
+      return res.status(404).json({
+        success: false,
+        error: 'Order not found',
+      });
+    }
+
+    if (
+      currentOrder[0].payment_status === 'completed' &&
+      payment_status !== 'completed'
+    ) {
+      return res.status(400).json({
+        success: false,
+        error: 'Cannot change payment status away from completed without refund flow',
       });
     }
 
@@ -944,7 +738,7 @@ const parsedResult: Order = {
       message: 'Payment status updated successfully',
     });
   } catch (error: any) {
-    console.error('Error updating payment status:', error);
+    logger.error('Error updating payment status:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to update payment status',
@@ -989,61 +783,157 @@ router.post('/:id/cancel', verifyAdmin, async (req: Request, res: Response) => {
     // Parse items for inventory restoration
     const items = typeof order.items === 'string' ? JSON.parse(order.items) : order.items;
 
-    // Process PayPal refund if payment was completed and refund is requested
-    let refundResult: { success: boolean; refundId?: string; error?: string } = { success: false };
-    if (process_refund && order.payment_status === 'completed' && order.paypal_capture_id) {
-      console.log('Processing PayPal refund for order:', order.order_number);
-      refundResult = await processPayPalRefund(order.paypal_capture_id);
-      
-      if (!refundResult.success) {
-        // Don't fail the cancellation if refund fails, but log it
-        console.error('❌ Refund failed for order:', order.order_number, refundResult.error);
-      } else {
-        console.log('✅ Refund processed for order:', order.order_number, 'Refund ID:', refundResult.refundId);
+    if (order.payment_status === 'pending') {
+      const cancelled = await cancelPendingOrderAndRestoreStock(id);
+      if (!cancelled) {
+        return res.status(409).json({
+          success: false,
+          error: 'Order is not in a cancellable pending state',
+        });
       }
+
+      const pendingResult = await sql`SELECT * FROM orders WHERE id = ${id}`;
+      const parsedPending = {
+        ...pendingResult[0],
+        items,
+        shipping_address:
+          typeof pendingResult[0].shipping_address === 'string'
+            ? JSON.parse(pendingResult[0].shipping_address)
+            : pendingResult[0].shipping_address,
+      };
+
+      return res.json({
+        success: true,
+        data: parsedPending,
+        refund: { processed: false, message: 'Pending order cancelled (no payment captured)' },
+        message: 'Pending order cancelled and inventory restored',
+      });
     }
 
-    // Update order status to cancelled
+    // Process PayPal refund if payment was completed and refund is requested
+    let refundResult: {
+      success: boolean;
+      refundId?: string;
+      amount?: string;
+      error?: string;
+    } = { success: false };
+
+    if (
+      process_refund &&
+      order.payment_status === 'completed' &&
+      !order.paypal_capture_id
+    ) {
+      return res.status(409).json({
+        success: false,
+        error: 'Missing PayPal capture ID',
+        message:
+          'This order cannot be auto-refunded. Reconcile the payment in PayPal before cancelling.',
+      });
+    }
+
+    if (process_refund && order.payment_status === 'completed' && order.paypal_capture_id) {
+      logger.info('Processing PayPal refund for order:', order.order_number);
+
+      const orderTotal = parseFloat(String(order.total ?? '0'));
+      const priorRefunded = parseFloat(String(order.refunded_amount ?? '0'));
+      const remaining = Math.max(0, orderTotal - priorRefunded);
+
+      refundResult = await refundPayPalCapture(
+        order.paypal_capture_id,
+        remaining > 0 ? remaining.toFixed(2) : undefined,
+        'USD'
+      );
+
+      if (!refundResult.success) {
+        logger.error('❌ Refund failed for order:', order.order_number, refundResult.error);
+        return res.status(502).json({
+          success: false,
+          error: 'Refund failed',
+          message: 'Order was not cancelled. Resolve the PayPal refund manually before retrying.',
+          refund: {
+            processed: false,
+            error: refundResult.error,
+          },
+        });
+      }
+
+      logger.info('✅ Refund processed for order:', order.order_number, 'Refund ID:', refundResult.refundId);
+
+      const refundAmount =
+        refundResult.amount ??
+        (remaining > 0 ? remaining.toFixed(2) : orderTotal.toFixed(2));
+
+      await syncOrderAfterRefund(order.paypal_capture_id, {
+        fullRefund: true,
+        refundAmount,
+        dedupeKey: refundResult.refundId
+          ? buildPayPalRefundDedupeKey(refundResult.refundId)
+          : undefined,
+        source: 'admin_cancel',
+      });
+
+      const orderRefunded = await isOrderFullyRefunded(id);
+      if (!orderRefunded) {
+        return res.status(502).json({
+          success: false,
+          error: 'Refund sync failed',
+          message:
+            'PayPal refund succeeded but the order could not be marked refunded. Reconcile manually.',
+          refund: {
+            processed: true,
+            refundId: refundResult.refundId,
+          },
+        });
+      }
+    } else if (order.payment_status === 'completed' && !process_refund) {
+      const updateResult = await sql`
+        UPDATE orders SET
+          status = 'cancelled',
+          updated_at = NOW()
+        WHERE id = ${id}
+        RETURNING *
+      `;
+
+      const parsedOnlyCancel = {
+        ...updateResult[0],
+        items,
+        shipping_address:
+          typeof updateResult[0].shipping_address === 'string'
+            ? JSON.parse(updateResult[0].shipping_address)
+            : updateResult[0].shipping_address,
+      };
+
+      return res.json({
+        success: true,
+        data: parsedOnlyCancel,
+        refund: { processed: false, message: 'Order cancelled without refund or inventory restore' },
+        message: 'Order cancelled without refund',
+      });
+    }
+
     const updateResult = await sql`
-      UPDATE orders SET
-        status = 'cancelled',
-        payment_status = ${refundResult.success ? 'refunded' : order.payment_status},
-        updated_at = NOW()
-      WHERE id = ${id}
-      RETURNING *
+      SELECT * FROM orders WHERE id = ${id}
     `;
 
-    // Restore inventory
-    try {
-      await updateInventory(
-        items.map((item: any) => ({
-          product_id: item.product_id,
-          quantity: item.quantity,
-        })),
-        'restore'
-      );
-      console.log('✅ Inventory restored for cancelled order:', order.order_number);
-    } catch (inventoryError) {
-      console.error('❌ Error restoring inventory:', inventoryError);
+    if (!updateResult.length) {
+      return res.status(404).json({ success: false, error: 'Order not found after refund sync' });
     }
 
-// Parse result
-const updatedOrder = updateResult[0] as Order;
-
-const parsedResult: Order = {
-  ...updatedOrder,
-  items: typeof updatedOrder.items === 'string' ? JSON.parse(updatedOrder.items) : updatedOrder.items,
-  shipping_address: typeof updatedOrder.shipping_address === 'string'
-    ? JSON.parse(updatedOrder.shipping_address)
-    : updatedOrder.shipping_address,
-};
+    const parsedResult: Order = {
+      ...(updateResult[0] as Order),
+      items,
+      shipping_address:
+        typeof updateResult[0].shipping_address === 'string'
+          ? JSON.parse(updateResult[0].shipping_address)
+          : (updateResult[0].shipping_address as ShippingAddress),
+    };
 
     // Send cancellation email
     try {
-      const emailData = {
+      emailService.sendOrderCancellation({
         customerName: parsedResult.customer_name,
         customerEmail: parsedResult.customer_email,
-        orderNumber: parsedResult.order_number,
+        orderNumber: parsedResult.order_number!,
         items: parsedResult.items.map((item: any) => ({
           product_name: item.product_name,
           product_image: item.product_image || item.image,
@@ -1057,26 +947,36 @@ const parsedResult: Order = {
         tax: parseFloat(parsedResult.tax?.toString() || '0'),
         total: parseFloat(parsedResult.total?.toString() || '0'),
         shippingAddress: parsedResult.shipping_address,
-      };
-      
-      // TODO: Implement sendOrderCancellation email method
-      console.log('📧 Cancellation notification should be sent for order:', parsedResult.order_number);
+        cancellationReason: reason,
+        refundProcessed: refundResult.success,
+        refundId: refundResult.refundId,
+      })
+        .then((result) => {
+          if (result.success) {
+            logger.info('✅ Cancellation email sent for order:', parsedResult.order_number);
+          } else {
+            logger.error('❌ Failed to send cancellation email:', result.error);
+          }
+        })
+        .catch((err) => {
+          logger.error('❌ Error sending cancellation email:', err);
+        });
     } catch (emailError) {
-      console.error('❌ Error sending cancellation email:', emailError);
+      logger.error('❌ Error sending cancellation email:', emailError);
     }
 
-    res.json({
+    return res.json({
       success: true,
       data: parsedResult,
       refund: {
         processed: refundResult.success,
         refund_id: refundResult.refundId,
-        message: refundResult.success ? 'Refund processed successfully' : 'Refund not processed (payment may not have been completed)',
+        message: refundResult.success ? 'Refund processed successfully' : 'Refund not processed',
       },
       message: `Order cancelled successfully${refundResult.success ? ' and refund processed' : ''}`,
     });
   } catch (error: any) {
-    console.error('Error cancelling order:', error);
+    logger.error('Error cancelling order:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to cancel order',
@@ -1089,25 +989,37 @@ router.delete('/:id', verifyAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    const result = await sql`
-      DELETE FROM orders 
-      WHERE id = ${id}
-      RETURNING id
+    const existing = await sql`
+      SELECT id, payment_status FROM orders WHERE id = ${id}
     `;
 
-    if (!result || result.length === 0) {
+    if (!existing.length) {
       return res.status(404).json({
         success: false,
         error: 'Order not found',
       });
     }
 
+    if (existing[0].payment_status === 'completed') {
+      return res.status(409).json({
+        success: false,
+        error: 'Cannot delete a completed order',
+        message: 'Cancel and refund the order before deleting it from the database.',
+      });
+    }
+
+    const result = await sql`
+      DELETE FROM orders 
+      WHERE id = ${id}
+      RETURNING id
+    `;
+
     res.json({
       success: true,
       message: 'Order deleted successfully',
     });
   } catch (error: any) {
-    console.error('Error deleting order:', error);
+    logger.error('Error deleting order:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to delete order',
@@ -1173,7 +1085,7 @@ router.post('/:id/notify-shipped', verifyAdmin, async (req: Request, res: Respon
       });
     }
   } catch (error: any) {
-    console.error('Error sending shipping notification:', error);
+    logger.error('Error sending shipping notification:', error);
     res.status(500).json({
       success: false,
       error: error.message,

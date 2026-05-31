@@ -1,331 +1,132 @@
-# 🎯 Admin Dashboard - Complete Guide
+# Admin Dashboard Guide
 
-## ✅ **Admin Dashboard Created**
+How to use the Lab Door Customs admin dashboard.
 
-A comprehensive admin panel has been created for managing your e-commerce store!
-
----
-
-## 🚀 **Access the Dashboard**
-
-### URL:
-```
-http://localhost:5173/admin
-```
-
-**Note:** This is currently open to anyone. For production, you should add authentication!
+**Full reference:** [`../info.md`](../info.md)
 
 ---
 
-## 📊 **Dashboard Features**
+## Access
 
-### 1. **Statistics Overview**
-Four summary cards showing:
-- ✅ **Total Orders** - All-time order count
-- ✅ **Total Revenue** - Sum of completed payments ($)
-- ✅ **Pending Orders** - Orders awaiting processing
-- ✅ **Completed Orders** - Successfully delivered orders
+| Item | Value |
+|------|-------|
+| Login URL | `/admin/login` |
+| Dashboard URL | `/adminshivamdashboard` |
+| Session | HttpOnly cookie, 24 hours |
 
-### 2. **Advanced Filtering**
-- 🔍 **Search** - By order number, customer name, or email
-- 📦 **Order Status Filter** - pending, processing, shipped, delivered, cancelled
-- 💳 **Payment Status Filter** - completed, pending, failed, refunded
-- 🔄 **Refresh Button** - Reload latest orders
+Login with admin username and password. Sessions are stored server-side in `admin_sessions`.
 
-### 3. **Order Cards**
-Each order displays:
-- Order number (#ORD-XXXXXXXXXX)
-- Date and time placed
-- Status badge (color-coded)
-- Payment status badge
-- Customer name
-- Tracking number (if available)
-- Total amount
-- Number of items
-
-### 4. **Detailed Order View**
-Click any order to see full details:
-
-#### **Customer Information:**
-- Full name
-- Email address
-- Phone number
-- Complete shipping address
-
-#### **Payment Information:**
-- 💰 Payment method (PayPal)
-- Payment status (completed/pending/failed)
-- PayPal Capture ID
-- **Order breakdown:**
-  - Subtotal
-  - Shipping cost
-  - Tax
-  - **Total Received** (highlighted in green)
-
-#### **Shipping & Tracking:**
-- 🚚 Tracking number
-- Delivery provider (Blue Dart, etc.)
-- Estimated delivery date
-- **Track Shipment button** - Links to delivery provider
-
-#### **Order Items:**
-- Product name
-- Quantity
-- Price per item
-- Size (if applicable)
-- Total per item
+Generate a production password hash via `POST /api/admin/generate-hash` and set `ADMIN_PASSWORD_HASH` on the backend.
 
 ---
 
-## 🎨 **Visual Features**
+## Analytics tab
 
-### Color-Coded Status:
-- **Pending** - 🟡 Orange
-- **Processing** - 🔵 Blue
-- **Shipped** - 🟣 Purple
-- **Delivered** - 🟢 Green
-- **Cancelled** - 🔴 Red
+Displays:
 
-### Payment Status Colors:
-- **Completed** - 🟢 Green
-- **Pending** - 🟡 Orange
-- **Failed** - 🔴 Red
-- **Refunded** - ⚪ Gray
+- Order counts and revenue (completed vs pending)
+- Product metrics (views, cart adds)
+- Customer statistics
+- Geographic breakdown from activity logs
+- GA4 and Google Search Console configuration status with external dashboard links
+
+Data source: `GET /api/admin/analytics`
 
 ---
 
-## 📱 **Responsive Design**
+## Products tab
 
-- ✅ **Desktop** - Multi-column grid layout
-- ✅ **Tablet** - Adaptive grid
-- ✅ **Mobile** - Single column, optimized touch
+- View all products with stock and status
+- Create new products (name, price, images, category, size, color, stock)
+- Edit existing products
+- Delete products
+- Bulk update stock / out-of-stock flags via `POST /api/admin/products/bulk-update`
 
----
-
-## 🔍 **Use Cases**
-
-### Check Order Status:
-1. Go to `/admin`
-2. Search by customer email
-3. View order status and tracking
-
-### Track Payment:
-1. Filter by "Payment Status"
-2. See which orders are completed
-3. View exact payment amount received
-
-### Update Tracking:
-1. Click on order
-2. See tracking number and carrier
-3. Click "Track Shipment" to view on delivery site
-
-### Find Specific Order:
-1. Use search box
-2. Enter order number, name, or email
-3. Instantly filter results
+Product list API responses are cached (60s TTL); writes invalidate cache.
 
 ---
 
-## 🔐 **Security Considerations**
+## Orders tab
 
-### Current Setup:
-⚠️ **No authentication** - Anyone can access `/admin`
+### View and filter
 
-### For Production:
-You should add:
-1. **Admin login** - Username/password
-2. **Session management** - JWT or cookies
-3. **Protected routes** - Middleware check
-4. **Role-based access** - Admin vs customer
+Filter by order status and payment status. Paginated list from `GET /api/orders`.
 
-### Quick Security Example:
-```typescript
-// Add authentication check
-useEffect(() => {
-  const adminToken = localStorage.getItem('adminToken');
-  if (!adminToken) {
-    navigate('/admin-login');
-  }
-}, []);
-```
+### Update fulfillment
 
----
+- Set order status: pending → processing → shipped → delivered
+- Add tracking number, carrier, tracking URL, estimated delivery
+- Send shipping notification email (`POST /api/orders/:id/notify-shipped`)
 
-## 📊 **API Endpoints Used**
+### Cancel orders
 
-### Get All Orders:
-```
-GET /api/orders
-```
+**Pending orders:** Cancels and restores inventory automatically.
 
-### Get Order Statistics:
-```
-GET /api/orders/stats/summary
-```
+**Completed orders with refund:**
 
-**Response includes:**
-```json
-{
-  "success": true,
-  "data": {
-    "total_orders": 10,
-    "total_revenue": 980.50,
-    "pending_orders": 2,
-    "completed_orders": 8
-  }
-}
-```
+1. Set `process_refund: true` in cancel request.
+2. Backend refunds remaining balance via PayPal.
+3. Order marked refunded, inventory restored, customer stats reversed.
+
+If PayPal refund succeeds but DB sync fails, the API returns 502 — reconcile manually in PayPal dashboard.
+
+### Payment status
+
+`PATCH /api/orders/:id/payment-status` allows admin corrections. Use cancel/refund flows for completed orders.
 
 ---
 
-## 🎯 **Key Information Displayed**
+## Messages tab
 
-### For Each Order:
-✅ Order Number
-✅ Customer Name & Email
-✅ Shipping Address
-✅ Payment Method
-✅ Payment Status
-✅ **Payment Amount Received**
-✅ Order Status
-✅ Tracking Number
-✅ Delivery Provider
-✅ Tracking URL
-✅ Order Items
-✅ Item Quantities
-✅ Individual Prices
-✅ Total Amount
+Contact form submissions from `contact_messages` table.
 
-**Everything you requested is included!** ✨
+- View message details
+- Update status: new → read → replied → archived
+- Bulk status updates via `POST /api/admin/messages/bulk-update`
 
 ---
 
-## 💡 **Tips for Using Dashboard**
+## Customers tab
 
-### Quick Filtering:
-1. **Today's orders** - Sort by date (newest first)
-2. **Pending payments** - Filter payment status = pending
-3. **Ready to ship** - Filter order status = processing
+Aggregated customer data from the `customers` table (updated on order capture).
 
-### Bulk Actions:
-(Future enhancement)
-- Select multiple orders
-- Bulk status update
-- Export to CSV
-
-### Notifications:
-(Future enhancement)
-- New order alerts
-- Payment received notifications
-- Shipping updates
+- View customer list with order count and total spent
+- View individual customer detail and order history
+- Soft delete customers (`is_deleted = true`)
+- Restore deleted customers
 
 ---
 
-## 🛠️ **Customization Options**
+## API-only admin features
 
-### Add More Stats:
-```typescript
-// In stats cards
-<StatCard
-  icon={TrendingUp}
-  title="This Month"
-  value="$2,450"
-  color="#f59e0b"
-/>
-```
+These are available via API but do not have dedicated dashboard tabs:
 
-### Add Export Feature:
-```typescript
-const exportOrders = () => {
-  const csv = orders.map(o => 
-    `${o.order_number},${o.customer_name},${o.total}`
-  ).join('\n');
-  // Download CSV
-};
-```
-
-### Add Filters:
-```typescript
-// Date range filter
-const [dateRange, setDateRange] = useState({ start: '', end: '' });
-```
+| Feature | Endpoints |
+|---------|-----------|
+| Coupons | `GET/POST/PUT/DELETE /api/coupons` |
+| Reviews | `GET /api/reviews`, `PATCH /api/reviews/:id/status` |
+| Activity logs | `GET /api/activity/logs`, `/export` |
+| PayPal refunds | `POST /api/paypal/refund/:captureId` |
+| PayPal test | `GET /api/paypal/test` |
 
 ---
 
-## 📸 **Dashboard Sections**
+## Bulk operations
 
-### Header:
-```
-Admin Dashboard
-Manage orders, track payments, and monitor deliveries
-```
+| Endpoint | Purpose |
+|----------|---------|
+| `POST /api/admin/products/bulk-update` | Bulk product field updates |
+| `POST /api/admin/orders/bulk-update` | Bulk order status updates (not cancellation) |
+| `POST /api/admin/messages/bulk-update` | Bulk message status updates |
 
-### Statistics (4 cards):
-```
-┌─────────────┬─────────────┬─────────────┬─────────────┐
-│ Total       │ Total       │ Pending     │ Completed   │
-│ Orders      │ Revenue     │ Orders      │ Orders      │
-│    10       │ $980.50     │     2       │     8       │
-└─────────────┴─────────────┴─────────────┴─────────────┘
-```
-
-### Filters:
-```
-┌──────────────┬──────────────┬──────────────┬──────────┐
-│ Search       │ Order Status │ Payment      │ Refresh  │
-│ [_________]  │ [All Status] │ [All Pay...] │ [Button] │
-└──────────────┴──────────────┴──────────────┴──────────┘
-```
-
-### Orders Grid:
-```
-┌──────────────────┬──────────────────┬──────────────────┐
-│ Order #123       │ Order #124       │ Order #125       │
-│ [Details]        │ [Details]        │ [Details]        │
-│ $98.00           │ $129.00          │ $89.00           │
-└──────────────────┴──────────────────┴──────────────────┘
-```
+Use dedicated cancel/refund endpoints for order cancellation — not bulk update.
 
 ---
 
-## ✅ **What's Included**
+## Session management
 
-| Feature | Status |
-|---------|--------|
-| View all orders | ✅ |
-| Order tracking ID | ✅ |
-| Delivery provider | ✅ |
-| Payment received status | ✅ |
-| Payment amount | ✅ |
-| Customer details | ✅ |
-| Shipping address | ✅ |
-| Order items | ✅ |
-| Search & filters | ✅ |
-| Statistics | ✅ |
-| Responsive design | ✅ |
-| Beautiful UI | ✅ |
+- `GET /api/admin/sessions` — list active admin sessions
+- `POST /api/admin/sessions/cleanup` — remove expired sessions
+- `POST /api/admin/logout` — end current session
 
----
-
-## 🎉 **Ready to Use!**
-
-Your admin dashboard is fully functional and ready to manage orders!
-
-### Access Now:
-```
-http://localhost:5173/admin
-```
-
-### Next Steps:
-1. ✅ Test the dashboard
-2. ✅ Place a test order
-3. ✅ View it in admin panel
-4. 🔐 Add authentication (for production)
-5. 🚀 Deploy to production
-
----
-
-**Dashboard Created:** December 8, 2025  
-**Status:** COMPLETE ✅  
-**Features:** ALL REQUESTED FEATURES INCLUDED 🎊
-
+If your session expires mid-use, API calls return 401. Log in again at `/admin/login`.

@@ -1,5 +1,6 @@
 import { Resend } from 'resend';
 import { withRetry } from './db';
+import { logger } from './logger';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -43,6 +44,13 @@ interface OrderEmailData {
   carrier?: string;
   estimatedDelivery?: string;
   orderDate?: string;
+  accessToken?: string;
+}
+
+interface OrderCancellationEmailData extends OrderEmailData {
+  cancellationReason?: string;
+  refundProcessed?: boolean;
+  refundId?: string;
 }
 
 // Base URL for product images (fallback for relative paths)
@@ -69,6 +77,12 @@ export class EmailService {
     this.supportEmail = process.env.COMPANY_SUPPORT_EMAIL || 'support@labdoorcustoms.com';
   }
 
+  private getOrderTrackingUrl(orderNumber: string, accessToken?: string): string {
+    const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
+    const base = `${frontendUrl}/orders?orderNumber=${encodeURIComponent(orderNumber)}`;
+    return accessToken ? `${base}&token=${encodeURIComponent(accessToken)}` : `${frontendUrl}/orders`;
+  }
+
   /**
    * Send order confirmation email
    */
@@ -84,14 +98,14 @@ export class EmailService {
       });
 
       if (error) {
-        console.error('❌ Failed to send order confirmation:', error);
+        logger.error('❌ Failed to send order confirmation:', error);
         return { success: false, error };
       }
 
-      console.log('✅ Order confirmation email sent:', emailData);
+      logger.info('✅ Order confirmation email sent:', emailData);
       return { success: true, messageId: emailData?.id };
     } catch (error) {
-      console.error('❌ Failed to send order confirmation:', error);
+      logger.error('❌ Failed to send order confirmation:', error);
       return { success: false, error };
     }
   }
@@ -111,14 +125,41 @@ export class EmailService {
       });
 
       if (error) {
-        console.error('❌ Failed to send shipping notification:', error);
+        logger.error('❌ Failed to send shipping notification:', error);
         return { success: false, error };
       }
 
-      console.log('✅ Shipping notification email sent:', emailData);
+      logger.info('✅ Shipping notification email sent:', emailData);
       return { success: true, messageId: emailData?.id };
     } catch (error) {
-      console.error('❌ Failed to send shipping notification:', error);
+      logger.error('❌ Failed to send shipping notification:', error);
+      return { success: false, error };
+    }
+  }
+
+  /**
+   * Send order cancellation notification
+   */
+  async sendOrderCancellation(data: OrderCancellationEmailData) {
+    try {
+      const emailHtml = this.generateOrderCancellationHTML(data);
+
+      const { data: emailData, error } = await sendResendEmail({
+        from: `${this.companyName} <${this.senderEmail}>`,
+        to: data.customerEmail,
+        subject: `Order Cancelled - ${data.orderNumber}`,
+        html: emailHtml,
+      });
+
+      if (error) {
+        logger.error('❌ Failed to send order cancellation:', error);
+        return { success: false, error };
+      }
+
+      logger.info('✅ Order cancellation email sent:', emailData);
+      return { success: true, messageId: emailData?.id };
+    } catch (error) {
+      logger.error('❌ Failed to send order cancellation:', error);
       return { success: false, error };
     }
   }
@@ -138,14 +179,14 @@ export class EmailService {
       });
 
       if (error) {
-        console.error('❌ Failed to send contact reply:', error);
+        logger.error('❌ Failed to send contact reply:', error);
         return { success: false, error };
       }
 
-      console.log('✅ Contact form reply sent:', emailData);
+      logger.info('✅ Contact form reply sent:', emailData);
       return { success: true, messageId: emailData?.id };
     } catch (error) {
-      console.error('❌ Failed to send contact reply:', error);
+      logger.error('❌ Failed to send contact reply:', error);
       return { success: false, error };
     }
   }
@@ -312,10 +353,15 @@ export class EmailService {
 
       <!-- Track Order Link -->
       <div style="text-align: center; margin: 30px 0;">
-        <a href="http://localhost:5173/my-orders" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
+        <a href="${this.getOrderTrackingUrl(data.orderNumber, data.accessToken)}" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
           View Order Status
         </a>
       </div>
+      ${data.accessToken ? `
+      <p style="text-align: center; color: #6b7280; font-size: 13px; margin: 0 0 24px 0;">
+        Save your access token from this email — you will need it with your order number to track this order.
+      </p>
+      ` : ''}
     </div>
 
     <!-- Footer -->
@@ -435,6 +481,113 @@ export class EmailService {
       <p style="margin: 0 0 10px 0; color: #6b7280; font-size: 14px;">
         Questions? Contact us at <a href="mailto:${this.supportEmail}" style="color: #8b5cf6; text-decoration: none;">${this.supportEmail}</a>
       </p>
+      <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+        © ${new Date().getFullYear()} ${this.companyName}. All rights reserved.
+      </p>
+    </div>
+  </div>
+</body>
+</html>
+    `;
+  }
+
+  /**
+   * Generate order cancellation HTML
+   */
+  private generateOrderCancellationHTML(data: OrderCancellationEmailData): string {
+    const itemsHTML = data.items.map(item => `
+      <tr>
+        <td style="padding: 12px 0; border-bottom: 1px solid #e5e7eb; color: #6b7280;">
+          ${item.product_name} × ${item.quantity}
+        </td>
+        <td style="padding: 12px 0; border-bottom: 1px solid #e5e7eb; text-align: right; font-weight: 600; color: #1f2937;">
+          $${(item.price * item.quantity).toFixed(2)}
+        </td>
+      </tr>
+    `).join('');
+
+    const refundSection = data.refundProcessed
+      ? `
+      <div style="background-color: #ecfdf5; border-radius: 8px; padding: 20px; margin-bottom: 24px; border: 1px solid #a7f3d0;">
+        <p style="margin: 0; color: #047857; font-size: 15px; font-weight: 600;">
+          ✓ A refund of $${data.total.toFixed(2)} has been initiated to your original payment method.
+        </p>
+        ${data.refundId ? `
+        <p style="margin: 8px 0 0 0; color: #6b7280; font-size: 13px;">
+          Refund reference: <span style="font-family: monospace;">${data.refundId}</span>
+        </p>
+        ` : ''}
+        <p style="margin: 8px 0 0 0; color: #6b7280; font-size: 13px;">
+          Please allow 3–5 business days for the refund to appear on your statement.
+        </p>
+      </div>
+      `
+      : `
+      <div style="background-color: #f9fafb; border-radius: 8px; padding: 20px; margin-bottom: 24px; border: 1px solid #e5e7eb;">
+        <p style="margin: 0; color: #6b7280; font-size: 14px;">
+          No refund was processed for this order. If you believe this is an error, please contact support.
+        </p>
+      </div>
+      `;
+
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Order Cancelled</title>
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #1f2937; margin: 0; padding: 0; background-color: #f9fafb;">
+  <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff;">
+    <div style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); padding: 40px 20px; text-align: center;">
+      <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 800;">
+        ${this.companyName}
+      </h1>
+      <p style="color: #ffffff; margin: 10px 0 0 0; font-size: 16px; opacity: 0.9;">
+        Order Cancelled
+      </p>
+    </div>
+
+    <div style="padding: 40px 20px;">
+      <h2 style="color: #1f2937; margin: 0 0 15px 0; font-size: 24px; font-weight: 700;">
+        Hi ${data.customerName},
+      </h2>
+      <p style="color: #6b7280; margin: 0 0 24px 0; font-size: 16px; line-height: 1.8;">
+        Your order <strong>${data.orderNumber}</strong> has been cancelled.
+      </p>
+
+      ${data.cancellationReason ? `
+      <div style="background-color: #fef2f2; border-radius: 8px; padding: 16px; margin-bottom: 24px; border-left: 4px solid #ef4444;">
+        <p style="margin: 0 0 4px 0; color: #991b1b; font-size: 13px; font-weight: 600; text-transform: uppercase;">
+          Reason
+        </p>
+        <p style="margin: 0; color: #374151; font-size: 15px;">
+          ${data.cancellationReason}
+        </p>
+      </div>
+      ` : ''}
+
+      ${refundSection}
+
+      <h3 style="margin: 0 0 12px 0; color: #1f2937; font-size: 18px; font-weight: 700;">
+        Cancelled Items
+      </h3>
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">
+        ${itemsHTML}
+        <tr>
+          <td style="padding: 12px 0; font-weight: 700; color: #1f2937;">Order Total</td>
+          <td style="padding: 12px 0; text-align: right; font-weight: 700; color: #1f2937;">$${data.total.toFixed(2)}</td>
+        </tr>
+      </table>
+
+      <p style="color: #6b7280; font-size: 14px; line-height: 1.8; margin: 0;">
+        If you have questions about this cancellation, reply to this email or contact us at
+        <a href="mailto:${this.supportEmail}" style="color: #667eea; text-decoration: none;">${this.supportEmail}</a>.
+      </p>
+    </div>
+
+    <div style="background-color: #f9fafb; padding: 30px 20px; text-align: center; border-top: 1px solid #e5e7eb;">
       <p style="margin: 0; color: #9ca3af; font-size: 12px;">
         © ${new Date().getFullYear()} ${this.companyName}. All rights reserved.
       </p>

@@ -1,50 +1,40 @@
-# 🔄 Restart Backend Server
+# Restart Backend
 
-## Your backend is running but needs to restart to use the database!
+How to restart the Lab Door Customs API server.
 
-### **Steps:**
-
-1. **Find the terminal running the backend**
-   - Look for terminal 3 or the terminal showing:
-   ```
-   🚀 Server Running Successfully!
-   ```
-
-2. **Stop the server:**
-   - Press `Ctrl+C` in that terminal
-
-3. **Restart it:**
-   ```bash
-   npm run dev
-   ```
-
-4. **You should now see:**
-   ```
-   ╔════════════════════════════════════════╗
-   ║   🚀 Server Running Successfully!     ║
-   ╚════════════════════════════════════════╝
-   📍 Port: 5000
-   ✅ Ready to accept connections!
-   ```
-
-5. **Test products API:**
-   ```bash
-   curl http://localhost:5000/api/products
-   ```
-
-   **Should return 5 Nike shoes now!** (not empty array)
+**Full reference:** [`../info.md`](../info.md)
 
 ---
 
-## ✅ Once Restarted:
+## Local development
 
-The server will:
-- ✅ Connect to your database
-- ✅ Return real products (5 sample shoes)
-- ✅ Save orders to database
-- ✅ Save contact messages
+```bash
+cd backend
+# Ctrl+C to stop, then:
+npm run dev
+```
 
 ---
 
-**Just restart the backend and everything will work!** 🚀
+## Production (Railway)
 
+1. Open Railway dashboard → backend service.
+2. Click **Restart** or redeploy from latest commit.
+3. Verify: `GET /api/health`
+
+---
+
+## After restart
+
+The server automatically:
+
+- Connects to Redis (required in production)
+- Applies schema patches (idempotency, refund events tables)
+- Warms product cache
+- Starts maintenance jobs (order expiry, idempotency cleanup)
+
+---
+
+## Logs
+
+Check Railway logs or stdout for Pino JSON output. Filter by `X-Request-Id` for specific requests.

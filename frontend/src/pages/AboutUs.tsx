@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Heart, Award, Truck, Shield, Users, MapPin } from "lucide-react";
 import MetaTags from "../components/MetaTags";

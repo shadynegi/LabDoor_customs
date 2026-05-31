@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { Mail, Phone, MapPin, Send } from "lucide-react";
 import { toast } from "sonner";
 import MetaTags from "../components/MetaTags";
+import { logError } from "../lib/logger";
+import { apiFetch } from "../config";
 
 export default function ContactUs() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -26,11 +28,8 @@ export default function ContactUs() {
     setIsSubmitting(true);
     
     try {
-      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}/api/contact`, {
+      const response = await apiFetch('/contact', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify(formData),
       });
 
@@ -53,7 +52,7 @@ export default function ContactUs() {
         });
       }
     } catch (error) {
-      console.error('Error submitting contact form:', error);
+      logError('Error submitting contact form:', error);
       if (error instanceof TypeError && error.message === 'Failed to fetch') {
         toast.error('Network error', {
           description: 'Please check your internet connection and try again.',

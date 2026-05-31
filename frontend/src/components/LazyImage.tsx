@@ -1,7 +1,7 @@
 // components/LazyImage.tsx
 // Lazy loading image component with placeholder and blur-up effect
 
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, type CSSProperties } from 'react';
 import { optimizeImageUrl } from '../utils/imageUrl';
 
 interface LazyImageProps {
@@ -9,7 +9,7 @@ interface LazyImageProps {
   alt: string;
   width?: number | string;
   height?: number | string;
-  style?: React.CSSProperties;
+  style?: CSSProperties;
   className?: string;
   placeholder?: string;
   objectFit?: 'cover' | 'contain' | 'fill' | 'none' | 'scale-down';
@@ -100,6 +100,9 @@ export default function LazyImage({
             alignItems: 'center',
             justifyContent: 'center',
             background: '#f3f4f6',
+            backgroundImage: `url(${placeholder})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
           }}
         >
           {/* Shimmer effect */}

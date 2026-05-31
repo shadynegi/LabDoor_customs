@@ -1,4 +1,5 @@
 // backend/src/routes/reviews.ts - Customer Reviews API
+import { logger } from '../lib/logger';
 import { Router, Request, Response } from 'express';
 import sql from '../lib/db';
 import { parsePagination, paginationMeta } from '../lib/pagination';
@@ -145,7 +146,7 @@ router.get('/product/:productId', async (req: Request, res: Response) => {
       }
     });
   } catch (error: any) {
-    console.error('Error fetching reviews:', error);
+    logger.error('Error fetching reviews:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to fetch reviews'
@@ -252,7 +253,7 @@ router.post('/', async (req: Request, res: Response) => {
       data: result[0]
     });
   } catch (error: any) {
-    console.error('Error creating review:', error);
+    logger.error('Error creating review:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to create review'
@@ -355,7 +356,7 @@ router.post('/:id/vote', async (req: Request, res: Response) => {
       action: 'created'
     });
   } catch (error: any) {
-    console.error('Error voting on review:', error);
+    logger.error('Error voting on review:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to record vote'
@@ -451,7 +452,7 @@ router.get('/', verifyAdmin, async (req: Request, res: Response) => {
       )
     });
   } catch (error: any) {
-    console.error('Error fetching reviews:', error);
+    logger.error('Error fetching reviews:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to fetch reviews'
@@ -501,7 +502,7 @@ router.patch('/:id/status', verifyAdmin, async (req: Request, res: Response) => 
       data: result[0]
     });
   } catch (error: any) {
-    console.error('Error updating review:', error);
+    logger.error('Error updating review:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to update review'
@@ -530,7 +531,7 @@ router.delete('/:id', verifyAdmin, async (req: Request, res: Response) => {
       message: 'Review deleted successfully'
     });
   } catch (error: any) {
-    console.error('Error deleting review:', error);
+    logger.error('Error deleting review:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to delete review'
@@ -564,7 +565,7 @@ router.get('/check/:productId/:email', async (req: Request, res: Response) => {
       }
     });
   } catch (error: any) {
-    console.error('Error checking review eligibility:', error);
+    logger.error('Error checking review eligibility:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to check review eligibility'

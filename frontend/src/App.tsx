@@ -63,23 +63,11 @@ function ProtectedAdminRoute({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const verifyAuth = async () => {
-      const token = localStorage.getItem('adminToken');
-      if (!token) {
-        setIsAuthenticated(false);
-        return;
-      }
-
       try {
-        const response = await apiFetch('/admin/verify', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const response = await apiFetch('/admin/verify');
         setIsAuthenticated(response.ok);
-        if (!response.ok) {
-          localStorage.removeItem('adminToken');
-        }
       } catch {
         setIsAuthenticated(false);
-        localStorage.removeItem('adminToken');
       }
     };
 

@@ -1,299 +1,123 @@
-# Lab Door Customs - Deployment Guide
+# Deployment Guide
 
-This guide covers deploying Lab Door Customs to Railway with custom domain and monitoring setup.
+**Authoritative reference:** [`../info.md`](../info.md) — environment variables and CI/CD.
 
-## Prerequisites
-
-- Railway account (https://railway.app)
-- Custom domain (optional)
-- Sentry account for error tracking (optional)
+Deploy Lab Door Customs to production using Railway (backend + frontend) with Cloudflare in front.
 
 ---
 
-## 1. Railway Deployment
+## Architecture
 
-### 1.1 Create Railway Project
-
-1. Go to Railway dashboard and create a new project
-2. Choose "Deploy from GitHub repo"
-3. Connect your GitHub repository
-
-### 1.2 Backend Service Setup
-
-1. Click "New Service" → "GitHub Repo"
-2. Select the repository and set the **Root Directory** to `backend`
-3. Add the following environment variables:
-
-```env
-# Server Configuration
-PORT=5000
-NODE_ENV=production
-FRONTEND_URL=https://your-frontend-domain.com
-
-# Database (from Supabase)
-DATABASE_URL=postgresql://postgres:password@db.project.supabase.co:5432/postgres
-
-# PayPal
-PAYPAL_CLIENT_ID=your_live_client_id
-PAYPAL_SECRET=your_live_secret
-PAYPAL_MODE=live
-PAYPAL_WEBHOOK_ID=your_webhook_id
-
-# Admin Authentication
-ADMIN_USERNAME=your_admin_username
-ADMIN_PASSWORD=your_secure_password
-JWT_SECRET=your_32_character_or_longer_secret
-
-# Email (Resend)
-RESEND_API_KEY=your_resend_api_key
-SENDER_EMAIL=noreply@yourdomain.com
-COMPANY_NAME=Lab Door Customs
-COMPANY_SUPPORT_EMAIL=support@yourdomain.com
 ```
-
-4. The build command will run automatically from `railway.json`:
-   - Build: `npm install && npm run build`
-   - Start: `npm start`
-
-### 1.3 Frontend Service Setup
-
-1. Click "New Service" → "GitHub Repo"
-2. Select the same repository and set the **Root Directory** to `frontend`
-3. Add environment variables:
-
-```env
-VITE_API_BASE_URL=https://your-backend-service.railway.app/api
-VITE_BACKEND_URL=https://your-backend-service.railway.app
-```
-
-4. Build and start commands from `railway.json`:
-   - Build: `npm install && npm run build`
-   - Start: `npm start` (serves static files)
-
-### 1.4 Verify Deployment
-
-1. Check the deployment logs for any errors
-2. Visit your backend health endpoint: `https://your-backend.railway.app/api/health`
-3. Visit your frontend URL
-
----
-
-## 2. Custom Domain Configuration
-
-### 2.1 Add Domain to Railway
-
-1. Go to your frontend service in Railway
-2. Click "Settings" → "Domains"
-3. Click "Custom Domain" and enter your domain (e.g., `labdoorcustoms.com`)
-4. Railway will provide DNS records to configure
-
-### 2.2 Configure DNS Records
-
-Add these records at your domain registrar (e.g., Namecheap, GoDaddy, Cloudflare):
-
-**For apex domain (labdoorcustoms.com):**
-```
-Type: CNAME
-Name: @
-Value: [railway-provided-value].up.railway.app
-```
-
-Note: Some registrars don't support CNAME on apex domain. In that case:
-- Use Railway's provided A record IP, or
-- Use a subdomain like www and redirect apex to it
-
-**For www subdomain:**
-```
-Type: CNAME
-Name: www
-Value: [railway-provided-value].up.railway.app
-```
-
-### 2.3 SSL Certificate
-
-Railway automatically provisions SSL certificates via Let's Encrypt. Allow up to 10 minutes for certificate issuance after DNS propagation.
-
-### 2.4 Backend Domain (Optional)
-
-For a custom API domain (e.g., `api.labdoorcustoms.com`):
-
-1. Add domain to backend service in Railway
-2. Configure DNS CNAME record
-3. Update frontend environment variables:
-   ```
-   VITE_API_BASE_URL=https://api.labdoorcustoms.com/api
-   VITE_BACKEND_URL=https://api.labdoorcustoms.com
-   ```
-
----
-
-## 3. Monitoring & Error Tracking
-
-### 3.1 Sentry Integration (Error Tracking)
-
-#### Backend Setup
-
-1. Install Sentry:
-   ```bash
-   cd backend
-   npm install @sentry/node
-   ```
-
-2. Add to `server.ts` at the top:
-   ```typescript
-   import * as Sentry from '@sentry/node';
-
-   Sentry.init({
-     dsn: process.env.SENTRY_DSN,
-     environment: process.env.NODE_ENV || 'development',
-     tracesSampleRate: 0.2, // Capture 20% of transactions
-   });
-   ```
-
-3. Add environment variable to Railway:
-   ```
-   SENTRY_DSN=https://xxx@xxx.ingest.sentry.io/xxx
-   ```
-
-#### Frontend Setup
-
-1. Install Sentry:
-   ```bash
-   cd frontend
-   npm install @sentry/react
-   ```
-
-2. Add to main entry file:
-   ```typescript
-   import * as Sentry from '@sentry/react';
-
-   Sentry.init({
-     dsn: import.meta.env.VITE_SENTRY_DSN,
-     environment: import.meta.env.MODE,
-     tracesSampleRate: 0.2,
-   });
-   ```
-
-3. Add environment variable:
-   ```
-   VITE_SENTRY_DSN=https://xxx@xxx.ingest.sentry.io/xxx
-   ```
-
-### 3.2 Railway Metrics
-
-Railway provides built-in metrics:
-
-1. Go to your service in Railway
-2. Click "Metrics" tab
-3. View CPU, Memory, and Network usage
-4. Set up alerts for resource thresholds
-
-### 3.3 Uptime Monitoring
-
-Set up external uptime monitoring with UptimeRobot (free) or Better Uptime:
-
-1. Create account at https://uptimerobot.com
-2. Add new monitor:
-   - Type: HTTP(s)
-   - URL: `https://your-backend.railway.app/api/health`
-   - Monitoring Interval: 5 minutes
-3. Configure alerts (email, Slack, etc.)
-
-### 3.4 Health Check Endpoint
-
-The health endpoint at `/api/health` returns:
-
-```json
-{
-  "status": "OK",
-  "message": "All systems operational",
-  "timestamp": "2024-01-01T00:00:00.000Z",
-  "uptime": 3600,
-  "environment": "production",
-  "services": {
-    "database": {
-      "status": "connected",
-      "latency_ms": 12
-    },
-    "paypal": {
-      "mode": "live",
-      "api": "https://api-m.paypal.com"
-    }
-  },
-  "responseTime_ms": 15
-}
+User → Cloudflare (DNS + proxy) → Railway frontend (static SPA)
+                               → Railway backend (Express API)
+                               → Supabase PostgreSQL
+                               → Redis
+                               → PayPal (live)
+                               → Resend (email)
+                               → Sentry (errors)
 ```
 
 ---
 
-## 4. Production Checklist
+## Backend (Railway)
 
-### Security
-- [ ] Change all default passwords
-- [ ] Use strong JWT secret (32+ characters)
-- [ ] Enable HTTPS (automatic with Railway)
-- [ ] Configure CORS for your domain only
-- [ ] Set `NODE_ENV=production`
+1. Create a Railway service from the `backend/` directory.
+2. Set **start command:** `npm run build && npm start`
+3. Set **healthcheck path:** `/api/health`
 
-### PayPal
-- [ ] Switch from sandbox to live credentials
-- [ ] Configure webhook URL with your production domain
-- [ ] Update `PAYPAL_MODE=live`
-- [ ] Test a real transaction
+### Required environment variables
 
-### Database
-- [ ] Run all schema migrations
-- [ ] Verify coupons table is created
-- [ ] Check RLS policies are active
+| Variable | Value |
+|----------|-------|
+| `NODE_ENV` | `production` |
+| `DATABASE_URL` | Supabase pooler URL (port 6543) |
+| `FRONTEND_URL` | `https://www.labdoorcustoms.com` |
+| `ADMIN_PASSWORD_HASH` | Bcrypt hash of admin password |
+| `PAYPAL_CLIENT_ID` | Live PayPal client ID |
+| `PAYPAL_SECRET` | Live PayPal secret |
+| `PAYPAL_MODE` | `live` |
+| `PAYPAL_WEBHOOK_ID` | PayPal webhook ID |
+| `TRUST_CLOUDFLARE` | `true` |
+| `REDIS_URL` | Redis connection string |
+| `SENTRY_DSN` | Sentry backend DSN |
+| `JWT_SECRET` | 32+ character secret |
+| `RESEND_API_KEY` | Resend API key |
 
-### Email
-- [ ] Verify sender domain in Resend
-- [ ] Test order confirmation emails
-- [ ] Test shipping notification emails
+### Recommended
 
-### Monitoring
-- [ ] Set up Sentry error tracking
-- [ ] Configure uptime monitoring
-- [ ] Set up alert notifications
-
----
-
-## 5. Troubleshooting
-
-### Common Issues
-
-**Build fails:**
-- Check Node.js version compatibility
-- Verify all dependencies are in package.json
-- Check TypeScript compilation errors
-
-**Database connection fails:**
-- Verify DATABASE_URL is correct
-- Check Supabase project is active
-- Ensure IP is not blocked by Supabase
-
-**CORS errors:**
-- Update FRONTEND_URL in backend environment
-- Ensure URLs don't have trailing slashes
-
-**PayPal issues:**
-- Verify credentials match the mode (sandbox/live)
-- Check webhook URL is accessible
-- Ensure webhook secret is correct
-
-### Logs
-
-View logs in Railway:
-1. Go to your service
-2. Click "Deployments" 
-3. Click on active deployment
-4. View real-time logs
+| Variable | Purpose |
+|----------|---------|
+| `DB_SSL_CA_PATH` | Supabase CA certificate |
+| `SENTRY_RELEASE` | Git commit SHA for Sentry releases |
+| `PENDING_ORDER_TTL_HOURS` | Abandoned checkout TTL (default 24) |
 
 ---
 
-## Support
+## Frontend (Railway)
 
-For deployment issues:
-- Railway Documentation: https://docs.railway.app
-- Supabase Documentation: https://supabase.com/docs
-- Sentry Documentation: https://docs.sentry.io
+1. Create a Railway service from the `frontend/` directory.
+2. Set **build command:** `npm run build`
+3. Set **start command:** `npm start` (serves `dist/`)
+
+### Required build-time variables
+
+| Variable | Value |
+|----------|-------|
+| `NODE_ENV` | `production` |
+| `CI` | `true` (or rely on NODE_ENV) |
+| `VITE_API_BASE_URL` | `https://api.yourdomain.com/api` |
+| `VITE_SITE_URL` | `https://www.yourdomain.com` |
+| `VITE_SENTRY_DSN` | Sentry frontend DSN |
+| `SITEMAP_REQUIRE_PRODUCTS` | `true` (default in prod builds) |
+
+The build runs `validate-env.mjs` → `generate-sitemap.mjs` → TypeScript → Vite.
+
+### Optional
+
+| Variable | Purpose |
+|----------|---------|
+| `VITE_GA4_MEASUREMENT_ID` | Google Analytics |
+| `VITE_GSC_VERIFICATION` | Search Console verification |
+| `VITE_SENTRY_RELEASE` | Sentry release tag |
+
+---
+
+## Cloudflare
+
+See [CLOUDFLARE_RAILWAY.md](./CLOUDFLARE_RAILWAY.md).
+
+- Proxy both frontend and API domains through Cloudflare (orange cloud).
+- Backend requires `TRUST_CLOUDFLARE=true` — direct Railway URL access is blocked except `/api/health`.
+
+---
+
+## PayPal webhooks
+
+1. In PayPal Developer Dashboard (live mode), create a webhook pointing to:
+   `https://api.yourdomain.com/api/paypal/webhook`
+2. Subscribe to: `PAYMENT.CAPTURE.COMPLETED`, `PAYMENT.CAPTURE.DENIED`, `PAYMENT.CAPTURE.REFUNDED`, `PAYMENT.CAPTURE.REVERSED`
+3. Set `PAYPAL_WEBHOOK_ID` on the backend service.
+
+---
+
+## GitHub CI secrets
+
+| Secret | Used by |
+|--------|---------|
+| `PRODUCTION_API_BASE_URL` | Frontend build, sitemap job |
+| `VITE_SENTRY_DSN` | Frontend build |
+| `DATABASE_URL` | Supabase keep-alive cron |
+
+---
+
+## Post-deploy checks
+
+1. `GET https://api.yourdomain.com/api/health` — DB and Redis healthy
+2. Browse storefront — products load from API
+3. Complete a sandbox/live test order
+4. Admin login and dashboard analytics
+5. Verify `https://www.yourdomain.com/sitemap.xml` contains product URLs
+6. Submit sitemap in Google Search Console
+
+See also: [DEPLOYMENT.md](./DEPLOYMENT.md), [SSL_DNS_CHECKLIST.md](./SSL_DNS_CHECKLIST.md)

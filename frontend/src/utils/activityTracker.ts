@@ -1,5 +1,6 @@
 // Activity tracking utility for user behavior analytics
 import { config, apiFetch } from '../config';
+import { logDebug } from '../lib/logger';
 
 // Generate or get session ID
 const getSessionId = (): string => {
@@ -43,7 +44,7 @@ interface ActivityData {
 
 // Queue for batching activities
 let activityQueue: ActivityData[] = [];
-let flushTimeout: NodeJS.Timeout | null = null;
+let flushTimeout: ReturnType<typeof setTimeout> | null = null;
 
 // Flush the activity queue to the server
 const flushQueue = async () => {
@@ -66,7 +67,7 @@ const flushQueue = async () => {
     });
   } catch (error) {
     // Silently fail - don't interrupt user experience
-    console.debug('Activity tracking failed:', error);
+    logDebug('Activity tracking failed:', error);
   }
 };
 

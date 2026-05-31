@@ -1,202 +1,110 @@
-# Database Setup Guide
+# Database Setup
 
-This guide will help you set up the Supabase database for Lab Door Customs.
+PostgreSQL schema and migrations for Lab Door Customs on Supabase.
 
-## Prerequisites
+**Full reference:** [`../info.md`](../info.md)
 
-1. A Supabase account (free tier is sufficient for development)
-2. A Supabase project created
+---
 
-## Setup Steps
+## Connection
 
-### 1. Create a Supabase Project
+| Use case | Port | Notes |
+|----------|------|-------|
+| App server (production) | 6543 | PgBouncer pooler — `prepare: false` |
+| Migrations / admin | 5432 | Direct connection |
 
-1. Go to [Supabase Dashboard](https://app.supabase.com/)
-2. Click "New Project"
-3. Fill in:
-   - Project Name: `gaultier-shoe-store` (or your preferred name)
-   - Database Password: (generate a strong password and save it)
-   - Region: Choose the closest to your location
-4. Click "Create new project"
-5. Wait for the project to be created (takes 1-2 minutes)
+```
+DATABASE_URL=postgresql://postgres:PASSWORD@db.PROJECT.supabase.co:6543/postgres?pgbouncer=true
+```
 
-### 2. Get Your Credentials
+Production TLS: set `DB_SSL_CA_PATH` to Supabase CA bundle.
 
-1. In your Supabase project dashboard, go to **Settings** → **API**
-2. Copy the following:
-   - **Project URL** (e.g., `https://xxxxxxxxxxxxx.supabase.co`)
-   - **Project API Key** → `service_role` key (secret key)
+---
 
-### 3. Configure Backend Environment
+## Initial setup
 
-1. Navigate to `backend` directory
-2. Copy `env.template` to `.env`:
-   ```bash
-   cp env.template .env
-   ```
+1. Create a Supabase project.
+2. Run `backend/src/database/schema.sql` in the SQL editor.
+3. Optionally run `backend/src/database/seed.sql` for sample products.
+4. Apply migration files in `backend/src/database/` as needed.
 
-3. Edit `.env` file and add your Supabase credentials:
-   ```env
-   SUPABASE_URL=https://your-project-id.supabase.co
-   SUPABASE_KEY=your-service-role-key
-   ```
+---
 
-### 4. Run Database Schema
+## Core tables
 
-1. Go to your Supabase project dashboard
-2. Click on **SQL Editor** in the left sidebar
-3. Click **New Query**
-4. Copy the contents of `backend/src/database/schema.sql`
-5. Paste it into the SQL Editor
-6. Click **Run** button to execute
+| Table | Purpose |
+|-------|---------|
+| `products` | Catalog — price, stock, category, size, color, ratings |
+| `orders` | Orders — JSONB items/shipping, PayPal IDs, payment/status enums |
+| `customers` | Aggregated stats — total_orders, total_spent, soft delete |
+| `coupons` | Discount rules — type, limits, scope (`applies_to`) |
+| `coupon_usage` | Per-order coupon reservations |
+| `contact_messages` | Contact form inbox |
+| `activity_logs` | Client activity (anonymized IP) |
+| `admin_sessions` | Admin session tokens |
 
-This will create:
-- `products` table
-- `orders` table
-- `contact_messages` table
-- Necessary indexes
-- Row Level Security policies
-- Auto-update triggers
+---
 
-### 5. (Optional) Add Sample Data
+## Payment tables
 
-1. In the SQL Editor, create another **New Query**
-2. Copy the contents of `backend/src/database/seed.sql`
-3. Paste and **Run**
+Created at server startup via `ensureIdempotencyTable()` and `ensureOrderPaymentSchema()`:
 
-This will add:
-- Sample products (6 shoe products)
-- Sample orders (2 test orders)
-- Sample contact messages (3 test messages)
+| Table | Purpose |
+|-------|---------|
+| `payment_idempotency` | Create/capture deduplication |
+| `processed_refund_events` | Refund webhook/admin deduplication |
 
-### 6. Verify Setup
+Migration files:
 
-1. Go to **Table Editor** in Supabase dashboard
-2. You should see three tables:
-   - `products`
-   - `orders`
-   - `contact_messages`
-3. Click on each table to see the data
+- `migration-payment-idempotency.sql`
+- `migration-paypal-unique-refunds.sql`
+- `migration-processed-refund-events.sql`
 
-### 7. Test Backend Connection
+---
 
-1. Start your backend server:
-   ```bash
-   cd backend
-   npm run dev
-   ```
+## Orders table highlights
 
-2. Test the health endpoint:
-   ```bash
-   curl http://localhost:5000/api/health
-   ```
+| Column | Purpose |
+|--------|---------|
+| `paypal_order_id` | PayPal checkout order ID (unique when set) |
+| `paypal_capture_id` | PayPal capture ID (unique when set) |
+| `refunded_amount` | Cumulative refunded total |
+| `access_token_hash` | SHA-256 hash of customer access token |
+| `items` | JSONB line items |
+| `shipping_address` | JSONB shipping details |
 
-3. Test the products endpoint:
-   ```bash
-   curl http://localhost:5000/api/products
-   ```
+---
 
-You should see a list of products if everything is set up correctly!
+## Reviews
 
-## Table Structures
+Applied via `migration-reviews.sql`:
 
-### Products Table
-- `id` - Serial primary key
-- `name` - Product name
-- `price` - Product price (decimal)
-- `image` - Image path/URL
-- `description` - Product description
-- `background` - Background image for product display
-- `category` - Product category
-- `stock` - Available stock quantity
-- `created_at` - Auto-generated timestamp
-- `updated_at` - Auto-updated timestamp
+- `reviews` — rating, content, moderation status, verified purchase
+- `review_votes` — helpful/not helpful votes
+- Trigger updates product `rating` and `review_count`
 
-### Orders Table
-- `id` - UUID primary key
-- `order_number` - Unique order identifier
-- `customer_email` - Customer email
-- `customer_name` - Customer name
-- `shipping_address` - JSONB field with address details
-- `items` - JSONB array of order items
-- `subtotal`, `shipping_cost`, `tax`, `total` - Price calculations
-- `payment_status` - pending | completed | failed | refunded
-- `payment_method` - Payment method used
-- `payment_id`, `paypal_order_id`, `paypal_capture_id` - Payment references
-- `status` - pending | processing | shipped | delivered | cancelled
-- `created_at`, `updated_at` - Timestamps
+---
 
-### Contact Messages Table
-- `id` - UUID primary key
-- `name` - Sender name
-- `email` - Sender email
-- `subject` - Message subject
-- `message` - Message content
-- `status` - new | read | replied | archived
-- `created_at`, `updated_at` - Timestamps
+## Row-level security
 
-## Security Notes
+Supabase RLS policies may be applied for direct client access. The backend uses the **service role** connection and bypasses RLS for API operations.
 
-### Row Level Security (RLS)
+See [RLS_OPTIMIZATION.md](./RLS_OPTIMIZATION.md).
 
-RLS is enabled on all tables with the following policies:
+---
 
-**Products:**
-- Public read access (anyone can view)
-- Authenticated users can create/update/delete
+## Maintenance
 
-**Orders:**
-- Users can read their own orders (by email)
-- Anyone can create orders
-- Authenticated users can update
+The backend runs scheduled jobs:
 
-**Contact Messages:**
-- Anyone can submit
-- Only authenticated users can read/manage
+- Expire abandoned pending orders (restore stock)
+- Clean expired idempotency rows
+- Reap stuck processing idempotency keys
 
-### API Keys
+---
 
-**NEVER** expose your `service_role` key in frontend code! This key bypasses RLS and should only be used in your backend.
+## Keep-alive
 
-For frontend applications, use the `anon` public key instead.
+GitHub Actions cron (every 6 days) runs `backend/scripts/keep-alive.js` to prevent Supabase free-tier pausing. Requires `DATABASE_URL` secret.
 
-## Troubleshooting
-
-### "relation does not exist" error
-- Make sure you ran the schema.sql file completely
-- Check that all tables were created in the Table Editor
-
-### "permission denied" error
-- Verify your `service_role` key is correct
-- Check RLS policies are set up correctly
-
-### Connection timeout
-- Check your Supabase project is active
-- Verify the SUPABASE_URL is correct
-- Check your internet connection
-
-### Cannot insert data
-- Verify RLS policies allow the operation
-- Check table constraints (e.g., price must be >= 0)
-- Ensure required fields are provided
-
-## Need Help?
-
-- [Supabase Documentation](https://supabase.com/docs)
-- [Supabase Discord Community](https://discord.supabase.com/)
-- Check backend logs for detailed error messages
-
-## Production Checklist
-
-Before deploying to production:
-
-- [ ] Remove sample data from seed.sql
-- [ ] Update RLS policies for production security
-- [ ] Set up proper authentication
-- [ ] Add rate limiting
-- [ ] Configure backup schedules
-- [ ] Set up monitoring and alerts
-- [ ] Use environment-specific Supabase projects
-- [ ] Rotate API keys regularly
-- [ ] Review and tighten CORS settings
-
+See [SUPABASE_SETUP_INSTRUCTIONS.md](./SUPABASE_SETUP_INSTRUCTIONS.md), [GET_DATABASE_URL.md](./GET_DATABASE_URL.md).
