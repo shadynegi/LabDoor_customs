@@ -4,8 +4,8 @@ import {
   parseCaptureFromPayPalOrder,
   extractCaptureAmountFromWebhookResource,
   extractRefundAmountFromWebhookResource,
-} from '../../src/lib/paypalWebhookUtils';
-import { isFullRefundAmount } from '../../src/lib/refundSync';
+} from '../../backend/src/lib/paypalWebhookUtils';
+import { isFullRefundAmount } from '../../backend/src/lib/refundSync';
 
 describe('paypalWebhookUtils', () => {
   it('extracts capture ID from refund webhook up link', () => {

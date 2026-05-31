@@ -1,12 +1,29 @@
 import { getCsrfToken, initCsrfToken, resetCsrfSession, setCsrfToken, fetchCsrfToken } from './utils/csrf';
 
+/** In dev, route API through Vite proxy (/api) unless env explicitly uses a LAN IP. */
+function resolveApiBaseUrl(): string {
+  const envUrl = import.meta.env.VITE_API_BASE_URL?.trim();
+  const devFallback = import.meta.env.DEV ? '/api' : 'http://localhost:5000/api';
+
+  if (!envUrl) return devFallback;
+
+  if (import.meta.env.DEV) {
+    const isLocalhostApi =
+      /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/api)?\/?$/i.test(envUrl) ||
+      envUrl.startsWith('http://localhost:') ||
+      envUrl.startsWith('http://127.0.0.1:');
+    if (isLocalhostApi) {
+      return '/api';
+    }
+  }
+
+  return envUrl;
+}
+
 export const config = {
-  // Dev default `/api` is proxied by Vite to the backend (works on LAN devices).
-  apiBaseUrl:
-    import.meta.env.VITE_API_BASE_URL ||
-    (import.meta.env.DEV ? '/api' : 'http://localhost:5000/api'),
+  apiBaseUrl: resolveApiBaseUrl(),
   backendUrl:
-    import.meta.env.VITE_BACKEND_URL ||
+    import.meta.env.VITE_BACKEND_URL?.trim() ||
     (import.meta.env.DEV ? '' : 'http://localhost:5000'),
   apiTimeoutMs: parseInt(import.meta.env.VITE_API_TIMEOUT_MS || '15000', 10),
 } as const;

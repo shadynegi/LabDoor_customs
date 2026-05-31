@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import request from 'supertest';
-import { app } from '../../src/server';
+import { app } from '../../backend/src/server';
 import { createCsrfAgent, withCsrf } from '../helpers/http';
 
 const validOrderPayload = {

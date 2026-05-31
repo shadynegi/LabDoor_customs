@@ -20,7 +20,8 @@
 | Document | Purpose |
 |----------|---------|
 | [API_DOCUMENTATION.md](./API_DOCUMENTATION.md) | REST API endpoints |
-| [TESTING_INSTRUCTIONS.md](./TESTING_INSTRUCTIONS.md) | Manual and automated testing |
+| [../Tests/test_guidelines.md](../Tests/test_guidelines.md) | Manual and automated testing (primary) |
+| [TESTING_INSTRUCTIONS.md](./TESTING_INSTRUCTIONS.md) | Redirect → `Tests/test_guidelines.md` |
 | [DATABASE_SETUP.md](./DATABASE_SETUP.md) | Schema, migrations, Supabase |
 | [ADMIN_DASHBOARD_GUIDE.md](./ADMIN_DASHBOARD_GUIDE.md) | Admin UI workflows |
 

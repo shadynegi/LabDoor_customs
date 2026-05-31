@@ -838,9 +838,9 @@ npm run dev             # http://localhost:5173
 **Strict env validation** is skipped locally unless `CI=true` or `NODE_ENV=production`.
 
 ```bash
-cd backend && npm test           # Vitest (45 tests)
+cd backend && npm test           # Vitest (54 tests)
 cd frontend && npm run build     # validate-env + sitemap + tsc + vite
-cd frontend && npm run test:e2e  # Playwright smoke
+cd Tests && npm run test:frontend  # Playwright smoke (or npm run test:e2e from frontend)
 npm run links:check              # from repo root
 ```
 
@@ -854,7 +854,9 @@ npm run links:check              # from repo root
 | Frontend E2E | Playwright | Home, products, checkout shell, contact page render |
 | Link check | Custom script | Documentation internal links |
 
-API tests mock the database layer (`tests/setup.ts`) for fast isolated runs.
+API tests mock the database layer (`Tests/setup.ts`) for fast isolated runs.
+
+**Detailed runbook:** [Tests/test_guidelines.md](Tests/test_guidelines.md) — automated tests, manual QA, CI, commands, and policy (run tests only when explicitly requested).
 
 ---
 
@@ -862,6 +864,7 @@ API tests mock the database layer (`tests/setup.ts`) for fast isolated runs.
 
 | Document | Topic |
 |----------|-------|
+| [Tests/test_guidelines.md](Tests/test_guidelines.md) | Testing — automated, manual QA, CI, when to run |
 | [documentation/QUICK_START.md](documentation/QUICK_START.md) | 10-minute local setup |
 | [documentation/API_DOCUMENTATION.md](documentation/API_DOCUMENTATION.md) | Full REST API |
 | [documentation/DEPLOYMENT.md](documentation/DEPLOYMENT.md) | Production deploy |

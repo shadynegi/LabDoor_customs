@@ -6,7 +6,7 @@ import {
   isCloudflareIp,
   isIpv4InCidr,
   normalizeIp,
-} from '../../src/lib/clientIp';
+} from '../../backend/src/lib/clientIp';
 
 function mockRequest(overrides: Partial<Request> & { headers?: Record<string, string> } = {}): Request {
   return {

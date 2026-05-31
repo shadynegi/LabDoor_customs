@@ -3,8 +3,8 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     environment: 'node',
-    setupFiles: ['./tests/setup.ts'],
-    include: ['tests/**/*.test.ts'],
+    setupFiles: ['../Tests/setup.ts'],
+    include: ['../Tests/backend/**/*.test.ts', '../Tests/api/**/*.test.ts'],
     env: {
       NODE_ENV: 'test',
       DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/postgres',

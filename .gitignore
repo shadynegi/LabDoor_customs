@@ -27,6 +27,11 @@ Thumbs.db
 # Test / coverage
 coverage/
 .nyc_output/
+frontend/test-results/
+Tests/test-results/*
+!Tests/test-results/.gitignore
+!Tests/test-results/.gitkeep
+!Tests/test-results/README.md
 
 # Vite / tooling
 frontend/dist/

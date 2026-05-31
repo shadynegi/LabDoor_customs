@@ -7,8 +7,11 @@
     "dev": "nodemon --exec ts-node src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "test": "vitest run",
+    "test": "node ../Tests/scripts/run-with-report.mjs vitest",
     "test:watch": "vitest",
+    "test:unit": "node ../Tests/scripts/run-with-report.mjs unit",
+    "test:api": "node ../Tests/scripts/run-with-report.mjs api",
+    "test:raw": "vitest run",
     "keep-alive": "node scripts/keep-alive.js"
   },
   "dependencies": {

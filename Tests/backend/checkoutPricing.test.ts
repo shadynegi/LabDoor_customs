@@ -8,7 +8,7 @@ import {
   validateCartItems,
   FREE_SHIPPING_THRESHOLD,
   SHIPPING_COST,
-} from '../../src/lib/paypalCheckout';
+} from '../../backend/src/lib/paypalCheckout';
 import { sqlMock } from '../setup';
 
 describe('checkoutPricing', () => {

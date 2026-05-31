@@ -2,7 +2,7 @@ import { vi } from 'vitest';
 
 export const sqlMock = vi.fn(async () => [] as unknown[]);
 
-vi.mock('../src/lib/db', () => ({
+vi.mock('../backend/src/lib/db', () => ({
   default: sqlMock,
   withRetry: async <T>(fn: () => Promise<T>) => fn(),
   runInChunks: async <T>(
@@ -24,7 +24,7 @@ vi.mock('../src/lib/db', () => ({
   }),
 }));
 
-vi.mock('../src/lib/paymentIdempotency', () => ({
+vi.mock('../backend/src/lib/paymentIdempotency', () => ({
   buildCreatePaymentKey: () => 'test-idempotency-key',
   claimIdempotencyKey: async () => ({ type: 'claimed' as const }),
   completeIdempotencyKey: async () => {},
@@ -35,7 +35,7 @@ vi.mock('../src/lib/paymentIdempotency', () => ({
   reclaimFailedIdempotencyKey: async () => false,
 }));
 
-vi.mock('../src/lib/redis', () => ({
+vi.mock('../backend/src/lib/redis', () => ({
   connectRedis: async () => {},
   disconnectRedis: async () => {},
   isRedisEnabled: () => false,

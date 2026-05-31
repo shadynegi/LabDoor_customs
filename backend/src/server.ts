@@ -238,7 +238,9 @@ const extraOrigins =
 const allowedOrigins = [
   process.env.FRONTEND_URL || 'http://localhost:5173',
   'http://localhost:5173',
+  'http://127.0.0.1:5173',
   'http://localhost:3000',
+  'http://127.0.0.1:3000',
   ...extraOrigins,
 ].filter(Boolean);
 
@@ -287,8 +289,14 @@ app.use((req: Request, res: Response, next: NextFunction) => {
         return callback(new Error('Not allowed by CORS'));
       }
 
-      if (allowedOrigins.includes(origin) || isDevLanOrigin(origin)) {
-        return callback(null, true);
+      const allowOrigin =
+        allowedOrigins.includes(origin) ||
+        isDevLanOrigin(origin) ||
+        (!isProduction && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin));
+
+      if (allowOrigin) {
+        // Must reflect the request origin (not *) when credentials: true
+        return callback(null, origin);
       }
 
       logger.warn({ origin }, 'CORS blocked origin');

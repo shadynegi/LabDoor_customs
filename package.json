@@ -2,7 +2,12 @@
   "name": "labdoor-customs",
   "private": true,
   "scripts": {
-    "links:check": "node scripts/link-check.mjs"
+    "links:check": "node scripts/link-check.mjs",
+    "test": "npm run test --prefix backend",
+    "test:backend": "npm run test:unit --prefix backend",
+    "test:api": "npm run test:api --prefix backend",
+    "test:frontend": "npm run test:frontend --prefix Tests",
+    "test:all": "node Tests/scripts/run-with-report.mjs all"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0"

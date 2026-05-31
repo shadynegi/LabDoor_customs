@@ -17,11 +17,13 @@ LabDoor_customs/
 │   │   ├── lib/
 │   │   ├── middleware/
 │   │   └── database/
-│   └── tests/
 ├── frontend/         React SPA
 │   ├── src/
-│   ├── e2e/
 │   └── scripts/
+├── Tests/            Vitest + Playwright test suites
+│   ├── backend/
+│   ├── api/
+│   └── frontend/
 └── documentation/
 ```
 

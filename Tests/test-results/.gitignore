@@ -1,0 +1,5 @@
+# Generated test reports — keep folder, ignore report files
+*
+!.gitignore
+!.gitkeep
+!README.md

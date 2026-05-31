@@ -4,7 +4,7 @@ import {
   hashOrderAccessToken,
   orderAccessMatches,
   stripOrderSecrets,
-} from '../../src/lib/orderTokens';
+} from '../../backend/src/lib/orderTokens';
 
 describe('orderTokens', () => {
   it('generates token and matching hash', () => {

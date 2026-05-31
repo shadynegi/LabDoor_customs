@@ -11,8 +11,8 @@
     "build:analyze": "ANALYZE=true tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview --port 5173",
-    "test:e2e": "playwright test",
-    "test:e2e:install": "playwright install chromium",
+    "test:e2e": "npm run test:frontend --prefix ../Tests",
+    "test:e2e:install": "npm run test:frontend:install --prefix ../Tests",
     "start": "serve -s dist -l ${PORT:-5173}"
   },
   "dependencies": {
@@ -31,7 +31,6 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
-    "@playwright/test": "^1.60.0",
     "@types/country-list": "^2.1.4",
     "@types/node": "^24.10.0",
     "@types/react": "^19.2.2",

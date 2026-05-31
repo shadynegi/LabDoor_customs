@@ -1,5 +1,5 @@
 import request, { type Test } from 'supertest';
-import { app } from '../../src/server';
+import { app } from '../../backend/src/server';
 
 export async function createCsrfAgent() {
   const agent = request.agent(app);

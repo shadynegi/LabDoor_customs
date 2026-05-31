@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   buildPayPalRefundDedupeKey,
   buildWebhookRefundDedupeKey,
-} from '../../src/lib/refundIdempotency';
-import { isFullRefundAmount } from '../../src/lib/refundSync';
+} from '../../backend/src/lib/refundIdempotency';
+import { isFullRefundAmount } from '../../backend/src/lib/refundSync';
 
 describe('refundIdempotency helpers', () => {
   it('builds PayPal refund dedupe key', () => {

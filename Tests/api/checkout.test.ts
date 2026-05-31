@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import request from 'supertest';
-import { app } from '../../src/server';
+import { app } from '../../backend/src/server';
 import { sqlMock } from '../setup';
 import { createCsrfAgent, withCsrf } from '../helpers/http';
 

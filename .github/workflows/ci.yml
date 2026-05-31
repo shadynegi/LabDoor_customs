@@ -56,8 +56,15 @@ jobs:
           VITE_API_BASE_URL: ${{ secrets.PRODUCTION_API_BASE_URL }}
           VITE_SITE_URL: https://www.labdoorcustoms.com
           VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
-      - run: npx playwright install chromium --with-deps
-      - run: npm run test:e2e
+      - name: Install E2E test runner
+        working-directory: Tests
+        run: npm ci
+      - name: Install Playwright browser
+        working-directory: Tests
+        run: npx playwright install chromium --with-deps
+      - name: Run storefront E2E smoke tests
+        working-directory: Tests
+        run: npm run test:frontend
         env:
           CI: true
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { getConnectionOptions, usePoolerMode } = require('../../scripts/keep-alive.js');
+const { getConnectionOptions, usePoolerMode } = require('../../backend/scripts/keep-alive.js');
 
 describe('keep-alive connection config', () => {
   it('disables prepared statements for transaction pooler port 6543', () => {
