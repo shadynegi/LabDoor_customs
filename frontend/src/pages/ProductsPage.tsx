@@ -84,7 +84,7 @@ const ProductsPage = () => {
     return (
       <div style={{
         minHeight: '100vh',
-        background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
+        background: 'linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)',
         padding: isMobile ? '20px' : '40px 60px',
       }}>
         <SkeletonStyles />
@@ -161,7 +161,7 @@ const ProductsPage = () => {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
+      background: 'linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)',
       padding: isMobile ? '20px' : '40px 60px',
     }}>
       <MetaTags
@@ -183,7 +183,7 @@ const ProductsPage = () => {
             fontWeight: 900,
             color: '#1f2937',
             marginBottom: 12,
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            background: 'linear-gradient(135deg, #361906 0%, #9c6649 100%)',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
           }}
@@ -290,9 +290,9 @@ const ProductsPage = () => {
                   padding: '6px 12px',
                   fontSize: 13,
                   fontWeight: 500,
-                  color: '#667eea',
+                  color: '#9c6649',
                   background: 'transparent',
-                  border: '1px solid #667eea',
+                  border: '1px solid #9c6649',
                   borderRadius: 6,
                   cursor: 'pointer',
                   transition: 'all 0.2s ease',
@@ -356,7 +356,7 @@ const ProductsPage = () => {
                 position: 'relative',
                 paddingTop: '100%',
                 overflow: 'hidden',
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                background: 'linear-gradient(135deg, #361906 0%, #9c6649 100%)',
               }}>
                 <img
                   src={optimizeImageUrl(product.image, { width: 480 })}
@@ -410,7 +410,7 @@ const ProductsPage = () => {
                 <div style={{
                   fontSize: isMobile ? 18 : 22,
                   fontWeight: 800,
-                  color: '#667eea',
+                  color: '#9c6649',
                   marginBottom: 8,
                 }}>
                   ${product.price}
@@ -507,7 +507,7 @@ const ProductsPage = () => {
               style={{
                 marginTop: 20,
                 padding: '10px 24px',
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                background: 'linear-gradient(135deg, #361906 0%, #9c6649 100%)',
                 color: 'white',
                 border: 'none',
                 borderRadius: 8,
@@ -518,7 +518,7 @@ const ProductsPage = () => {
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = 'translateY(-2px)';
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.4)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(156, 102, 73, 0.4)';
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.transform = 'translateY(0)';

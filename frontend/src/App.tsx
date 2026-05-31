@@ -39,7 +39,7 @@ const PageLoader = () => (
     display: 'flex', 
     alignItems: 'center', 
     justifyContent: 'center',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+    background: 'linear-gradient(135deg, #361906 0%, #9c6649 100%)'
   }}>
     <div style={{ textAlign: 'center', color: 'white' }}>
       <div style={{ 
@@ -82,7 +82,7 @@ function ProtectedAdminRoute({ children }: { children: React.ReactNode }) {
         display: 'flex', 
         alignItems: 'center', 
         justifyContent: 'center',
-        background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)'
+        background: 'linear-gradient(135deg, #361906 0%, #9c6649 100%)'
       }}>
         <div style={{ color: 'white', fontSize: 18 }}>Verifying authentication...</div>
       </div>
@@ -223,7 +223,7 @@ function Navigation() {
           to="/orders" 
           style={{ 
             textDecoration: "none",
-            color: location.pathname === '/orders' ? "#667eea" : "#6b7280",
+            color: location.pathname === '/orders' ? "#9c6649" : "#6b7280",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -245,7 +245,7 @@ function Navigation() {
           to="/cart" 
           style={{ 
             textDecoration: "none",
-            color: location.pathname === '/cart' ? "#667eea" : "#6b7280",
+            color: location.pathname === '/cart' ? "#9c6649" : "#6b7280",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -397,7 +397,7 @@ export default function App() {
                   marginTop: 8,
                   background: 'none',
                   border: 'none',
-                  color: '#667eea',
+                  color: '#9c6649',
                   fontSize: 13,
                   cursor: 'pointer',
                   textDecoration: 'underline',

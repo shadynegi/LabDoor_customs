@@ -148,7 +148,7 @@ interface ProductDetailSkeletonProps {
 export const ProductDetailSkeleton: React.FC<ProductDetailSkeletonProps> = ({ isMobile = false }) => (
   <div style={{
     minHeight: '100vh',
-    background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
+    background: 'linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)',
   }}>
     <SkeletonStyles />
     
@@ -299,7 +299,7 @@ export const OrderCardSkeleton: React.FC<OrderCardSkeletonProps> = ({ isMobile =
 
     {/* Timeline Skeleton */}
     <div style={{
-      background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
+      background: 'linear-gradient(135deg, #f5e0d5 0%, #9c6649 100%)',
       borderRadius: 12,
       padding: isMobile ? 16 : 24,
       marginBottom: 16,
@@ -382,7 +382,7 @@ interface HomePageSkeletonProps {
 export const HomePageSkeleton: React.FC<HomePageSkeletonProps> = ({ isMobile = false }) => (
   <div style={{
     minHeight: '100vh',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    background: 'linear-gradient(135deg, #361906 0%, #9c6649 100%)',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
@@ -479,7 +479,7 @@ interface DashboardSkeletonProps {
 export const DashboardSkeleton: React.FC<DashboardSkeletonProps> = ({ isMobile = false }) => (
   <div style={{
     minHeight: '100vh',
-    background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
+    background: 'linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)',
     padding: isMobile ? 16 : 32,
   }}>
     <SkeletonStyles />
@@ -586,7 +586,7 @@ interface CartSkeletonProps {
 export const CartSkeleton: React.FC<CartSkeletonProps> = ({ isMobile = false }) => (
   <div style={{
     minHeight: '100vh',
-    background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
+    background: 'linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)',
     padding: isMobile ? 20 : 40,
   }}>
     <SkeletonStyles />

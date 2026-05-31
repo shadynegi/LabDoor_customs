@@ -20,7 +20,7 @@ export default function ShippingPolicy() {
           width: 40,
           height: 40,
           borderRadius: 10,
-          background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+          background: 'linear-gradient(135deg, #361906 0%, #9c6649 100%)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -62,7 +62,7 @@ export default function ShippingPolicy() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
+      background: 'linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)',
       padding: isMobile ? '20px' : '40px',
     }}>
       <div style={{ maxWidth: 900, margin: '0 auto' }}>
@@ -91,7 +91,7 @@ export default function ShippingPolicy() {
 
         {/* Header */}
         <div style={{
-          background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+          background: 'linear-gradient(135deg, #361906 0%, #9c6649 100%)',
           borderRadius: 20,
           padding: isMobile ? '32px 24px' : '48px',
           marginBottom: 32,

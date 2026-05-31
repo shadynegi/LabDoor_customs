@@ -67,7 +67,7 @@ export default function ErrorMessage({ message, onRetry }: ErrorMessageProps) {
             alignItems: 'center',
             gap: 8,
             padding: '12px 24px',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            background: 'linear-gradient(135deg, #361906 0%, #9c6649 100%)',
             color: 'white',
             border: 'none',
             borderRadius: 8,

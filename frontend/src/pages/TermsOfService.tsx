@@ -20,7 +20,7 @@ export default function TermsOfService() {
           width: 40,
           height: 40,
           borderRadius: 10,
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          background: 'linear-gradient(135deg, #361906 0%, #9c6649 100%)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -38,7 +38,7 @@ export default function TermsOfService() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
+      background: 'linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)',
       padding: isMobile ? '20px' : '40px',
     }}>
       <div style={{ maxWidth: 900, margin: '0 auto' }}>
@@ -67,7 +67,7 @@ export default function TermsOfService() {
 
         {/* Header */}
         <div style={{
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          background: 'linear-gradient(135deg, #361906 0%, #9c6649 100%)',
           borderRadius: 20,
           padding: isMobile ? '32px 24px' : '48px',
           marginBottom: 32,
@@ -167,7 +167,7 @@ export default function TermsOfService() {
             padding: 20,
             background: '#f9fafb',
             borderRadius: 12,
-            borderLeft: '4px solid #667eea',
+            borderLeft: '4px solid #9c6649',
           }}>
             <p style={{ margin: 0, color: '#4b5563', fontSize: 14 }}>
               For questions about these Terms of Service, please contact us at{' '}

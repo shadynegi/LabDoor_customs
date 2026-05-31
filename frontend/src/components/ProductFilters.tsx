@@ -58,7 +58,7 @@ const ProductFilters: React.FC<ProductFiltersProps> = ({
             gap: 8,
             padding: isMobile ? '12px 18px' : '10px 16px',
             minHeight: isMobile ? 48 : 44,
-            background: isExpanded ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'white',
+            background: isExpanded ? 'linear-gradient(135deg, #361906 0%, #9c6649 100%)' : 'white',
             color: isExpanded ? 'white' : '#374151',
             border: isExpanded ? 'none' : '2px solid #e5e7eb',
             borderRadius: 10,
@@ -85,8 +85,8 @@ const ProductFilters: React.FC<ProductFiltersProps> = ({
           Filters
           {activeFilterCount > 0 && (
             <span style={{
-              background: isExpanded ? 'white' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              color: isExpanded ? '#667eea' : 'white',
+              background: isExpanded ? 'white' : 'linear-gradient(135deg, #361906 0%, #9c6649 100%)',
+              color: isExpanded ? '#9c6649' : 'white',
               padding: '2px 8px',
               borderRadius: 12,
               fontSize: 12,
@@ -215,7 +215,7 @@ const ProductFilters: React.FC<ProductFiltersProps> = ({
                         cursor: 'pointer',
                         transition: 'all 0.2s ease',
                         background: !filters.category 
-                          ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' 
+                          ? 'linear-gradient(135deg, #361906 0%, #9c6649 100%)' 
                           : '#f3f4f6',
                         color: !filters.category ? 'white' : '#6b7280',
                       }}
@@ -236,7 +236,7 @@ const ProductFilters: React.FC<ProductFiltersProps> = ({
                           cursor: 'pointer',
                           transition: 'all 0.2s ease',
                           background: filters.category === category 
-                            ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' 
+                            ? 'linear-gradient(135deg, #361906 0%, #9c6649 100%)' 
                             : '#f3f4f6',
                           color: filters.category === category ? 'white' : '#6b7280',
                         }}
@@ -277,7 +277,7 @@ const ProductFilters: React.FC<ProductFiltersProps> = ({
                           cursor: 'pointer',
                           transition: 'all 0.2s ease',
                           background: !filters.size 
-                            ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' 
+                            ? 'linear-gradient(135deg, #361906 0%, #9c6649 100%)' 
                             : '#f3f4f6',
                           color: !filters.size ? 'white' : '#6b7280',
                         }}
@@ -297,7 +297,7 @@ const ProductFilters: React.FC<ProductFiltersProps> = ({
                             cursor: 'pointer',
                             transition: 'all 0.2s ease',
                             background: filters.size === size 
-                              ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' 
+                              ? 'linear-gradient(135deg, #361906 0%, #9c6649 100%)' 
                               : '#f3f4f6',
                             color: filters.size === size ? 'white' : '#6b7280',
                           }}
@@ -339,7 +339,7 @@ const ProductFilters: React.FC<ProductFiltersProps> = ({
                           cursor: 'pointer',
                           transition: 'all 0.2s ease',
                           background: !filters.color 
-                            ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' 
+                            ? 'linear-gradient(135deg, #361906 0%, #9c6649 100%)' 
                             : '#f3f4f6',
                           color: !filters.color ? 'white' : '#6b7280',
                         }}
@@ -362,7 +362,7 @@ const ProductFilters: React.FC<ProductFiltersProps> = ({
                             alignItems: 'center',
                             gap: 6,
                             background: filters.color === color 
-                              ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' 
+                              ? 'linear-gradient(135deg, #361906 0%, #9c6649 100%)' 
                               : '#f3f4f6',
                             color: filters.color === color ? 'white' : '#6b7280',
                           }}
@@ -493,7 +493,7 @@ const ProductFilters: React.FC<ProductFiltersProps> = ({
                           alignItems: 'center',
                           gap: 4,
                           background: filters.minRating === option.value 
-                            ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' 
+                            ? 'linear-gradient(135deg, #361906 0%, #9c6649 100%)' 
                             : '#f3f4f6',
                           color: filters.minRating === option.value ? 'white' : '#6b7280',
                         }}

@@ -17,7 +17,7 @@ export default function AboutUs() {
     <div
       style={{
         minHeight: "100vh",
-        background: "linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)",
+        background: "linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)",
       }}
     >
       <MetaTags
@@ -30,7 +30,7 @@ export default function AboutUs() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         style={{
-          background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+          background: "linear-gradient(135deg, #361906 0%, #9c6649 100%)",
           padding: isMobile ? "60px 20px" : "100px 40px",
           textAlign: "center",
           color: "white",
@@ -200,7 +200,7 @@ export default function AboutUs() {
                   width: 60,
                   height: 60,
                   borderRadius: "50%",
-                  background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                  background: "linear-gradient(135deg, #361906 0%, #9c6649 100%)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -238,7 +238,7 @@ export default function AboutUs() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 1 }}
           style={{
-            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+            background: "linear-gradient(135deg, #361906 0%, #9c6649 100%)",
             borderRadius: 20,
             padding: isMobile ? 40 : 60,
             textAlign: "center",
@@ -269,7 +269,7 @@ export default function AboutUs() {
               display: "inline-block",
               padding: isMobile ? "14px 32px" : "16px 40px",
               background: "white",
-              color: "#667eea",
+              color: "#9c6649",
               borderRadius: 12,
               fontSize: isMobile ? 16 : 18,
               fontWeight: 700,

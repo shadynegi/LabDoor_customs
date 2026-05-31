@@ -112,7 +112,7 @@ export function EmptyState({
             onClick={handlePrimaryAction}
             style={{
               padding: '14px 28px',
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              background: 'linear-gradient(135deg, #361906 0%, #9c6649 100%)',
               color: 'white',
               border: 'none',
               borderRadius: 12,
@@ -123,7 +123,7 @@ export function EmptyState({
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = 'translateY(-2px)';
-              e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.4)';
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(156, 102, 73, 0.4)';
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.transform = 'translateY(0)';

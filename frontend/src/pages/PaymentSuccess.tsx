@@ -56,7 +56,7 @@ function PaymentProgress({ currentStep, isMobile }: { currentStep: PaymentStep; 
           height: 80,
           borderRadius: '50%',
           border: '4px solid #e5e7eb',
-          borderTopColor: '#667eea',
+          borderTopColor: '#9c6649',
           margin: '0 auto 24px',
         }}
       />
@@ -97,9 +97,9 @@ function PaymentProgress({ currentStep, isMobile }: { currentStep: PaymentStep; 
                 gap: 16,
                 padding: '12px 16px',
                 marginBottom: 8,
-                background: isCurrent ? '#f0f9ff' : isCompleted ? '#f0fdf4' : '#f9fafb',
+                background: isCurrent ? '#f5e0d5' : isCompleted ? '#f0fdf4' : '#f9fafb',
                 borderRadius: 12,
-                border: isCurrent ? '2px solid #3b82f6' : isCompleted ? '2px solid #10b981' : '2px solid transparent',
+                border: isCurrent ? '2px solid #9c6649' : isCompleted ? '2px solid #10b981' : '2px solid transparent',
               }}
             >
               <div style={{
@@ -109,7 +109,7 @@ function PaymentProgress({ currentStep, isMobile }: { currentStep: PaymentStep; 
                 background: isCompleted 
                   ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
                   : isCurrent 
-                    ? 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)'
+                    ? 'linear-gradient(135deg, #361906 0%, #9c6649 100%)'
                     : '#e5e7eb',
                 display: 'flex',
                 alignItems: 'center',
@@ -126,7 +126,7 @@ function PaymentProgress({ currentStep, isMobile }: { currentStep: PaymentStep; 
                 <div style={{
                   fontSize: 14,
                   fontWeight: 600,
-                  color: isCompleted ? '#059669' : isCurrent ? '#1d4ed8' : '#9ca3af',
+                  color: isCompleted ? '#059669' : isCurrent ? '#361906' : '#9ca3af',
                 }}>
                   {step.label}
                 </div>
@@ -353,7 +353,7 @@ export default function PaymentSuccess() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
+          background: 'linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)',
           padding: 20,
         }}
       >
@@ -366,7 +366,7 @@ export default function PaymentSuccess() {
     <div
       style={{
         minHeight: '100vh',
-        background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
+        background: 'linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)',
         padding: isMobile ? '20px' : '40px 20px',
       }}
     >
@@ -575,14 +575,14 @@ export default function PaymentSuccess() {
                   width: 40,
                   height: 40,
                   borderRadius: 8,
-                  background: '#dbeafe',
+                  background: '#f5e0d5',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   flexShrink: 0,
                 }}
               >
-                <Mail size={20} color="#2563eb" />
+                <Mail size={20} color="#9c6649" />
               </div>
               <div>
                 <div style={{ fontSize: 14, fontWeight: 600, color: '#1f2937', marginBottom: 4 }}>
@@ -600,14 +600,14 @@ export default function PaymentSuccess() {
                   width: 40,
                   height: 40,
                   borderRadius: 8,
-                  background: '#dbeafe',
+                  background: '#f5e0d5',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   flexShrink: 0,
                 }}
               >
-                <Package size={20} color="#2563eb" />
+                <Package size={20} color="#9c6649" />
               </div>
               <div>
                 <div style={{ fontSize: 14, fontWeight: 600, color: '#1f2937', marginBottom: 4 }}>
@@ -625,14 +625,14 @@ export default function PaymentSuccess() {
                   width: 40,
                   height: 40,
                   borderRadius: 8,
-                  background: '#dbeafe',
+                  background: '#f5e0d5',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   flexShrink: 0,
                 }}
               >
-                <Truck size={20} color="#2563eb" />
+                <Truck size={20} color="#9c6649" />
               </div>
               <div>
                 <div style={{ fontSize: 14, fontWeight: 600, color: '#1f2937', marginBottom: 4 }}>
@@ -665,7 +665,7 @@ export default function PaymentSuccess() {
               alignItems: 'center',
               gap: 8,
               padding: '14px 28px',
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              background: 'linear-gradient(135deg, #361906 0%, #9c6649 100%)',
               color: 'white',
               border: 'none',
               borderRadius: 12,

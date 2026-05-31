@@ -461,7 +461,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
           padding: '14px',
           background: formData.rating === 0 
             ? '#e5e7eb' 
-            : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            : 'linear-gradient(135deg, #361906 0%, #9c6649 100%)',
           color: formData.rating === 0 ? '#9ca3af' : 'white',
           border: 'none',
           borderRadius: 12,

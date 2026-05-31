@@ -46,7 +46,7 @@ class ErrorBoundary extends Component<Props, State> {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
+            background: 'linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)',
             padding: '20px',
           }}
         >
@@ -123,7 +123,7 @@ class ErrorBoundary extends Component<Props, State> {
               onClick={this.handleReset}
               style={{
                 padding: '14px 28px',
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                background: 'linear-gradient(135deg, #361906 0%, #9c6649 100%)',
                 color: 'white',
                 border: 'none',
                 borderRadius: 12,

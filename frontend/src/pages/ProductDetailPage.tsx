@@ -171,7 +171,7 @@ const ProductDetailPage: React.FC = () => {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
+      background: 'linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)',
     }}>
       <MetaTags
         title={`${product.name} — Lab Door Customs`}
@@ -247,7 +247,7 @@ const ProductDetailPage: React.FC = () => {
               overflow: 'hidden',
               background: product.background 
                 ? `url(${product.background})` 
-                : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                : 'linear-gradient(135deg, #361906 0%, #9c6649 100%)',
               backgroundSize: 'cover',
               backgroundPosition: 'center',
               display: 'flex',
@@ -374,8 +374,8 @@ const ProductDetailPage: React.FC = () => {
               <div style={{
                 display: 'inline-block',
                 padding: '6px 12px',
-                background: '#ede9fe',
-                color: '#667eea',
+                background: '#f5e0d5',
+                color: '#9c6649',
                 borderRadius: 8,
                 fontSize: 12,
                 fontWeight: 700,
@@ -411,7 +411,7 @@ const ProductDetailPage: React.FC = () => {
             <div style={{
               fontSize: isMobile ? 32 : 48,
               fontWeight: 900,
-              color: '#667eea',
+              color: '#9c6649',
               marginBottom: 24,
             }}>
               ${product.price}
@@ -466,7 +466,7 @@ const ProductDetailPage: React.FC = () => {
                       border: "none",
                       borderRadius: 8,
                       background: selectedSizeSystem === system
-                        ? "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
+                        ? "linear-gradient(135deg, #361906 0%, #9c6649 100%)"
                         : "transparent",
                       color: selectedSizeSystem === system ? "white" : "#6b7280",
                       fontWeight: selectedSizeSystem === system ? 700 : 600,
@@ -499,11 +499,11 @@ const ProductDetailPage: React.FC = () => {
                       padding: isMobile ? "14px 8px" : "12px 8px",
                       minHeight: isMobile ? 48 : 44,
                       border: selectedSize === size
-                        ? "2px solid #667eea"
+                        ? "2px solid #9c6649"
                         : "1px solid #d1d5db",
                       borderRadius: 10,
-                      background: selectedSize === size ? "#ede9fe" : "white",
-                      color: selectedSize === size ? "#667eea" : "#374151",
+                      background: selectedSize === size ? "#f5e0d5" : "white",
+                      color: selectedSize === size ? "#9c6649" : "#374151",
                       fontWeight: selectedSize === size ? 700 : 500,
                       fontSize: isMobile ? 15 : 14,
                       cursor: "pointer",
@@ -545,7 +545,7 @@ const ProductDetailPage: React.FC = () => {
                 padding: isMobile ? '16px' : '20px',
                 background: addedToCart 
                   ? "linear-gradient(90deg, #10b981, #059669)" 
-                  : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                  : "linear-gradient(135deg, #361906 0%, #9c6649 100%)",
                 color: "white",
                 border: "none",
                 borderRadius: 12,
@@ -582,17 +582,17 @@ const ProductDetailPage: React.FC = () => {
               borderTop: '1px solid #e5e7eb',
             }}>
               <div style={{ textAlign: 'center' }}>
-                <Truck size={24} color="#667eea" style={{ margin: '0 auto 8px' }} />
+                <Truck size={24} color="#9c6649" style={{ margin: '0 auto 8px' }} />
                 <div style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>Free Shipping</div>
                 <div style={{ fontSize: 11, color: '#9ca3af' }}>On orders over $1000</div>
               </div>
               <div style={{ textAlign: 'center' }}>
-                <Shield size={24} color="#667eea" style={{ margin: '0 auto 8px' }} />
+                <Shield size={24} color="#9c6649" style={{ margin: '0 auto 8px' }} />
                 <div style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>Secure Payment</div>
                 <div style={{ fontSize: 11, color: '#9ca3af' }}>100% protected</div>
               </div>
               <div style={{ textAlign: 'center' }}>
-                <Package size={24} color="#667eea" style={{ margin: '0 auto 8px' }} />
+                <Package size={24} color="#9c6649" style={{ margin: '0 auto 8px' }} />
                 <div style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>Easy Returns</div>
                 <div style={{ fontSize: 11, color: '#9ca3af' }}>30-day guarantee</div>
               </div>

@@ -37,7 +37,7 @@ export default function LoadingSpinner({ size = 'medium', message }: LoadingSpin
           width: spinnerSize,
           height: spinnerSize,
           border: '4px solid #e5e7eb',
-          borderTopColor: '#667eea',
+          borderTopColor: '#9c6649',
           borderRadius: '50%',
         }}
       />

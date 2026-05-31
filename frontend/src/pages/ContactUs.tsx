@@ -76,7 +76,7 @@ export default function ContactUs() {
   return (
     <div style={{ 
       minHeight: "100vh",
-      background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+      background: "linear-gradient(135deg, #361906 0%, #9c6649 100%)",
       padding: isMobile ? "40px 20px" : "60px 40px",
       paddingBottom: isMobile ? "max(40px, env(safe-area-inset-bottom))" : "40px"
     }}>
@@ -98,7 +98,7 @@ export default function ContactUs() {
           <h1 style={{
             fontSize: isMobile ? 36 : 48,
             fontWeight: 900,
-            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+            background: "linear-gradient(135deg, #361906 0%, #9c6649 100%)",
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
             marginBottom: 16
@@ -124,7 +124,7 @@ export default function ContactUs() {
             <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
               <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
                 <div style={{
-                  background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                  background: "linear-gradient(135deg, #361906 0%, #9c6649 100%)",
                   padding: 12,
                   borderRadius: 12,
                   display: "flex",
@@ -143,7 +143,7 @@ export default function ContactUs() {
 
               <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
                 <div style={{
-                  background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                  background: "linear-gradient(135deg, #361906 0%, #9c6649 100%)",
                   padding: 12,
                   borderRadius: 12,
                   display: "flex",
@@ -162,7 +162,7 @@ export default function ContactUs() {
 
               <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
                 <div style={{
-                  background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                  background: "linear-gradient(135deg, #361906 0%, #9c6649 100%)",
                   padding: 12,
                   borderRadius: 12,
                   display: "flex",
@@ -189,7 +189,7 @@ export default function ContactUs() {
               padding: 20,
               background: "#f9fafb",
               borderRadius: 12,
-              borderLeft: "4px solid #667eea"
+              borderLeft: "4px solid #9c6649"
             }}>
               <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8, color: "#374151" }}>
                 Business Hours
@@ -228,7 +228,7 @@ export default function ContactUs() {
                     transition: "all 0.2s",
                     outline: "none"
                   }}
-                  onFocus={(e) => e.currentTarget.style.borderColor = "#667eea"}
+                  onFocus={(e) => e.currentTarget.style.borderColor = "#9c6649"}
                   onBlur={(e) => e.currentTarget.style.borderColor = "#e5e7eb"}
                 />
               </div>
@@ -252,7 +252,7 @@ export default function ContactUs() {
                     transition: "all 0.2s",
                     outline: "none"
                   }}
-                  onFocus={(e) => e.currentTarget.style.borderColor = "#667eea"}
+                  onFocus={(e) => e.currentTarget.style.borderColor = "#9c6649"}
                   onBlur={(e) => e.currentTarget.style.borderColor = "#e5e7eb"}
                 />
               </div>
@@ -276,7 +276,7 @@ export default function ContactUs() {
                     transition: "all 0.2s",
                     outline: "none"
                   }}
-                  onFocus={(e) => e.currentTarget.style.borderColor = "#667eea"}
+                  onFocus={(e) => e.currentTarget.style.borderColor = "#9c6649"}
                   onBlur={(e) => e.currentTarget.style.borderColor = "#e5e7eb"}
                 />
               </div>
@@ -302,7 +302,7 @@ export default function ContactUs() {
                     fontFamily: "inherit",
                     resize: "vertical"
                   }}
-                  onFocus={(e) => e.currentTarget.style.borderColor = "#667eea"}
+                  onFocus={(e) => e.currentTarget.style.borderColor = "#9c6649"}
                   onBlur={(e) => e.currentTarget.style.borderColor = "#e5e7eb"}
                 />
               </div>
@@ -325,7 +325,7 @@ export default function ContactUs() {
                 type="submit"
                 disabled={submitted || isSubmitting}
                 style={{
-                  background: (submitted || isSubmitting) ? "#9ca3af" : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                  background: (submitted || isSubmitting) ? "#9ca3af" : "linear-gradient(135deg, #361906 0%, #9c6649 100%)",
                   color: "white",
                   padding: "14px 24px",
                   border: "none",

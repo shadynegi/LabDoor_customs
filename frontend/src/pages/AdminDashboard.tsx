@@ -382,9 +382,9 @@ export default function AdminDashboard() {
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
-      pending: '#f59e0b', processing: '#3b82f6', shipped: '#8b5cf6',
+      pending: '#f59e0b', processing: '#9c6649', shipped: '#9c6649',
       delivered: '#10b981', cancelled: '#ef4444', completed: '#10b981',
-      failed: '#ef4444', refunded: '#6b7280', new: '#3b82f6',
+      failed: '#ef4444', refunded: '#6b7280', new: '#9c6649',
       read: '#f59e0b', replied: '#10b981', archived: '#6b7280',
     };
     return colors[status] || '#6b7280';
@@ -423,10 +423,10 @@ export default function AdminDashboard() {
       <div>
         {/* Stats Grid */}
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)', gap: 16, marginBottom: 32 }}>
-          <StatCard icon={Package} title="Total Orders" value={analytics.orders.total_orders} color="#667eea" subtitle="All time" />
+          <StatCard icon={Package} title="Total Orders" value={analytics.orders.total_orders} color="#9c6649" subtitle="All time" />
           <StatCard icon={DollarSign} title="Total Revenue" value={`$${analytics.orders.total_revenue.toFixed(2)}`} color="#10b981" subtitle="All time" />
-          <StatCard icon={TrendingUp} title="Orders (30d)" value={analytics.orders.orders_last_30_days} color="#3b82f6" subtitle={`$${analytics.orders.revenue_last_30_days.toFixed(2)} revenue`} />
-          <StatCard icon={Users} title="Customers" value={analytics.customers.total_customers} color="#8b5cf6" subtitle={`${analytics.customers.new_customers_30_days} new (30d)`} />
+          <StatCard icon={TrendingUp} title="Orders (30d)" value={analytics.orders.orders_last_30_days} color="#9c6649" subtitle={`$${analytics.orders.revenue_last_30_days.toFixed(2)} revenue`} />
+          <StatCard icon={Users} title="Customers" value={analytics.customers.total_customers} color="#9c6649" subtitle={`${analytics.customers.new_customers_30_days} new (30d)`} />
         </div>
 
         {/* Product Stats */}
@@ -434,7 +434,7 @@ export default function AdminDashboard() {
           <StatCard icon={ShoppingBag} title="Products" value={analytics.products.total_products} color="#f59e0b" />
           <StatCard icon={AlertTriangle} title="Out of Stock" value={analytics.products.out_of_stock_products} color="#ef4444" />
           <StatCard icon={Eye} title="Product Views" value={analytics.products.total_views} color="#06b6d4" />
-          <StatCard icon={ShoppingBag} title="Cart Adds" value={analytics.products.total_cart_adds} color="#ec4899" />
+          <StatCard icon={ShoppingBag} title="Cart Adds" value={analytics.products.total_cart_adds} color="#9c6649" />
         </div>
 
         {/* Top Products */}
@@ -468,7 +468,7 @@ export default function AdminDashboard() {
             {analytics.countrySummary.map((loc: any, i: number) => (
               <div key={i} style={{ background: '#f9fafb', padding: 16, borderRadius: 12 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                  <MapPinned size={16} color="#667eea" />
+                  <MapPinned size={16} color="#9c6649" />
                   <span style={{ fontWeight: 600 }}>{loc.country || 'Unknown'}</span>
                 </div>
                 <div style={{ fontSize: 14, color: '#6b7280' }}>
@@ -495,7 +495,7 @@ export default function AdminDashboard() {
                   href={analytics.integrations.ga4?.consoleUrl || 'https://analytics.google.com/'}
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{ color: '#667eea', fontWeight: 600, fontSize: 14 }}
+                  style={{ color: '#9c6649', fontWeight: 600, fontSize: 14 }}
                 >
                   Open GA4 Console →
                 </a>
@@ -511,7 +511,7 @@ export default function AdminDashboard() {
                   href={analytics.integrations.searchConsole?.consoleUrl || 'https://search.google.com/search-console'}
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{ color: '#667eea', fontWeight: 600, fontSize: 14 }}
+                  style={{ color: '#9c6649', fontWeight: 600, fontSize: 14 }}
                 >
                   Open Search Console →
                 </a>
@@ -632,7 +632,7 @@ export default function AdminDashboard() {
         <button onClick={() => setSelectedOrders(new Set())} style={{ padding: '10px 16px', background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: 'pointer' }}>Clear</button>
         {selectedOrders.size > 0 && (
           <select onChange={(e) => { if (e.target.value) handleBulkOrderUpdate({ status: e.target.value }); e.target.value = ''; }}
-            style={{ padding: '10px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: 8, fontWeight: 600 }}>
+            style={{ padding: '10px 16px', background: '#9c6649', color: 'white', border: 'none', borderRadius: 8, fontWeight: 600 }}>
             <option value="">Bulk Update ({selectedOrders.size})</option>
             <option value="processing">Mark Processing</option>
             <option value="shipped">Mark Shipped</option>
@@ -640,7 +640,7 @@ export default function AdminDashboard() {
             <option value="cancelled">Mark Cancelled</option>
           </select>
         )}
-        <button onClick={fetchOrders} style={{ padding: '10px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <button onClick={fetchOrders} style={{ padding: '10px 16px', background: '#9c6649', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
           <RefreshCw size={16} /> Refresh
         </button>
       </div>
@@ -648,7 +648,7 @@ export default function AdminDashboard() {
       {/* Orders Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(350px, 1fr))', gap: 16 }}>
         {filteredOrders.map((order) => (
-          <div key={order.id} style={{ background: 'white', borderRadius: 12, padding: 16, border: `2px solid ${selectedOrders.has(order.id) ? '#667eea' : '#e5e7eb'}`, cursor: 'pointer' }}>
+          <div key={order.id} style={{ background: 'white', borderRadius: 12, padding: 16, border: `2px solid ${selectedOrders.has(order.id) ? '#9c6649' : '#e5e7eb'}`, cursor: 'pointer' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
               <input type="checkbox" checked={selectedOrders.has(order.id)} onChange={(e) => {
                 e.stopPropagation();
@@ -673,7 +673,7 @@ export default function AdminDashboard() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f3f4f6', paddingTop: 12 }}>
               <div>
                 <div style={{ fontSize: 14, color: '#6b7280' }}>{order.customer_name}</div>
-                {order.tracking_number && <div style={{ fontSize: 12, color: '#8b5cf6' }}><Truck size={12} style={{ display: 'inline', marginRight: 4 }} />{order.tracking_number}</div>}
+                {order.tracking_number && <div style={{ fontSize: 12, color: '#9c6649' }}><Truck size={12} style={{ display: 'inline', marginRight: 4 }} />{order.tracking_number}</div>}
               </div>
               <div style={{ fontSize: 20, fontWeight: 700, color: '#10b981' }}>${order.total.toFixed(2)}</div>
             </div>
@@ -709,7 +709,7 @@ export default function AdminDashboard() {
       {/* Messages List */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {filteredMessages.map((msg) => (
-          <div key={msg.id} style={{ background: 'white', borderRadius: 12, padding: 16, border: `2px solid ${selectedMessages.has(msg.id) ? '#667eea' : '#e5e7eb'}`, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+          <div key={msg.id} style={{ background: 'white', borderRadius: 12, padding: 16, border: `2px solid ${selectedMessages.has(msg.id) ? '#9c6649' : '#e5e7eb'}`, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
             <input type="checkbox" checked={selectedMessages.has(msg.id)} onChange={(e) => {
               const newSet = new Set(selectedMessages);
               e.target.checked ? newSet.add(msg.id) : newSet.delete(msg.id);
@@ -770,7 +770,7 @@ export default function AdminDashboard() {
                 <td style={{ padding: 16, color: '#6b7280' }}>{customer.last_order_date ? new Date(customer.last_order_date).toLocaleDateString() : 'N/A'}</td>
                 <td style={{ padding: 16 }}>
                   <button onClick={async () => { setSelectedCustomer(customer); await fetchCustomerHistory(customer.email); }}
-                    style={{ padding: '8px 16px', background: '#667eea', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                    style={{ padding: '8px 16px', background: '#9c6649', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
                     View History
                   </button>
                 </td>
@@ -793,7 +793,7 @@ export default function AdminDashboard() {
   return (
     <div style={{ minHeight: '100vh', background: '#f9fafb' }}>
       {/* Header */}
-      <div style={{ background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)', padding: isMobile ? '16px' : '24px 40px', position: 'sticky', top: 0, zIndex: 100 }}>
+      <div style={{ background: 'linear-gradient(135deg, #361906 0%, #9c6649 100%)', padding: isMobile ? '16px' : '24px 40px', position: 'sticky', top: 0, zIndex: 100 }}>
         <div style={{ maxWidth: 1400, margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h1 style={{ margin: 0, fontSize: isMobile ? 24 : 32, fontWeight: 800, color: 'white' }}>Admin Dashboard</h1>
           <button onClick={handleLogout} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', background: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 8, cursor: 'pointer', fontSize: 14, fontWeight: 600 }}>
@@ -807,8 +807,8 @@ export default function AdminDashboard() {
         <div style={{ maxWidth: 1400, margin: '0 auto', padding: '0 16px', display: 'flex', gap: 4, overflowX: 'auto' }}>
           {tabs.map(({ id, label, icon: Icon }) => (
             <button key={id} onClick={() => setActiveTab(id)}
-              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '16px 20px', background: 'none', border: 'none', borderBottom: activeTab === id ? '3px solid #667eea' : '3px solid transparent',
-                color: activeTab === id ? '#667eea' : '#6b7280', fontSize: 14, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '16px 20px', background: 'none', border: 'none', borderBottom: activeTab === id ? '3px solid #9c6649' : '3px solid transparent',
+                color: activeTab === id ? '#9c6649' : '#6b7280', fontSize: 14, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
               <Icon size={18} /> {label}
             </button>
           ))}
@@ -895,7 +895,7 @@ export default function AdminDashboard() {
               <p style={{ margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>{selectedMessage.message}</p>
             </div>
             <div style={{ display: 'flex', gap: 12 }}>
-              <a href={`mailto:${selectedMessage.email}?subject=Re: ${selectedMessage.subject}`} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 14, background: '#667eea', color: 'white', textDecoration: 'none', borderRadius: 8, fontWeight: 600 }}>
+              <a href={`mailto:${selectedMessage.email}?subject=Re: ${selectedMessage.subject}`} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 14, background: '#9c6649', color: 'white', textDecoration: 'none', borderRadius: 8, fontWeight: 600 }}>
                 <Mail size={18} /> Reply via Email
               </a>
             </div>
@@ -916,7 +916,7 @@ export default function AdminDashboard() {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 24 }}>
               <div style={{ background: '#f9fafb', padding: 16, borderRadius: 12, textAlign: 'center' }}>
-                <p style={{ margin: 0, fontSize: 28, fontWeight: 800, color: '#667eea' }}>{selectedCustomer.total_orders}</p>
+                <p style={{ margin: 0, fontSize: 28, fontWeight: 800, color: '#9c6649' }}>{selectedCustomer.total_orders}</p>
                 <p style={{ margin: 0, fontSize: 14, color: '#6b7280' }}>Total Orders</p>
               </div>
               <div style={{ background: '#f9fafb', padding: 16, borderRadius: 12, textAlign: 'center' }}>

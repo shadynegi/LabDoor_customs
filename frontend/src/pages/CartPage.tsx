@@ -53,7 +53,7 @@ export default function CartPage() {
             style={{
               display: "inline-block",
               padding: isMobile ? "12px 24px" : "14px 32px",
-              background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+              background: "linear-gradient(135deg, #361906 0%, #9c6649 100%)",
               color: "white",
               textDecoration: "none",
               borderRadius: 12,
@@ -333,7 +333,7 @@ export default function CartPage() {
               style={{ 
                 flex: 1, 
                 padding: isMobile ? "14px 24px" : "16px 32px",
-                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                background: "linear-gradient(135deg, #361906 0%, #9c6649 100%)",
                 color: "white", 
                 border: "none", 
                 borderRadius: 12, 

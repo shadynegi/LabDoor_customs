@@ -53,8 +53,8 @@ export default function Loader({ isLoading }: LoaderProps) {
               bottom: 0,
               borderRadius: "50%",
               border: "3px solid transparent",
-              borderTopColor: "#667eea",
-              borderRightColor: "#764ba2",
+              borderTopColor: "#9c6649",
+              borderRightColor: "#361906",
             }}
           />
 
@@ -74,8 +74,8 @@ export default function Loader({ isLoading }: LoaderProps) {
               bottom: 10,
               borderRadius: "50%",
               border: "2px solid transparent",
-              borderBottomColor: "#667eea",
-              borderLeftColor: "#764ba2",
+              borderBottomColor: "#9c6649",
+              borderLeftColor: "#361906",
             }}
           />
 
@@ -105,7 +105,7 @@ export default function Loader({ isLoading }: LoaderProps) {
               style={{
                 width: 100,
                 height: "auto",
-                filter: "drop-shadow(0 4px 12px rgba(102, 126, 234, 0.3))",
+                filter: "drop-shadow(0 4px 12px rgba(156, 102, 73, 0.3))",
                 display: "block",
               }}
             />
@@ -117,7 +117,7 @@ export default function Loader({ isLoading }: LoaderProps) {
           style={{
             fontSize: 18,
             fontWeight: 600,
-            color: "#667eea",
+            color: "#9c6649",
             display: "flex",
             alignItems: "center",
             gap: 4,

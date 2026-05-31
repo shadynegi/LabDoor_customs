@@ -203,7 +203,7 @@ const ReviewList: React.FC<ReviewListProps> = ({ productId, onWriteReview }) => 
               alignItems: 'center',
               gap: 6,
               padding: '8px 16px',
-              background: showFilters ? '#667eea' : 'white',
+              background: showFilters ? '#9c6649' : 'white',
               color: showFilters ? 'white' : '#374151',
               border: '1px solid #e5e7eb',
               borderRadius: 8,
@@ -270,7 +270,7 @@ const ReviewList: React.FC<ReviewListProps> = ({ productId, onWriteReview }) => 
             gap: 8,
             width: '100%',
             padding: '14px',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            background: 'linear-gradient(135deg, #361906 0%, #9c6649 100%)',
             color: 'white',
             border: 'none',
             borderRadius: 12,
@@ -412,12 +412,12 @@ const ReviewList: React.FC<ReviewListProps> = ({ productId, onWriteReview }) => 
                 {review.admin_response && (
                   <div style={{
                     background: '#f9fafb',
-                    borderLeft: '3px solid #667eea',
+                    borderLeft: '3px solid #9c6649',
                     padding: '12px 16px',
                     borderRadius: '0 8px 8px 0',
                     marginBottom: 12,
                   }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: '#667eea', marginBottom: 4 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: '#9c6649', marginBottom: 4 }}>
                       Response from Lab Door Customs
                     </div>
                     <p style={{ fontSize: 13, color: '#4b5563' }}>{review.admin_response}</p>
@@ -487,7 +487,7 @@ const ReviewList: React.FC<ReviewListProps> = ({ productId, onWriteReview }) => 
                 height: 36,
                 border: 'none',
                 borderRadius: 8,
-                background: p === page ? '#667eea' : 'white',
+                background: p === page ? '#9c6649' : 'white',
                 color: p === page ? 'white' : '#374151',
                 fontWeight: 600,
                 cursor: 'pointer',

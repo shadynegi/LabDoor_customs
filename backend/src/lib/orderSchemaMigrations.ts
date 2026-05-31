@@ -23,5 +23,17 @@ export async function ensureOrderPaymentSchema(): Promise<void> {
 
   await ensureProcessedRefundEventsTable();
 
+  await sql`
+    ALTER TABLE customers
+    ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE
+  `;
+  await sql`
+    ALTER TABLE customers
+    ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ NULL
+  `;
+  await sql`
+    CREATE INDEX IF NOT EXISTS idx_customers_is_deleted ON customers(is_deleted)
+  `;
+
   logger.info('Order payment schema patches applied');
 }

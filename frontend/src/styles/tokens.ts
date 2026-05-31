@@ -2,36 +2,46 @@
 // Design tokens for consistent styling across the application
 
 // ============================================
+// BRAND PALETTE
+// ============================================
+
+export const brand = {
+  dark: '#361906',
+  mid: '#9c6649',
+  light: '#f5e0d5',
+} as const;
+
+// ============================================
 // COLOR TOKENS
 // ============================================
 
 export const colors = {
-  // Primary brand colors
+  // Primary brand colors (warm brown palette)
   primary: {
-    50: '#f0f5ff',
-    100: '#e5edff',
-    200: '#cdddff',
-    300: '#a4c1ff',
-    400: '#7a9eff',
-    500: '#667eea', // Main primary
-    600: '#5a67d8',
-    700: '#4c51bf',
-    800: '#3c3f9b',
-    900: '#34377d',
+    50: '#faf4f0',
+    100: '#f5e0d5',
+    200: '#e8c9b8',
+    300: '#d4a88a',
+    400: '#b8846a',
+    500: '#9c6649', // Main primary
+    600: '#7a5238',
+    700: '#5c3d28',
+    800: '#452b1a',
+    900: '#361906',
   },
-  
-  // Secondary/Accent
+
+  // Secondary/Accent (deep brown)
   secondary: {
-    50: '#fdf4ff',
-    100: '#fae8ff',
-    200: '#f5d0fe',
-    300: '#f0abfc',
-    400: '#e879f9',
-    500: '#764ba2', // Main secondary
-    600: '#9333ea',
-    700: '#7e22ce',
-    800: '#6b21a8',
-    900: '#581c87',
+    50: '#f5e0d5',
+    100: '#e8c9b8',
+    200: '#c9a088',
+    300: '#a67c5a',
+    400: '#8a5f3e',
+    500: '#361906', // Main secondary
+    600: '#2d1405',
+    700: '#240f04',
+    800: '#1a0b03',
+    900: '#120802',
   },
 
   // Success
@@ -93,8 +103,8 @@ export const colors = {
   // Background
   background: {
     default: '#ffffff',
-    secondary: '#f9fafb',
-    tertiary: '#f3f4f6',
+    secondary: '#f5e0d5',
+    tertiary: '#e8c9b8',
   },
 
   // Text
@@ -139,7 +149,7 @@ export const typography = {
     sans: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
     mono: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, monospace',
   },
-  
+
   fontSize: {
     xs: '12px',
     sm: '14px',
@@ -201,11 +211,11 @@ export const shadows = {
   xl: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
   '2xl': '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
   inner: 'inset 0 2px 4px 0 rgba(0, 0, 0, 0.06)',
-  
+
   // Custom shadows
   card: '0 4px 6px -1px rgba(0,0,0,0.1)',
   cardHover: '0 10px 40px rgba(0,0,0,0.15)',
-  button: '0 4px 12px rgba(102, 126, 234, 0.4)',
+  button: '0 4px 12px rgba(156, 102, 73, 0.4)',
 } as const;
 
 // ============================================
@@ -219,7 +229,7 @@ export const transitions = {
     slow: '300ms',
     slower: '500ms',
   },
-  
+
   timing: {
     ease: 'ease',
     easeIn: 'ease-in',
@@ -266,14 +276,17 @@ export const zIndex = {
 // ============================================
 
 export const gradients = {
-  primary: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+  /** Buttons, CTAs, active tabs */
+  primary: 'linear-gradient(135deg, #361906 0%, #9c6649 100%)',
+  /** Full-page backgrounds */
+  background: 'linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)',
+  /** Admin headers, dark sections */
+  dark: 'linear-gradient(135deg, #361906 0%, #9c6649 50%, #361906 100%)',
+  /** Light accent panels */
+  backgroundSoft: 'linear-gradient(135deg, #f5e0d5 0%, #9c6649 100%)',
   success: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
   warning: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
   error: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-  blue: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-  purple: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
-  pink: 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)',
-  background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
 } as const;
 
 // ============================================
@@ -298,7 +311,7 @@ export const components = {
       lg: '18px',
     },
   },
-  
+
   input: {
     height: {
       sm: '36px',
@@ -309,7 +322,7 @@ export const components = {
     borderRadius: '8px',
     borderWidth: '2px',
   },
-  
+
   card: {
     padding: {
       sm: '16px',
@@ -318,7 +331,7 @@ export const components = {
     },
     borderRadius: '16px',
   },
-  
+
   touchTarget: {
     minimum: '44px',
     comfortable: '48px',
@@ -330,6 +343,7 @@ export const components = {
 // ============================================
 
 export const theme = {
+  brand,
   colors,
   spacing,
   typography,

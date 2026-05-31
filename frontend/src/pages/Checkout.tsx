@@ -126,7 +126,7 @@ const InputField = React.memo(({
           }}
           onFocus={(e) => {
             if (!hasError) {
-              e.target.style.borderColor = "#667eea";
+              e.target.style.borderColor = "#9c6649";
               e.target.style.boxShadow = "0 0 0 3px rgba(102,126,234,0.1)";
             }
           }}
@@ -271,19 +271,19 @@ export default function Checkout() {
   const selectStyles: StylesConfig<CountryOption, false> = useMemo(() => ({
     control: (base, state) => ({
       ...base,
-      borderColor: errors.country ? "#ef4444" : state.isFocused ? "#667eea" : "#d1d5db",
+      borderColor: errors.country ? "#ef4444" : state.isFocused ? "#9c6649" : "#d1d5db",
       borderWidth: errors.country ? 2 : 1,
       borderRadius: 8,
       padding: "4px",
       boxShadow: state.isFocused && !errors.country ? "0 0 0 3px rgba(102,126,234,0.1)" : "none",
       "&:hover": {
-        borderColor: errors.country ? "#ef4444" : "#667eea",
+        borderColor: errors.country ? "#ef4444" : "#9c6649",
       },
     }),
     option: (base, state) => ({
       ...base,
       backgroundColor: state.isSelected
-        ? "#667eea"
+        ? "#9c6649"
         : state.isFocused
         ? "#f3f4f6"
         : "white",
@@ -474,7 +474,7 @@ export default function Checkout() {
     <div
       style={{
         minHeight: "100vh",
-        background: "linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)",
+        background: "linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)",
         padding: isMobile ? "20px" : "40px 20px",
         paddingBottom: isMobile ? "max(20px, env(safe-area-inset-bottom))" : "20px",
       }}
@@ -516,7 +516,7 @@ export default function Checkout() {
                 width: 48,
                 height: 48,
                 borderRadius: "50%",
-                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                background: "linear-gradient(135deg, #361906 0%, #9c6649 100%)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -915,7 +915,7 @@ export default function Checkout() {
                         padding: "12px 20px",
                         background: couponLoading || !couponCode.trim()
                           ? "#d1d5db"
-                          : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                          : "linear-gradient(135deg, #361906 0%, #9c6649 100%)",
                         color: "white",
                         border: "none",
                         borderRadius: 8,

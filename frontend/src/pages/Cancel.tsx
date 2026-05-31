@@ -9,7 +9,7 @@ export default function Cancel() {
     <div
       style={{
         minHeight: "100vh",
-        background: "linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)",
+        background: "linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)",
         padding: "40px 20px",
         display: "flex",
         alignItems: "center",
@@ -84,7 +84,7 @@ export default function Cancel() {
               alignItems: "center",
               gap: 8,
               padding: "14px 28px",
-              background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+              background: "linear-gradient(135deg, #361906 0%, #9c6649 100%)",
               color: "white",
               border: "none",
               borderRadius: 12,

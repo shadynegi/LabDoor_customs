@@ -78,7 +78,10 @@ export function ProductViewer({ shoe, onNext, onPrevious, currentIndex, totalIte
                 repeat: Infinity,
                 ease: "easeInOut"
               }}
-              className="w-64 h-64 md:w-96 md:h-96 bg-gradient-radial from-blue-500/20 via-purple-500/10 to-transparent rounded-full blur-3xl"
+              className="w-64 h-64 md:w-96 md:h-96 rounded-full blur-3xl"
+              style={{
+                background: 'radial-gradient(circle, rgba(156, 102, 73, 0.25) 0%, rgba(54, 25, 6, 0.1) 50%, transparent 70%)',
+              }}
             />
           </div>
 

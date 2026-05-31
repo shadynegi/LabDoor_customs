@@ -66,7 +66,7 @@ export default function AdminLogin() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
+        background: 'linear-gradient(135deg, #361906 0%, #9c6649 50%, #361906 100%)',
         padding: 20,
       }}
     >
@@ -95,12 +95,12 @@ export default function AdminLogin() {
               width: 80,
               height: 80,
               borderRadius: '50%',
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              background: 'linear-gradient(135deg, #361906 0%, #9c6649 100%)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               margin: '0 auto 20px',
-              boxShadow: '0 10px 40px rgba(102, 126, 234, 0.4)',
+              boxShadow: '0 10px 40px rgba(156, 102, 73, 0.4)',
             }}
           >
             <Shield size={40} color="white" />
@@ -180,7 +180,7 @@ export default function AdminLogin() {
                   transition: 'border-color 0.2s, background 0.2s',
                 }}
                 onFocus={(e) => {
-                  e.target.style.borderColor = 'rgba(102, 126, 234, 0.5)';
+                  e.target.style.borderColor = 'rgba(156, 102, 73, 0.5)';
                   e.target.style.background = 'rgba(255, 255, 255, 0.08)';
                 }}
                 onBlur={(e) => {
@@ -228,7 +228,7 @@ export default function AdminLogin() {
                   transition: 'border-color 0.2s, background 0.2s',
                 }}
                 onFocus={(e) => {
-                  e.target.style.borderColor = 'rgba(102, 126, 234, 0.5)';
+                  e.target.style.borderColor = 'rgba(156, 102, 73, 0.5)';
                   e.target.style.background = 'rgba(255, 255, 255, 0.08)';
                 }}
                 onBlur={(e) => {
@@ -265,7 +265,7 @@ export default function AdminLogin() {
             style={{
               width: '100%',
               padding: '16px',
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              background: 'linear-gradient(135deg, #361906 0%, #9c6649 100%)',
               border: 'none',
               borderRadius: 12,
               color: '#ffffff',

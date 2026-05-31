@@ -152,7 +152,7 @@ export default function Home() {
   // Show error state with retry
   if (error && products.length === 0) {
     return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)" }}>
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)" }}>
         <ErrorMessage message={error} onRetry={refetch} />
       </div>
     );
@@ -161,13 +161,13 @@ export default function Home() {
   // Show empty state
   if (products.length === 0) {
     return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", background: "linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)" }}>
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", background: "linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)" }}>
         <div style={{ textAlign: "center", maxWidth: 500 }}>
           <h2 style={{ fontSize: 32, fontWeight: 800, color: "#1f2937", marginBottom: 16 }}>No Products Available</h2>
           <p style={{ fontSize: 16, color: "#6b7280", marginBottom: 24 }}>Check back soon for our latest collection!</p>
           <button
             onClick={() => navigate('/contact')}
-            style={{ padding: "12px 24px", background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", color: "white", border: "none", borderRadius: 8, fontSize: 16, fontWeight: 600, cursor: "pointer" }}
+            style={{ padding: "12px 24px", background: "linear-gradient(135deg, #361906 0%, #9c6649 100%)", color: "white", border: "none", borderRadius: 8, fontSize: 16, fontWeight: 600, cursor: "pointer" }}
           >
             Contact Us
           </button>
@@ -850,13 +850,13 @@ export default function Home() {
                       style={{
                         flex: 1,
                         padding: "10px 16px",
-                        border: `1px solid ${selectedSizeSystem === system ? "rgba(102, 126, 234, 0.4)" : "transparent"}`,
+                        border: `1px solid ${selectedSizeSystem === system ? "rgba(156, 102, 73, 0.4)" : "transparent"}`,
                         borderRadius: 8,
                         background: selectedSizeSystem === system
-                          ? "rgba(102, 126, 234, 0.2)"
+                          ? "rgba(156, 102, 73, 0.2)"
                           : "transparent",
                         backdropFilter: "blur(10px)",
-                        color: selectedSizeSystem === system ? "#667eea" : "#6b7280",
+                        color: selectedSizeSystem === system ? "#9c6649" : "#6b7280",
                         fontWeight: selectedSizeSystem === system ? 700 : 600,
                         fontSize: 15,
                         cursor: "pointer",
@@ -895,14 +895,14 @@ export default function Home() {
                       style={{
                         padding: "12px 8px",
                         border: selectedSize === size
-                          ? "2px solid rgba(102, 126, 234, 0.6)"
+                          ? "2px solid rgba(156, 102, 73, 0.6)"
                           : "1px solid rgba(209, 213, 219, 0.4)",
                         borderRadius: 8,
                         background: selectedSize === size 
                           ? "rgba(237, 233, 254, 0.4)" 
                           : "rgba(255, 255, 255, 0.2)",
                         backdropFilter: "blur(10px)",
-                        color: selectedSize === size ? "#667eea" : "#374151",
+                        color: selectedSize === size ? "#9c6649" : "#374151",
                         fontWeight: selectedSize === size ? 700 : 500,
                         fontSize: 14,
                         cursor: "pointer",
@@ -949,10 +949,10 @@ export default function Home() {
                 style={{
                   width: "100%",
                   padding: "16px",
-                  background: "rgba(102, 126, 234, 0.2)",
+                  background: "rgba(156, 102, 73, 0.2)",
                   backdropFilter: "blur(10px)",
-                  color: "#667eea",
-                  border: "1px solid rgba(102, 126, 234, 0.4)",
+                  color: "#9c6649",
+                  border: "1px solid rgba(156, 102, 73, 0.4)",
                   borderRadius: 12,
                   fontSize: 16,
                   fontWeight: 700,

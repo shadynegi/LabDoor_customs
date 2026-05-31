@@ -74,7 +74,7 @@ export default function ProductSearchBar({
   const borderColor = isFocused
     ? isHero
       ? 'rgba(255,255,255,0.9)'
-      : '#667eea'
+      : '#9c6649'
     : isHero
       ? 'rgba(255,255,255,0.35)'
       : '#e5e7eb';
@@ -84,7 +84,7 @@ export default function ProductSearchBar({
   const iconColor = isFocused
     ? isHero
       ? 'rgba(255,255,255,0.95)'
-      : '#667eea'
+      : '#9c6649'
     : isHero
       ? 'rgba(255,255,255,0.65)'
       : '#9ca3af';
@@ -149,7 +149,7 @@ export default function ProductSearchBar({
           boxShadow: isFocused
             ? isHero
               ? '0 4px 20px rgba(0,0,0,0.25)'
-              : '0 4px 12px rgba(102, 126, 234, 0.15)'
+              : '0 4px 12px rgba(156, 102, 73, 0.15)'
             : isHero
               ? '0 2px 8px rgba(0,0,0,0.15)'
               : '0 2px 4px rgba(0, 0, 0, 0.05)',
@@ -294,7 +294,7 @@ export default function ProductSearchBar({
                   borderRadius: 8,
                   cursor: 'pointer',
                   fontWeight: 600,
-                  color: '#667eea',
+                  color: '#9c6649',
                   fontSize: 13,
                   marginTop: 4,
                 }}

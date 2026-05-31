@@ -172,11 +172,11 @@ function OrderTimeline({ order, isMobile }: { order: Order; isMobile: boolean })
 
   return (
     <div style={{
-      background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
+      background: 'linear-gradient(135deg, #f5e0d5 0%, #9c6649 100%)',
       borderRadius: 12,
       padding: isMobile ? 16 : 24,
       marginBottom: 16,
-      border: '1px solid #bae6fd',
+      border: '1px solid #e8c9b8',
     }}>
       <div style={{
         fontSize: 14,
@@ -574,7 +574,7 @@ export default function MyOrders() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'delivered': return '#10b981';
-      case 'shipped': return '#3b82f6';
+      case 'shipped': return '#9c6649';
       case 'processing': return '#f59e0b';
       case 'pending': return '#6b7280';
       case 'cancelled': return '#ef4444';
@@ -626,7 +626,7 @@ export default function MyOrders() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
+      background: 'linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)',
       padding: isMobile ? '20px' : '40px 20px',
     }}>
       <div style={{ maxWidth: 1000, margin: '0 auto' }}>
@@ -640,12 +640,12 @@ export default function MyOrders() {
             width: 80,
             height: 80,
             borderRadius: '50%',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            background: 'linear-gradient(135deg, #361906 0%, #9c6649 100%)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             margin: '0 auto 20px',
-            boxShadow: '0 10px 40px rgba(102, 126, 234, 0.3)',
+            boxShadow: '0 10px 40px rgba(156, 102, 73, 0.3)',
           }}>
             <Package size={40} color="white" />
           </div>
@@ -712,7 +712,7 @@ export default function MyOrders() {
                   outline: 'none',
                   transition: 'border-color 0.2s ease',
                 }}
-                onFocus={(e) => e.target.style.borderColor = '#667eea'}
+                onFocus={(e) => e.target.style.borderColor = '#9c6649'}
                 onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
               />
             </div>
@@ -749,7 +749,7 @@ export default function MyOrders() {
                     outline: 'none',
                     transition: 'border-color 0.2s ease',
                   }}
-                  onFocus={(e) => e.target.style.borderColor = '#667eea'}
+                  onFocus={(e) => e.target.style.borderColor = '#9c6649'}
                   onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
                 />
               </div>
@@ -758,7 +758,7 @@ export default function MyOrders() {
                 disabled={loading}
                 style={{
                   padding: '12px 24px',
-                  background: loading ? '#9ca3af' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  background: loading ? '#9ca3af' : 'linear-gradient(135deg, #361906 0%, #9c6649 100%)',
                   color: 'white',
                   border: 'none',
                   borderRadius: 8,
@@ -776,7 +776,7 @@ export default function MyOrders() {
                 onMouseEnter={(e) => {
                   if (!loading) {
                     e.currentTarget.style.transform = 'translateY(-2px)';
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.4)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(156, 102, 73, 0.4)';
                   }
                 }}
                 onMouseLeave={(e) => {
@@ -831,7 +831,7 @@ export default function MyOrders() {
                   alignItems: 'center',
                   gap: 8,
                   padding: '10px 16px',
-                  background: showFilters ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : '#f3f4f6',
+                  background: showFilters ? 'linear-gradient(135deg, #361906 0%, #9c6649 100%)' : '#f3f4f6',
                   color: showFilters ? 'white' : '#374151',
                   border: 'none',
                   borderRadius: 10,
@@ -1178,7 +1178,7 @@ export default function MyOrders() {
               onClick={clearFilters}
               style={{
                 padding: '12px 24px',
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                background: 'linear-gradient(135deg, #361906 0%, #9c6649 100%)',
                 color: 'white',
                 border: 'none',
                 borderRadius: 10,
@@ -1265,11 +1265,11 @@ export default function MyOrders() {
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
                   style={{
-                    background: 'linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)',
+                    background: 'linear-gradient(135deg, #f5e0d5 0%, #e8c9b8 100%)',
                     borderRadius: 12,
                     padding: isMobile ? 16 : 20,
                     marginBottom: 16,
-                    border: '1px solid #e9d5ff',
+                    border: '1px solid #9c6649',
                   }}
                 >
                   <div style={{
@@ -1432,7 +1432,7 @@ export default function MyOrders() {
                     padding: '8px',
                     background: 'transparent',
                     border: 'none',
-                    color: '#667eea',
+                    color: '#9c6649',
                     fontSize: 14,
                     fontWeight: 600,
                     cursor: 'pointer',

@@ -54,7 +54,7 @@ const ProductCarousel: React.FC<ProductCarouselProps> = ({ products }) => {
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           style={{
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            background: 'linear-gradient(135deg, #361906 0%, #9c6649 100%)',
             color: 'white',
             border: 'none',
             padding: isMobile ? '12px 20px' : '16px 32px',

@@ -20,7 +20,7 @@ export default function HelpCenter() {
   return (
     <div style={{ 
       minHeight: "100vh",
-      background: "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
+      background: "linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)",
       padding: isMobile ? "40px 20px" : "60px 40px",
       paddingBottom: isMobile ? "max(40px, env(safe-area-inset-bottom))" : "40px"
     }}>
@@ -62,7 +62,7 @@ export default function HelpCenter() {
                 width: "100%",
                 padding: isMobile ? "20px" : "24px 32px",
                 background: activeSection === "shipping" 
-                  ? "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" 
+                  ? "linear-gradient(135deg, #361906 0%, #9c6649 100%)" 
                   : "white",
                 color: activeSection === "shipping" ? "white" : "#1f2937",
                 border: "none",
@@ -130,7 +130,7 @@ export default function HelpCenter() {
                   padding: 16, 
                   background: "#f9fafb", 
                   borderRadius: 10,
-                  borderLeft: "4px solid #667eea"
+                  borderLeft: "4px solid #9c6649"
                 }}>
                   <p style={{ margin: 0, color: "#4b5563", fontSize: 14 }}>
                     <strong>Note:</strong> Shipping times are estimates and may vary due to weather, 
@@ -154,7 +154,7 @@ export default function HelpCenter() {
                 width: "100%",
                 padding: isMobile ? "20px" : "24px 32px",
                 background: activeSection === "privacy" 
-                  ? "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" 
+                  ? "linear-gradient(135deg, #361906 0%, #9c6649 100%)" 
                   : "white",
                 color: activeSection === "privacy" ? "white" : "#1f2937",
                 border: "none",
@@ -254,7 +254,7 @@ export default function HelpCenter() {
                   padding: 16, 
                   background: "#f9fafb", 
                   borderRadius: 10,
-                  borderLeft: "4px solid #667eea"
+                  borderLeft: "4px solid #9c6649"
                 }}>
                   <p style={{ margin: 0, color: "#4b5563", fontSize: 14 }}>
                     For privacy-related questions or to exercise your rights, contact us at 
@@ -278,7 +278,7 @@ export default function HelpCenter() {
                 width: "100%",
                 padding: isMobile ? "20px" : "24px 32px",
                 background: activeSection === "terms" 
-                  ? "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" 
+                  ? "linear-gradient(135deg, #361906 0%, #9c6649 100%)" 
                   : "white",
                 color: activeSection === "terms" ? "white" : "#1f2937",
                 border: "none",
@@ -393,7 +393,7 @@ export default function HelpCenter() {
                   padding: 16, 
                   background: "#f9fafb", 
                   borderRadius: 10,
-                  borderLeft: "4px solid #667eea"
+                  borderLeft: "4px solid #9c6649"
                 }}>
                   <p style={{ margin: 0, color: "#4b5563", fontSize: 14 }}>
                     For questions about these Terms & Conditions, contact us at legal@gaultiershoes.com
