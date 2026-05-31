@@ -752,7 +752,9 @@ app.post("/api/paypal/create-payment", async (req: Request, res: Response) => {
       links: data.links,
       status: data.status,
       couponId,
-      discount,
+      discount: pricing.discount,
+      volumeDiscount: pricing.volumeDiscount,
+      couponDiscount: pricing.couponDiscount,
       idempotencyKey,
     };
 
