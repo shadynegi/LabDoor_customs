@@ -1,8 +1,13 @@
 import { getCsrfToken, initCsrfToken, resetCsrfSession, setCsrfToken, fetchCsrfToken } from './utils/csrf';
 
 export const config = {
-  apiBaseUrl: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api',
-  backendUrl: import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000',
+  // Dev default `/api` is proxied by Vite to the backend (works on LAN devices).
+  apiBaseUrl:
+    import.meta.env.VITE_API_BASE_URL ||
+    (import.meta.env.DEV ? '/api' : 'http://localhost:5000/api'),
+  backendUrl:
+    import.meta.env.VITE_BACKEND_URL ||
+    (import.meta.env.DEV ? '' : 'http://localhost:5000'),
   apiTimeoutMs: parseInt(import.meta.env.VITE_API_TIMEOUT_MS || '15000', 10),
 } as const;
 

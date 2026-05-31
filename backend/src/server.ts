@@ -230,12 +230,34 @@ app.use(
 );
 
 // CORS with origin validation (per-request so no-origin rules can use req.path)
+const extraOrigins =
+  process.env.ALLOWED_ORIGINS?.split(',')
+    .map((o) => o.trim())
+    .filter(Boolean) ?? [];
+
 const allowedOrigins = [
-  process.env.FRONTEND_URL || "http://localhost:5173",
-  "http://localhost:5173",
-  "http://localhost:3000",
-  // Add production domains here
+  process.env.FRONTEND_URL || 'http://localhost:5173',
+  'http://localhost:5173',
+  'http://localhost:3000',
+  ...extraOrigins,
 ].filter(Boolean);
+
+/** Allow phones/tablets on the same Wi‑Fi to hit the dev frontend (non-production only). */
+const isDevLanOrigin = (origin: string): boolean => {
+  if (isProduction) return false;
+  try {
+    const { hostname, port } = new URL(origin);
+    const devPorts = new Set(['5173', '3000', '4173', '']);
+    if (!devPorts.has(port)) return false;
+    if (hostname === 'localhost' || hostname === '127.0.0.1') return true;
+    if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(hostname)) return true;
+    if (/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname)) return true;
+    if (/^172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}$/.test(hostname)) return true;
+    return false;
+  } catch {
+    return false;
+  }
+};
 
 const corsBaseOptions = {
   credentials: true,
@@ -265,7 +287,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
         return callback(new Error('Not allowed by CORS'));
       }
 
-      if (allowedOrigins.includes(origin)) {
+      if (allowedOrigins.includes(origin) || isDevLanOrigin(origin)) {
         return callback(null, true);
       }
 
@@ -1348,18 +1370,23 @@ function startHttpServer() {
   const HTTPS_PORT = process.env.HTTPS_PORT || 443;
   const sslConfig = getSSLConfig();
 
+  const listenHost = isProduction ? undefined : '0.0.0.0';
+
   if (sslConfig && isProduction) {
     const httpsServer = https.createServer(sslConfig, app).listen(HTTPS_PORT, () => {
       logServerBanner('HTTPS', HTTPS_PORT, true);
     });
-    app.listen(PORT, () => {
+    app.listen(PORT, listenHost, () => {
       logger.info(`📍 HTTP Port: ${PORT} (redirecting to HTTPS)`);
     });
     return httpsServer;
   }
 
-  return app.listen(PORT, () => {
+  return app.listen(PORT, listenHost, () => {
     logServerBanner('HTTP', PORT, false);
+    if (!isProduction && listenHost === '0.0.0.0') {
+      logger.info('📡 LAN: backend reachable at http://<your-ip>:' + PORT);
+    }
   });
 }
 

@@ -18,7 +18,18 @@ export default defineConfig({
     }),
   ].filter(Boolean),
   server: {
-    host: true,   // exposes dev server to your LAN
+    host: true, // listen on 0.0.0.0 — use Network URL from `vite` output on other devices
+    port: 5173,
+    // Proxy API to backend so phones/tablets on LAN use /api (same origin), not localhost:5000
+    proxy: {
+      '/api': {
+        target: process.env.VITE_DEV_PROXY_TARGET || 'http://127.0.0.1:5000',
+        changeOrigin: true,
+      },
+    },
+  },
+  preview: {
+    host: true,
     port: 5173,
   },
   // Build optimization for 1000+ concurrent users
