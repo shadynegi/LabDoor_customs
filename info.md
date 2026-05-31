@@ -24,11 +24,12 @@
 14. [Maintenance jobs](#maintenance-jobs)
 15. [SEO and sitemap](#seo-and-sitemap)
 16. [Database](#database)
-17. [API reference summary](#api-reference-summary)
-18. [Environment variables](#environment-variables)
-19. [CI/CD and deployment](#cicd-and-deployment)
-20. [Local development](#local-development)
-21. [Testing](#testing)
+17. [Complete API endpoints](#complete-api-endpoints)
+18. [Webpage URLs](#webpage-urls)
+19. [Environment variables](#environment-variables)
+20. [CI/CD and deployment](#cicd-and-deployment)
+21. [Local development](#local-development)
+22. [Testing](#testing)
 
 ---
 
@@ -542,38 +543,193 @@ Started on server boot and run on intervals (`maintenanceJobs.ts`):
 
 ---
 
-## API reference summary
+## Complete API endpoints
 
-Full detail: [`documentation/API_DOCUMENTATION.md`](documentation/API_DOCUMENTATION.md)
+**Base URL (local):** `http://localhost:5000`  
+**Base URL (production):** your Railway/API host (frontend uses `VITE_API_BASE_URL`, typically `https://api.example.com/api`)
 
-### Payment (server.ts)
+**Auth legend**
 
-| Method | Path | Auth |
-|--------|------|------|
-| POST | `/api/paypal/webhook` | PayPal signature |
-| POST | `/api/paypal/create-payment` | Public + CSRF |
-| POST | `/api/paypal/capture-payment/:orderId` | Order token + CSRF |
-| GET | `/api/paypal/checkout-context/:paypalOrderId` | Order token |
-| POST | `/api/paypal/refund/:captureId` | Admin |
-| GET | `/api/paypal/test` | Admin |
-| GET | `/api/paypal/order/:orderId` | Admin |
+| Label | Meaning |
+|-------|---------|
+| Public | No login required |
+| CSRF | State-changing methods require `X-CSRF-Token` header + `csrf_token` cookie (SPA uses `/api/csrf-token`) |
+| Admin | `admin_session` HttpOnly cookie or legacy `Authorization: Bearer` |
+| Order token | Per-order access token via `?token=` query or `X-Order-Access-Token` header |
+| PayPal | Webhook signature verification (`PAYPAL_WEBHOOK_ID`) |
 
-### Other route modules
+Expanded request/response docs: [`documentation/API_DOCUMENTATION.md`](documentation/API_DOCUMENTATION.md)
 
-| Prefix | Module |
-|--------|--------|
-| `/api/products` | Catalog, search, filters, sitemap URLs, admin CRUD |
-| `/api/orders` | Admin order management, customer lookup with token, cancel, ship notify |
-| `/api/coupons` | Validate (public), admin CRUD |
-| `/api/reviews` | Public read/submit/vote, admin moderation |
-| `/api/contact` | Public submit, admin inbox |
-| `/api/activity` | Public logging, admin query/export |
-| `/api/admin` | Login, logout, verify, analytics, customers, bulk updates |
+### Core (`backend/src/server.ts`)
 
-### Deprecated endpoints (410 Gone)
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/csrf-token` | Public | Issue CSRF cookie + token for SPA |
+| GET | `/api/health` | Public | Health check (DB ping); used by Railway |
+| POST | `/api/paypal/webhook` | PayPal | PayPal event webhook (raw JSON body) |
+| GET | `/api/paypal/test` | Admin | PayPal API connectivity test |
+| POST | `/api/paypal/create-payment` | Public + CSRF | Create pending order + PayPal order |
+| POST | `/api/paypal/capture-payment/:orderId` | Order token + CSRF | Capture PayPal payment after approval |
+| GET | `/api/paypal/checkout-context/:paypalOrderId` | Order token | Resume checkout after PayPal redirect |
+| GET | `/api/paypal/order/:orderId` | Admin | Fetch PayPal order details |
+| POST | `/api/paypal/refund/:captureId` | Admin + CSRF | Issue full or partial refund |
 
-- `POST /api/orders` — use PayPal checkout
-- `POST /api/coupons/use` — coupon usage via capture flow only
+Any unmatched `/api/*` path returns **404** JSON `{ error: "Route not found" }`.
+
+### Products (`/api/products` — `backend/src/routes/products.ts`)
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/products` | Public | List products (pagination, filters) |
+| GET | `/api/products/filters` | Public | Available filter facets |
+| GET | `/api/products/sitemap-urls` | Public | Product IDs/paths for sitemap generation |
+| GET | `/api/products/category/:category` | Public | Products by category slug |
+| GET | `/api/products/:id` | Public | Single product by ID |
+| POST | `/api/products/search` | Public + CSRF | Fuse.js product search |
+| POST | `/api/products` | Admin + CSRF | Create product |
+| PUT | `/api/products/:id` | Admin + CSRF | Update product |
+| DELETE | `/api/products/:id` | Admin + CSRF | Delete product |
+
+### Orders (`/api/orders` — `backend/src/routes/orders.ts`)
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/api/orders` | — | **410 Gone** — use `POST /api/paypal/create-payment` |
+| GET | `/api/orders` | Admin | List all orders (pagination, status filters) |
+| GET | `/api/orders/stats/summary` | Admin | Order/revenue summary stats |
+| GET | `/api/orders/number/:orderNumber` | Order token or Admin | Lookup by order number |
+| GET | `/api/orders/customer/:email` | Admin | Orders for customer email |
+| GET | `/api/orders/:id` | Order token or Admin | Lookup by order UUID |
+| PUT | `/api/orders/:id` | Admin + CSRF | Update order fields |
+| PATCH | `/api/orders/:id/status` | Admin + CSRF | Update fulfillment status |
+| PATCH | `/api/orders/:id/payment-status` | Admin + CSRF | Update payment status |
+| POST | `/api/orders/:id/cancel` | Admin + CSRF | Cancel order (+ inventory restore) |
+| DELETE | `/api/orders/:id` | Admin + CSRF | Delete order |
+| POST | `/api/orders/:id/notify-shipped` | Admin + CSRF | Send shipped notification email |
+
+### Coupons (`/api/coupons` — `backend/src/routes/coupons.ts`)
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/api/coupons/validate` | Public + CSRF | Validate coupon code at checkout |
+| POST | `/api/coupons/use` | — | **410 Gone** — usage recorded at capture |
+| GET | `/api/coupons` | Admin | List coupons |
+| GET | `/api/coupons/:id` | Admin | Single coupon |
+| POST | `/api/coupons` | Admin + CSRF | Create coupon |
+| PUT | `/api/coupons/:id` | Admin + CSRF | Update coupon |
+| PATCH | `/api/coupons/:id/toggle` | Admin + CSRF | Enable/disable coupon |
+| DELETE | `/api/coupons/:id` | Admin + CSRF | Delete coupon |
+| GET | `/api/coupons/:id/usage` | Admin | Coupon redemption history |
+
+### Reviews (`/api/reviews` — `backend/src/routes/reviews.ts`)
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/reviews/product/:productId` | Public | Approved reviews for a product |
+| POST | `/api/reviews` | Public + CSRF | Submit a review |
+| POST | `/api/reviews/:id/vote` | Public + CSRF | Helpful/not helpful vote |
+| GET | `/api/reviews/check/:productId/:email` | Public | Check if email already reviewed product |
+| GET | `/api/reviews` | Admin | List reviews (moderation queue) |
+| PATCH | `/api/reviews/:id/status` | Admin + CSRF | Approve/reject review |
+| DELETE | `/api/reviews/:id` | Admin + CSRF | Delete review |
+
+### Contact (`/api/contact` — `backend/src/routes/contact.ts`)
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/api/contact` | Public + CSRF | Submit contact form |
+| GET | `/api/contact` | Admin | List contact messages |
+| GET | `/api/contact/stats/summary` | Admin | Inbox summary stats |
+| GET | `/api/contact/:id` | Admin | Single message |
+| PATCH | `/api/contact/:id/status` | Admin + CSRF | Update message status |
+| DELETE | `/api/contact/:id` | Admin + CSRF | Delete message |
+
+### Activity (`/api/activity` — `backend/src/routes/activity.ts`)
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/api/activity/log` | Public + CSRF | Log single analytics event |
+| POST | `/api/activity/batch` | Public + CSRF | Log batched events |
+| GET | `/api/activity/export` | Admin | Export activity logs |
+| GET | `/api/activity/logs` | Admin | Query activity logs |
+| GET | `/api/activity/stats` | Admin | Aggregated activity stats |
+
+### Admin (`/api/admin` — `backend/src/routes/admin.ts`)
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/api/admin/login` | Public + CSRF | Admin login; sets `admin_session` cookie |
+| POST | `/api/admin/generate-hash` | Public | Generate bcrypt hash for `ADMIN_PASSWORD_HASH` (setup) |
+| POST | `/api/admin/logout` | Admin + CSRF | Logout; clears session |
+| GET | `/api/admin/verify` | Admin | Verify current session |
+| GET | `/api/admin/sessions` | Admin | List active admin sessions |
+| POST | `/api/admin/sessions/cleanup` | Admin + CSRF | Purge expired sessions |
+| GET | `/api/admin/analytics` | Admin | Dashboard analytics payload |
+| GET | `/api/admin/customers` | Admin | Customer list |
+| GET | `/api/admin/customers/:email` | Admin | Customer detail by email |
+| POST | `/api/admin/customers/:id/restore` | Admin + CSRF | Restore soft-deleted customer |
+| DELETE | `/api/admin/customers/:id` | Admin + CSRF | Soft-delete customer |
+| POST | `/api/admin/products/bulk-update` | Admin + CSRF | Bulk product field updates |
+| POST | `/api/admin/orders/bulk-update` | Admin + CSRF | Bulk order status updates |
+| POST | `/api/admin/messages/bulk-update` | Admin + CSRF | Bulk contact message status updates |
+
+**Endpoint count:** 71 routes (69 active + 2 deprecated **410** responses).
+
+---
+
+## Webpage URLs
+
+**SPA routing:** React Router in `frontend/src/App.tsx` (`BrowserRouter`). Production base URL is `VITE_SITE_URL` (default `https://www.labdoorcustoms.com`). Local dev: `http://localhost:5173`.
+
+### Storefront routes
+
+| URL | Page component | Notes |
+|-----|----------------|-------|
+| `/` | `Home` | Landing page, carousel, featured products |
+| `/products` | `ProductsPage` | Catalog; optional query `?q=` for search |
+| `/product/:id` | `ProductDetailPage` | `:id` = numeric product ID; also in sitemap |
+| `/about` | `AboutUs` | About page |
+| `/contact` | `ContactUs` | Contact form |
+| `/help` | `HelpCenter` | Help / FAQ |
+| `/privacy-policy` | `PrivacyPolicy` | Privacy policy |
+| `/terms-of-service` | `TermsOfService` | Terms of service |
+| `/returns-policy` | `ReturnsPolicy` | Returns policy |
+| `/shipping-policy` | `ShippingPolicy` | Shipping policy |
+| `/cart` | `CartPage` | Shopping cart |
+| `/checkout` | `Checkout` | Checkout form + PayPal redirect |
+| `/orders` | `MyOrders` | Order lookup; optional `?orderNumber=` & `?token=` deep link |
+| `/payment/success` | `PaymentSuccess` | PayPal return; query params `token`, `PayerID`, `aid` |
+| `/payment/cancel` | `Cancel` | PayPal cancel return |
+
+### Admin routes
+
+| URL | Page component | Notes |
+|-----|----------------|-------|
+| `/admin/login` | `AdminLogin` | Admin sign-in |
+| `/adminshivamdashboard` | `AdminDashboard` | Protected; redirects to `/admin/login` if unauthenticated |
+
+**Admin dashboard sections** (same URL, in-app tabs — not separate routes): Analytics, Products, Orders, Messages, Customers.
+
+### Fallback
+
+| URL | Behavior |
+|-----|----------|
+| `*` (any unmatched path) | Inline **404** page with “Go Home” link |
+
+### Static public files (`frontend/public/`)
+
+| URL | File | Notes |
+|-----|------|-------|
+| `/sitemap.xml` | `public/sitemap.xml` | Static pages + build-time product URLs via `scripts/generate-sitemap.mjs` |
+| `/robots.txt` | `public/robots.txt` | Disallows `/admin/`, `/adminshivamdashboard`, `/checkout`, `/cart`, `/payment/` |
+
+### Sitemap static paths (also in `generate-sitemap.mjs`)
+
+`/`, `/products`, `/about`, `/contact`, `/help`, `/privacy-policy`, `/terms-of-service`, `/returns-policy`, `/shipping-policy`, plus dynamic `/product/{id}` entries from `GET /api/products/sitemap-urls` at build time.
+
+### URLs referenced in navigation (not separate routes)
+
+Footer/header links use the routes above. Product search navigates to `/products?q={query}`. Cart badge and checkout flow link `/cart` → `/checkout` → PayPal → `/payment/success` or `/payment/cancel`.
 
 ---
 
