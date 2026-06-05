@@ -1,0 +1,30 @@
+﻿{
+  "version": 1,
+  "permissions": {
+    "allow": [
+      "Shell(cd)",
+      "Shell(dir)",
+      "Shell(ForEach-Object)",
+      "Shell(Get-ChildItem)",
+      "Shell(git)",
+      "Shell(gh)",
+      "Shell(Measure-Object)",
+      "Shell(node)",
+      "Shell(npm)",
+      "Shell(npx)",
+      "Shell(powershell)",
+      "Shell(Remove-Item)",
+      "Shell(Resolve-DnsName)",
+      "Shell(Select-Object)",
+      "Shell(Select-String)",
+      "Shell(Set-Location)",
+      "Shell(Test-NetConnection)",
+      "Shell(Test-Path)",
+      "Shell(tsc)",
+      "Shell(vitest)",
+      "Shell(Where-Object)",
+      "Shell(Write-Output)"
+    ],
+    "deny": []
+  }
+}

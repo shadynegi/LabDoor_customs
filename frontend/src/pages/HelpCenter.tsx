@@ -1,17 +1,12 @@
 import React, { useState } from "react";
 import { Package, Shield, FileText, ChevronDown, ChevronUp } from "lucide-react";
+import { useResponsive } from "../hooks/useResponsive";
 
 type Section = "shipping" | "privacy" | "terms";
 
 export default function HelpCenter() {
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const { isMobile } = useResponsive();
   const [activeSection, setActiveSection] = useState<Section | null>(null);
-
-  React.useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
 
   const toggleSection = (section: Section) => {
     setActiveSection(activeSection === section ? null : section);

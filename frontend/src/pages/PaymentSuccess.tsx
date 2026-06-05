@@ -8,6 +8,7 @@ import { apiFetch } from '../config';
 import { toast } from 'sonner';
 import { getFriendlyError } from '../utils/errorMessages';
 import { logError } from '../lib/logger';
+import { useResponsive } from '../hooks/useResponsive';
 
 // Payment progress steps
 type PaymentStep = 'verifying' | 'capturing' | 'saving' | 'complete' | 'error';
@@ -175,17 +176,10 @@ export default function PaymentSuccess() {
   const [isLoading, setIsLoading] = useState(true);
   const [paymentStep, setPaymentStep] = useState<PaymentStep>('verifying');
   const [captureError, setCaptureError] = useState<string | null>(null);
-  const [isMobile, setIsMobile] = useState(false);
+  const { isMobile } = useResponsive();
 
   const token = searchParams.get('token');
   const payerId = searchParams.get('PayerID');
-
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
 
   useEffect(() => {
     const capturePayment = async () => {

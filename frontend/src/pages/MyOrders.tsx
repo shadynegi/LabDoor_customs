@@ -1,5 +1,6 @@
 // MyOrders.tsx - Enhanced Order tracking page with visual timeline
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useResponsive } from '../hooks/useResponsive';
 import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -350,7 +351,7 @@ export default function MyOrders() {
   const [error, setError] = useState<string | null>(null);
   const [searched, setSearched] = useState(false);
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const { isMobile } = useResponsive();
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -418,12 +419,6 @@ export default function MyOrders() {
     setStatusFilter('all');
     setDateRange('all');
   };
-
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
 
   // Fetch orders for all saved order number + token pairs
   const refreshTrackedOrders = useCallback(async (isRefresh = false) => {

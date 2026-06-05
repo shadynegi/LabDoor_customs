@@ -1,17 +1,10 @@
-import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Heart, Award, Truck, Shield, Users, MapPin } from "lucide-react";
 import MetaTags from "../components/MetaTags";
+import { useResponsive } from "../hooks/useResponsive";
 
 export default function AboutUs() {
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
-  }, []);
+  const { isMobile } = useResponsive();
 
   return (
     <div

@@ -396,43 +396,4 @@ export function Product360Viewer({
   return viewerContent;
 }
 
-export function Product360ViewerFallback({
-  image,
-  productName,
-  size = 'md',
-}: {
-  image: string;
-  productName: string;
-  size?: 'sm' | 'md' | 'lg' | 'full';
-}) {
-  return (
-    <div className={`${rootClass(size, false)} flex-center`}>
-      <img
-        src={optimizeImageUrl(image, { width: 720 })}
-        alt={productName}
-        width={720}
-        height={720}
-        loading="lazy"
-        decoding="async"
-        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-      />
-      <div
-        style={{
-          position: 'absolute',
-          bottom: 16,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          fontSize: 12,
-          color: 'rgba(255,255,255,0.5)',
-          background: 'rgba(0,0,0,0.5)',
-          padding: '4px 12px',
-          borderRadius: 999,
-        }}
-      >
-        360° view coming soon
-      </div>
-    </div>
-  );
-}
-
 export default Product360Viewer;

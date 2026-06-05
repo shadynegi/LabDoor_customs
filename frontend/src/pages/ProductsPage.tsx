@@ -12,6 +12,7 @@ import ProductFilters from '../components/ProductFilters';
 import { ProductGridSkeleton, SkeletonStyles } from '../components/Skeletons';
 import { optimizeImageUrl } from '../utils/imageUrl';
 import MetaTags from '../components/MetaTags';
+import { useResponsive } from '../hooks/useResponsive';
 
 const ProductsPage = () => {
   const navigate = useNavigate();
@@ -33,7 +34,7 @@ const ProductsPage = () => {
     filterOptions,
     activeFilterCount,
   } = useProductSearch(300);
-  const [isMobile, setIsMobile] = useState(false);
+  const { isMobile } = useResponsive();
   const observerRef = useRef<HTMLDivElement>(null);
   const initialQueryApplied = useRef(false);
 
@@ -49,13 +50,6 @@ const ProductsPage = () => {
   // Determine which products to display - search/filter results or all products
   const isUsingSearchOrFilters = isSearching || isFiltering;
   const displayProducts = isUsingSearchOrFilters ? searchResults : products;
-
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
 
   // Infinite scroll observer
   useEffect(() => {

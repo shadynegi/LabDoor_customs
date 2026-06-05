@@ -8,26 +8,6 @@
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 
-/* Layout */
-.responsive-page {
-  padding-left: max(var(--page-padding-x), env(safe-area-inset-left, 0px));
-  padding-right: max(var(--page-padding-x), env(safe-area-inset-right, 0px));
-  padding-bottom: max(var(--page-padding-y), var(--safe-bottom));
-}
-
-.responsive-grid-2 {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 16px;
-}
-
-@media (min-width: 768px) {
-  .responsive-grid-2 {
-    grid-template-columns: 1fr 1fr;
-    gap: 24px;
-  }
-}
-
 .responsive-table-wrap {
   width: 100%;
   overflow-x: auto;

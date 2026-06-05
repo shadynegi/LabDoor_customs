@@ -4,9 +4,10 @@ import { toast } from "sonner";
 import MetaTags from "../components/MetaTags";
 import { logError } from "../lib/logger";
 import { apiFetch } from "../config";
+import { useResponsive } from "../hooks/useResponsive";
 
 export default function ContactUs() {
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const { isMobile } = useResponsive();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -15,12 +16,6 @@ export default function ContactUs() {
   });
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  React.useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

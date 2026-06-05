@@ -1,17 +1,12 @@
 // src/pages/TermsOfService.tsx
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useResponsive } from '../hooks/useResponsive';
 import { ArrowLeft, FileText, Scale, ShoppingBag, AlertTriangle, Copyright, Globe } from 'lucide-react';
 
 export default function TermsOfService() {
   const navigate = useNavigate();
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
+  const { isMobile } = useResponsive();
 
   const Section = ({ icon: Icon, title, children }: { icon: any; title: string; children: React.ReactNode }) => (
     <div style={{ marginBottom: 32 }}>

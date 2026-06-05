@@ -15,6 +15,7 @@ import { HomePageSkeleton } from "../components/Skeletons";
 import { optimizeImageUrl } from "../utils/imageUrl";
 import MetaTags from "../components/MetaTags";
 import { DEFAULT_META } from "../lib/site";
+import { useResponsive } from "../hooks/useResponsive";
 
 const ProductCarousel = lazy(() => import("../components/ProductCarousel"));
 
@@ -63,7 +64,7 @@ export default function Home() {
   const { products: apiProducts, loading, error, refetch } = useProducts();
   const products = apiProducts;  
   const [[index, direction], setIndex] = useState<[number, number]>([0, 0]);
-  const [isMobile, setIsMobile] = useState(false);
+  const { isMobile } = useResponsive();
   const productsCount = products.length;
   const startX = useRef<number | null>(null);
   const startY = useRef<number | null>(null);
@@ -75,15 +76,6 @@ export default function Home() {
     loading: searchLoading,
     clearSearch,
   } = useProductSearchSuggestions();
-
-  useEffect(() => {
-    const checkLayout = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    checkLayout();
-    window.addEventListener('resize', checkLayout);
-    return () => window.removeEventListener('resize', checkLayout);
-  }, []);
 
   const go = (dir: number) => {
     setIndex(([i]) => {

@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import type { Product } from '../hooks/useProducts';
 import { optimizeImageUrl } from '../utils/imageUrl';
+import { useResponsive } from '../hooks/useResponsive';
 
 interface ProductCarouselProps {
   products: Product[];
@@ -12,13 +13,7 @@ interface ProductCarouselProps {
 const ProductCarousel: React.FC<ProductCarouselProps> = ({ products }) => {
   const navigate = useNavigate();
   const [duplicatedProducts, setDuplicatedProducts] = useState<Product[]>([]);
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
+  const { isMobile } = useResponsive();
 
   useEffect(() => {
     // Duplicate products array 3 times for seamless infinite scroll

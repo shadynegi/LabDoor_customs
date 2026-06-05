@@ -12,6 +12,7 @@ import { trackGaPageView } from "./lib/analytics";
 import { apiFetch } from "./config";
 import logoAllPagesText from "./assets/Logo/LogoAllPagesText.png";
 import logoAllPages from "./assets/Logo/LogoAllPages.png";
+import { useResponsive } from "./hooks/useResponsive";
 
 // Lazy load pages for better performance (code splitting for 1000+ users)
 const Home = lazy(() => import("./pages/Home"));
@@ -110,20 +111,9 @@ function PageViewTracker() {
 
 function Navigation() {
   const location = useLocation();
-  const [isMobile, setIsMobile] = useState(false);
-  const [isSmallMobile, setIsSmallMobile] = useState(false);
+  const { isMobile, isSmallMobile } = useResponsive();
   const { state } = useCart();
   const cartCount = state.items.reduce((sum, item) => sum + item.quantity, 0);
-
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-      setIsSmallMobile(window.innerWidth < 375);
-    };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
 
   // Don't show navigation on home page or admin pages
   if (location.pathname === '/' || location.pathname.startsWith('/admin')) {

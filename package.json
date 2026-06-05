@@ -21,7 +21,6 @@
     "links:check": "node scripts/link-check.mjs"
   },
   "devDependencies": {
-    "@types/bcrypt": "^6.0.0",
     "concurrently": "^9.2.1"
   },
   "engines": {

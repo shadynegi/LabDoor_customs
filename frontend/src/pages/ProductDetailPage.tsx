@@ -13,6 +13,7 @@ import { optimizeImageUrl } from '../utils/imageUrl';
 import MetaTags from '../components/MetaTags';
 import ProductJsonLd from '../components/ProductJsonLd';
 import { logError } from '../lib/logger';
+import { useResponsive } from '../hooks/useResponsive';
 
 const Product360Viewer = lazy(() =>
   import('../components/Product360Viewer').then((m) => ({ default: m.Product360Viewer }))
@@ -57,8 +58,8 @@ const ProductDetailPage: React.FC = () => {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isMobile, setIsMobile] = useState(false);
-  
+  const { isMobile } = useResponsive();
+
   const [selectedSizeSystem, setSelectedSizeSystem] = useState<SizeSystem>("US");
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [addedToCart, setAddedToCart] = useState(false);
@@ -70,13 +71,6 @@ const ProductDetailPage: React.FC = () => {
     US: ["6", "6.5", "7", "7.5", "8", "8.5", "9", "9.5", "10", "10.5", "11", "11.5", "12", "12.5", "13"],
     EU: ["38", "39", "40", "41", "42", "43", "44", "45", "46", "47", "48"],
   };
-
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
 
   useEffect(() => {
     const fetchProduct = async () => {

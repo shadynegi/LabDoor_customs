@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Cookie, X, Settings, Check, Shield } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useResponsive } from '../hooks/useResponsive';
 
 interface CookiePreferences {
   essential: boolean;
@@ -16,18 +17,12 @@ const COOKIE_PREFERENCES_KEY = 'lab_door_cookie_preferences';
 export default function CookieConsent() {
   const [isVisible, setIsVisible] = useState(false);
   const [showPreferences, setShowPreferences] = useState(false);
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const { isMobile } = useResponsive();
   const [preferences, setPreferences] = useState<CookiePreferences>({
     essential: true, // Always true, cannot be disabled
     analytics: false,
     marketing: false,
   });
-
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
 
   useEffect(() => {
     // Check if user has already consented
