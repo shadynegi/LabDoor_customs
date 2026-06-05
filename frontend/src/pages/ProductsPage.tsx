@@ -323,14 +323,7 @@ const ProductsPage = () => {
         maxWidth: 1400,
         margin: '0 auto',
       }}>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: isMobile 
-            ? 'repeat(auto-fill, minmax(150px, 1fr))' 
-            : 'repeat(auto-fill, minmax(260px, 1fr))',
-          gap: isMobile ? 16 : 24,
-          marginBottom: 40,
-        }}>
+        <div className="responsive-product-grid" style={{ marginBottom: 40 }}>
           {displayProducts.map((product, index) => (
             <motion.div
               key={product.id}

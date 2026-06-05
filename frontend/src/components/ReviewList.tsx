@@ -6,6 +6,8 @@ import { apiFetch } from '../config';
 import StarRating from './StarRating';
 import { ReviewListSkeleton } from './Skeletons';
 import { logError } from '../lib/logger';
+import { useResponsive } from '../hooks/useResponsive';
+import { gridCols } from '../lib/responsive';
 
 interface Review {
   id: string;
@@ -41,6 +43,7 @@ interface ReviewListProps {
 }
 
 const ReviewList: React.FC<ReviewListProps> = ({ productId, onWriteReview }) => {
+  const { isMobile } = useResponsive();
   const [reviews, setReviews] = useState<Review[]>([]);
   const [stats, setStats] = useState<ReviewStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -120,11 +123,8 @@ const ReviewList: React.FC<ReviewListProps> = ({ productId, onWriteReview }) => 
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
+          className="review-stats-grid"
           style={{
-            display: 'grid',
-            gridTemplateColumns: 'auto 1fr',
-            gap: 32,
-            padding: 24,
             background: 'white',
             borderRadius: 16,
             marginBottom: 24,
@@ -132,7 +132,7 @@ const ReviewList: React.FC<ReviewListProps> = ({ productId, onWriteReview }) => 
           }}
         >
           {/* Average Rating */}
-          <div style={{ textAlign: 'center', borderRight: '1px solid #e5e7eb', paddingRight: 32 }}>
+          <div className="review-stats-average">
             <div style={{ fontSize: 48, fontWeight: 800, color: '#1f2937' }}>
               {Number(stats.average_rating).toFixed(1)}
             </div>
@@ -373,7 +373,7 @@ const ReviewList: React.FC<ReviewListProps> = ({ productId, onWriteReview }) => 
 
                 {/* Pros & Cons */}
                 {(review.pros?.length || review.cons?.length) && (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 12 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: gridCols(isMobile, '1fr', '1fr 1fr'), gap: 16, marginBottom: 12 }}>
                     {review.pros && review.pros.length > 0 && (
                       <div>
                         {review.pros.map((pro, i) => (

@@ -23,12 +23,14 @@ If the user did not mention testing, **skip** `npm test`, `npm run test:all`, Pl
 
 | Suite | Tool | Location | Count | Needs live DB? |
 |-------|------|----------|-------|----------------|
-| Backend unit | Vitest | `Tests/backend/` | 6 files | No (mocked) |
+| Backend unit | Vitest | `Tests/backend/` | 10 files | No (mocked) |
 | API integration | Vitest + Supertest | `Tests/api/` | 4 files | No (mocked) |
 | Frontend E2E smoke | Playwright | `Tests/frontend/` | 1 file, 4 tests | No (static preview) |
 | Link checker | Custom script | repo root | — | No |
 
-**Total:** 54 Vitest tests + 4 Playwright smoke tests.
+**Total:** 76 Vitest tests + 4 Playwright smoke tests.
+
+Backend unit tests include: payment idempotency, order tokens, checkout exchange hashing, order token encryption, webhook errors, product image validation, admin session hashing, PayPal webhook utils, refund idempotency, checkout pricing, client IP, keep-alive.
 
 ---
 
@@ -50,7 +52,7 @@ Tests/
 └── package.json         # Playwright dependency + frontend test scripts
 ```
 
-Legacy paths **`backend/tests/`** and **`frontend/e2e/`** were removed; all automated tests live under **`Tests/`**.
+All automated tests live under **`Tests/`** (`backend/`, `api/`, `frontend/`).
 
 ---
 
@@ -59,8 +61,8 @@ Legacy paths **`backend/tests/`** and **`frontend/e2e/`** were removed; all auto
 ### Backend / API (Vitest)
 
 ```bash
-cd backend
-npm install
+npm install            # from repository root (workspaces)
+npm test
 ```
 
 No running server or database required. `Tests/setup.ts` mocks Postgres, Redis, and idempotency storage.
@@ -68,13 +70,13 @@ No running server or database required. `Tests/setup.ts` mocks Postgres, Redis, 
 ### Frontend E2E (Playwright)
 
 ```bash
-cd frontend
-npm install
-npm run build          # required — Playwright serves frontend/dist via Vite preview
+npm install            # from repository root
+npm run build -w frontend   # Playwright serves frontend/dist via Vite preview
 
-cd ../Tests
+cd Tests
 npm install
 npm run test:frontend:install   # first time only — downloads Chromium
+npm run test:frontend
 ```
 
 Playwright starts `vite preview` on `http://127.0.0.1:4173` automatically (see `playwright.config.ts`). The backend does **not** need to be running for smoke tests.
@@ -112,7 +114,7 @@ Run these **only when you or the user explicitly want verification**.
 ### From repo root
 
 ```bash
-npm run test              # Backend unit + API (54 tests)
+npm run test              # Backend unit + API (76 tests)
 npm run test:backend      # Backend unit only
 npm run test:api          # API tests only
 npm run test:frontend     # Playwright smoke (frontend must be built first)
@@ -122,11 +124,10 @@ npm run test:all          # Vitest + Playwright
 ### Backend (Vitest)
 
 ```bash
-cd backend
-npm test                  # All Vitest tests (backend + api)
-npm run test:watch        # Watch mode
-npm run test:unit         # Tests/backend only
-npm run test:api          # Tests/api only
+npm test                  # from repository root
+npm run test:watch -w backend
+npm run test:unit
+npm run test:api
 ```
 
 **Locations:** `Tests/backend/` and `Tests/api/`
@@ -141,17 +142,9 @@ API tests mock the database layer for fast isolated runs.
 ### Frontend (Playwright)
 
 ```bash
-cd frontend
-npm run build
-npm run test:e2e:install  # first time only
-npm run test:e2e          # Delegates to Tests/
-```
-
-Or directly from `Tests/`:
-
-```bash
-cd Tests
-npm run test:frontend
+npm run build -w frontend
+cd Tests && npm run test:frontend:install   # first time only
+npm run test:frontend                       # from repository root
 ```
 
 **Location:** `Tests/frontend/storefront.spec.ts`

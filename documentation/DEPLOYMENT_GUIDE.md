@@ -1,55 +1,56 @@
-# Deployment
+# Deployment Guide
 
 Production deployment for Lab Door Customs on Railway with Cloudflare.
 
-**Full reference:** [`../info.md`](../info.md) | **Extended guide:** [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)
+**Full reference:** [`../info.md`](../info.md) | **Checklist:** [DEPLOYMENT.md](./DEPLOYMENT.md)
 
 ---
 
-## Services
+## Service topology
 
-| Service | Platform | Directory | Port |
-|---------|----------|-----------|------|
-| API | Railway | `backend/` | 5000 |
-| Storefront | Railway | `frontend/` | 5173 (serve) |
+| Component | Platform | Root | Port |
+|-----------|----------|------|------|
+| API + storefront | Railway | repository root | `PORT` (default 5000) |
 
-Both services sit behind Cloudflare DNS proxy in production.
+One Express process serves `/api/*` and the React SPA (`frontend/dist`). Cloudflare proxies the public domain in production.
 
 ---
 
-## Backend deploy checklist
+## Deploy checklist
+
+### Runtime (Railway environment)
 
 - [ ] `NODE_ENV=production`
 - [ ] `DATABASE_URL` — Supabase pooler (6543)
-- [ ] `FRONTEND_URL` — public storefront HTTPS URL
-- [ ] `ADMIN_PASSWORD_HASH` — bcrypt hash (use `POST /api/admin/generate-hash`)
+- [ ] `FRONTEND_URL` — public site URL (`https://www.yourdomain.com`)
+- [ ] `ADMIN_USERNAME` — admin login username
+- [ ] `ADMIN_PASSWORD_HASH` — bcrypt hash (`node backend/scripts/generate-admin-hash.mjs "password"`)
 - [ ] `PAYPAL_*` — live credentials + `PAYPAL_WEBHOOK_ID`
 - [ ] `TRUST_CLOUDFLARE=true`
-- [ ] `REDIS_URL` — Redis instance connected at startup
+- [ ] `REDIS_URL` — Redis instance
 - [ ] `SENTRY_DSN` — backend error tracking
 - [ ] `JWT_SECRET` — 32+ characters
 - [ ] `RESEND_API_KEY` — transactional email
 - [ ] Healthcheck: `/api/health`
 
----
+### Build-time (same Railway service)
 
-## Frontend deploy checklist
-
-- [ ] `VITE_API_BASE_URL` — production API HTTPS URL
+- [ ] `VITE_API_BASE_URL=/api`
 - [ ] `VITE_SITE_URL` — canonical storefront URL
 - [ ] `VITE_SENTRY_DSN` — frontend error tracking
-- [ ] Sitemap generated with live product URLs (`SITEMAP_REQUIRE_PRODUCTS=true`)
+- [ ] Optional: `SITEMAP_API_BASE_URL` — live API URL for product URLs in sitemap during build
 - [ ] Optional: `VITE_GA4_MEASUREMENT_ID`, `VITE_GSC_VERIFICATION`
 
-Build pipeline: `validate-env` → `sitemap` → `tsc` → `vite build` → `serve -s dist`
+Build command (from [`railway.json`](../railway.json)): `npm install && npm run build`  
+Start command: `npm start`
 
 ---
 
 ## Cloudflare
 
-- Orange-cloud proxy for frontend and API subdomains
+- Orange-cloud proxy on the public domain
 - SSL mode: Full (strict) recommended
-- Backend blocks non-Cloudflare traffic when `TRUST_CLOUDFLARE=true`
+- Direct Railway URL access is blocked when `TRUST_CLOUDFLARE=true` (except `/api/health`)
 
 Details: [CLOUDFLARE_RAILWAY.md](./CLOUDFLARE_RAILWAY.md)
 
@@ -57,14 +58,15 @@ Details: [CLOUDFLARE_RAILWAY.md](./CLOUDFLARE_RAILWAY.md)
 
 ## CI
 
-GitHub Actions (`.github/workflows/ci.yml`) runs on push/PR:
+GitHub Actions (`.github/workflows/ci.yml`):
 
-- Backend build + Vitest
-- Frontend build (requires secrets) + Playwright E2E
-- Sitemap generation with live API
-- Documentation link check
+| Job | Purpose |
+|-----|---------|
+| monorepo | Root install, validate-env, build, Vitest, Playwright smoke |
+| sitemap | Live product URLs via `PRODUCTION_API_BASE_URL` secret |
+| links | Documentation link checker |
 
-Configure secrets: `PRODUCTION_API_BASE_URL`, `VITE_SENTRY_DSN`, `DATABASE_URL`.
+Secrets: `PRODUCTION_API_BASE_URL`, `VITE_SENTRY_DSN`, `DATABASE_URL`.
 
 ---
 

@@ -1,0 +1,38 @@
+---
+description: Keep info.md and documentation/*.md in sync when changing code
+alwaysApply: true
+---
+
+# Documentation sync
+
+Lab Door Customs treats **`info.md`** as the authoritative system reference. **`documentation/`** holds operational guides; **`Tests/test_guidelines.md`** covers testing.
+
+## When to update docs
+
+Update documentation in the **same change** whenever you modify:
+
+- API routes, auth, or request/response shapes → `info.md`, `documentation/API_DOCUMENTATION.md`
+- Admin dashboard tabs or workflows → `info.md`, `documentation/ADMIN_DASHBOARD_GUIDE.md`, `documentation/ORDER_MANAGEMENT_GUIDE.md`
+- PayPal/checkout/payment flow → `info.md`, `documentation/PAYPAL_TESTING_GUIDE.md`, `documentation/diagnose-paypal-issue.md`
+- Environment variables, CI, or deploy topology → `info.md`, `documentation/DEPLOYMENT.md`, `documentation/QUICK_START.md`, `backend/env.template`, `frontend/env.template`, root `package.json`, `railway.json`
+- Security controls → `info.md`, `documentation/AUDIT_SUMMARY.md`
+- Database/schema/RLS → `info.md`, `documentation/SUPABASE_SQL_TO_RUN.md`, `documentation/RLS_OPTIMIZATION.md`
+- Tests added/removed → `info.md`, `Tests/test_guidelines.md`
+
+## Update order
+
+1. **`info.md`** — complete truth for architecture, endpoints, env vars, security
+2. **Affected guides** — describe how the feature works (not what changed); link back to `info.md`
+3. **`documentation/PROJECT_STATUS.md`** — if capabilities list changed
+
+## Do not
+
+- Edit historical completion reports (`*_COMPLETE.md`, `*_SUMMARY.md` from past milestones) unless the user asks
+- Leave stale endpoint counts, test counts, or env var lists in `info.md`
+- Document secrets or real credentials
+
+## Quick checklist before finishing a task
+
+- [ ] `info.md` reflects new behavior
+- [ ] Relevant `documentation/*.md` guides describe current behavior (functional docs, not changelogs)
+- [ ] Test count in `info.md` and `Tests/test_guidelines.md` matches `npm test` output if tests changed

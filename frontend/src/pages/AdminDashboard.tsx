@@ -1,5 +1,5 @@
 // AdminDashboard.tsx - Enhanced Admin panel with analytics, bulk actions, and product management
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Package,
@@ -19,10 +19,20 @@ import {
   AlertTriangle,
   X,
   MapPinned,
+  Plus,
+  Pencil,
+  Trash2,
+  Tag,
+  CheckCircle,
+  Ban,
+  Send,
 } from 'lucide-react';
 import { apiFetch } from '../config';
+import { useResponsive } from '../hooks/useResponsive';
 import { toast } from 'sonner';
 import LiquidModal from '../components/LiquidModal';
+import AdminProductFormModal, { type AdminProduct } from '../components/AdminProductFormModal';
+import AdminCouponsTab from '../components/AdminCouponsTab';
 import { DashboardSkeleton, SkeletonStyles } from '../components/Skeletons';
 import { logError } from '../lib/logger';
 
@@ -51,20 +61,12 @@ interface Order {
   updated_at: string;
 }
 
-interface Product {
-  id: number;
-  name: string;
-  price: number;
-  image: string;
-  description?: string;
-  category?: string;
-  stock: number;
+type Product = AdminProduct & {
   rating?: number;
   review_count?: number;
   view_count?: number;
   cart_count?: number;
-  is_out_of_stock: boolean;
-}
+};
 
 interface ContactMessage {
   id: string;
@@ -77,12 +79,14 @@ interface ContactMessage {
 }
 
 interface Customer {
+  id: string;
   email: string;
   name: string;
   total_orders: number;
   total_spent: number;
   last_order_date: string;
   first_order_date: string;
+  is_deleted?: boolean;
 }
 
 interface Analytics {
@@ -102,12 +106,12 @@ interface Analytics {
   };
 }
 
-type Tab = 'analytics' | 'products' | 'orders' | 'messages' | 'customers';
+type Tab = 'analytics' | 'products' | 'orders' | 'messages' | 'customers' | 'coupons';
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<Tab>('analytics');
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const { isMobile } = useResponsive();
   
   // Data states
   const [orders, setOrders] = useState<Order[]>([]);
@@ -115,13 +119,23 @@ export default function AdminDashboard() {
   const [messages, setMessages] = useState<ContactMessage[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
+  const [analyticsError, setAnalyticsError] = useState<string | null>(null);
   
   // UI states
   const [loading, setLoading] = useState(true);
+  const [ordersPage, setOrdersPage] = useState(1);
+  const [ordersTotalPages, setOrdersTotalPages] = useState(1);
+  const [ordersTotal, setOrdersTotal] = useState(0);
+  const [orderActionLoading, setOrderActionLoading] = useState(false);
+  const [orderTrackingNumber, setOrderTrackingNumber] = useState('');
+  const [orderTrackingUrl, setOrderTrackingUrl] = useState('');
+  const [orderCarrier, setOrderCarrier] = useState('Blue Dart');
+  const [showDeletedCustomers, setShowDeletedCustomers] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [selectedMessage, setSelectedMessage] = useState<ContactMessage | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [customerOrders, setCustomerOrders] = useState<Order[]>([]);
+  const [customerHistoryLoading, setCustomerHistoryLoading] = useState(false);
   
   // Filter states
   const [orderSearch, setOrderSearch] = useState('');
@@ -134,12 +148,8 @@ export default function AdminDashboard() {
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
   const [selectedProducts, setSelectedProducts] = useState<Set<number>>(new Set());
   const [selectedMessages, setSelectedMessages] = useState<Set<string>>(new Set());
-
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
+  const [productFormOpen, setProductFormOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
   useEffect(() => {
     loadData();
@@ -164,6 +174,8 @@ export default function AdminDashboard() {
         case 'customers':
           await fetchCustomers();
           break;
+        case 'coupons':
+          break;
       }
     } finally {
       setLoading(false);
@@ -171,22 +183,31 @@ export default function AdminDashboard() {
   };
 
   const fetchAnalytics = async () => {
+    setAnalyticsError(null);
     try {
       const response = await apiFetch('/admin/analytics', {
       });
       const data = await response.json();
       if (data.success) {
         setAnalytics(data.data);
+      } else {
+        setAnalytics(null);
+        setAnalyticsError(data.error || 'Failed to load analytics');
+        toast.error(data.error || 'Failed to load analytics');
       }
     } catch (error) {
       logError('Error fetching analytics:', error);
+      setAnalytics(null);
+      setAnalyticsError('Unable to load analytics. Check your connection and try again.');
+      toast.error('Failed to load analytics');
     }
   };
 
-  const fetchOrders = async () => {
+  const fetchOrders = async (page = ordersPage, search = orderSearch) => {
     try {
-      const response = await apiFetch('/orders', {
-      });
+      const statusQuery = orderStatusFilter !== 'all' ? `&status=${orderStatusFilter}` : '';
+      const searchQuery = search.trim() ? `&search=${encodeURIComponent(search.trim())}` : '';
+      const response = await apiFetch(`/orders?limit=50&page=${page}${statusQuery}${searchQuery}`);
       const data = await response.json();
       if (data.success) {
         const parsed = (data.data || []).map((o: any) => ({
@@ -198,9 +219,13 @@ export default function AdminDashboard() {
           items: (o.items || []).map((i: any) => ({ ...i, price: parseFloat(i.price) })),
         }));
         setOrders(parsed);
+        setOrdersTotal(data.count ?? parsed.length);
+        setOrdersTotalPages(data.pagination?.totalPages ?? 1);
+        setOrdersPage(data.pagination?.page ?? page);
       }
     } catch (error) {
       logError('Error fetching orders:', error);
+      toast.error('Failed to load orders');
     }
   };
 
@@ -236,27 +261,239 @@ export default function AdminDashboard() {
 
   const fetchCustomers = async () => {
     try {
-      const response = await apiFetch('/admin/customers', {
-      });
+      const deletedQuery = showDeletedCustomers ? '&include_deleted=true' : '';
+      const response = await apiFetch(`/admin/customers?limit=100${deletedQuery}`);
       const data = await response.json();
       if (data.success) {
         setCustomers(data.data || []);
       }
     } catch (error) {
       logError('Error fetching customers:', error);
+      toast.error('Failed to load customers');
+    }
+  };
+
+  useEffect(() => {
+    if (selectedOrder) {
+      setOrderTrackingNumber(selectedOrder.tracking_number || '');
+      setOrderTrackingUrl(selectedOrder.tracking_url || '');
+      setOrderCarrier(selectedOrder.carrier || 'Blue Dart');
+    }
+  }, [selectedOrder?.id]);
+
+  useEffect(() => {
+    if (activeTab === 'customers') {
+      fetchCustomers();
+    }
+  }, [showDeletedCustomers]);
+
+  const skipOrderSearchDebounce = useRef(true);
+  useEffect(() => {
+    if (activeTab !== 'orders') {
+      skipOrderSearchDebounce.current = true;
+      return;
+    }
+    if (skipOrderSearchDebounce.current) {
+      skipOrderSearchDebounce.current = false;
+      return;
+    }
+    const timer = setTimeout(() => {
+      setOrdersPage(1);
+      fetchOrders(1, orderSearch);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [orderSearch, activeTab]);
+
+  const refreshSelectedOrder = async (orderId: string) => {
+    const response = await apiFetch(`/orders/${orderId}`);
+    const data = await response.json();
+    if (data.success && data.data) {
+      const o = data.data;
+      const parsed: Order = {
+        ...o,
+        subtotal: parseFloat(o.subtotal),
+        shipping_cost: parseFloat(o.shipping_cost),
+        tax: parseFloat(o.tax),
+        total: parseFloat(o.total),
+        items: (o.items || []).map((i: any) => ({ ...i, price: parseFloat(i.price) })),
+      };
+      setSelectedOrder(parsed);
+      setOrders((prev) => prev.map((row) => (row.id === orderId ? parsed : row)));
+    }
+  };
+
+  const handleOrderStatusUpdate = async (orderId: string, status: Order['status']) => {
+    setOrderActionLoading(true);
+    try {
+      const response = await apiFetch(`/orders/${orderId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ status }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        toast.success(`Order marked ${status}`);
+        await refreshSelectedOrder(orderId);
+        fetchOrders(ordersPage);
+      } else {
+        toast.error(data.message || data.error || 'Update failed');
+      }
+    } catch {
+      toast.error('Update failed');
+    } finally {
+      setOrderActionLoading(false);
+    }
+  };
+
+  const handleMarkPaid = async (orderId: string) => {
+    if (!window.confirm('Mark this order as paid without PayPal capture?')) return;
+    const adminNote = window.prompt('Reason for manual payment (required, min 3 characters):');
+    if (adminNote === null) return;
+    if (!adminNote.trim() || adminNote.trim().length < 3) {
+      toast.error('A reason of at least 3 characters is required');
+      return;
+    }
+    setOrderActionLoading(true);
+    try {
+      const response = await apiFetch(`/orders/${orderId}/payment-status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ payment_status: 'completed', admin_note: adminNote.trim() }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        toast.success('Payment marked completed');
+        await refreshSelectedOrder(orderId);
+        fetchOrders(ordersPage);
+      } else {
+        toast.error(data.error || 'Update failed');
+      }
+    } catch {
+      toast.error('Update failed');
+    } finally {
+      setOrderActionLoading(false);
+    }
+  };
+
+  const handleSaveTracking = async (orderId: string) => {
+    if (!orderTrackingNumber.trim()) {
+      toast.error('Tracking number is required');
+      return;
+    }
+    setOrderActionLoading(true);
+    try {
+      const response = await apiFetch(`/orders/${orderId}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          tracking_number: orderTrackingNumber.trim(),
+          tracking_url: orderTrackingUrl.trim() || undefined,
+          carrier: orderCarrier.trim() || 'Blue Dart',
+        }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        toast.success('Tracking saved');
+        await refreshSelectedOrder(orderId);
+        fetchOrders(ordersPage);
+      } else {
+        toast.error(data.error || 'Failed to save tracking');
+      }
+    } catch {
+      toast.error('Failed to save tracking');
+    } finally {
+      setOrderActionLoading(false);
+    }
+  };
+
+  const handleNotifyShipped = async (orderId: string) => {
+    setOrderActionLoading(true);
+    try {
+      const response = await apiFetch(`/orders/${orderId}/notify-shipped`, { method: 'POST' });
+      const data = await response.json();
+      if (data.success) {
+        toast.success('Shipping notification sent');
+      } else {
+        toast.error(data.error || 'Failed to send notification');
+      }
+    } catch {
+      toast.error('Failed to send notification');
+    } finally {
+      setOrderActionLoading(false);
+    }
+  };
+
+  const handleCancelOrder = async (orderId: string) => {
+    const reasonRaw = window.prompt('Cancellation reason (optional):');
+    if (reasonRaw === null) return;
+    const reason = reasonRaw.trim() || undefined;
+    setOrderActionLoading(true);
+    try {
+      const response = await apiFetch(`/orders/${orderId}/cancel`, {
+        method: 'POST',
+        body: JSON.stringify({ reason, process_refund: true }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        toast.success(data.message || 'Order cancelled');
+        await refreshSelectedOrder(orderId);
+        fetchOrders(ordersPage);
+      } else {
+        toast.error(data.message || data.error || 'Cancellation failed');
+      }
+    } catch {
+      toast.error('Cancellation failed');
+    } finally {
+      setOrderActionLoading(false);
+    }
+  };
+
+  const handleDeleteCustomer = async (customer: Customer) => {
+    if (!window.confirm(`Soft-delete customer ${customer.email}?`)) return;
+    try {
+      const response = await apiFetch(`/admin/customers/${customer.id}`, { method: 'DELETE' });
+      const data = await response.json();
+      if (data.success) {
+        toast.success('Customer deleted');
+        fetchCustomers();
+      } else {
+        toast.error(data.error || 'Delete failed');
+      }
+    } catch {
+      toast.error('Delete failed');
+    }
+  };
+
+  const handleRestoreCustomer = async (customer: Customer) => {
+    try {
+      const response = await apiFetch(`/admin/customers/${customer.id}/restore`, { method: 'POST' });
+      const data = await response.json();
+      if (data.success) {
+        toast.success('Customer restored');
+        fetchCustomers();
+      } else {
+        toast.error(data.error || 'Restore failed');
+      }
+    } catch {
+      toast.error('Restore failed');
     }
   };
 
   const fetchCustomerHistory = async (email: string) => {
+    setCustomerHistoryLoading(true);
     try {
       const response = await apiFetch(`/admin/customers/${encodeURIComponent(email)}`, {
       });
       const data = await response.json();
       if (data.success) {
         setCustomerOrders(data.data.orders || []);
+      } else {
+        toast.error(data.error || 'Failed to load customer history');
+        setCustomerOrders([]);
       }
     } catch (error) {
       logError('Error fetching customer history:', error);
+      toast.error('Failed to load customer history');
+      setCustomerOrders([]);
+    } finally {
+      setCustomerHistoryLoading(false);
     }
   };
 
@@ -356,15 +593,36 @@ export default function AdminDashboard() {
     }
   };
 
+  const openCreateProduct = () => {
+    setEditingProduct(null);
+    setProductFormOpen(true);
+  };
+
+  const openEditProduct = (product: Product) => {
+    setEditingProduct(product);
+    setProductFormOpen(true);
+  };
+
+  const handleDeleteProduct = async (product: Product) => {
+    if (!window.confirm(`Delete "${product.name}" (${product.size || 'no size'})? This cannot be undone.`)) {
+      return;
+    }
+    try {
+      const response = await apiFetch(`/products/${product.id}`, { method: 'DELETE' });
+      const data = await response.json();
+      if (data.success) {
+        toast.success('Product deleted');
+        fetchProducts();
+      } else {
+        toast.error(data.error || 'Delete failed');
+      }
+    } catch {
+      toast.error('Delete failed');
+    }
+  };
+
   // Filter functions
-  const filteredOrders = orders.filter(o => {
-    const matchesStatus = orderStatusFilter === 'all' || o.status === orderStatusFilter;
-    const matchesSearch = !orderSearch || 
-      o.order_number.toLowerCase().includes(orderSearch.toLowerCase()) ||
-      o.customer_name.toLowerCase().includes(orderSearch.toLowerCase()) ||
-      o.customer_email.toLowerCase().includes(orderSearch.toLowerCase());
-    return matchesStatus && matchesSearch;
-  });
+  const filteredOrders = orders;
 
   const filteredProducts = products.filter(p => {
     return !productSearch || p.name.toLowerCase().includes(productSearch.toLowerCase());
@@ -410,6 +668,23 @@ export default function AdminDashboard() {
   );
 
   const renderAnalytics = () => {
+    if (analyticsError) {
+      return (
+        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 12, padding: 32, textAlign: 'center' }}>
+          <AlertTriangle size={40} color="#dc2626" style={{ marginBottom: 16 }} />
+          <h3 style={{ margin: '0 0 8px', color: '#991b1b' }}>Analytics unavailable</h3>
+          <p style={{ margin: '0 0 20px', color: '#6b7280' }}>{analyticsError}</p>
+          <button
+            type="button"
+            onClick={fetchAnalytics}
+            style={{ padding: '10px 20px', background: '#9c6649', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}
+          >
+            Retry
+          </button>
+        </div>
+      );
+    }
+
     if (!analytics) {
       return (
         <>
@@ -550,11 +825,17 @@ export default function AdminDashboard() {
             </button>
           </>
         )}
+        <button
+          onClick={openCreateProduct}
+          style={{ padding: '10px 16px', background: '#9c6649', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}
+        >
+          <Plus size={16} /> Add Shoe
+        </button>
       </div>
 
       {/* Products Table */}
-      <div style={{ background: 'white', borderRadius: 12, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <div className="responsive-table-wrap" style={{ background: 'white', borderRadius: 12, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: isMobile ? 560 : 720 }}>
           <thead>
             <tr style={{ background: '#f9fafb' }}>
               <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#374151', width: 40 }}>
@@ -562,11 +843,12 @@ export default function AdminDashboard() {
                   onChange={(e) => setSelectedProducts(e.target.checked ? new Set(filteredProducts.map(p => p.id)) : new Set())} />
               </th>
               <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#374151' }}>Product</th>
+              <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#374151' }}>Size</th>
               <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#374151' }}>Price</th>
               <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#374151' }}>Stock</th>
               <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#374151' }}>Views</th>
-              <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#374151' }}>Cart Adds</th>
-              <th style={{ padding: 16, textAlign: 'center', fontSize: 13, fontWeight: 600, color: '#374151' }}>Out of Stock</th>
+              <th style={{ padding: 16, textAlign: 'center', fontSize: 13, fontWeight: 600, color: '#374151' }}>Status</th>
+              <th style={{ padding: 16, textAlign: 'center', fontSize: 13, fontWeight: 600, color: '#374151' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -581,9 +863,24 @@ export default function AdminDashboard() {
                     }} />
                 </td>
                 <td style={{ padding: 16 }}>
-                  <div style={{ fontWeight: 600, color: '#1f2937' }}>{product.name}</div>
-                  <div style={{ fontSize: 12, color: '#6b7280' }}>{product.category}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    {product.image && (
+                      <img
+                        src={product.image}
+                        alt=""
+                        style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 8, background: '#f3f4f6' }}
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                      />
+                    )}
+                    <div>
+                      <div style={{ fontWeight: 600, color: '#1f2937' }}>{product.name}</div>
+                      <div style={{ fontSize: 12, color: '#6b7280' }}>
+                        {[product.category, product.color].filter(Boolean).join(' · ')}
+                      </div>
+                    </div>
+                  </div>
                 </td>
+                <td style={{ padding: 16, color: '#374151', fontWeight: 500 }}>{product.size || '—'}</td>
                 <td style={{ padding: 16, fontWeight: 600, color: '#10b981' }}>${product.price.toFixed(2)}</td>
                 <td style={{ padding: 16 }}>
                   <span style={{ padding: '4px 12px', borderRadius: 12, fontSize: 13, fontWeight: 600,
@@ -593,14 +890,34 @@ export default function AdminDashboard() {
                   </span>
                 </td>
                 <td style={{ padding: 16, color: '#6b7280' }}>{product.view_count || 0}</td>
-                <td style={{ padding: 16, color: '#6b7280' }}>{product.cart_count || 0}</td>
                 <td style={{ padding: 16, textAlign: 'center' }}>
                   <button onClick={() => toggleProductStock(product.id, product.is_out_of_stock)}
+                    title={product.is_out_of_stock ? 'Mark in stock' : 'Mark out of stock'}
                     style={{ width: 40, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer',
                       background: product.is_out_of_stock ? '#ef4444' : '#10b981', position: 'relative' }}>
                     <span style={{ position: 'absolute', width: 18, height: 18, borderRadius: '50%', background: 'white', top: 3,
                       left: product.is_out_of_stock ? 19 : 3, transition: 'left 0.2s' }} />
                   </button>
+                </td>
+                <td style={{ padding: 16, textAlign: 'center' }}>
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: 8 }}>
+                    <button
+                      type="button"
+                      onClick={() => openEditProduct(product)}
+                      title="Edit"
+                      style={{ padding: 8, background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: 'pointer' }}
+                    >
+                      <Pencil size={16} color="#374151" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteProduct(product)}
+                      title="Delete"
+                      style={{ padding: 8, background: '#fee2e2', border: 'none', borderRadius: 8, cursor: 'pointer' }}
+                    >
+                      <Trash2 size={16} color="#dc2626" />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -619,7 +936,7 @@ export default function AdminDashboard() {
           <input type="text" placeholder="Search orders..." value={orderSearch} onChange={(e) => setOrderSearch(e.target.value)}
             style={{ width: '100%', padding: '10px 12px 10px 40px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14 }} />
         </div>
-        <select value={orderStatusFilter} onChange={(e) => setOrderStatusFilter(e.target.value)}
+        <select value={orderStatusFilter} onChange={(e) => { setOrderStatusFilter(e.target.value); setOrdersPage(1); fetchOrders(1); }}
           style={{ padding: '10px 16px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14 }}>
           <option value="all">All Status</option>
           <option value="pending">Pending</option>
@@ -637,10 +954,28 @@ export default function AdminDashboard() {
             <option value="processing">Mark Processing</option>
             <option value="shipped">Mark Shipped</option>
             <option value="delivered">Mark Delivered</option>
-            <option value="cancelled">Mark Cancelled</option>
           </select>
         )}
-        <button onClick={fetchOrders} style={{ padding: '10px 16px', background: '#9c6649', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ fontSize: 13, color: '#6b7280' }}>
+          {ordersTotal} orders · page {ordersPage} of {ordersTotalPages}
+        </span>
+        <button
+          type="button"
+          disabled={ordersPage <= 1}
+          onClick={() => fetchOrders(ordersPage - 1)}
+          style={{ padding: '10px 16px', background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: ordersPage <= 1 ? 'not-allowed' : 'pointer', opacity: ordersPage <= 1 ? 0.5 : 1 }}
+        >
+          Previous
+        </button>
+        <button
+          type="button"
+          disabled={ordersPage >= ordersTotalPages}
+          onClick={() => fetchOrders(ordersPage + 1)}
+          style={{ padding: '10px 16px', background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: ordersPage >= ordersTotalPages ? 'not-allowed' : 'pointer', opacity: ordersPage >= ordersTotalPages ? 0.5 : 1 }}
+        >
+          Next
+        </button>
+        <button onClick={() => fetchOrders(ordersPage)} style={{ padding: '10px 16px', background: '#9c6649', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
           <RefreshCw size={16} /> Refresh
         </button>
       </div>
@@ -738,17 +1073,25 @@ export default function AdminDashboard() {
   const renderCustomers = () => (
     <div>
       {/* Search */}
-      <div style={{ background: 'white', borderRadius: 12, padding: 16, marginBottom: 16, border: '1px solid #e5e7eb' }}>
-        <div style={{ position: 'relative', maxWidth: 400 }}>
+      <div style={{ background: 'white', borderRadius: 12, padding: 16, marginBottom: 16, border: '1px solid #e5e7eb', display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
+        <div style={{ position: 'relative', flex: 1, minWidth: 200, maxWidth: 400 }}>
           <Search size={18} color="#9ca3af" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
           <input type="text" placeholder="Search customers..." value={customerSearch} onChange={(e) => setCustomerSearch(e.target.value)}
             style={{ width: '100%', padding: '10px 12px 10px 40px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14 }} />
         </div>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: '#374151', cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={showDeletedCustomers}
+            onChange={(e) => setShowDeletedCustomers(e.target.checked)}
+          />
+          Show deleted customers
+        </label>
       </div>
 
       {/* Customers Table */}
-      <div style={{ background: 'white', borderRadius: 12, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <div className="responsive-table-wrap" style={{ background: 'white', borderRadius: 12, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: isMobile ? 480 : 640 }}>
           <thead>
             <tr style={{ background: '#f9fafb' }}>
               <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#374151' }}>Customer</th>
@@ -769,10 +1112,23 @@ export default function AdminDashboard() {
                 <td style={{ padding: 16, fontWeight: 600, color: '#10b981' }}>${customer.total_spent.toFixed(2)}</td>
                 <td style={{ padding: 16, color: '#6b7280' }}>{customer.last_order_date ? new Date(customer.last_order_date).toLocaleDateString() : 'N/A'}</td>
                 <td style={{ padding: 16 }}>
-                  <button onClick={async () => { setSelectedCustomer(customer); await fetchCustomerHistory(customer.email); }}
-                    style={{ padding: '8px 16px', background: '#9c6649', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
-                    View History
-                  </button>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <button onClick={async () => { setSelectedCustomer(customer); await fetchCustomerHistory(customer.email); }}
+                      style={{ padding: '8px 16px', background: '#9c6649', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                      View History
+                    </button>
+                    {customer.is_deleted ? (
+                      <button type="button" onClick={() => handleRestoreCustomer(customer)}
+                        style={{ padding: '8px 16px', background: '#dcfce7', color: '#16a34a', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                        Restore
+                      </button>
+                    ) : (
+                      <button type="button" onClick={() => handleDeleteCustomer(customer)}
+                        style={{ padding: '8px 16px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                        Delete
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -786,6 +1142,7 @@ export default function AdminDashboard() {
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
     { id: 'products', label: 'Products', icon: ShoppingBag },
     { id: 'orders', label: 'Orders', icon: Package },
+    { id: 'coupons', label: 'Coupons', icon: Tag },
     { id: 'messages', label: 'Messages', icon: MessageSquare },
     { id: 'customers', label: 'Customers', icon: Users },
   ];
@@ -827,6 +1184,7 @@ export default function AdminDashboard() {
             {activeTab === 'analytics' && renderAnalytics()}
             {activeTab === 'products' && renderProducts()}
             {activeTab === 'orders' && renderOrders()}
+            {activeTab === 'coupons' && <AdminCouponsTab />}
             {activeTab === 'messages' && renderMessages()}
             {activeTab === 'customers' && renderCustomers()}
           </>
@@ -836,10 +1194,10 @@ export default function AdminDashboard() {
       {/* Order Detail Modal */}
       {selectedOrder && (
         <LiquidModal isOpen={!!selectedOrder} onClose={() => setSelectedOrder(null)} maxWidth={700}>
-          <div style={{ padding: 24 }}>
+          <div className="responsive-modal-body">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
               <div>
-                <h2 style={{ margin: 0, fontSize: 24, fontWeight: 800 }}>#{selectedOrder.order_number}</h2>
+                <h2 style={{ margin: 0, fontSize: isMobile ? 20 : 24, fontWeight: 800 }}>#{selectedOrder.order_number}</h2>
                 <p style={{ margin: 0, fontSize: 14, color: '#6b7280', marginTop: 4 }}>{new Date(selectedOrder.created_at).toLocaleString()}</p>
               </div>
               <button onClick={() => setSelectedOrder(null)} style={{ background: '#f3f4f6', border: 'none', borderRadius: 8, padding: 8, cursor: 'pointer' }}><X size={20} /></button>
@@ -850,7 +1208,7 @@ export default function AdminDashboard() {
             </div>
             <div style={{ background: '#f9fafb', borderRadius: 12, padding: 20, marginBottom: 20 }}>
               <h3 style={{ margin: 0, marginBottom: 16, fontWeight: 700 }}>Customer</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16 }}>
                 <div><span style={{ color: '#6b7280', fontSize: 12 }}>Name</span><p style={{ margin: 0, fontWeight: 600 }}>{selectedOrder.customer_name}</p></div>
                 <div><span style={{ color: '#6b7280', fontSize: 12 }}>Email</span><p style={{ margin: 0, fontWeight: 600 }}>{selectedOrder.customer_email}</p></div>
               </div>
@@ -870,11 +1228,75 @@ export default function AdminDashboard() {
                 </div>
               ))}
             </div>
-            <div style={{ background: '#ecfdf5', borderRadius: 12, padding: 20, border: '1px solid #10b981' }}>
+            <div style={{ background: '#ecfdf5', borderRadius: 12, padding: 20, border: '1px solid #10b981', marginBottom: 20 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}><span>Subtotal</span><span>${selectedOrder.subtotal.toFixed(2)}</span></div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}><span>Shipping</span><span>${selectedOrder.shipping_cost.toFixed(2)}</span></div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid #d1fae5' }}><span>Tax</span><span>${selectedOrder.tax.toFixed(2)}</span></div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 20, fontWeight: 800 }}><span>Total</span><span style={{ color: '#10b981' }}>${selectedOrder.total.toFixed(2)}</span></div>
+            </div>
+
+            <div style={{ background: '#f9fafb', borderRadius: 12, padding: 20, marginBottom: 20 }}>
+              <h3 style={{ margin: '0 0 16px', fontWeight: 700 }}>Fulfillment</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                <label style={{ fontSize: 13, color: '#374151' }}>
+                  Tracking number
+                  <input value={orderTrackingNumber} onChange={(e) => setOrderTrackingNumber(e.target.value)}
+                    style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8 }} />
+                </label>
+                <label style={{ fontSize: 13, color: '#374151' }}>
+                  Carrier
+                  <input value={orderCarrier} onChange={(e) => setOrderCarrier(e.target.value)}
+                    style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8 }} />
+                </label>
+              </div>
+              <label style={{ fontSize: 13, color: '#374151', display: 'block', marginBottom: 12 }}>
+                Tracking URL (optional)
+                <input value={orderTrackingUrl} onChange={(e) => setOrderTrackingUrl(e.target.value)}
+                  style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8 }} />
+              </label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                <button type="button" disabled={orderActionLoading} onClick={() => handleSaveTracking(selectedOrder.id)}
+                  style={{ padding: '10px 16px', background: '#9c6649', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
+                  Save tracking
+                </button>
+                <button type="button" disabled={orderActionLoading} onClick={() => handleNotifyShipped(selectedOrder.id)}
+                  style={{ padding: '10px 16px', background: '#8b5cf6', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Send size={16} /> Notify shipped
+                </button>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {selectedOrder.status === 'pending' && (
+                <button type="button" disabled={orderActionLoading} onClick={() => handleOrderStatusUpdate(selectedOrder.id, 'processing')}
+                  style={{ padding: '10px 16px', background: '#f59e0b', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
+                  Mark processing
+                </button>
+              )}
+              {['pending', 'processing'].includes(selectedOrder.status) && (
+                <button type="button" disabled={orderActionLoading} onClick={() => handleOrderStatusUpdate(selectedOrder.id, 'shipped')}
+                  style={{ padding: '10px 16px', background: '#06b6d4', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
+                  Mark shipped
+                </button>
+              )}
+              {selectedOrder.status === 'shipped' && (
+                <button type="button" disabled={orderActionLoading} onClick={() => handleOrderStatusUpdate(selectedOrder.id, 'delivered')}
+                  style={{ padding: '10px 16px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <CheckCircle size={16} /> Mark delivered
+                </button>
+              )}
+              {selectedOrder.payment_status === 'pending' && selectedOrder.status !== 'cancelled' && (
+                <button type="button" disabled={orderActionLoading} onClick={() => handleMarkPaid(selectedOrder.id)}
+                  style={{ padding: '10px 16px', background: '#16a34a', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
+                  Mark paid
+                </button>
+              )}
+              {selectedOrder.status !== 'cancelled' && selectedOrder.status !== 'delivered' && (
+                <button type="button" disabled={orderActionLoading} onClick={() => handleCancelOrder(selectedOrder.id)}
+                  style={{ padding: '10px 16px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Ban size={16} /> Cancel order
+                </button>
+              )}
             </div>
           </div>
         </LiquidModal>
@@ -903,6 +1325,16 @@ export default function AdminDashboard() {
         </LiquidModal>
       )}
 
+      <AdminProductFormModal
+        isOpen={productFormOpen}
+        product={editingProduct}
+        onClose={() => {
+          setProductFormOpen(false);
+          setEditingProduct(null);
+        }}
+        onSaved={fetchProducts}
+      />
+
       {/* Customer History Modal */}
       {selectedCustomer && (
         <LiquidModal isOpen={!!selectedCustomer} onClose={() => { setSelectedCustomer(null); setCustomerOrders([]); }} maxWidth={800}>
@@ -914,7 +1346,7 @@ export default function AdminDashboard() {
               </div>
               <button onClick={() => { setSelectedCustomer(null); setCustomerOrders([]); }} style={{ background: '#f3f4f6', border: 'none', borderRadius: 8, padding: 8, cursor: 'pointer' }}><X size={20} /></button>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 24 }}>
+            <div className="admin-stats-row" style={{ marginBottom: 24 }}>
               <div style={{ background: '#f9fafb', padding: 16, borderRadius: 12, textAlign: 'center' }}>
                 <p style={{ margin: 0, fontSize: 28, fontWeight: 800, color: '#9c6649' }}>{selectedCustomer.total_orders}</p>
                 <p style={{ margin: 0, fontSize: 14, color: '#6b7280' }}>Total Orders</p>
@@ -930,7 +1362,11 @@ export default function AdminDashboard() {
             </div>
             <h3 style={{ margin: 0, marginBottom: 16, fontWeight: 700 }}>Order History</h3>
             <div style={{ maxHeight: 400, overflowY: 'auto' }}>
-              {customerOrders.map((order) => (
+              {customerHistoryLoading ? (
+                <p style={{ padding: 16, color: '#6b7280', textAlign: 'center' }}>Loading order history…</p>
+              ) : customerOrders.length === 0 ? (
+                <p style={{ padding: 16, color: '#6b7280', textAlign: 'center' }}>No orders found for this customer.</p>
+              ) : customerOrders.map((order) => (
                 <div key={order.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 16, background: '#f9fafb', borderRadius: 8, marginBottom: 8 }}>
                   <div>
                     <p style={{ margin: 0, fontWeight: 600 }}>#{order.order_number}</p>

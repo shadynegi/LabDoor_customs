@@ -113,6 +113,18 @@ function saveTrackedOrder(ref: TrackedOrderRef) {
   sessionStorage.setItem(TRACKED_ORDERS_KEY, JSON.stringify([ref, ...existing]));
 }
 
+async function lookupOrderByToken(orderNumber: string, token: string) {
+  const response = await apiFetch('/orders/lookup', {
+    method: 'POST',
+    body: JSON.stringify({
+      orderNumber: orderNumber.trim(),
+      accessToken: token.trim(),
+    }),
+  });
+  const data = await response.json();
+  return { response, data };
+}
+
 function normalizeOrder(order: any): Order {
   return {
     ...order,
@@ -429,10 +441,7 @@ export default function MyOrders() {
     try {
       const fetchedOrders: Order[] = [];
       for (const ref of refs) {
-        const response = await apiFetch(
-          `/orders/number/${encodeURIComponent(ref.orderNumber)}?token=${encodeURIComponent(ref.token)}`
-        );
-        const data = await response.json();
+        const { response, data } = await lookupOrderByToken(ref.orderNumber, ref.token);
         if (response.ok && data.success && data.data) {
           fetchedOrders.push(normalizeOrder(data.data));
         }
@@ -484,10 +493,7 @@ export default function MyOrders() {
     setSearched(true);
 
     try {
-      const response = await apiFetch(
-        `/orders/number/${encodeURIComponent(orderNum.trim())}?token=${encodeURIComponent(token.trim())}`
-      );
-      const data = await response.json();
+      const { response, data } = await lookupOrderByToken(orderNum, token);
 
       if (response.ok && data.success && data.data) {
         const ref = { orderNumber: orderNum.trim(), token: token.trim() };

@@ -1,3 +1,4 @@
+import type { Sql, TransactionSql } from 'postgres';
 import sql from './db';
 import { logger } from './logger';
 
@@ -33,7 +34,7 @@ export interface ClaimRefundEventResult {
  * Insert dedupe key; returns claimed=false when this refund event was already processed.
  */
 export async function claimRefundEvent(
-  tx: typeof sql,
+  tx: Sql | TransactionSql,
   dedupeKey: string,
   captureId: string,
   source: RefundEventSource,

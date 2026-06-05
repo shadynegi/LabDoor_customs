@@ -22,6 +22,22 @@ export type ClaimResult =
   | { type: 'completed'; response: Record<string, unknown> }
   | { type: 'failed'; error: string };
 
+/** Hash operation + client key so create/capture rows never share one DB key. */
+export function resolveIdempotencyStorageKey(operation: string, key: string): string {
+  return crypto.createHash('sha256').update(`${operation}\0${key}`).digest('hex');
+}
+
+export function buildCapturePaymentKey(
+  headerKey: string | undefined,
+  paypalOrderId: string
+): string {
+  const trimmed = headerKey?.trim();
+  if (trimmed && trimmed.length >= 8 && trimmed.length <= 128) {
+    return trimmed;
+  }
+  return paypalOrderId;
+}
+
 export function buildCreatePaymentKey(
   headerKey: string | undefined,
   email: string,
@@ -69,10 +85,12 @@ export async function claimIdempotencyKey(
   operation: string,
   ttlMinutes = 30
 ): Promise<ClaimResult> {
+  const storageKey = resolveIdempotencyStorageKey(operation, key);
+
   const inserted = await sql<IdempotencyRow[]>`
     INSERT INTO payment_idempotency (idempotency_key, operation, status, expires_at)
     VALUES (
-      ${key},
+      ${storageKey},
       ${operation},
       'processing',
       NOW() + ${ttlMinutes} * interval '1 minute'
@@ -86,11 +104,20 @@ export async function claimIdempotencyKey(
   }
 
   const existing = await sql<IdempotencyRow[]>`
-    SELECT * FROM payment_idempotency WHERE idempotency_key = ${key} LIMIT 1
+    SELECT * FROM payment_idempotency WHERE idempotency_key = ${storageKey} LIMIT 1
   `;
   const row = existing[0];
 
   if (!row) {
+    return claimIdempotencyKey(key, operation, ttlMinutes);
+  }
+
+  if (row.operation !== operation) {
+    logger.warn('Idempotency row operation mismatch; treating as reclaim', {
+      storageKey,
+      expected: operation,
+      actual: row.operation,
+    });
     return claimIdempotencyKey(key, operation, ttlMinutes);
   }
 
@@ -111,14 +138,16 @@ export async function claimIdempotencyKey(
 /** Reset a failed idempotency row so capture can be retried (order still pending). */
 export async function reclaimFailedIdempotencyKey(
   key: string,
+  operation: string,
   ttlMinutes = 15
 ): Promise<boolean> {
+  const storageKey = resolveIdempotencyStorageKey(operation, key);
   const updated = await sql`
     UPDATE payment_idempotency
     SET
       status = 'processing',
       expires_at = NOW() + ${ttlMinutes} * interval '1 minute'
-    WHERE idempotency_key = ${key} AND status = 'failed'
+    WHERE idempotency_key = ${storageKey} AND operation = ${operation} AND status = 'failed'
     RETURNING id
   `;
   return updated.length > 0;
@@ -126,24 +155,27 @@ export async function reclaimFailedIdempotencyKey(
 
 export async function completeIdempotencyKey(
   key: string,
+  operation: string,
   response: Record<string, unknown>,
   opts?: { serverOrderId?: string; paypalOrderId?: string }
 ): Promise<void> {
+  const storageKey = resolveIdempotencyStorageKey(operation, key);
   await sql`
     UPDATE payment_idempotency SET
       status = 'completed',
       response_json = ${sql.json(JSON.parse(JSON.stringify(response)))},
       server_order_id = COALESCE(${opts?.serverOrderId ?? null}, server_order_id),
       paypal_order_id = COALESCE(${opts?.paypalOrderId ?? null}, paypal_order_id)
-    WHERE idempotency_key = ${key}
+    WHERE idempotency_key = ${storageKey} AND operation = ${operation}
   `;
 }
 
-export async function failIdempotencyKey(key: string): Promise<void> {
+export async function failIdempotencyKey(key: string, operation: string): Promise<void> {
+  const storageKey = resolveIdempotencyStorageKey(operation, key);
   await sql`
     UPDATE payment_idempotency
     SET status = 'failed'
-    WHERE idempotency_key = ${key} AND status = 'processing'
+    WHERE idempotency_key = ${storageKey} AND operation = ${operation} AND status = 'processing'
   `;
 }
 

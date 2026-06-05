@@ -232,6 +232,8 @@ ON CONFLICT DO NOTHING;
 ALTER TABLE products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE contact_messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE coupons ENABLE ROW LEVEL SECURITY;
+ALTER TABLE coupon_usage ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for products (public read, admin write)
 -- Using subqueries for auth functions to prevent re-evaluation per row (performance optimization)
@@ -284,6 +286,19 @@ CREATE POLICY "Only authenticated users can delete contact messages" ON contact_
 GRANT ALL ON products TO service_role;
 GRANT ALL ON orders TO service_role;
 GRANT ALL ON contact_messages TO service_role;
+GRANT ALL ON coupons TO service_role;
+GRANT ALL ON coupon_usage TO service_role;
+
+-- Coupons: service role only (validated via Express API)
+CREATE POLICY "Service role manages coupons" ON coupons
+  FOR ALL
+  USING ((select auth.role()) = 'service_role')
+  WITH CHECK ((select auth.role()) = 'service_role');
+
+CREATE POLICY "Service role manages coupon_usage" ON coupon_usage
+  FOR ALL
+  USING ((select auth.role()) = 'service_role')
+  WITH CHECK ((select auth.role()) = 'service_role');
 
 -- Comment: RLS policy design:
 -- - Anyone can read products (public catalog)

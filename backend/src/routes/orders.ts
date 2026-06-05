@@ -16,6 +16,7 @@ import { cancelPendingOrderAndRestoreStock } from '../lib/orderLifecycle';
 import { refundPayPalCapture } from '../lib/paypalRefund';
 import { syncOrderAfterRefund, isOrderFullyRefunded } from '../lib/refundSync';
 import { buildPayPalRefundDedupeKey } from '../lib/refundIdempotency';
+import { getClientIp } from '../lib/clientIp';
 
 const router = Router();
 
@@ -167,49 +168,44 @@ router.get('/', verifyAdmin, async (req: Request, res: Response) => {
       return res.status(parsed.status).json({ success: false, error: parsed.error });
     }
     const { limit: limitNum, offset: offsetNum } = parsed.params;
-    const { status, payment_status } = req.query;
+    const { status, payment_status, search } = req.query;
 
-    let orders;
-    let countResult;
+    const statusStr = status ? String(status) : null;
+    const paymentStatusStr = payment_status ? String(payment_status) : null;
+    const searchRaw = String(search || '').trim();
+    const searchPattern = searchRaw ? `%${searchRaw}%` : null;
 
-    const statusStr = String(status || '');
-    const paymentStatusStr = String(payment_status || '');
+    const orders = await sql`
+      SELECT * FROM orders
+      WHERE (${statusStr ? sql`status = ${statusStr}` : sql`TRUE`})
+        AND (${paymentStatusStr ? sql`payment_status = ${paymentStatusStr}` : sql`TRUE`})
+        AND (
+          ${searchPattern
+            ? sql`(
+              order_number ILIKE ${searchPattern}
+              OR customer_email ILIKE ${searchPattern}
+              OR customer_name ILIKE ${searchPattern}
+            )`
+            : sql`TRUE`}
+        )
+      ORDER BY created_at DESC
+      LIMIT ${limitNum} OFFSET ${offsetNum}
+    `;
 
-    if (status && payment_status) {
-      orders = await sql`
-        SELECT * FROM orders 
-        WHERE status = ${statusStr} AND payment_status = ${paymentStatusStr}
-        ORDER BY created_at DESC
-        LIMIT ${limitNum} OFFSET ${offsetNum}
-      `;
-      countResult = await sql`
-        SELECT COUNT(*) as count FROM orders 
-        WHERE status = ${statusStr} AND payment_status = ${paymentStatusStr}
-      `;
-    } else if (status) {
-      orders = await sql`
-        SELECT * FROM orders 
-        WHERE status = ${statusStr}
-        ORDER BY created_at DESC
-        LIMIT ${limitNum} OFFSET ${offsetNum}
-      `;
-      countResult = await sql`SELECT COUNT(*) as count FROM orders WHERE status = ${statusStr}`;
-    } else if (payment_status) {
-      orders = await sql`
-        SELECT * FROM orders 
-        WHERE payment_status = ${paymentStatusStr}
-        ORDER BY created_at DESC
-        LIMIT ${limitNum} OFFSET ${offsetNum}
-      `;
-      countResult = await sql`SELECT COUNT(*) as count FROM orders WHERE payment_status = ${paymentStatusStr}`;
-    } else {
-      orders = await sql`
-        SELECT * FROM orders 
-        ORDER BY created_at DESC
-        LIMIT ${limitNum} OFFSET ${offsetNum}
-      `;
-      countResult = await sql`SELECT COUNT(*) as count FROM orders`;
-    }
+    const countResult = await sql`
+      SELECT COUNT(*) as count FROM orders
+      WHERE (${statusStr ? sql`status = ${statusStr}` : sql`TRUE`})
+        AND (${paymentStatusStr ? sql`payment_status = ${paymentStatusStr}` : sql`TRUE`})
+        AND (
+          ${searchPattern
+            ? sql`(
+              order_number ILIKE ${searchPattern}
+              OR customer_email ILIKE ${searchPattern}
+              OR customer_name ILIKE ${searchPattern}
+            )`
+            : sql`TRUE`}
+        )
+    `;
 
     const totalCount = Number(countResult[0].count);
 
@@ -265,6 +261,48 @@ router.get('/stats/summary', verifyAdmin, async (req: Request, res: Response) =>
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to fetch order statistics',
+    });
+  }
+});
+
+// POST order lookup (token in body — avoids query-string leaks)
+router.post('/lookup', async (req: Request, res: Response) => {
+  try {
+    const { orderNumber, accessToken } = req.body as {
+      orderNumber?: string;
+      accessToken?: string;
+    };
+
+    if (!orderNumber?.trim() || !accessToken?.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: 'orderNumber and accessToken are required',
+      });
+    }
+
+    const order = await sql`
+      SELECT * FROM orders
+      WHERE order_number = ${orderNumber.trim()}
+      LIMIT 1
+    `;
+
+    if (!order?.length) {
+      return res.status(404).json({ success: false, error: 'Order not found' });
+    }
+
+    if (!orderAccessMatches(order[0].access_token_hash, accessToken.trim())) {
+      return forbiddenOrderAccess(res);
+    }
+
+    res.json({
+      success: true,
+      data: parseOrderRow(order[0] as Record<string, unknown>),
+    });
+  } catch (error: unknown) {
+    logger.error('Order lookup error:', error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to lookup order',
     });
   }
 });
@@ -663,7 +701,8 @@ const parsedResult: Order = {
 router.patch('/:id/payment-status', verifyAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { payment_status, payment_id } = req.body;
+    const { payment_status, payment_id, admin_note } = req.body;
+    const adminUser = (req as { admin?: { username?: string } }).admin?.username || 'admin';
 
     if (!payment_status) {
       return res.status(400).json({
@@ -687,11 +726,24 @@ router.patch('/:id/payment-status', verifyAdmin, async (req: Request, res: Respo
       });
     }
 
-    const currentOrder = await sql`SELECT payment_status FROM orders WHERE id = ${id}`;
+    const currentOrder = await sql`
+      SELECT payment_status, order_number FROM orders WHERE id = ${id}
+    `;
     if (!currentOrder.length) {
       return res.status(404).json({
         success: false,
         error: 'Order not found',
+      });
+    }
+
+    if (
+      payment_status === 'completed' &&
+      currentOrder[0].payment_status === 'pending' &&
+      (!admin_note || String(admin_note).trim().length < 3)
+    ) {
+      return res.status(400).json({
+        success: false,
+        error: 'admin_note is required (min 3 characters) when manually marking an order paid',
       });
     }
 
@@ -731,6 +783,26 @@ const parsedResult: Order = {
     ? JSON.parse(dbOrder.shipping_address)
     : dbOrder.shipping_address,
 };
+
+    if (
+      payment_status === 'completed' &&
+      currentOrder[0].payment_status === 'pending'
+    ) {
+      await sql`
+        INSERT INTO activity_logs (action_type, metadata, ip_address, user_agent)
+        VALUES (
+          'admin_mark_paid',
+          ${JSON.stringify({
+            order_id: id,
+            order_number: currentOrder[0].order_number,
+            admin: adminUser,
+            admin_note: String(admin_note).trim(),
+          })},
+          ${getClientIp(req)},
+          ${req.get('user-agent') || 'admin'}
+        )
+      `.catch((err) => logger.warn('Failed to log admin mark paid:', err));
+    }
 
     res.json({
       success: true,

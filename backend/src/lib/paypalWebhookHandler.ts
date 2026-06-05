@@ -91,13 +91,17 @@ export function createPayPalWebhookHandler(isProduction: boolean) {
             webhookEvent.resource
           );
 
-          if (orderId && captureId) {
-            try {
-              await syncWebhookPaymentCompleted(orderId, captureId, capturedAmount);
-            } catch (dbError) {
-              processingFailed = true;
-              logger.error('Database update error:', dbError);
-            }
+          if (!orderId || !captureId) {
+            logger.error('Webhook PAYMENT.CAPTURE.COMPLETED missing orderId or captureId');
+            processingFailed = true;
+            break;
+          }
+
+          try {
+            await syncWebhookPaymentCompleted(orderId, captureId, capturedAmount);
+          } catch (dbError) {
+            processingFailed = true;
+            logger.error('Webhook capture completion failed:', dbError);
           }
           break;
         }

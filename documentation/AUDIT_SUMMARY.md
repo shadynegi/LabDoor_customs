@@ -6,8 +6,8 @@ Security implementation overview for Lab Door Customs.
 
 ## Authentication
 
-- Admin: bcrypt password hash, HTTP-only session cookie, 24h TTL
-- Customer orders: access token (SHA-256 hash stored), required for lookup and capture
+- Admin: bcrypt password hash, HTTP-only session cookie, SHA-256 session hash in `admin_sessions`, 24h TTL
+- Customer orders: access token (SHA-256 hash stored); checkout exchange codes for PayPal redirect URLs
 
 ## Request protection
 
@@ -20,11 +20,20 @@ Security implementation overview for Lab Door Customs.
 
 - Server-side pricing only — client totals validated against server calculation
 - PayPal webhook signature verification on raw body
+- Webhook capture amount resolved from PayPal API when missing from payload
 - Capture amount mismatch triggers auto-refund
-- Idempotency keys prevent duplicate orders and refunds
+- Idempotency keys prevent duplicate orders and refunds (separate keys for create vs capture)
 
 ## Data protection
 
 - Secrets stripped from API responses (access tokens, password hashes)
 - Parameterized SQL via postgres.js
 - Admin routes require session middleware
+- Product image uploads capped at 512KB for data URLs
+- Supabase RLS: service role for writes; applied at backend startup
+
+## Production gates
+
+- `backend/scripts/validate-env.mjs` + startup validation + CI step
+- Redis required for healthy status and startup in production
+- `POST /api/admin/generate-hash` disabled in production

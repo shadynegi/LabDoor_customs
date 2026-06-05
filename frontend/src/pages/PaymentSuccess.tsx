@@ -12,14 +12,25 @@ import { logError } from '../lib/logger';
 // Payment progress steps
 type PaymentStep = 'verifying' | 'capturing' | 'saving' | 'complete' | 'error';
 
+interface CheckoutFormData {
+  email?: string;
+  fullName?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  country?: string;
+}
+
 interface PendingOrderContext {
   serverOrderId?: string;
   orderNumber?: string;
   accessToken?: string;
+  paypalOrderId?: string;
   idempotencyKey?: string;
   total?: number;
   items?: unknown;
-  formData?: unknown;
+  formData?: CheckoutFormData;
   coupon?: { id?: string; discount_amount?: number } | null;
 }
 
@@ -163,6 +174,7 @@ export default function PaymentSuccess() {
   const [orderDetails, setOrderDetails] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [paymentStep, setPaymentStep] = useState<PaymentStep>('verifying');
+  const [captureError, setCaptureError] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
 
   const token = searchParams.get('token');
@@ -177,29 +189,30 @@ export default function PaymentSuccess() {
 
   useEffect(() => {
     const capturePayment = async () => {
-      // Check for persisted order (page refresh after completion)
-      if (!token) {
-        const lastOrder = localStorage.getItem('lastCompletedOrder');
-        if (lastOrder) {
-          try {
-            const parsedOrder = JSON.parse(lastOrder);
-            // Check if order was completed within the last 24 hours
-            const completedAt = new Date(parsedOrder.completedAt);
-            const hoursSinceCompletion = (Date.now() - completedAt.getTime()) / (1000 * 60 * 60);
-            
-            if (hoursSinceCompletion < 24) {
-              setOrderDetails(parsedOrder);
-              setIsLoading(false);
-              return;
-            } else {
-              // Clean up old order data
-              localStorage.removeItem('lastCompletedOrder');
-            }
-          } catch (e) {
-            logError('Error parsing last order:', e);
-            localStorage.removeItem('lastCompletedOrder');
+      setCaptureError(null);
+
+      const lastOrder = localStorage.getItem('lastCompletedOrder');
+      if (lastOrder) {
+        try {
+          const parsedOrder = JSON.parse(lastOrder);
+          const completedAt = new Date(parsedOrder.completedAt);
+          const hoursSinceCompletion = (Date.now() - completedAt.getTime()) / (1000 * 60 * 60);
+
+          if (hoursSinceCompletion < 24) {
+            setOrderDetails(parsedOrder);
+            setPaymentStep('complete');
+            setIsLoading(false);
+            window.history.replaceState({}, '', '/payment/success');
+            return;
           }
+          localStorage.removeItem('lastCompletedOrder');
+        } catch (e) {
+          logError('Error parsing last order:', e);
+          localStorage.removeItem('lastCompletedOrder');
         }
+      }
+
+      if (!token) {
         navigate('/');
         return;
       }
@@ -214,11 +227,35 @@ export default function PaymentSuccess() {
           ? JSON.parse(pendingOrderRaw)
           : null;
 
-        const aidFromUrl = searchParams.get('aid');
+        const checkoutCode = searchParams.get('code');
+        const legacyAid = searchParams.get('aid');
 
-        if (!pendingOrder && token && aidFromUrl) {
+        if (!pendingOrder && checkoutCode) {
+          const exchangeRes = await apiFetch(
+            `/paypal/checkout-exchange/${encodeURIComponent(checkoutCode)}`
+          );
+          const exchange = await exchangeRes.json();
+
+          if (exchangeRes.ok && exchange.accessToken) {
+            pendingOrder = {
+              serverOrderId: exchange.serverOrderId,
+              orderNumber: exchange.orderNumber,
+              accessToken: exchange.accessToken,
+              paypalOrderId: token || exchange.paypalOrderId || undefined,
+              total: exchange.total,
+              coupon: exchange.couponId
+                ? {
+                    id: exchange.couponId,
+                    discount_amount: exchange.discount_amount,
+                  }
+                : null,
+            };
+          }
+        }
+
+        if (!pendingOrder && token && legacyAid) {
           const contextRes = await apiFetch(`/paypal/checkout-context/${token}`, {
-            headers: { 'X-Order-Access-Token': aidFromUrl },
+            headers: { 'X-Order-Access-Token': legacyAid },
           });
           const context = await contextRes.json();
 
@@ -237,8 +274,8 @@ export default function PaymentSuccess() {
             pendingOrder = {
               serverOrderId: context.serverOrderId,
               orderNumber: context.orderNumber,
-              accessToken: aidFromUrl,
-              idempotencyKey: token,
+              accessToken: legacyAid,
+              paypalOrderId: token || undefined,
               total: context.total,
               coupon: context.couponId
                 ? {
@@ -262,10 +299,13 @@ export default function PaymentSuccess() {
 
         // Step 2: Capturing payment (bound to server order)
         setPaymentStep('capturing');
+        const captureIdempotencyKey =
+          token || pendingOrder.paypalOrderId || '';
+
         const response = await apiFetch(`/paypal/capture-payment/${token}`, {
           method: 'POST',
           headers: {
-            'X-Idempotency-Key': pendingOrder.idempotencyKey || token || '',
+            'X-Idempotency-Key': captureIdempotencyKey,
           },
           body: JSON.stringify({
             serverOrderId: pendingOrder.serverOrderId,
@@ -287,17 +327,30 @@ export default function PaymentSuccess() {
         setPaymentStep('saving');
 
         const serverOrder = data.order;
-        const orderDetails = {
+        const shippingAddress = serverOrder?.shipping_address || pendingOrder.formData;
+        const completedDetails = {
           ...pendingOrder,
           ...data,
           orderNumber: data.orderNumber || pendingOrder.orderNumber,
+          customer_email: serverOrder?.customer_email || pendingOrder.formData?.email,
+          customer_name: serverOrder?.customer_name || pendingOrder.formData?.fullName,
           items: serverOrder?.items || pendingOrder.items,
+          shipping_address: serverOrder?.shipping_address,
+          formData: pendingOrder.formData || (shippingAddress?.address ? {
+            fullName: serverOrder?.customer_name,
+            email: serverOrder?.customer_email,
+            address: shippingAddress.address,
+            city: shippingAddress.city,
+            state: shippingAddress.state,
+            zipCode: shippingAddress.zipCode,
+            country: shippingAddress.country,
+          } : undefined),
           total: serverOrder?.total ?? pendingOrder.total,
           captureId: data.captureId,
           orderId: data.captureId,
           orderDate: new Date().toISOString(),
         };
-        setOrderDetails(orderDetails);
+        setOrderDetails(completedDetails);
 
         if (pendingOrder.accessToken && (data.orderNumber || pendingOrder.orderNumber)) {
           sessionStorage.setItem(
@@ -315,35 +368,43 @@ export default function PaymentSuccess() {
           );
         }
 
-        // Clear cart and pending order
         clearCart();
         localStorage.removeItem('pendingOrder');
-        
-        // Store completed order for persistence (in case of page refresh)
+
+        const { accessToken: _omitToken, ...persistDetails } = completedDetails;
         localStorage.setItem('lastCompletedOrder', JSON.stringify({
-          ...orderDetails,
+          ...persistDetails,
           captureId: data.captureId,
           completedAt: new Date().toISOString(),
         }));
-        
-        // Step 4: Complete
+
         setPaymentStep('complete');
-        await new Promise(resolve => setTimeout(resolve, 500)); // Brief pause to show completion
+        window.history.replaceState({}, '', '/payment/success');
+        await new Promise(resolve => setTimeout(resolve, 500));
         setIsLoading(false);
       } catch (error) {
         setPaymentStep('error');
         logError('Payment capture error:', error);
         const friendlyError = getFriendlyError(error);
+        setCaptureError(friendlyError.message);
         toast.error(friendlyError.message, {
           description: friendlyError.description + ' Please contact support with your order details.',
           duration: 10000,
         });
-        navigate('/checkout');
+        setIsLoading(false);
       }
     };
 
     capturePayment();
   }, [token, payerId, navigate, clearCart]);
+
+  const displayEmail =
+    orderDetails?.customer_email ||
+    orderDetails?.formData?.email ||
+    orderDetails?.order?.customer_email;
+
+  const getItemName = (item: { product_name?: string; name?: string }) =>
+    item.product_name || item.name || 'Item';
 
   if (isLoading) {
     return (
@@ -358,6 +419,45 @@ export default function PaymentSuccess() {
         }}
       >
         <PaymentProgress currentStep={paymentStep} isMobile={isMobile} />
+      </div>
+    );
+  }
+
+  if (captureError) {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)',
+          padding: 20,
+        }}
+      >
+        <div style={{ background: 'white', borderRadius: 16, padding: 32, maxWidth: 480, textAlign: 'center' }}>
+          <h2 style={{ margin: '0 0 12px', color: '#991b1b' }}>Payment could not be completed</h2>
+          <p style={{ color: '#6b7280', marginBottom: 24 }}>{captureError}</p>
+          <p style={{ fontSize: 14, color: '#9ca3af', marginBottom: 24 }}>
+            If PayPal charged you, check your email for confirmation or contact support with your PayPal receipt.
+          </p>
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              style={{ padding: '12px 20px', background: '#9c6649', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}
+            >
+              Try again
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/contact')}
+              style={{ padding: '12px 20px', background: '#f3f4f6', color: '#374151', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}
+            >
+              Contact support
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -427,8 +527,11 @@ export default function PaymentSuccess() {
               marginBottom: 24,
             }}
           >
-            Thank you for your order. We've sent a confirmation email to{' '}
-            <strong>{orderDetails?.formData?.email}</strong>
+            Thank you for your order.{displayEmail ? (
+              <> We&apos;ve sent a confirmation email to <strong>{displayEmail}</strong></>
+            ) : (
+              <> Check your email for confirmation details.</>
+            )}
           </p>
 
           {/* Order ID */}
@@ -469,9 +572,9 @@ export default function PaymentSuccess() {
               Order Summary
             </h3>
             
-            {orderDetails?.items?.map((item: any) => (
+            {orderDetails?.items?.map((item: any, index: number) => (
               <div
-                key={item.id}
+                key={item.id ?? `${getItemName(item)}-${index}`}
                 style={{
                   display: 'flex',
                   justifyContent: 'space-between',
@@ -484,13 +587,13 @@ export default function PaymentSuccess() {
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span>
-                    {item.name} × {item.quantity}
+                    {getItemName(item)} × {item.quantity}
                   </span>
-                  <span>${(item.price * item.quantity).toFixed(2)}</span>
+                  <span>${(Number(item.price) * item.quantity).toFixed(2)}</span>
                 </div>
-                {item.size && (
+                {(item.size_value || item.size) && (
                   <span style={{ fontSize: 12, color: '#9ca3af' }}>
-                    Size: {item.size.system} {item.size.value}
+                    Size: {item.size?.system || item.size_system} {item.size?.value || item.size_value}
                   </span>
                 )}
               </div>

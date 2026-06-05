@@ -6,14 +6,18 @@ This folder contains setup guides, operational references, and QA checklists for
 
 **Index:** [DOCUMENTATION_INDEX.md](./DOCUMENTATION_INDEX.md)
 
+**Keeping docs current:** When changing code, update [`../info.md`](../info.md) and the relevant guides in this folder. See [`.cursor/rules/documentation-sync.mdc`](../.cursor/rules/documentation-sync.mdc).
+
 ---
 
 ## What this project is
 
-Lab Door Customs is a React + Express e-commerce site for custom footwear with:
+Lab Door Customs is a monorepo e-commerce platform for custom footwear:
 
+- **Storefront:** React 19 + Vite (`frontend/`)
+- **Server:** Express API + static SPA hosting (`backend/`)
 - PayPal checkout (server-bound orders, atomic inventory, webhooks)
-- Admin dashboard (products, orders, customers, messages, analytics)
+- Admin dashboard (products, orders, coupons, customers, messages, analytics)
 - Product reviews, coupons, contact form, activity tracking
 - Redis caching, rate limits, CSRF protection, Sentry monitoring
 

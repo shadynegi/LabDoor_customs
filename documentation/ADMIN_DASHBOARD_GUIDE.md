@@ -14,9 +14,9 @@ How to use the Lab Door Customs admin dashboard.
 | Dashboard URL | `/adminshivamdashboard` |
 | Session | HttpOnly cookie, 24 hours |
 
-Login with admin username and password. Sessions are stored server-side in `admin_sessions`.
+Login with admin username and password. Sessions are stored server-side in `admin_sessions` as **SHA-256 hashes** of the session token (the raw token is never persisted).
 
-Generate a production password hash via `POST /api/admin/generate-hash` and set `ADMIN_PASSWORD_HASH` on the backend.
+Generate a production password hash locally with `node backend/scripts/generate-admin-hash.mjs "your-password"` and set `ADMIN_PASSWORD_HASH` on the backend. The `/api/admin/generate-hash` route is development-only.
 
 ---
 
@@ -31,6 +31,8 @@ Displays:
 - GA4 and Google Search Console configuration status with external dashboard links
 
 Data source: `GET /api/admin/analytics`
+
+If the analytics API fails, the tab shows an error message with a **Retry** button.
 
 ---
 
@@ -50,13 +52,25 @@ Product list API responses are cached (60s TTL); writes invalidate cache.
 
 ### View and filter
 
-Filter by order status and payment status. Paginated list from `GET /api/orders`.
+- **Search** — type in the search box to filter by order number, customer email, or name (debounced server-side query via `?search=`).
+- **Status filter** — dropdown filters by fulfillment status (`pending`, `processing`, `shipped`, `delivered`, `cancelled`).
+- **Pagination** — 50 orders per page with previous/next controls.
 
-### Update fulfillment
+Data source: `GET /api/orders?page=&limit=50&status=&search=`.
 
-- Set order status: pending → processing → shipped → delivered
-- Add tracking number, carrier, tracking URL, estimated delivery
-- Send shipping notification email (`POST /api/orders/:id/notify-shipped`)
+### Order detail modal
+
+Click an order card to open fulfillment actions:
+
+- **Tracking** — save tracking number, carrier, optional tracking URL
+- **Notify shipped** — `POST /api/orders/:id/notify-shipped` (requires tracking number)
+- **Status** — Mark processing, shipped, or delivered (valid transitions enforced)
+- **Mark paid** — prompts for a reason, then `PATCH /api/orders/:id/payment-status` with `completed` and `admin_note` (manual/offline payments; logged to activity)
+- **Cancel order** — prompts for optional reason; dismiss the prompt to abort. Uses `POST /api/orders/:id/cancel` with optional PayPal refund
+
+### Bulk updates
+
+Bulk status dropdown supports processing, shipped, and delivered only. **Cancelled** is not available in bulk — use the order modal cancel action.
 
 ### Cancel orders
 
@@ -72,7 +86,23 @@ If PayPal refund succeeds but DB sync fails, the API returns 502 — reconcile m
 
 ### Payment status
 
-`PATCH /api/orders/:id/payment-status` allows admin corrections. Use cancel/refund flows for completed orders.
+`PATCH /api/orders/:id/payment-status` allows marking pending orders as **completed** when accompanied by `admin_note` (≥3 characters). Use cancel/refund flows to move away from completed.
+
+---
+
+## Coupons tab
+
+Manage discount codes used at checkout (server-side billing via `resolveCouponDiscount`).
+
+- **Quick presets** — create `SAVE5`, `SAVE10`, `SAVE20`, `SAVE25`, `SAVE50` (percentage off)
+- **Custom coupon** — any code + 5–50% discount
+- **Edit** — pencil icon opens a modal to update description, max uses, valid-until date, and active status (`PUT /api/coupons/:id`)
+- **Activate / deactivate** — toggle `is_active` without deleting
+- **Delete** — remove unused coupons
+
+On narrow screens, the coupons table scrolls horizontally.
+
+API: `GET/POST/PUT/DELETE /api/coupons`
 
 ---
 
@@ -90,10 +120,11 @@ Contact form submissions from `contact_messages` table.
 
 Aggregated customer data from the `customers` table (updated on order capture).
 
-- View customer list with order count and total spent
-- View individual customer detail and order history
-- Soft delete customers (`is_deleted = true`)
-- Restore deleted customers
+- View customer list with order count and total spent (table scrolls horizontally on mobile)
+- **View History** — opens a modal with customer stats and order list; shows a loading state while fetching and a toast on failure
+- Soft delete customers (`is_deleted = true`) — **Delete** button in table
+- Restore deleted customers — enable **Show deleted customers**, then **Restore**
+- Toggle **Show deleted customers** to include soft-deleted rows
 
 ---
 
@@ -103,7 +134,6 @@ These are available via API but do not have dedicated dashboard tabs:
 
 | Feature | Endpoints |
 |---------|-----------|
-| Coupons | `GET/POST/PUT/DELETE /api/coupons` |
 | Reviews | `GET /api/reviews`, `PATCH /api/reviews/:id/status` |
 | Activity logs | `GET /api/activity/logs`, `/export` |
 | PayPal refunds | `POST /api/paypal/refund/:captureId` |

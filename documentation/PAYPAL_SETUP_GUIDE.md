@@ -30,7 +30,7 @@ PAYPAL_MODE=sandbox
 
 ## Webhooks
 
-**URL:** `https://api.yourdomain.com/api/paypal/webhook`
+**URL:** `https://www.yourdomain.com/api/paypal/webhook`
 
 **Events to subscribe:**
 

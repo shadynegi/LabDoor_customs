@@ -3,7 +3,7 @@ import { getCsrfToken, initCsrfToken, resetCsrfSession, setCsrfToken, fetchCsrfT
 /** In dev, route API through Vite proxy (/api) unless env explicitly uses a LAN IP. */
 function resolveApiBaseUrl(): string {
   const envUrl = import.meta.env.VITE_API_BASE_URL?.trim();
-  const devFallback = import.meta.env.DEV ? '/api' : 'http://localhost:5000/api';
+  const devFallback = '/api';
 
   if (!envUrl) return devFallback;
 

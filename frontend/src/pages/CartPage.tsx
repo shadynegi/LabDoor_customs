@@ -1,5 +1,6 @@
 // src/pages/CartPage.tsx - Mobile Responsive Version
-import { useState, useEffect } from "react";
+import { useResponsive } from "../hooks/useResponsive";
+import MobileStickyCta from "../components/MobileStickyCta";
 import { useCart } from "./CartContext";
 import { Link, useNavigate } from "react-router-dom";
 import { Trash2, Plus, Minus, ShoppingBag } from "lucide-react";
@@ -9,24 +10,21 @@ import { optimizeImageUrl } from "../utils/imageUrl";
 export default function CartPage() {
   const { state, incrementQuantity, decrementQuantity, removeFromCart } = useCart();
   const navigate = useNavigate();
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
+  const { isMobile } = useResponsive();
   
   // Calculate totals using shared utility
   const totalItemCount = state.items.reduce((sum, item) => sum + item.quantity, 0);
   const pricing = calculateCheckoutPricing(state.total, totalItemCount, 0);
   const { subtotal, shipping, total, volumeDiscount, volumeDiscountPercent } = pricing;
 
+  const hasItems = state.items.length > 0;
+
   return (
-    <div style={{ 
+    <div
+      className={isMobile && hasItems ? "has-mobile-sticky-cta" : undefined}
+      style={{ 
       padding: isMobile ? "16px" : "24px", 
-      paddingBottom: isMobile ? "max(16px, env(safe-area-inset-bottom))" : "24px",
+      paddingBottom: isMobile && hasItems ? undefined : isMobile ? "max(16px, env(safe-area-inset-bottom))" : "24px",
       maxWidth: 1000, 
       margin: "0 auto",
       minHeight: "calc(100vh - 200px)"
@@ -380,6 +378,13 @@ export default function CartPage() {
             </button>
           </div>
         </>
+      )}
+      {isMobile && hasItems && (
+        <MobileStickyCta
+          amount={`$${total.toFixed(2)}`}
+          label="Checkout"
+          onClick={() => navigate("/checkout")}
+        />
       )}
     </div>
   );

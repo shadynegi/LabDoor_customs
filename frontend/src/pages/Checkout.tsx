@@ -16,6 +16,8 @@ import {
 import { toast } from "sonner";
 import { getFriendlyError } from "../utils/errorMessages";
 import { logError } from "../lib/logger";
+import { useResponsive } from "../hooks/useResponsive";
+import MobileStickyCta from "../components/MobileStickyCta";
 import {
   CreditCard,
   User,
@@ -163,7 +165,7 @@ InputField.displayName = 'InputField';
 export default function Checkout() {
   const { state } = useCart();
   const navigate = useNavigate();
-  const [isMobile, setIsMobile] = useState(false);
+  const { isMobile } = useResponsive();
   const [isProcessing, setIsProcessing] = useState(false);
   const paymentIdempotencyKey = useRef(crypto.randomUUID());
   const [errors, setErrors] = useState<FormErrors>({});
@@ -247,15 +249,6 @@ export default function Checkout() {
     setAppliedCoupon(null);
     setCouponError("");
   };
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
 
   useEffect(() => {
     if (state.items.length === 0) {
@@ -437,7 +430,6 @@ export default function Checkout() {
           total: data.total ?? total,
           serverOrderId: data.serverOrderId,
           orderNumber: data.orderNumber,
-          accessToken: data.access_token,
           paypalOrderId: data.orderId,
           idempotencyKey: paymentIdempotencyKey.current,
           discount: pricing.discount,
@@ -472,11 +464,12 @@ export default function Checkout() {
 
   return (
     <div
+      className={isMobile ? "has-mobile-sticky-cta" : undefined}
       style={{
         minHeight: "100vh",
         background: "linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)",
         padding: isMobile ? "20px" : "40px 20px",
-        paddingBottom: isMobile ? "max(20px, env(safe-area-inset-bottom))" : "20px",
+        paddingBottom: isMobile ? undefined : "20px",
       }}
     >
       <div
@@ -1067,7 +1060,7 @@ export default function Checkout() {
                   fontSize: 16,
                   fontWeight: 600,
                   cursor: isProcessing ? "not-allowed" : "pointer",
-                  display: "flex",
+                  display: isMobile ? "none" : "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   gap: 8,
@@ -1117,6 +1110,14 @@ export default function Checkout() {
           </motion.div>
         </div>
       </div>
+      {isMobile && (
+        <MobileStickyCta
+          amount={`$${total.toFixed(2)}`}
+          label={isProcessing ? "Processing…" : "Pay with PayPal"}
+          onClick={handlePayPalPayment}
+          disabled={isProcessing}
+        />
+      )}
     </div>
   );
 }

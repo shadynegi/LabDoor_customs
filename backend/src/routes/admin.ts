@@ -12,34 +12,13 @@ import {
   adminSessionCookieOptions,
   secureCookieDefaults,
 } from '../lib/cookies';
+import { hashAdminSessionToken } from '../lib/adminSession';
+import { validateJwtSecretComplexity } from '../lib/jwtSecret';
 
 const router = Router();
 
 // Bcrypt configuration
 const BCRYPT_ROUNDS = 12; // Cost factor for hashing
-
-// Validate JWT secret with complexity requirements
-const validateJwtSecretComplexity = (secret: string): { valid: boolean; issues: string[] } => {
-  const issues: string[] = [];
-  
-  if (secret.length < 32) {
-    issues.push('Must be at least 32 characters long');
-  }
-  if (!/[A-Z]/.test(secret)) {
-    issues.push('Must contain at least one uppercase letter');
-  }
-  if (!/[a-z]/.test(secret)) {
-    issues.push('Must contain at least one lowercase letter');
-  }
-  if (!/[0-9]/.test(secret)) {
-    issues.push('Must contain at least one number');
-  }
-  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(secret)) {
-    issues.push('Must contain at least one special character');
-  }
-  
-  return { valid: issues.length === 0, issues };
-};
 
 // Validate required environment variables
 const getJwtSecret = (): string => {
@@ -194,9 +173,10 @@ async function validateAdminSession(
   }
 
   try {
+    const tokenHash = hashAdminSessionToken(token);
     const sessions = await sql`
       SELECT username FROM admin_sessions
-      WHERE token = ${token}
+      WHERE token = ${tokenHash}
       AND expires_at > NOW()
       LIMIT 1
     `;
@@ -292,6 +272,7 @@ router.post('/login', async (req: Request, res: Response) => {
     }
 
     const token = generateToken(username);
+    const tokenHash = hashAdminSessionToken(token);
 
     // Clean up expired sessions (runs on each login)
     await cleanupExpiredSessions();
@@ -303,7 +284,7 @@ router.post('/login', async (req: Request, res: Response) => {
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
     await sql`
       INSERT INTO admin_sessions (token, username, ip_address, user_agent, expires_at)
-      VALUES (${token}, ${username}, ${ipAddress}, ${userAgent}, ${expiresAt})
+      VALUES (${tokenHash}, ${username}, ${ipAddress}, ${userAgent}, ${expiresAt})
     `;
 
     // Log successful login
@@ -376,7 +357,8 @@ router.post('/logout', verifyAdmin, async (req: Request, res: Response) => {
     const token = extractAdminToken(req);
 
     if (token) {
-      await sql`DELETE FROM admin_sessions WHERE token = ${token}`.catch(() => {});
+      const tokenHash = hashAdminSessionToken(token);
+      await sql`DELETE FROM admin_sessions WHERE token = ${tokenHash}`.catch(() => {});
     }
 
     res.clearCookie(ADMIN_SESSION_COOKIE, {

@@ -566,12 +566,12 @@ export default function Home() {
                 <motion.img
                   src={heroImageSrc}
                   alt={current.name}
-                  width={isMobile ? 350 : 562}
-                  height={isMobile ? 350 : 562}
+                  width={562}
+                  height={562}
                   loading="eager"
                   decoding="async"
+                  className="hero-product-img"
                   style={{
-                    width: isMobile ? "350px" : "562px",
                     height: "auto",
                     filter: "drop-shadow(0 30px 60px rgba(0,0,0,0.6))",
                     userSelect: "none",

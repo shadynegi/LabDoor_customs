@@ -24,16 +24,19 @@ vi.mock('../backend/src/lib/db', () => ({
   }),
 }));
 
-vi.mock('../backend/src/lib/paymentIdempotency', () => ({
-  buildCreatePaymentKey: () => 'test-idempotency-key',
-  claimIdempotencyKey: async () => ({ type: 'claimed' as const }),
-  completeIdempotencyKey: async () => {},
-  failIdempotencyKey: async () => {},
-  ensureIdempotencyTable: async () => {},
-  cleanupExpiredIdempotencyKeys: async () => {},
-  reapStuckIdempotencyKeys: async () => 0,
-  reclaimFailedIdempotencyKey: async () => false,
-}));
+vi.mock('../backend/src/lib/paymentIdempotency', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../backend/src/lib/paymentIdempotency')>();
+  return {
+    ...actual,
+    claimIdempotencyKey: async () => ({ type: 'claimed' as const }),
+    completeIdempotencyKey: async () => {},
+    failIdempotencyKey: async () => {},
+    ensureIdempotencyTable: async () => {},
+    cleanupExpiredIdempotencyKeys: async () => {},
+    reapStuckIdempotencyKeys: async () => 0,
+    reclaimFailedIdempotencyKey: async () => false,
+  };
+});
 
 vi.mock('../backend/src/lib/redis', () => ({
   connectRedis: async () => {},

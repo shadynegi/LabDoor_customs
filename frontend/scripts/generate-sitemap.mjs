@@ -12,14 +12,30 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const publicDir = join(__dirname, '..', 'public');
 
 const SITE_URL = (process.env.VITE_SITE_URL || 'https://www.labdoorcustoms.com').replace(/\/$/, '');
-const API_BASE = (process.env.VITE_API_BASE_URL || 'http://localhost:5000/api').replace(/\/$/, '');
+
+function resolveApiBase(rawBase, siteUrl) {
+  const base = (rawBase || 'http://localhost:5000/api').trim().replace(/\/$/, '');
+  if (base.startsWith('/')) {
+    return `${siteUrl}${base}`;
+  }
+  return base;
+}
+
+const rawApiBase =
+  process.env.SITEMAP_API_BASE_URL ||
+  process.env.VITE_API_BASE_URL ||
+  'http://localhost:5000/api';
+const API_BASE = resolveApiBase(rawApiBase, SITE_URL);
+const isRelativeApiBase = rawApiBase.trim().startsWith('/');
 const isStrictBuild =
   process.env.NODE_ENV === 'production' ||
   process.env.CI === 'true' ||
   process.env.VITE_STRICT_ENV === 'true';
 const REQUIRE_PRODUCTS =
   process.env.SITEMAP_REQUIRE_PRODUCTS === 'true' ||
-  (isStrictBuild && process.env.SITEMAP_REQUIRE_PRODUCTS !== 'false');
+  (isStrictBuild &&
+    process.env.SITEMAP_REQUIRE_PRODUCTS !== 'false' &&
+    !isRelativeApiBase);
 
 const STATIC_ROUTES = [
   { path: '/', changefreq: 'daily', priority: '1.0' },

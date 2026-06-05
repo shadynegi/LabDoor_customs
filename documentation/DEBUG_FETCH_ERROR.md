@@ -1,6 +1,6 @@
 # API Fetch Debugging
 
-Diagnose CORS, CSRF, and network errors between frontend and backend.
+Diagnose CORS, CSRF, and network errors between the storefront and API.
 
 **Full reference:** [`../info.md`](../info.md)
 
@@ -12,11 +12,11 @@ Diagnose CORS, CSRF, and network errors between frontend and backend.
 
 **Checks:**
 
-1. `FRONTEND_URL` on backend matches exact storefront origin (including https, no trailing slash mismatch).
-2. Frontend `VITE_API_BASE_URL` points to correct API host.
+1. `FRONTEND_URL` on the backend matches the browser origin (scheme, host, no trailing slash).
+2. `VITE_API_BASE_URL` is `/api` in production (same origin) or points to the correct API host in dev.
 3. Requests include `credentials: 'include'` (handled by `apiFetch`).
 
-**Allowed origins:** `FRONTEND_URL` + localhost dev ports (5173, 3000).
+**Development origins allowed:** `FRONTEND_URL`, localhost ports 5173 and 3000, and LAN IPs on those ports.
 
 ---
 
@@ -27,11 +27,9 @@ Diagnose CORS, CSRF, and network errors between frontend and backend.
 **Checks:**
 
 1. Frontend calls `GET /api/csrf-token` before mutating requests (automatic in `apiFetch`).
-2. Cookies enabled in browser (third-party cookie blocking can affect cross-origin setups).
+2. Cookies enabled in the browser.
 3. `X-CSRF-Token` header present on POST/PUT/PATCH/DELETE.
-4. On 403, frontend retries once after refreshing token.
-
-**Cross-origin setup:** CSRF token cached in memory via `initCsrfToken()`.
+4. On CSRF 403, frontend retries once after refreshing the token.
 
 ---
 
@@ -41,9 +39,9 @@ Diagnose CORS, CSRF, and network errors between frontend and backend.
 
 **Checks:**
 
-1. Backend running and reachable at `VITE_API_BASE_URL`.
+1. Backend running and reachable.
 2. `REQUEST_TIMEOUT_MS` on backend (default 15s).
-3. Database connection healthy (`GET /api/health`).
+3. Database healthy (`GET /api/health`).
 
 ---
 
@@ -53,8 +51,8 @@ Diagnose CORS, CSRF, and network errors between frontend and backend.
 
 **Checks:**
 
-1. Admin session cookie present (`admin_session`).
-2. Session not expired (24h TTL) — log in again.
+1. `admin_session` cookie present.
+2. Session not expired (24h TTL).
 3. `credentials: 'include'` on fetch requests.
 
 ---
@@ -66,26 +64,35 @@ Diagnose CORS, CSRF, and network errors between frontend and backend.
 1. Railway service running.
 2. Redis connected (required in production).
 3. Database reachable.
-4. Check `/api/health` for component status.
+4. `/api/health` component status.
 
 ---
 
 ## Debugging steps
 
-1. Open browser DevTools → Network tab.
+1. Browser DevTools → Network tab.
 2. Inspect failing request: headers, cookies, response body.
-3. Check backend Pino logs using `X-Request-Id` from response headers.
-4. Verify env vars match between frontend build and backend deploy.
+3. Backend Pino logs filtered by `X-Request-Id`.
+4. Env vars consistent between frontend build and server runtime.
 
 ---
 
 ## Local development
 
 ```
-Frontend: http://localhost:5173
-Backend:  http://localhost:5000
-VITE_API_BASE_URL=http://localhost:5000/api
-FRONTEND_URL=http://localhost:5173
+npm run dev          # from repository root
+Storefront:         http://localhost:5173
+API (direct):       http://localhost:5000
+API (via Vite):     http://localhost:5173/api
+
+frontend/.env:      VITE_API_BASE_URL=/api
+backend/.env:       FRONTEND_URL=http://localhost:5173
 ```
 
-Both servers must be running simultaneously.
+**Production-like local server:**
+
+```
+npm run build
+cd backend && SERVE_FRONTEND=true npm start
+# → http://localhost:5000 (API and SPA on one port)
+```

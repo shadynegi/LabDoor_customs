@@ -1,16 +1,4 @@
 {
   "$schema": "https://railway.app/railway.schema.json",
-  "build": {
-    "builder": "NIXPACKS",
-    "buildCommand": "npm install && npm run build"
-  },
-  "deploy": {
-    "numReplicas": 1,
-    "startCommand": "npm start",
-    "sleepApplication": false,
-    "restartPolicyType": "ON_FAILURE",
-    "restartPolicyMaxRetries": 10,
-    "healthcheckPath": "/api/health",
-    "healthcheckTimeout": 10
-  }
+  "_comment": "Deploy from repository root using ../railway.json (unified monorepo). This file is kept for reference only."
 }

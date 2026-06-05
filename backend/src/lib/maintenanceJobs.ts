@@ -4,6 +4,7 @@ import {
   cleanupExpiredIdempotencyKeys,
   reapStuckIdempotencyKeys,
 } from './paymentIdempotency';
+import { cleanupExpiredCheckoutExchanges } from './orderCheckoutExchange';
 
 export function startMaintenanceJobs(): void {
   const hourMs = 60 * 60 * 1000;
@@ -15,6 +16,9 @@ export function startMaintenanceJobs(): void {
     );
     expireStalePendingOrders().catch((err) =>
       logger.warn('Stale pending order cleanup failed:', err)
+    );
+    cleanupExpiredCheckoutExchanges().catch((err) =>
+      logger.warn('Checkout exchange cleanup failed:', err)
     );
   }, hourMs);
 

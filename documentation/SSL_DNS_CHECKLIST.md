@@ -8,16 +8,15 @@ HTTPS and DNS configuration for production.
 
 ## DNS
 
-- [ ] Frontend domain (www) → Cloudflare → Railway frontend
-- [ ] API domain (api) → Cloudflare → Railway backend
-- [ ] Both records proxied (orange cloud)
+- [ ] Public domain (`www`) → Cloudflare → Railway service (repository root)
+- [ ] Record proxied (orange cloud)
 
 ---
 
 ## SSL/TLS
 
 - [ ] Cloudflare SSL mode: Full (strict)
-- [ ] Railway services serve HTTPS
+- [ ] Railway service serves HTTPS behind Cloudflare
 - [ ] Backend enforces HTTPS redirect via `x-forwarded-proto` in production
 
 ---
@@ -32,7 +31,7 @@ HTTPS and DNS configuration for production.
 ## Environment
 
 - [ ] `FRONTEND_URL=https://www.yourdomain.com`
-- [ ] `VITE_API_BASE_URL=https://api.yourdomain.com/api`
+- [ ] `VITE_API_BASE_URL=/api`
 - [ ] `VITE_SITE_URL=https://www.yourdomain.com`
 - [ ] `TRUST_CLOUDFLARE=true`
 
@@ -40,6 +39,7 @@ HTTPS and DNS configuration for production.
 
 ## Verify
 
-- [ ] https://www.yourdomain.com loads storefront
-- [ ] https://api.yourdomain.com/api/health returns 200
-- [ ] No mixed content warnings in browser console
+- [ ] `https://www.yourdomain.com` loads the storefront
+- [ ] `https://www.yourdomain.com/api/health` returns 200
+- [ ] `https://www.yourdomain.com/sitemap.xml` is reachable
+- [ ] No mixed content warnings in the browser console

@@ -8,28 +8,42 @@ How customers look up their orders.
 
 ## Customer flow
 
-1. After payment, customer receives confirmation email with tracking link.
-2. Link format: `{FRONTEND_URL}/orders?order={orderNumber}&token={accessToken}`
-3. Customer can also visit `/orders` and enter order number + access token manually.
+1. After payment, the customer receives a confirmation email with a tracking link.
+2. Deep link format: `{FRONTEND_URL}/orders?orderNumber={orderNumber}&token={accessToken}`
+3. The customer can also visit `/orders` and enter the order number and access token manually.
+4. Multiple tracked orders are stored in browser `sessionStorage` and refreshed automatically.
 
 ---
 
 ## Access token
 
 - Generated at order creation (64-character hex string).
-- Only SHA-256 hash stored in database.
-- Required for: order lookup, payment capture, checkout recovery.
+- Only a SHA-256 hash is stored in the database.
+- Required for order lookup, payment capture, and checkout context recovery.
+- Sent to the API in the **request body** (`POST /api/orders/lookup`), not in GET query strings.
 
 ---
 
 ## API
 
-`GET /api/orders/number/:orderNumber?token={accessToken}`
+**Preferred lookup:**
 
-Returns order details with items and shipping address. Secrets stripped from response.
+```
+POST /api/orders/lookup
+Content-Type: application/json
+
+{
+  "orderNumber": "LDC-2026-00001",
+  "accessToken": "64-char-hex-token"
+}
+```
+
+Returns order details with items and shipping address. Secrets are stripped from the response.
+
+**Alternate lookup:** `GET /api/orders/number/:orderNumber?token={accessToken}`
 
 ---
 
 ## Admin lookup
 
-Admins can look up any order without token via dashboard or `GET /api/orders/:id`.
+Admins can view any order without a customer token via the dashboard or `GET /api/orders/:id`.

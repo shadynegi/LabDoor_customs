@@ -2,15 +2,14 @@
 
 **Authoritative reference:** [`../info.md`](../info.md) — environment variables and CI/CD.
 
-Deploy Lab Door Customs to production using Railway (backend + frontend) with Cloudflare in front.
+Deploy Lab Door Customs from the repository root on Railway. Express serves the API (`/api/*`) and the built React storefront (`frontend/dist`) on one host.
 
 ---
 
 ## Architecture
 
 ```
-User → Cloudflare (DNS + proxy) → Railway frontend (static SPA)
-                               → Railway backend (Express API)
+User → Cloudflare (DNS + proxy) → Railway (Express API + static SPA)
                                → Supabase PostgreSQL
                                → Redis
                                → PayPal (live)
@@ -18,13 +17,21 @@ User → Cloudflare (DNS + proxy) → Railway frontend (static SPA)
                                → Sentry (errors)
 ```
 
+| Path | Handler |
+|------|---------|
+| `/api/*` | Express REST API |
+| `/*` | React SPA (`frontend/dist`) with client-side routing fallback |
+
 ---
 
-## Backend (Railway)
+## Railway
 
-1. Create a Railway service from the `backend/` directory.
-2. Set **start command:** `npm run build && npm start`
-3. Set **healthcheck path:** `/api/health`
+1. Link a Railway service to the **repository root**.
+2. Railway reads [`railway.json`](../railway.json):
+   - **Build:** `npm install && npm run build`
+   - **Start:** `npm start`
+   - **Healthcheck:** `/api/health`
+3. Set environment variables on the service (runtime + build).
 
 ### Required environment variables
 
@@ -32,8 +39,9 @@ User → Cloudflare (DNS + proxy) → Railway frontend (static SPA)
 |----------|-------|
 | `NODE_ENV` | `production` |
 | `DATABASE_URL` | Supabase pooler URL (port 6543) |
-| `FRONTEND_URL` | `https://www.labdoorcustoms.com` |
-| `ADMIN_PASSWORD_HASH` | Bcrypt hash of admin password |
+| `FRONTEND_URL` | `https://www.labdoorcustoms.com` (same public URL as the Railway service) |
+| `ADMIN_PASSWORD_HASH` | Bcrypt hash — `node backend/scripts/generate-admin-hash.mjs "password"` |
+| `ADMIN_USERNAME` | Admin login username |
 | `PAYPAL_CLIENT_ID` | Live PayPal client ID |
 | `PAYPAL_SECRET` | Live PayPal secret |
 | `PAYPAL_MODE` | `live` |
@@ -41,45 +49,39 @@ User → Cloudflare (DNS + proxy) → Railway frontend (static SPA)
 | `TRUST_CLOUDFLARE` | `true` |
 | `REDIS_URL` | Redis connection string |
 | `SENTRY_DSN` | Sentry backend DSN |
-| `JWT_SECRET` | 32+ character secret |
-| `RESEND_API_KEY` | Resend API key |
+| `JWT_SECRET` | 32+ characters with mixed case, number, and special character |
+| `RESEND_API_KEY` | Resend API key (required at startup) |
 
-### Recommended
+### Required build-time variables (frontend Vite build)
 
-| Variable | Purpose |
-|----------|---------|
-| `DB_SSL_CA_PATH` | Supabase CA certificate |
-| `SENTRY_RELEASE` | Git commit SHA for Sentry releases |
-| `PENDING_ORDER_TTL_HOURS` | Abandoned checkout TTL (default 24) |
-
----
-
-## Frontend (Railway)
-
-1. Create a Railway service from the `frontend/` directory.
-2. Set **build command:** `npm run build`
-3. Set **start command:** `npm start` (serves `dist/`)
-
-### Required build-time variables
+Set these on the same Railway service so `npm run build` can compile the SPA:
 
 | Variable | Value |
 |----------|-------|
-| `NODE_ENV` | `production` |
-| `CI` | `true` (or rely on NODE_ENV) |
-| `VITE_API_BASE_URL` | `https://api.yourdomain.com/api` |
-| `VITE_SITE_URL` | `https://www.yourdomain.com` |
+| `VITE_API_BASE_URL` | `/api` (same-origin API) |
+| `VITE_SITE_URL` | `https://www.labdoorcustoms.com` |
 | `VITE_SENTRY_DSN` | Sentry frontend DSN |
-| `SITEMAP_REQUIRE_PRODUCTS` | `true` (default in prod builds) |
 
-The build runs `validate-env.mjs` → `generate-sitemap.mjs` → TypeScript → Vite.
+The frontend build runs `validate-env.mjs` → `generate-sitemap.mjs` → TypeScript → Vite. In production, Express automatically serves `frontend/dist` when `index.html` exists.
 
 ### Optional
 
 | Variable | Purpose |
 |----------|---------|
+| `ORDER_TOKEN_ENCRYPTION_KEY` | Dedicated key for checkout exchange encryption (falls back to `JWT_SECRET`) |
+| `SERVE_FRONTEND` | `false` to disable static hosting (API-only mode); auto-enabled in production when dist exists |
+| `FRONTEND_DIST_PATH` | Override path to built SPA (default: `frontend/dist`) |
+| `DB_SSL_CA_PATH` | Supabase CA certificate |
 | `VITE_GA4_MEASUREMENT_ID` | Google Analytics |
-| `VITE_GSC_VERIFICATION` | Search Console verification |
-| `VITE_SENTRY_RELEASE` | Sentry release tag |
+| `SITEMAP_REQUIRE_PRODUCTS` | Fail build if sitemap has zero products |
+
+Validate locally before deploy:
+
+```bash
+npm install
+CI_VALIDATE_PRODUCTION=true TRUST_CLOUDFLARE=true ... npm run validate-env -w backend
+VITE_API_BASE_URL=/api VITE_SITE_URL=https://www.example.com VITE_SENTRY_DSN=... npm run build
+```
 
 ---
 
@@ -87,17 +89,17 @@ The build runs `validate-env.mjs` → `generate-sitemap.mjs` → TypeScript → 
 
 See [CLOUDFLARE_RAILWAY.md](./CLOUDFLARE_RAILWAY.md).
 
-- Proxy both frontend and API domains through Cloudflare (orange cloud).
-- Backend requires `TRUST_CLOUDFLARE=true` — direct Railway URL access is blocked except `/api/health`.
+- Proxy the public domain through Cloudflare (orange cloud).
+- `TRUST_CLOUDFLARE=true` blocks direct Railway URL access except `/api/health`.
 
 ---
 
 ## PayPal webhooks
 
 1. In PayPal Developer Dashboard (live mode), create a webhook pointing to:
-   `https://api.yourdomain.com/api/paypal/webhook`
+   `https://www.labdoorcustoms.com/api/paypal/webhook`
 2. Subscribe to: `PAYMENT.CAPTURE.COMPLETED`, `PAYMENT.CAPTURE.DENIED`, `PAYMENT.CAPTURE.REFUNDED`, `PAYMENT.CAPTURE.REVERSED`
-3. Set `PAYPAL_WEBHOOK_ID` on the backend service.
+3. Set `PAYPAL_WEBHOOK_ID` on the Railway service.
 
 ---
 
@@ -105,19 +107,24 @@ See [CLOUDFLARE_RAILWAY.md](./CLOUDFLARE_RAILWAY.md).
 
 | Secret | Used by |
 |--------|---------|
-| `PRODUCTION_API_BASE_URL` | Frontend build, sitemap job |
-| `VITE_SENTRY_DSN` | Frontend build |
+| `PRODUCTION_API_BASE_URL` | Sitemap job (live product URLs during CI) |
+| `VITE_SENTRY_DSN` | Monorepo production build |
 | `DATABASE_URL` | Supabase keep-alive cron |
+
+---
+
+## Health and Redis
+
+`GET /api/health` reports database latency, Redis connectivity, PayPal mode, and uptime. Returns **503** in production when Redis is required but disconnected.
 
 ---
 
 ## Post-deploy checks
 
-1. `GET https://api.yourdomain.com/api/health` — DB and Redis healthy
-2. Browse storefront — products load from API
-3. Complete a sandbox/live test order
-4. Admin login and dashboard analytics
-5. Verify `https://www.yourdomain.com/sitemap.xml` contains product URLs
-6. Submit sitemap in Google Search Console
+1. `GET https://www.labdoorcustoms.com/api/health` — DB and Redis healthy
+2. `GET https://www.labdoorcustoms.com/` — storefront loads
+3. Complete a test order (PayPal sandbox or live)
+4. Admin login at `/admin/login`
+5. Verify `/sitemap.xml` contains product URLs
 
-See also: [DEPLOYMENT.md](./DEPLOYMENT.md), [SSL_DNS_CHECKLIST.md](./SSL_DNS_CHECKLIST.md)
+See also: [SSL_DNS_CHECKLIST.md](./SSL_DNS_CHECKLIST.md)

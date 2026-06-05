@@ -6,11 +6,17 @@ SQL scripts to initialize and maintain the Lab Door Customs database.
 
 ## Schema files
 
-Located in `backend/migrations/`:
+Located in `backend/src/database/`:
 
-- Core tables: products, orders, order_items, customers, coupons, reviews, contact_messages
-- PayPal fields: capture IDs, refund amounts, access token hashes
-- Idempotency and refund event tables (also patched at server boot)
+- `schema.sql` — base schema
+- `migration-*.sql` — incremental migrations
+- `migration-rls-tighten.sql` — RLS policy tighten (also applied at server boot via `ensureRlsPolicies()`)
+- `migration-rls-sensitive-tables.sql` — RLS on coupons, coupon_usage, payment_idempotency, processed_refund_events (skips tables not created yet)
+
+Runtime tables created/patched at server boot:
+
+- `payment_idempotency`, `processed_refund_events`, `order_checkout_exchanges`
+- `orders.refunded_amount`, customer soft-delete columns, PayPal unique indexes
 
 ## Running SQL
 

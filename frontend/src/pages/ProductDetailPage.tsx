@@ -8,7 +8,7 @@ import type { Product } from '../hooks/useProducts';
 import { useCart, type SizeSystem } from './CartContext';
 import StarRating from '../components/StarRating';
 import ErrorMessage from '../components/ErrorMessage';
-import { generatePlaceholder360Images } from '../utils/product360Images';
+import { generatePlaceholder360Images, get360VideoPath } from '../utils/product360Images';
 import { optimizeImageUrl } from '../utils/imageUrl';
 import MetaTags from '../components/MetaTags';
 import ProductJsonLd from '../components/ProductJsonLd';
@@ -146,6 +146,9 @@ const ProductDetailPage: React.FC = () => {
   if (loading) {
     return <ProductDetailSkeleton isMobile={isMobile} />;
   }
+
+  const productSlug = product?.name?.toLowerCase().replace(/\s+/g, '-') ?? '';
+  const hasReal360Assets = Boolean(get360VideoPath(productSlug));
 
   if (error || !product) {
     return (
@@ -309,7 +312,7 @@ const ProductDetailPage: React.FC = () => {
                 }}
               >
                 <RotateCcw size={16} />
-                360°
+                {hasReal360Assets ? '360°' : 'Spin'}
               </motion.button>
             </div>
 
@@ -329,7 +332,7 @@ const ProductDetailPage: React.FC = () => {
                     padding: 20,
                   }}
                 >
-                  <Suspense fallback={<div style={{ padding: 40, color: '#fff' }}>Loading 360° view…</div>}>
+                  <Suspense fallback={<div style={{ padding: 40, color: '#fff' }}>Loading spin view…</div>}>
                     <Product360Viewer
                       images={generatePlaceholder360Images(product.image, 8)}
                       productName={product.name}

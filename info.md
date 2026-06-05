@@ -4,6 +4,8 @@
 
 **Documentation hub:** [`documentation/DOCUMENTATION_INDEX.md`](documentation/DOCUMENTATION_INDEX.md)
 
+**Doc maintenance:** When changing behavior, update this file and the relevant guides under [`documentation/`](documentation/DOCUMENTATION_INDEX.md). Agents follow [`.cursor/rules/documentation-sync.mdc`](.cursor/rules/documentation-sync.mdc).
+
 ---
 
 ## Table of contents
@@ -36,11 +38,11 @@
 ## Architecture
 
 ```
-┌─────────────────┐     HTTPS/CORS      ┌──────────────────┐
-│  React SPA      │ ◄──────────────────►│  Express API     │
-│  (Vite build)   │   CSRF + cookies    │  (TypeScript)    │
-└────────┬────────┘                     └────────┬─────────┘
-         │                                       │
+┌─────────────────────────────────────────────────────────────┐
+│  Single Express server (production)                          │
+│  • /api/*  → REST API                                        │
+│  • /*      → React SPA (frontend/dist) + client-side routes  │
+└────────┬───────────────────────────────────────┬────────────┘
          │ PayPal redirect                       │ postgres.js
          ▼                                       ▼
 ┌─────────────────┐                     ┌──────────────────┐
@@ -60,13 +62,19 @@
 
 | Path | Role |
 |------|------|
-| `frontend/` | React 19 SPA — pages, cart, checkout, admin UI |
-| `backend/` | Express REST API — routes, PayPal, jobs, cache |
+| `package.json` | Root workspace — `npm run dev`, `build`, `start`, `test` |
+| `frontend/` | React 19 SPA — Vite build output consumed by Express |
+| `backend/` | Express server — API, static SPA hosting, PayPal, jobs, cache |
+| `Tests/` | Vitest + Playwright |
 | `.github/workflows/` | CI, Supabase keep-alive cron |
 | `documentation/` | Setup, deploy, and operational guides |
 | `scripts/` | Root link checker, doc sync utilities |
 
-**Order creation rule:** New orders are created only through `POST /api/paypal/create-payment`. The legacy `POST /api/orders` endpoint returns **410 Gone**.
+**Local development** runs the Vite dev server (port 5173) and API (port 5000) in parallel via `npm run dev` from the repo root. Vite proxies `/api` to the backend.
+
+**Production** builds both packages (`npm run build`) and starts one process (`npm start`) that serves API + static files.
+
+**Order creation rule:** New orders are created only through `POST /api/paypal/create-payment`. `POST /api/orders` returns **410 Gone**.
 
 ---
 
@@ -82,7 +90,7 @@
 | Email | Resend |
 | Observability | Pino (structured logs), Sentry (backend + frontend) |
 | Testing | Vitest (backend), Playwright (frontend E2E smoke) |
-| Deploy | Railway (backend + frontend services), Cloudflare (required proxy in production) |
+| Deploy | Railway (single service, repo root), Cloudflare (required proxy in production) |
 
 ---
 
@@ -94,12 +102,12 @@
 |-------|---------|
 | `/` | Home — hero carousel, product search bar, featured products |
 | `/products` | Catalog — filters, Fuse.js search, pagination; supports `?q=` deep links |
-| `/product/:id` | Product detail — 360° viewer, reviews, JSON-LD, meta tags |
+| `/product/:id` | Product detail — 360° viewer (real multi-angle or static placeholder), reviews, JSON-LD, meta tags |
 | `/cart` | Shopping cart (localStorage via `CartContext`) |
 | `/checkout` | Customer/shipping form, coupon validation, PayPal redirect |
 | `/payment/success` | Post-PayPal capture, order confirmation, cart clear |
 | `/payment/cancel` | Abandoned checkout |
-| `/orders` | Customer order lookup (order number + access token) |
+| `/orders` | Customer order lookup (order number + access token via `POST /api/orders/lookup`) |
 | `/contact` | Contact form with CSRF-protected POST |
 | `/about`, `/help` | Static content |
 | `/privacy-policy`, `/terms-of-service`, `/returns-policy`, `/shipping-policy` | Legal pages |
@@ -122,19 +130,20 @@
 
 **URL:** `/adminshivamdashboard` (not under `/admin/*` to reduce scanner noise)
 
-**Authentication:** Username + password → HttpOnly `admin_session` cookie (24-hour session stored in `admin_sessions` table).
+**Authentication:** Username + password → HttpOnly `admin_session` cookie (24-hour session). Session tokens are **SHA-256 hashed** before storage in `admin_sessions` (raw token never persisted).
 
 **Tabs and capabilities**
 
 | Tab | Functions |
 |-----|-----------|
-| Analytics | Order/revenue stats, product metrics, customer counts, geo breakdown, GA4/GSC config status |
-| Products | List, create, edit, delete; bulk stock updates |
-| Orders | Filter, status updates, cancel with optional PayPal refund, shipping notifications |
+| Analytics | Order/revenue stats, product metrics, customer counts, geo breakdown, GA4/GSC config status; error state with retry |
+| Products | List, create, edit, delete; bulk stock updates; image validation (URL or ≤512KB data URL) |
+| Orders | Paginated list (50/page), **server-side search** (`?search=` on order number, email, name), filter by status, bulk status updates (not cancellation); order modal: tracking, notify shipped, status transitions, **mark paid** (manual, requires reason), cancel with refund |
+| Coupons | Preset percentage coupons (5/10/20/25/50%), custom codes, **edit** (description, max uses, expiry, active), activate/deactivate, delete |
 | Messages | Contact inbox — read, reply status, archive, bulk updates |
-| Customers | Aggregated customer list, detail view, soft delete / restore |
+| Customers | Aggregated customer list, detail view, soft delete / restore, show deleted toggle |
 
-**API-only admin features** (no dedicated UI tab): coupon CRUD, review moderation, activity log export.
+**API-only admin features** (no dedicated UI tab): review moderation, activity log export, PayPal refund/test endpoints.
 
 ---
 
@@ -167,7 +176,7 @@ POST /api/paypal/capture-payment/:paypalOrderId
   • Send confirmation email with tracking link
         │
         ▼
-Payment success page (also supports ?aid= token recovery)
+Payment success page redeems ?code= via GET /api/paypal/checkout-exchange/:code
 ```
 
 ### Create payment (`POST /api/paypal/create-payment`)
@@ -179,10 +188,11 @@ Payment success page (also supports ?aid= token recovery)
 5. Atomically inserts a pending order and decrements product stock.
 6. Reserves coupon usage in `coupon_usage`.
 7. Creates a PayPal order with `reference_id` / `custom_id` set to the server order UUID.
-8. Stores `paypal_order_id` on the order; returns PayPal approval links, `serverOrderId`, and a one-time **access token**.
-9. On any failure after order creation: rolls back pending order, restores stock, marks idempotency key failed.
+8. Creates a one-time **checkout exchange code** (stored hashed in `order_checkout_exchanges`, 30-minute TTL, single use).
+9. Stores `paypal_order_id` on the order; returns PayPal approval links and `serverOrderId` (access token is **not** returned — redeem checkout exchange code on return).
+10. On any failure after order creation: rolls back pending order, restores stock, marks idempotency key failed.
 
-**PayPal return URL:** `{FRONTEND_URL}/payment/success?aid={accessToken}`
+**PayPal return URL:** `{FRONTEND_URL}/payment/success?code={exchangeCode}` — PayPal appends `&token={paypalOrderId}`. Access token is **not** in the URL.
 
 ### Capture payment (`POST /api/paypal/capture-payment/:orderId`)
 
@@ -195,10 +205,15 @@ Payment success page (also supports ?aid= token recovery)
 7. `completeOrderPaymentCapture` sets `payment_status=completed`, `status=processing`, stores `paypal_capture_id`.
 8. Upserts customer aggregate stats (only after successful capture).
 9. Sends order confirmation email; caches idempotency response for safe retries.
+10. Returns **409** if PayPal capture succeeds but the order is not `payment_status=completed` in the database (prevents false-success UI).
+
+### Checkout exchange (PayPal return)
+
+`GET /api/paypal/checkout-exchange/:code` — atomically redeems the one-time `code` from the PayPal return URL and returns `accessToken`, `serverOrderId`, order totals, and coupon context. Access tokens are **AES-256-GCM encrypted** at rest in `order_checkout_exchanges`. Code is single-use and expires in 30 minutes.
 
 ### Checkout context recovery
 
-`GET /api/paypal/checkout-context/:paypalOrderId` — restores checkout state when localStorage is unavailable after PayPal redirect. Requires access token via query `aid`, `?token=`, or header `X-Order-Access-Token`.
+`GET /api/paypal/checkout-context/:paypalOrderId` — restores checkout state when the exchange code is unavailable. Requires the order access token via header `X-Order-Access-Token` or query `?aid=`.
 
 ### PayPal webhooks (`POST /api/paypal/webhook`)
 
@@ -208,7 +223,7 @@ Payment success page (also supports ?aid= token recovery)
 
 | Event | Behavior |
 |-------|----------|
-| `PAYMENT.CAPTURE.COMPLETED` | Complete order with amount validation; auto-refund on mismatch |
+| `PAYMENT.CAPTURE.COMPLETED` | Resolve capture amount from webhook or PayPal API if missing; complete order with amount validation; auto-refund on mismatch; returns **500** (PayPal retry) when order binding or capture application fails |
 | `PAYMENT.CAPTURE.DENIED` | Cancel pending order, restore stock |
 | `PAYMENT.CAPTURE.REFUNDED` | Sync refund to DB with deduplication |
 | `PAYMENT.CAPTURE.REVERSED` | Sync reversal with deduplication |
@@ -266,7 +281,9 @@ Statuses: `processing`, `completed`, `failed`. Stuck `processing` rows are reape
 
 - Each order receives a 64-character hex **access token** at creation; only a SHA-256 hash is stored.
 - Token is embedded in confirmation email tracking URLs.
-- Required for: `GET /api/orders/number/:orderNumber`, capture payment, checkout context recovery.
+- Customer lookup: `POST /api/orders/lookup` with `{ orderNumber, accessToken }` in the JSON body.
+- Alternate lookup: `GET /api/orders/number/:orderNumber` with token in query or `X-Order-Access-Token` header.
+- Access token is also required for payment capture and checkout context recovery.
 - Public listing of orders by email is blocked (`GET /api/orders/customer/:email` is admin-only).
 
 ### Customer aggregates
@@ -280,7 +297,9 @@ Statuses: `processing`, `completed`, `failed`. Stuck `processing` rows are reape
 - Cancel pending orders (restores stock automatically).
 - Cancel completed orders with PayPal refund (syncs DB, inventory, customer stats).
 - Send shipping notification email.
+- **Mark paid manually** via `PATCH /api/orders/:id/payment-status` with `payment_status: completed` and `admin_note` (≥3 chars); logged to `activity_logs` as `admin_mark_paid`.
 - Hard delete blocked when `payment_status === 'completed'`.
+- Bulk status update rejects `cancelled` — use `POST /api/orders/:id/cancel` instead.
 
 ---
 
@@ -349,7 +368,7 @@ At create-payment, a row in `coupon_usage` reserves the coupon for the pending o
 
 | Actor | Mechanism |
 |-------|-----------|
-| Admin | Bcrypt password hash (`ADMIN_PASSWORD_HASH` in production); HMAC-signed session token in HttpOnly cookie; validated against `admin_sessions`; legacy Bearer header supported |
+| Admin | Bcrypt password hash (`ADMIN_PASSWORD_HASH` in production); HMAC-signed session token in HttpOnly cookie; **SHA-256 hash** stored in `admin_sessions`; optional `Authorization: Bearer` header |
 | Customer orders | Per-order access token (hashed at rest) |
 | PayPal webhooks | PayPal signature verification via API |
 
@@ -365,7 +384,7 @@ At create-payment, a row in `coupon_usage` reserves the coupon for the pending o
 ### Rate limiting
 
 - Per-route limits via `express-rate-limit`.
-- Redis-backed store when `REDIS_URL` is set; in-memory fallback per limiter instance.
+- Redis-backed store when `REDIS_URL` is set; in-memory fallback in development only — **production fails closed** if Redis is required but unavailable.
 - Notable limits: admin login (5 per 15 min), contact, reviews, coupon validate, payment endpoints.
 
 ### Network and transport
@@ -386,12 +405,18 @@ At create-payment, a row in `coupon_usage` reserves the coupon for the pending o
 - Order secrets stripped from API responses (`stripOrderSecrets`).
 - DB TLS verification in production (`DB_SSL_CA_PATH`; `rejectUnauthorized` defaults true).
 - PayPal order/capture IDs have partial unique indexes to prevent duplicate binding.
+- Product images validated on admin create/update: HTTPS/relative URLs or data URLs ≤512KB (`lib/productImage.ts`).
+- Supabase RLS tightened at startup: products public read; writes via service role only (`ensureRlsPolicies()`).
 
 ### Production environment gates
 
-Backend exits on startup if missing:
+Backend exits on startup if missing (mirrors `backend/scripts/validate-env.mjs`):
 
-- `DATABASE_URL`, `FRONTEND_URL`, `ADMIN_PASSWORD_HASH`, `PAYPAL_WEBHOOK_ID`, `TRUST_CLOUDFLARE=true`, `REDIS_URL`, `SENTRY_DSN`
+- `DATABASE_URL`, `FRONTEND_URL`, `ADMIN_PASSWORD_HASH`, `ADMIN_USERNAME`, `JWT_SECRET` (32+ chars), `PAYPAL_WEBHOOK_ID`, `PAYPAL_CLIENT_ID`, `PAYPAL_SECRET`, `RESEND_API_KEY`, `TRUST_CLOUDFLARE=true`, `REDIS_URL`, `SENTRY_DSN`
+
+CI runs `npm run validate-env` in the backend job with `CI_VALIDATE_PRODUCTION=true`.
+
+**Admin password hash:** generate locally with `node backend/scripts/generate-admin-hash.mjs "password"` — `POST /api/admin/generate-hash` is **disabled in production**.
 
 Frontend build fails in CI/production if missing or invalid:
 
@@ -426,10 +451,10 @@ Redis connection failure in production prevents server startup.
 
 - Database latency and pool stats
 - PayPal mode (sandbox/live)
-- Redis connection status
+- Redis connection status (`required: true` in production when `REDIS_URL` is set)
 - Uptime
 
-Returns **503** if database is unreachable.
+Returns **503** if database is unreachable **or** Redis is required but disconnected.
 
 ---
 
@@ -480,6 +505,7 @@ Started on server boot and run on intervals (`maintenanceJobs.ts`):
 | Idempotency cleanup | 1 hour | Delete expired non-processing idempotency rows |
 | Stale pending orders | 1 hour | Cancel pending orders older than `PENDING_ORDER_TTL_HOURS` (default 24), restore stock, release coupons |
 | Stuck idempotency reaper | 15 min | Mark long-running `processing` idempotency rows as `failed` |
+| Checkout exchange cleanup | 1 hour | Delete expired or used `order_checkout_exchanges` rows |
 
 ---
 
@@ -525,7 +551,8 @@ Started on server boot and run on intervals (`maintenanceJobs.ts`):
 | `coupon_usage` | Per-order coupon reservations |
 | `contact_messages` | Contact inbox |
 | `activity_logs` | Anonymized activity events |
-| `admin_sessions` | Admin session tokens |
+| `admin_sessions` | Admin session token hashes (SHA-256) |
+| `order_checkout_exchanges` | One-time PayPal return codes → order access tokens |
 | `reviews` / `review_votes` | Product reviews and voting |
 
 ### Payment tables (runtime migrations at startup)
@@ -539,14 +566,16 @@ Started on server boot and run on intervals (`maintenanceJobs.ts`):
 
 - `backend/src/database/schema.sql` — base schema
 - `backend/src/database/migration-*.sql` — incremental migrations
-- Startup applies: `ensureIdempotencyTable()`, `ensureOrderPaymentSchema()` (refunded_amount, PayPal unique indexes, processed_refund_events)
+- Startup applies: `ensureIdempotencyTable()`, `ensureOrderPaymentSchema()`, `ensureCheckoutExchangeTable()`, `ensureRlsPolicies()`
+- `backend/src/database/migration-rls-tighten.sql` — reference SQL for RLS (also applied idempotently at boot)
 
 ---
 
 ## Complete API endpoints
 
-**Base URL (local):** `http://localhost:5000`  
-**Base URL (production):** your Railway/API host (frontend uses `VITE_API_BASE_URL`, typically `https://api.example.com/api`)
+**Base URL (local dev):** `http://localhost:5173` (Vite) with `/api` proxied to `http://localhost:5000`  
+**Base URL (local production-like):** `http://localhost:5000`  
+**Base URL (production):** `https://www.yourdomain.com` — API at `/api` (`VITE_API_BASE_URL=/api`)
 
 **Auth legend**
 
@@ -554,7 +583,7 @@ Started on server boot and run on intervals (`maintenanceJobs.ts`):
 |-------|---------|
 | Public | No login required |
 | CSRF | State-changing methods require `X-CSRF-Token` header + `csrf_token` cookie (SPA uses `/api/csrf-token`) |
-| Admin | `admin_session` HttpOnly cookie or legacy `Authorization: Bearer` |
+| Admin | `admin_session` HttpOnly cookie or `Authorization: Bearer` |
 | Order token | Per-order access token via `?token=` query or `X-Order-Access-Token` header |
 | PayPal | Webhook signature verification (`PAYPAL_WEBHOOK_ID`) |
 
@@ -570,7 +599,8 @@ Expanded request/response docs: [`documentation/API_DOCUMENTATION.md`](documenta
 | GET | `/api/paypal/test` | Admin | PayPal API connectivity test |
 | POST | `/api/paypal/create-payment` | Public + CSRF | Create pending order + PayPal order |
 | POST | `/api/paypal/capture-payment/:orderId` | Order token + CSRF | Capture PayPal payment after approval |
-| GET | `/api/paypal/checkout-context/:paypalOrderId` | Order token | Resume checkout after PayPal redirect |
+| GET | `/api/paypal/checkout-exchange/:code` | Public | Redeem one-time checkout code → access token |
+| GET | `/api/paypal/checkout-context/:paypalOrderId` | Order token | Checkout recovery when exchange code is unavailable |
 | GET | `/api/paypal/order/:orderId` | Admin | Fetch PayPal order details |
 | POST | `/api/paypal/refund/:captureId` | Admin + CSRF | Issue full or partial refund |
 
@@ -595,7 +625,8 @@ Any unmatched `/api/*` path returns **404** JSON `{ error: "Route not found" }`.
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | POST | `/api/orders` | — | **410 Gone** — use `POST /api/paypal/create-payment` |
-| GET | `/api/orders` | Admin | List all orders (pagination, status filters) |
+| GET | `/api/orders` | Admin | List all orders (pagination, status filters, `?search=` on order number/email/name) |
+| POST | `/api/orders/lookup` | Public + CSRF | Lookup order by `orderNumber` + `accessToken` in request body |
 | GET | `/api/orders/stats/summary` | Admin | Order/revenue summary stats |
 | GET | `/api/orders/number/:orderNumber` | Order token or Admin | Lookup by order number |
 | GET | `/api/orders/customer/:email` | Admin | Orders for customer email |
@@ -659,7 +690,7 @@ Any unmatched `/api/*` path returns **404** JSON `{ error: "Route not found" }`.
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | POST | `/api/admin/login` | Public + CSRF | Admin login; sets `admin_session` cookie |
-| POST | `/api/admin/generate-hash` | Public | Generate bcrypt hash for `ADMIN_PASSWORD_HASH` (setup) |
+| POST | `/api/admin/generate-hash` | Public (dev only) | Generate bcrypt hash — **403 in production**; use `scripts/generate-admin-hash.mjs` |
 | POST | `/api/admin/logout` | Admin + CSRF | Logout; clears session |
 | GET | `/api/admin/verify` | Admin | Verify current session |
 | GET | `/api/admin/sessions` | Admin | List active admin sessions |
@@ -673,7 +704,7 @@ Any unmatched `/api/*` path returns **404** JSON `{ error: "Route not found" }`.
 | POST | `/api/admin/orders/bulk-update` | Admin + CSRF | Bulk order status updates |
 | POST | `/api/admin/messages/bulk-update` | Admin + CSRF | Bulk contact message status updates |
 
-**Endpoint count:** 71 routes (69 active + 2 deprecated **410** responses).
+**Endpoint count:** 72 routes (70 active + 2 deprecated **410** responses).
 
 ---
 
@@ -697,8 +728,8 @@ Any unmatched `/api/*` path returns **404** JSON `{ error: "Route not found" }`.
 | `/shipping-policy` | `ShippingPolicy` | Shipping policy |
 | `/cart` | `CartPage` | Shopping cart |
 | `/checkout` | `Checkout` | Checkout form + PayPal redirect |
-| `/orders` | `MyOrders` | Order lookup; optional `?orderNumber=` & `?token=` deep link |
-| `/payment/success` | `PaymentSuccess` | PayPal return; query params `token`, `PayerID`, `aid` |
+| `/orders` | `MyOrders` | Order lookup via POST body; optional `?orderNumber=` & `?token=` deep link (token not sent in GET URLs) |
+| `/payment/success` | `PaymentSuccess` | PayPal return; query params `code` (exchange), `token` (PayPal order ID); optional `aid` (access token) |
 | `/payment/cancel` | `Cancel` | PayPal cancel return |
 
 ### Admin routes
@@ -708,7 +739,7 @@ Any unmatched `/api/*` path returns **404** JSON `{ error: "Route not found" }`.
 | `/admin/login` | `AdminLogin` | Admin sign-in |
 | `/adminshivamdashboard` | `AdminDashboard` | Protected; redirects to `/admin/login` if unauthenticated |
 
-**Admin dashboard sections** (same URL, in-app tabs — not separate routes): Analytics, Products, Orders, Messages, Customers.
+**Admin dashboard sections** (same URL, in-app tabs — not separate routes): Analytics, Products, Orders, Coupons, Messages, Customers.
 
 ### Fallback
 
@@ -744,19 +775,20 @@ Templates: `backend/env.template`, `frontend/env.template`
 | `DATABASE_URL` | PostgreSQL connection (pooler port 6543) |
 | `FRONTEND_URL` | CORS, CSP, PayPal return URLs |
 | `ADMIN_PASSWORD_HASH` | Bcrypt admin password |
+| `ADMIN_USERNAME` | Admin login username |
+| `JWT_SECRET` | Admin session signing (32+ chars required) |
+| `PAYPAL_CLIENT_ID`, `PAYPAL_SECRET` | PayPal API credentials |
 | `PAYPAL_WEBHOOK_ID` | Webhook signature verification |
+| `RESEND_API_KEY` | Transactional email |
 | `TRUST_CLOUDFLARE` | Must be `true` |
 | `REDIS_URL` | Cache and rate limits |
 | `SENTRY_DSN` | Error tracking |
 
-### Backend — payment and auth
+### Backend — payment and auth (optional in dev)
 
 | Variable | Purpose |
 |----------|---------|
-| `PAYPAL_CLIENT_ID`, `PAYPAL_SECRET` | PayPal API |
 | `PAYPAL_MODE` | `sandbox` or `live` |
-| `JWT_SECRET` | Admin session signing (32+ chars recommended) |
-| `ADMIN_USERNAME` | Admin login username |
 
 ### Backend — optional / operational
 
@@ -766,15 +798,17 @@ Templates: `backend/env.template`, `frontend/env.template`
 | `IDEMPOTENCY_STALE_MINUTES` | 5 | Stuck idempotency reaper |
 | `REQUEST_TIMEOUT_MS` | 15000 | HTTP request timeout |
 | `LOG_LEVEL` | info/debug | Pino log level |
-| `RESEND_API_KEY` | — | Email (required for notifications) |
+| `RESEND_API_KEY` | — | Email sender (required in production) |
 | `IP_SALT` | — | Activity log IP anonymization |
 | `DB_SSL_CA_PATH` | — | TLS CA bundle for production DB |
+| `SERVE_FRONTEND` | — | `false` disables static SPA hosting; auto-enabled in production when `frontend/dist` exists |
+| `FRONTEND_DIST_PATH` | `frontend/dist` | Path to built React SPA served by Express |
 
 ### Frontend — required at production/CI build
 
 | Variable | Purpose |
 |----------|---------|
-| `VITE_API_BASE_URL` | API base URL (HTTPS in production) |
+| `VITE_API_BASE_URL` | API base path or URL — `/api` in production (same origin) |
 | `VITE_SITE_URL` | Canonical site URL for SEO/sitemap |
 | `VITE_SENTRY_DSN` | Frontend error tracking |
 
@@ -785,7 +819,8 @@ Templates: `backend/env.template`, `frontend/env.template`
 | `VITE_BACKEND_URL` | Backend origin for non-API calls |
 | `VITE_GA4_MEASUREMENT_ID` | Google Analytics (consent-gated) |
 | `VITE_GSC_VERIFICATION` | Search Console verification token |
-| `SITEMAP_REQUIRE_PRODUCTS` | Fail build if sitemap has zero products (default true in prod/CI) |
+| `SITEMAP_REQUIRE_PRODUCTS` | Fail build if sitemap has zero products |
+| `SITEMAP_API_BASE_URL` | Absolute API URL for sitemap product fetch during build (defaults from `VITE_API_BASE_URL` + `VITE_SITE_URL`) |
 
 ---
 
@@ -795,9 +830,8 @@ Templates: `backend/env.template`, `frontend/env.template`
 
 | Job | Steps |
 |-----|-------|
-| backend | `npm ci`, build, test (Vitest) |
-| frontend | Requires `PRODUCTION_API_BASE_URL` + `VITE_SENTRY_DSN` secrets; validate-env; build with live sitemap; Playwright E2E smoke |
-| sitemap | Requires `PRODUCTION_API_BASE_URL`; generates sitemap with `SITEMAP_REQUIRE_PRODUCTS=true` |
+| monorepo | Root `npm ci`, backend validate-env, `npm run build` (`VITE_API_BASE_URL=/api`), Vitest, Playwright smoke |
+| sitemap | Requires `PRODUCTION_API_BASE_URL`; generates sitemap with live product URLs |
 | links | Markdown link checker |
 
 ### Keep-alive (`.github/workflows/keep-supabase-alive.yml`)
@@ -810,10 +844,10 @@ Weekly patch/minor updates for Express, PayPal SDK, React, Sentry, GitHub Action
 
 ### Deployment pattern
 
-- **Backend:** Railway — `npm run build && npm start`; healthcheck `/api/health`
-- **Frontend:** Railway — `npm run build && npm start` (serves `dist/`)
-- **DNS:** Cloudflare proxy in front of both services in production
-- **Secrets:** GitHub `PRODUCTION_API_BASE_URL`, `VITE_SENTRY_DSN`, `DATABASE_URL`
+- **Railway service** at repository root — `npm run build && npm start`; healthcheck `/api/health`
+- **DNS:** Cloudflare proxy on the public domain (`www.yourdomain.com`)
+- **API path:** `/api` on the same host as the storefront
+- **CI secrets:** `PRODUCTION_API_BASE_URL` (sitemap job), `VITE_SENTRY_DSN`, `DATABASE_URL`
 
 See [`documentation/DEPLOYMENT.md`](documentation/DEPLOYMENT.md) and [`documentation/CLOUDFLARE_RAILWAY.md`](documentation/CLOUDFLARE_RAILWAY.md).
 
@@ -822,26 +856,30 @@ See [`documentation/DEPLOYMENT.md`](documentation/DEPLOYMENT.md) and [`documenta
 ## Local development
 
 ```bash
-# Backend
-cd backend
-cp env.template .env    # fill DATABASE_URL, PayPal sandbox creds, etc.
-npm install
-npm run dev             # http://localhost:5000
+# From repository root (monorepo)
+cp backend/env.template backend/.env   # DATABASE_URL, PayPal sandbox, etc.
+cp frontend/env.template frontend/.env # VITE_API_BASE_URL=/api (default)
+npm install                            # installs frontend + backend workspaces
+npm run dev                            # API :5000 + Vite :5173 (proxy /api)
+```
 
-# Frontend
-cd frontend
-cp env.template .env    # VITE_API_BASE_URL=http://localhost:5000/api
-npm install
-npm run dev             # http://localhost:5173
+**API-only mode** (no static hosting): `cd backend && npm run dev`
+
+**Production-like single server locally:**
+
+```bash
+npm run build
+cd backend && SERVE_FRONTEND=true npm start   # http://localhost:5000
 ```
 
 **Strict env validation** is skipped locally unless `CI=true` or `NODE_ENV=production`.
 
 ```bash
-cd backend && npm test           # Vitest (54 tests)
-cd frontend && npm run build     # validate-env + sitemap + tsc + vite
-cd Tests && npm run test:frontend  # Playwright smoke (or npm run test:e2e from frontend)
-npm run links:check              # from repo root
+npm test                         # Vitest (76 tests)
+npm run validate-env             # backend + frontend env checks
+npm run build                    # frontend + backend
+npm run test:frontend            # Playwright smoke (from Tests workspace)
+npm run links:check
 ```
 
 ---
@@ -850,7 +888,7 @@ npm run links:check              # from repo root
 
 | Suite | Tool | Coverage |
 |-------|------|----------|
-| Backend unit/API | Vitest | Checkout validation, security, orders, health, PayPal utils, refund idempotency |
+| Backend unit/API | Vitest | Checkout validation, payment idempotency, order tokens, checkout exchange, order token encryption, webhook errors, product images, admin session hashing, PayPal utils, refund idempotency |
 | Frontend E2E | Playwright | Home, products, checkout shell, contact page render |
 | Link check | Custom script | Documentation internal links |
 

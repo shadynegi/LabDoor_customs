@@ -12,7 +12,8 @@
     "test:unit": "node ../Tests/scripts/run-with-report.mjs unit",
     "test:api": "node ../Tests/scripts/run-with-report.mjs api",
     "test:raw": "vitest run",
-    "keep-alive": "node scripts/keep-alive.js"
+    "keep-alive": "node scripts/keep-alive.js",
+    "validate-env": "node scripts/validate-env.mjs"
   },
   "dependencies": {
     "@paypal/checkout-server-sdk": "^1.0.3",

@@ -23,7 +23,7 @@ Diagnose PayPal checkout and webhook issues.
 ### Capture fails after PayPal approval
 
 - Verify `serverOrderId` and `accessToken` sent from frontend.
-- Check order access token matches (use `?aid=` from return URL if localStorage cleared).
+- After PayPal redirect, URL should have `?code=...&token=...` (PayPal order ID in `token`, not the order access token). Frontend calls `GET /api/paypal/checkout-exchange/:code` to obtain the access token. Alternate recovery uses `?aid=` with `GET /api/paypal/checkout-context/:paypalOrderId`.
 - Amount mismatch: server auto-refunds and cancels if PayPal captured wrong amount.
 
 ### Webhook not processing
@@ -45,10 +45,10 @@ Diagnose PayPal checkout and webhook issues.
 
 ```bash
 # Health check
-curl https://api.yourdomain.com/api/health
+curl https://www.yourdomain.com/api/health
 
 # PayPal connectivity (admin auth required)
-curl -b admin_session=... https://api.yourdomain.com/api/paypal/test
+curl -b admin_session=... https://www.yourdomain.com/api/paypal/test
 
 # Check backend logs for request ID
 # Filter Pino logs by paypal or webhook keywords

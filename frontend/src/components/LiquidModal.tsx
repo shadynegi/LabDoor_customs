@@ -42,7 +42,7 @@ const LiquidModal: React.FC<LiquidModalProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            padding: 20,
+            padding: 'max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left))',
             ...overlayStyle,
           }}
         >
@@ -77,7 +77,7 @@ const LiquidModal: React.FC<LiquidModalProps> = ({
                   WebkitBackdropFilter: 'blur(20px)',
                   border: '1px solid rgba(255, 255, 255, 0.3)',
                   borderRadius: 20,
-                  padding: 32,
+                  padding: 'clamp(16px, 4vw, 32px)',
                   boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)',
                 }}
               >

@@ -5,24 +5,21 @@ import { RotateCcw, Play, Pause, Maximize2, X, Hand } from 'lucide-react';
 import { optimizeImageUrl } from '../utils/imageUrl';
 
 interface Product360ViewerProps {
-  // Array of image URLs for different angles (ideally 8-36 images)
   images: string[];
-  // Optional: 360° video URL as alternative
   videoUrl?: string;
-  // Product name for alt text
   productName: string;
-  // Optional: Auto-rotate on load
   autoRotate?: boolean;
-  // Optional: Auto-rotate speed (ms per frame)
   autoRotateSpeed?: number;
-  // Optional: Custom size
   size?: 'sm' | 'md' | 'lg' | 'full';
-  // Optional: Show controls
   showControls?: boolean;
-  // Optional: Enable fullscreen
   enableFullscreen?: boolean;
-  // Optional: Callback when image changes
   onImageChange?: (index: number) => void;
+}
+
+function rootClass(size: 'sm' | 'md' | 'lg' | 'full', fullscreen: boolean): string {
+  if (fullscreen) return 'p360-root p360-root--full';
+  if (size === 'full') return 'p360-root p360-root--full';
+  return 'p360-root p360-root--md';
 }
 
 export function Product360Viewer({
@@ -43,39 +40,29 @@ export function Product360Viewer({
   const [showVideo, setShowVideo] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [loadedImages, setLoadedImages] = useState<Set<number>>(new Set());
-  
+
   const containerRef = useRef<HTMLDivElement>(null);
   const startXRef = useRef(0);
   const lastIndexRef = useRef(0);
   const autoRotateRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const totalFrames = images.length;
-  
-  // Size classes
-  const sizeClasses = {
-    sm: 'w-48 h-48 md:w-64 md:h-64',
-    md: 'w-64 h-64 md:w-96 md:h-96',
-    lg: 'w-80 h-80 md:w-[500px] md:h-[500px]',
-    full: 'w-full h-full max-w-2xl max-h-2xl',
-  };
+  const isStaticPlaceholder =
+    totalFrames > 1 && images.every((img) => img === images[0]);
 
-  // Preload images
   useEffect(() => {
     if (images.length === 0) return;
-    
+
     const preloadImage = (index: number) => {
       const img = new Image();
       img.onload = () => {
-        setLoadedImages(prev => new Set([...prev, index]));
+        setLoadedImages((prev) => new Set([...prev, index]));
         if (index === 0) setIsLoading(false);
       };
       img.src = images[index];
     };
 
-    // Preload first image immediately
     preloadImage(0);
-    
-    // Preload rest in background
     images.forEach((_, index) => {
       if (index !== 0) {
         setTimeout(() => preloadImage(index), index * 50);
@@ -83,11 +70,10 @@ export function Product360Viewer({
     });
   }, [images]);
 
-  // Auto-rotate effect
   useEffect(() => {
     if (isAutoRotating && !isDragging && !showVideo) {
       autoRotateRef.current = setInterval(() => {
-        setCurrentIndex(prev => (prev + 1) % totalFrames);
+        setCurrentIndex((prev) => (prev + 1) % totalFrames);
       }, autoRotateSpeed);
     }
 
@@ -98,40 +84,41 @@ export function Product360Viewer({
     };
   }, [isAutoRotating, isDragging, showVideo, totalFrames, autoRotateSpeed]);
 
-  // Notify parent of image change
   useEffect(() => {
     onImageChange?.(currentIndex);
   }, [currentIndex, onImageChange]);
 
-  // Handle drag start
-  const handleDragStart = useCallback((clientX: number) => {
-    setIsDragging(true);
-    setIsAutoRotating(false);
-    startXRef.current = clientX;
-    lastIndexRef.current = currentIndex;
-  }, [currentIndex]);
+  const handleDragStart = useCallback(
+    (clientX: number) => {
+      setIsDragging(true);
+      setIsAutoRotating(false);
+      startXRef.current = clientX;
+      lastIndexRef.current = currentIndex;
+    },
+    [currentIndex]
+  );
 
-  // Handle drag move
-  const handleDragMove = useCallback((clientX: number) => {
-    if (!isDragging || !containerRef.current) return;
+  const handleDragMove = useCallback(
+    (clientX: number) => {
+      if (!isDragging || !containerRef.current) return;
 
-    const containerWidth = containerRef.current.offsetWidth;
-    const deltaX = clientX - startXRef.current;
-    const sensitivity = containerWidth / totalFrames;
-    const indexChange = Math.round(deltaX / sensitivity);
-    
-    let newIndex = (lastIndexRef.current - indexChange) % totalFrames;
-    if (newIndex < 0) newIndex += totalFrames;
-    
-    setCurrentIndex(newIndex);
-  }, [isDragging, totalFrames]);
+      const containerWidth = containerRef.current.offsetWidth;
+      const deltaX = clientX - startXRef.current;
+      const sensitivity = containerWidth / totalFrames;
+      const indexChange = Math.round(deltaX / sensitivity);
 
-  // Handle drag end
+      let newIndex = (lastIndexRef.current - indexChange) % totalFrames;
+      if (newIndex < 0) newIndex += totalFrames;
+
+      setCurrentIndex(newIndex);
+    },
+    [isDragging, totalFrames]
+  );
+
   const handleDragEnd = useCallback(() => {
     setIsDragging(false);
   }, []);
 
-  // Mouse events
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
     handleDragStart(e.clientX);
@@ -149,7 +136,6 @@ export function Product360Viewer({
     if (isDragging) handleDragEnd();
   };
 
-  // Touch events
   const handleTouchStart = (e: React.TouchEvent) => {
     handleDragStart(e.touches[0].clientX);
   };
@@ -162,67 +148,101 @@ export function Product360Viewer({
     handleDragEnd();
   };
 
-  // Toggle auto-rotate
   const toggleAutoRotate = () => {
-    setIsAutoRotating(prev => !prev);
+    setIsAutoRotating((prev) => !prev);
   };
 
-  // Toggle fullscreen
   const toggleFullscreen = () => {
-    setIsFullscreen(prev => !prev);
+    setIsFullscreen((prev) => !prev);
   };
 
-  // Reset rotation
   const resetRotation = () => {
     setCurrentIndex(0);
     setIsAutoRotating(false);
   };
 
-  // Render loading state
   if (isLoading && images.length > 0) {
     return (
-      <div className={`${sizeClasses[size]} flex items-center justify-center bg-zinc-900/50 rounded-xl`}>
-        <div className="flex flex-col items-center gap-3">
+      <div className={`${rootClass(size, false)} p360-surface flex-center`}>
+        <div className="flex-center" style={{ flexDirection: 'column', gap: 12 }}>
           <motion.div
             animate={{ rotate: 360 }}
             transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-            className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full"
+            className="p360-spinner"
           />
-          <span className="text-sm text-zinc-400">Loading 360° view...</span>
+          <span style={{ fontSize: 14, color: '#a1a1aa' }}>Loading 360° view...</span>
         </div>
       </div>
     );
   }
 
-  // Render video player if showing video
   if (showVideo && videoUrl) {
     return (
-      <div className={`relative ${isFullscreen ? 'fixed inset-0 z-50 bg-black' : ''}`}>
+      <div className={isFullscreen ? 'p360-fullscreen' : 'relative'}>
         <video
           src={videoUrl}
           autoPlay
           loop
           muted
           playsInline
-          className={`${isFullscreen ? 'w-full h-full object-contain' : sizeClasses[size]} rounded-xl`}
+          className={isFullscreen ? '' : rootClass(size, false)}
+          style={
+            isFullscreen
+              ? { width: '100%', height: '100%', objectFit: 'contain' }
+              : { width: '100%', height: '100%', borderRadius: 12, objectFit: 'contain' }
+          }
         />
         {showControls && (
           <button
+            type="button"
             onClick={() => setShowVideo(false)}
-            className="absolute top-4 right-4 p-2 bg-black/50 rounded-full text-white hover:bg-black/70 transition-colors"
+            className="p360-btn"
+            style={{ position: 'absolute', top: 16, right: 16 }}
+            aria-label="Close video"
           >
-            <X className="w-5 h-5" />
+            <X size={20} />
           </button>
         )}
       </div>
     );
   }
 
-  // Main 360° viewer
+  if (isStaticPlaceholder && images[0]) {
+    return (
+      <div className={`${rootClass(size, false)} p360-surface flex-center`}>
+        <img
+          src={optimizeImageUrl(images[0], { width: 720 })}
+          alt={productName}
+          width={720}
+          height={720}
+          style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+          draggable={false}
+        />
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 12,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: 'rgba(0,0,0,0.6)',
+            backdropFilter: 'blur(4px)',
+            padding: '6px 12px',
+            borderRadius: 999,
+            color: 'rgba(255,255,255,0.85)',
+            fontSize: 12,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          Product photo — 360° view coming soon
+        </div>
+      </div>
+    );
+  }
+
   const viewerContent = (
     <div
       ref={containerRef}
-      className={`relative ${isFullscreen ? 'w-full h-full' : sizeClasses[size]} select-none`}
+      className={`${rootClass(size, isFullscreen)} ${isFullscreen ? '' : 'p360-surface'}`}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
@@ -232,29 +252,27 @@ export function Product360Viewer({
       onTouchEnd={handleTouchEnd}
       style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
     >
-      {/* Drag Instruction Overlay */}
       <AnimatePresence>
         {!isDragging && loadedImages.size === totalFrames && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none"
+            className="p360-hint"
           >
             <motion.div
               animate={{ x: [-20, 20, -20] }}
               transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-              className="flex items-center gap-2 bg-black/60 backdrop-blur-sm px-4 py-2 rounded-full text-white/80 text-sm"
+              className="p360-hint-pill"
             >
-              <Hand className="w-4 h-4" />
+              <Hand size={16} />
               <span>Drag to rotate</span>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Product Images */}
-      <div className="relative w-full h-full flex items-center justify-center">
+      <div className="absolute-fill flex-center">
         {images.map((src, index) => (
           <img
             key={index}
@@ -264,108 +282,111 @@ export function Product360Viewer({
             height={720}
             loading={index === currentIndex ? 'eager' : 'lazy'}
             decoding="async"
-            className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-75 ${
-              index === currentIndex ? 'opacity-100' : 'opacity-0'
-            }`}
+            className={`p360-img ${index === currentIndex ? 'p360-img--visible' : 'p360-img--hidden'}`}
             draggable={false}
           />
         ))}
       </div>
 
-      {/* Progress Indicator */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1">
+      <div className="p360-dots">
         {Array.from({ length: Math.min(totalFrames, 12) }).map((_, i) => {
           const frameIndex = Math.floor((i / Math.min(totalFrames, 12)) * totalFrames);
           const isActive = Math.abs(currentIndex - frameIndex) < totalFrames / 24;
           return (
             <div
               key={i}
-              className={`h-1 rounded-full transition-all ${
-                isActive ? 'w-3 bg-white' : 'w-1.5 bg-white/30'
-              }`}
+              className={`p360-dot ${isActive ? 'p360-dot--active' : ''}`}
             />
           );
         })}
       </div>
 
-      {/* Controls */}
       {showControls && (
-        <div className="absolute top-4 right-4 flex gap-2">
-          {/* Auto-rotate toggle */}
+        <div className="p360-controls">
           <button
+            type="button"
             onClick={(e) => {
               e.stopPropagation();
               toggleAutoRotate();
             }}
-            className={`p-2 rounded-full backdrop-blur-sm transition-colors ${
-              isAutoRotating 
-                ? 'bg-white text-black' 
-                : 'bg-black/50 text-white hover:bg-black/70'
-            }`}
+            className={`p360-btn ${isAutoRotating ? 'p360-btn--active' : ''}`}
             title={isAutoRotating ? 'Stop rotation' : 'Auto rotate'}
+            aria-label={isAutoRotating ? 'Stop rotation' : 'Auto rotate'}
           >
-            {isAutoRotating ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+            {isAutoRotating ? <Pause size={16} /> : <Play size={16} />}
           </button>
 
-          {/* Reset rotation */}
           <button
+            type="button"
             onClick={(e) => {
               e.stopPropagation();
               resetRotation();
             }}
-            className="p-2 bg-black/50 rounded-full text-white hover:bg-black/70 backdrop-blur-sm transition-colors"
+            className="p360-btn"
             title="Reset rotation"
+            aria-label="Reset rotation"
           >
-            <RotateCcw className="w-4 h-4" />
+            <RotateCcw size={16} />
           </button>
 
-          {/* Fullscreen toggle */}
           {enableFullscreen && (
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 toggleFullscreen();
               }}
-              className="p-2 bg-black/50 rounded-full text-white hover:bg-black/70 backdrop-blur-sm transition-colors"
+              className="p360-btn"
               title="Fullscreen"
+              aria-label={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
             >
-              {isFullscreen ? <X className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+              {isFullscreen ? <X size={16} /> : <Maximize2 size={16} />}
             </button>
           )}
 
-          {/* Video toggle (if video available) */}
           {videoUrl && (
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 setShowVideo(true);
               }}
-              className="p-2 bg-black/50 rounded-full text-white hover:bg-black/70 backdrop-blur-sm transition-colors"
+              className="p360-btn"
               title="Play 360° video"
+              aria-label="Play 360° video"
             >
-              <Play className="w-4 h-4" />
+              <Play size={16} />
             </button>
           )}
         </div>
       )}
 
-      {/* Frame counter (optional, for debugging) */}
       {import.meta.env.DEV && (
-        <div className="absolute bottom-4 right-4 text-xs text-white/50 bg-black/50 px-2 py-1 rounded">
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 16,
+            right: 16,
+            fontSize: 12,
+            color: 'rgba(255,255,255,0.5)',
+            background: 'rgba(0,0,0,0.5)',
+            padding: '4px 8px',
+            borderRadius: 4,
+          }}
+        >
           {currentIndex + 1}/{totalFrames}
         </div>
       )}
     </div>
   );
 
-  // Fullscreen wrapper
   if (isFullscreen) {
     return (
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 bg-black flex items-center justify-center"
+        className="p360-fullscreen"
       >
         {viewerContent}
       </motion.div>
@@ -375,7 +396,6 @@ export function Product360Viewer({
   return viewerContent;
 }
 
-// Helper component for single image fallback
 export function Product360ViewerFallback({
   image,
   productName,
@@ -385,15 +405,8 @@ export function Product360ViewerFallback({
   productName: string;
   size?: 'sm' | 'md' | 'lg' | 'full';
 }) {
-  const sizeClasses = {
-    sm: 'w-48 h-48 md:w-64 md:h-64',
-    md: 'w-64 h-64 md:w-96 md:h-96',
-    lg: 'w-80 h-80 md:w-[500px] md:h-[500px]',
-    full: 'w-full h-full max-w-2xl max-h-2xl',
-  };
-
   return (
-    <div className={`relative ${sizeClasses[size]} flex items-center justify-center`}>
+    <div className={`${rootClass(size, false)} flex-center`}>
       <img
         src={optimizeImageUrl(image, { width: 720 })}
         alt={productName}
@@ -401,9 +414,21 @@ export function Product360ViewerFallback({
         height={720}
         loading="lazy"
         decoding="async"
-        className="w-full h-full object-contain"
+        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
       />
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-xs text-white/50 bg-black/50 px-3 py-1 rounded-full">
+      <div
+        style={{
+          position: 'absolute',
+          bottom: 16,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          fontSize: 12,
+          color: 'rgba(255,255,255,0.5)',
+          background: 'rgba(0,0,0,0.5)',
+          padding: '4px 12px',
+          borderRadius: 999,
+        }}
+      >
         360° view coming soon
       </div>
     </div>

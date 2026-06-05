@@ -30,6 +30,7 @@ import { initSentry, captureException } from './lib/sentry';
 import { requestIdMiddleware } from './middleware/requestId';
 import {
   buildCreatePaymentKey,
+  buildCapturePaymentKey,
   claimIdempotencyKey,
   completeIdempotencyKey,
   failIdempotencyKey,
@@ -63,6 +64,15 @@ import {
   getOrderAccessTokenFromRequest,
 } from './lib/orderTokens';
 import { parseCaptureFromPayPalOrder } from './lib/paypalWebhookUtils';
+import {
+  ensureCheckoutExchangeTable,
+  createCheckoutExchangeCode,
+  redeemCheckoutExchangeCode,
+} from './lib/orderCheckoutExchange';
+import { ensureRlsPolicies } from './lib/rlsMigration';
+import { assertJwtSecretForProduction } from './lib/jwtSecret';
+import { purgeLegacyAdminSessions } from './lib/adminSessionMigration';
+import { mountFrontend } from './lib/serveFrontend';
 
 // Import routes
 import productsRouter from "./routes/products";
@@ -76,53 +86,58 @@ import couponsRouter from "./routes/coupons";
 dotenv.config();
 initSentry();
 
-// Validate required environment variables at startup
+// Validate required environment variables at startup (mirrors scripts/validate-env.mjs)
 const validateEnvVars = () => {
+  const isProd = process.env.NODE_ENV === 'production';
+
   const required = ['DATABASE_URL'];
-  const recommended = ['ADMIN_USERNAME', 'ADMIN_PASSWORD', 'JWT_SECRET', 'RESEND_API_KEY'];
-  
-  const missing = required.filter(v => !process.env[v]);
-  const missingRecommended = recommended.filter(v => !process.env[v]);
-  
+  const requiredProduction = [
+    'FRONTEND_URL',
+    'ADMIN_PASSWORD_HASH',
+    'ADMIN_USERNAME',
+    'JWT_SECRET',
+    'PAYPAL_WEBHOOK_ID',
+    'REDIS_URL',
+    'SENTRY_DSN',
+    'RESEND_API_KEY',
+    'PAYPAL_CLIENT_ID',
+    'PAYPAL_SECRET',
+  ];
+
+  const missing = required.filter((v) => !process.env[v]?.trim());
   if (missing.length > 0) {
     logger.error({ missing }, 'Missing required environment variables');
     process.exit(1);
   }
 
-  if (missingRecommended.length > 0) {
-    logger.warn({ missing: missingRecommended }, 'Missing recommended environment variables');
-  }
-
-  if (process.env.NODE_ENV === 'production' && !process.env.PAYPAL_WEBHOOK_ID) {
-    logger.error('PAYPAL_WEBHOOK_ID is required when NODE_ENV=production');
-    process.exit(1);
-  }
-
-  if (process.env.NODE_ENV === 'production') {
-    if (!process.env.FRONTEND_URL) {
-      logger.error('FRONTEND_URL is required when NODE_ENV=production');
+  if (isProd) {
+    const missingProd = requiredProduction.filter((v) => !process.env[v]?.trim());
+    if (missingProd.length > 0) {
+      logger.error({ missing: missingProd }, 'Missing production environment variables');
       process.exit(1);
     }
-    if (!process.env.ADMIN_PASSWORD_HASH) {
-      logger.error('ADMIN_PASSWORD_HASH is required when NODE_ENV=production');
-      process.exit(1);
-    }
+
     if (process.env.TRUST_CLOUDFLARE !== 'true') {
       logger.error('TRUST_CLOUDFLARE=true is required when NODE_ENV=production');
       process.exit(1);
     }
-    if (!process.env.REDIS_URL?.trim()) {
-      logger.error('REDIS_URL is required when NODE_ENV=production (distributed cache + rate limits)');
-      process.exit(1);
-    }
-    if (!process.env.SENTRY_DSN?.trim()) {
-      logger.error('SENTRY_DSN is required when NODE_ENV=production');
-      process.exit(1);
-    }
-  }
 
-  if (process.env.JWT_SECRET && process.env.JWT_SECRET.length < 32) {
-    logger.warn('JWT_SECRET should be at least 32 characters for security');
+    assertJwtSecretForProduction();
+
+    const paypalMode = (process.env.PAYPAL_MODE || 'sandbox').toLowerCase();
+    if (paypalMode !== 'live' && process.env.REQUIRE_PAYPAL_LIVE !== 'false') {
+      logger.error('PAYPAL_MODE must be "live" in production (set REQUIRE_PAYPAL_LIVE=false to override)');
+      process.exit(1);
+    }
+  } else {
+    const recommended = ['ADMIN_USERNAME', 'JWT_SECRET', 'RESEND_API_KEY'];
+    const missingRecommended = recommended.filter((v) => !process.env[v]?.trim());
+    if (missingRecommended.length > 0) {
+      logger.warn({ missing: missingRecommended }, 'Missing recommended environment variables');
+    }
+    if (process.env.JWT_SECRET && process.env.JWT_SECRET.length < 32) {
+      logger.warn('JWT_SECRET should be at least 32 characters for security');
+    }
   }
 };
 
@@ -459,6 +474,11 @@ app.use("/api/coupons", couponsRouter);
 
 // Routes
 
+// Health check aliases (Railway / load balancers)
+app.get("/health", (req: Request, res: Response) => {
+  res.redirect(307, "/api/health");
+});
+
 // Health check - enhanced for production monitoring
 app.get("/api/health", async (req: Request, res: Response) => {
   const startTime = Date.now();
@@ -475,7 +495,10 @@ app.get("/api/health", async (req: Request, res: Response) => {
     logger.error("Health check - DB error:", error);
   }
   
-  const isHealthy = dbStatus === "connected";
+  const redisConnected = Boolean(getRedisClient());
+  const redisRequired = isProduction && Boolean(process.env.REDIS_URL?.trim());
+  const redisOk = !redisRequired || redisConnected;
+  const isHealthy = dbStatus === "connected" && redisOk;
   
   res.status(isHealthy ? 200 : 503).json({
     status: isHealthy ? "OK" : "DEGRADED",
@@ -495,7 +518,9 @@ app.get("/api/health", async (req: Request, res: Response) => {
       },
       redis: {
         enabled: isRedisEnabled(),
-        connected: Boolean(getRedisClient()),
+        connected: redisConnected,
+        required: redisRequired,
+        status: redisOk ? "connected" : "disconnected",
       },
     },
     responseTime_ms: Date.now() - startTime,
@@ -620,7 +645,7 @@ app.post("/api/paypal/create-payment", async (req: Request, res: Response) => {
       });
     }
     if (claim.type === 'failed') {
-      const reclaimed = await reclaimFailedIdempotencyKey(idempotencyKey, 30);
+      const reclaimed = await reclaimFailedIdempotencyKey(idempotencyKey, 'create_payment', 30);
       if (!reclaimed) {
         return res.status(409).json({
           success: false,
@@ -673,6 +698,11 @@ app.post("/api/paypal/create-payment", async (req: Request, res: Response) => {
     const tax = pricing.tax;
     const amount = pricing.total.toFixed(2);
 
+    const checkoutExchangeCode = await createCheckoutExchangeCode(
+      pending.order.id as string,
+      pending.accessToken
+    );
+
     const orderPayload = {
       intent: "CAPTURE",
       purchase_units: [
@@ -718,7 +748,7 @@ app.post("/api/paypal/create-payment", async (req: Request, res: Response) => {
         },
       ],
       application_context: {
-        return_url: `${process.env.FRONTEND_URL}/payment/success?aid=${encodeURIComponent(pending.accessToken)}`,
+        return_url: `${process.env.FRONTEND_URL}/payment/success?code=${encodeURIComponent(checkoutExchangeCode)}`,
         cancel_url: `${process.env.FRONTEND_URL}/payment/cancel`,
         brand_name: "Lab Door Customs",
         landing_page: "BILLING",
@@ -756,7 +786,7 @@ app.post("/api/paypal/create-payment", async (req: Request, res: Response) => {
       await cancelPendingOrderAndRestoreStock(createdServerOrderId!).catch((err) =>
         logger.error('Rollback after duplicate PayPal order ID:', err)
       );
-      await failIdempotencyKey(idempotencyKey).catch(() => {});
+      await failIdempotencyKey(idempotencyKey, 'create_payment').catch(() => {});
       return res.status(409).json({
         success: false,
         error: 'PayPal order ID conflict',
@@ -777,7 +807,6 @@ app.post("/api/paypal/create-payment", async (req: Request, res: Response) => {
       orderId: data.id,
       serverOrderId: pending.order.id,
       orderNumber: pending.orderNumber,
-      access_token: pending.accessToken,
       total: pricing.total,
       links: data.links,
       status: data.status,
@@ -788,7 +817,7 @@ app.post("/api/paypal/create-payment", async (req: Request, res: Response) => {
       idempotencyKey,
     };
 
-    await completeIdempotencyKey(idempotencyKey, responsePayload, {
+    await completeIdempotencyKey(idempotencyKey, 'create_payment', responsePayload, {
       serverOrderId: pending.order.id,
       paypalOrderId: data.id,
     });
@@ -802,7 +831,7 @@ app.post("/api/paypal/create-payment", async (req: Request, res: Response) => {
       );
     }
     if (idempotencyKey) {
-      await failIdempotencyKey(idempotencyKey).catch(() => {});
+      await failIdempotencyKey(idempotencyKey, 'create_payment').catch(() => {});
     }
     res.status(500).json({
       success: false,
@@ -826,7 +855,10 @@ app.post("/api/paypal/capture-payment/:orderId", async (req: Request, res: Respo
       couponId?: string;
       discount_amount?: number;
     };
-    const idempotencyKey = req.headers['x-idempotency-key'] as string || paypalOrderId;
+    const idempotencyKey = buildCapturePaymentKey(
+      req.headers['x-idempotency-key'] as string | undefined,
+      paypalOrderId
+    );
 
     if (!paypalOrderId) {
       return res.status(400).json({
@@ -907,7 +939,7 @@ app.post("/api/paypal/capture-payment/:orderId", async (req: Request, res: Respo
     }
     if (captureClaim.type === 'failed') {
       if (boundOrder.payment_status === 'pending') {
-        const reclaimed = await reclaimFailedIdempotencyKey(idempotencyKey, 15);
+        const reclaimed = await reclaimFailedIdempotencyKey(idempotencyKey, 'capture_payment', 15);
         if (!reclaimed) {
           return res.status(409).json({
             success: false,
@@ -1003,7 +1035,7 @@ app.post("/api/paypal/capture-payment/:orderId", async (req: Request, res: Respo
         await cancelPendingOrderAndRestoreStock(serverOrderId).catch(() => {});
       }
 
-      await failIdempotencyKey(idempotencyKey).catch(() => {});
+      await failIdempotencyKey(idempotencyKey, 'capture_payment').catch(() => {});
       return res.status(400).json({
         success: false,
         error: "Payment amount mismatch",
@@ -1023,7 +1055,7 @@ app.post("/api/paypal/capture-payment/:orderId", async (req: Request, res: Respo
     );
 
     if (!updatedOrder) {
-      await failIdempotencyKey(idempotencyKey).catch(() => {});
+      await failIdempotencyKey(idempotencyKey, 'capture_payment').catch(() => {});
       return res.status(500).json({
         success: false,
         error: "Order not found after capture",
@@ -1039,11 +1071,26 @@ app.post("/api/paypal/capture-payment/:orderId", async (req: Request, res: Respo
         orderNumber: updatedOrder.order_number,
         cached: true,
       };
-      await completeIdempotencyKey(idempotencyKey, cachedResponse, {
+      await completeIdempotencyKey(idempotencyKey, 'capture_payment', cachedResponse, {
         serverOrderId,
         paypalOrderId,
       });
       return res.json(cachedResponse);
+    }
+
+    if (!updated || updatedOrder.payment_status !== 'completed') {
+      await failIdempotencyKey(idempotencyKey, 'capture_payment').catch(() => {});
+      logger.error('Capture succeeded at PayPal but order was not completed', {
+        serverOrderId,
+        payment_status: updatedOrder.payment_status,
+        captureId,
+      });
+      return res.status(409).json({
+        success: false,
+        error: 'Order was not updated after payment capture',
+        message: 'Payment may require manual reconciliation. Contact support with your order number.',
+        payment_status: updatedOrder.payment_status,
+      });
     }
 
     const items =
@@ -1096,6 +1143,8 @@ app.post("/api/paypal/capture-payment/:orderId", async (req: Request, res: Respo
       order: {
         id: updatedOrder.id,
         order_number: updatedOrder.order_number,
+        customer_email: orderRecord.customer_email,
+        customer_name: orderRecord.customer_name,
         total: parseFloat(updatedOrder.total?.toString() || '0'),
         status: updatedOrder.status,
         payment_status: updatedOrder.payment_status,
@@ -1105,7 +1154,7 @@ app.post("/api/paypal/capture-payment/:orderId", async (req: Request, res: Respo
       payer: (data as any).payer,
     };
 
-    await completeIdempotencyKey(idempotencyKey, captureResponse, {
+    await completeIdempotencyKey(idempotencyKey, 'capture_payment', captureResponse, {
       serverOrderId,
       paypalOrderId,
     });
@@ -1114,12 +1163,53 @@ app.post("/api/paypal/capture-payment/:orderId", async (req: Request, res: Respo
   } catch (error: any) {
     logger.error("❌ Capture payment error:", error);
 
-    const failedKey = req.headers['x-idempotency-key'] as string || req.params.orderId;
-    await failIdempotencyKey(failedKey).catch(() => {});
+    const failedKey = buildCapturePaymentKey(
+      req.headers['x-idempotency-key'] as string | undefined,
+      req.params.orderId
+    );
+    await failIdempotencyKey(failedKey, 'capture_payment').catch(() => {});
 
     res.status(500).json({
       success: false,
       error: error.message || "Failed to capture payment",
+    });
+  }
+});
+
+// Exchange one-time checkout code for order access token (PayPal return URL — no token in query string)
+app.get("/api/paypal/checkout-exchange/:code", async (req: Request, res: Response) => {
+  try {
+    const { code } = req.params;
+    if (!code?.trim()) {
+      return res.status(400).json({ success: false, error: 'Exchange code is required' });
+    }
+
+    const result = await redeemCheckoutExchangeCode(code);
+    if (!result) {
+      return res.status(404).json({
+        success: false,
+        error: 'Invalid or expired checkout code',
+        message: 'This payment link has expired. Check your email for order details or contact support.',
+      });
+    }
+
+    const coupon = await getCouponForOrder(result.serverOrderId);
+
+    res.json({
+      success: true,
+      accessToken: result.accessToken,
+      serverOrderId: result.serverOrderId,
+      orderNumber: result.orderNumber,
+      paypalOrderId: result.paypalOrderId,
+      total: result.total,
+      couponId: coupon?.coupon_id,
+      discount_amount: coupon?.discount_amount,
+    });
+  } catch (error: unknown) {
+    logger.error('Checkout exchange error:', error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to exchange checkout code',
     });
   }
 });
@@ -1312,14 +1402,41 @@ app.post("/api/paypal/refund/:captureId", verifyAdmin, async (req: Request, res:
   }
 });
 
-// 404 handler - must be before error handler
-app.use((req: Request, res: Response) => {
+// API 404 — JSON only under /api
+app.use('/api', (req: Request, res: Response) => {
   res.status(404).json({
     success: false,
-    error: "Route not found",
-    path: req.path,
+    error: 'Route not found',
+    path: req.originalUrl,
   });
 });
+
+const frontendMounted = mountFrontend(app, isProduction);
+
+if (!frontendMounted) {
+  app.use((req: Request, res: Response) => {
+    res.status(404).json({
+      success: false,
+      error: 'Route not found',
+      path: req.path,
+    });
+  });
+} else {
+  app.use((req: Request, res: Response) => {
+    if (req.path.startsWith('/api')) {
+      return res.status(404).json({
+        success: false,
+        error: 'Route not found',
+        path: req.path,
+      });
+    }
+    res.status(404).json({
+      success: false,
+      error: 'Route not found',
+      path: req.path,
+    });
+  });
+}
 
 // Error handling middleware - MUST have 4 parameters
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
@@ -1370,12 +1487,15 @@ async function bootstrap(): Promise<void> {
   }
   await ensureIdempotencyTable();
   await ensureOrderPaymentSchema();
+  await ensureCheckoutExchangeTable();
+  await ensureRlsPolicies();
+  await purgeLegacyAdminSessions();
   await warmCaches();
 }
 
 function startHttpServer() {
-  const PORT = process.env.PORT || 5000;
-  const HTTPS_PORT = process.env.HTTPS_PORT || 443;
+  const PORT = Number(process.env.PORT) || 5000;
+  const HTTPS_PORT = Number(process.env.HTTPS_PORT) || 443;
   const sslConfig = getSSLConfig();
 
   const listenHost = isProduction ? undefined : '0.0.0.0';
@@ -1384,18 +1504,26 @@ function startHttpServer() {
     const httpsServer = https.createServer(sslConfig, app).listen(HTTPS_PORT, () => {
       logServerBanner('HTTPS', HTTPS_PORT, true);
     });
-    app.listen(PORT, listenHost, () => {
-      logger.info(`📍 HTTP Port: ${PORT} (redirecting to HTTPS)`);
-    });
+    if (listenHost) {
+      app.listen(PORT, listenHost, () => {
+        logger.info(`📍 HTTP Port: ${PORT} (redirecting to HTTPS)`);
+      });
+    } else {
+      app.listen(PORT, () => {
+        logger.info(`📍 HTTP Port: ${PORT} (redirecting to HTTPS)`);
+      });
+    }
     return httpsServer;
   }
 
-  return app.listen(PORT, listenHost, () => {
+  const onListen = () => {
     logServerBanner('HTTP', PORT, false);
     if (!isProduction && listenHost === '0.0.0.0') {
       logger.info('📡 LAN: backend reachable at http://<your-ip>:' + PORT);
     }
-  });
+  };
+
+  return listenHost ? app.listen(PORT, listenHost, onListen) : app.listen(PORT, onListen);
 }
 
 function logServerBanner(mode: string, port: number | string, sslEnabled: boolean) {

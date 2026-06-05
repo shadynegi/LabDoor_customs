@@ -39,8 +39,11 @@ const siteUrl = requireEnv('VITE_SITE_URL');
 requireEnv('VITE_SENTRY_DSN');
 
 if (apiBaseUrl) {
-  rejectLocalhost('VITE_API_BASE_URL', apiBaseUrl);
-  rejectPlaceholder('VITE_API_BASE_URL', apiBaseUrl);
+  const isRelativeApi = apiBaseUrl.startsWith('/');
+  if (!isRelativeApi) {
+    rejectLocalhost('VITE_API_BASE_URL', apiBaseUrl);
+    rejectPlaceholder('VITE_API_BASE_URL', apiBaseUrl);
+  }
 }
 if (siteUrl) rejectLocalhost('VITE_SITE_URL', siteUrl);
 

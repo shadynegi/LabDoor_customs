@@ -7,6 +7,10 @@ import { CACHE, TTL, invalidateProductCaches } from '../lib/cacheKeys';
 import { parsePagination, paginationMeta } from '../lib/pagination';
 import { verifyAdmin } from './admin';
 import { sanitizeSearchQuery, sanitizeString } from '../utils/sanitize';
+import {
+  validateProductImageUrl,
+  validateOptionalProductImageUrl,
+} from '../lib/productImage';
 
 const router = Router();
 
@@ -264,14 +268,27 @@ router.post('/', verifyAdmin, async (req: Request, res: Response) => {
       });
     }
 
+    const imageResult = validateProductImageUrl(productData.image, 'Product image');
+    if (!imageResult.ok) {
+      return res.status(400).json({ success: false, error: imageResult.error });
+    }
+
+    const backgroundResult = validateOptionalProductImageUrl(
+      productData.background,
+      'Background image'
+    );
+    if (!backgroundResult.ok) {
+      return res.status(400).json({ success: false, error: backgroundResult.error });
+    }
+
     const result = await sql`
       INSERT INTO products (name, price, image, description, background, category, size, color, stock, rating, review_count)
       VALUES (
         ${productData.name},
         ${productData.price},
-        ${productData.image || null},
+        ${imageResult.value},
         ${productData.description || null},
-        ${productData.background || null},
+        ${backgroundResult.value},
         ${productData.category || null},
         ${productData.size || null},
         ${productData.color || null},
@@ -307,13 +324,31 @@ router.put('/:id', verifyAdmin, async (req: Request, res: Response) => {
     // Handle is_out_of_stock separately since it's a boolean
     const isOutOfStock = updates.is_out_of_stock !== undefined ? updates.is_out_of_stock : null;
 
+    let imageValue: string | null = null;
+    if (updates.image !== undefined) {
+      const imageResult = validateProductImageUrl(updates.image, 'Product image');
+      if (!imageResult.ok) {
+        return res.status(400).json({ success: false, error: imageResult.error });
+      }
+      imageValue = imageResult.value;
+    }
+
+    let backgroundValue: string | null | undefined = undefined;
+    if (updates.background !== undefined) {
+      const bgResult = validateOptionalProductImageUrl(updates.background, 'Background image');
+      if (!bgResult.ok) {
+        return res.status(400).json({ success: false, error: bgResult.error });
+      }
+      backgroundValue = bgResult.value;
+    }
+
     const result = await sql`
       UPDATE products SET
         name = COALESCE(${updates.name || null}, name),
         price = COALESCE(${updates.price || null}, price),
-        image = COALESCE(${updates.image || null}, image),
+        image = COALESCE(${imageValue}, image),
         description = COALESCE(${updates.description || null}, description),
-        background = COALESCE(${updates.background || null}, background),
+        background = COALESCE(${backgroundValue !== undefined ? backgroundValue : null}, background),
         category = COALESCE(${updates.category || null}, category),
         size = COALESCE(${updates.size || null}, size),
         color = COALESCE(${updates.color || null}, color),

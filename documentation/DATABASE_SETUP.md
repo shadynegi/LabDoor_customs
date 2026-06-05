@@ -41,18 +41,19 @@ Production TLS: set `DB_SSL_CA_PATH` to Supabase CA bundle.
 | `coupon_usage` | Per-order coupon reservations |
 | `contact_messages` | Contact form inbox |
 | `activity_logs` | Client activity (anonymized IP) |
-| `admin_sessions` | Admin session tokens |
+| `admin_sessions` | Admin session token hashes (SHA-256) |
 
 ---
 
 ## Payment tables
 
-Created at server startup via `ensureIdempotencyTable()` and `ensureOrderPaymentSchema()`:
+Created at server startup via `ensureIdempotencyTable()`, `ensureOrderPaymentSchema()`, and `ensureCheckoutExchangeTable()`:
 
 | Table | Purpose |
 |-------|---------|
 | `payment_idempotency` | Create/capture deduplication |
 | `processed_refund_events` | Refund webhook/admin deduplication |
+| `order_checkout_exchanges` | One-time PayPal return codes → access tokens |
 
 Migration files:
 
@@ -87,7 +88,7 @@ Applied via `migration-reviews.sql`:
 
 ## Row-level security
 
-Supabase RLS policies may be applied for direct client access. The backend uses the **service role** connection and bypasses RLS for API operations.
+`ensureRlsPolicies()` runs at startup (see `migration-rls-tighten.sql` and `migration-rls-sensitive-tables.sql`). Products allow public read; orders, contact_messages, coupons, coupon_usage, payment_idempotency, and processed_refund_events are service-role only. The backend uses the **service role** (or `postgres`) connection for all API operations.
 
 See [RLS_OPTIMIZATION.md](./RLS_OPTIMIZATION.md).
 
@@ -100,6 +101,7 @@ The backend runs scheduled jobs:
 - Expire abandoned pending orders (restore stock)
 - Clean expired idempotency rows
 - Reap stuck processing idempotency keys
+- Clean expired or used checkout exchange codes
 
 ---
 

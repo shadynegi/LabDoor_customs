@@ -1,8 +1,9 @@
 ﻿# Dependencies
 node_modules/
 
-# Environment templates (safe to commit)
-# Note: .env files are tracked intentionally — use a private repo only.
+# Environment (secrets — never commit)
+.env
+.env.*
 !.env.template
 !env.template
 

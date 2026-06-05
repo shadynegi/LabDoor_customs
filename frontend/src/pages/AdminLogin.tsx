@@ -6,8 +6,10 @@ import { Lock, User, Eye, EyeOff, AlertCircle, Shield } from 'lucide-react';
 import { apiFetch } from '../config';
 import { toast } from 'sonner';
 import LiquidButton from '../components/LiquidButton';
+import { useResponsive } from '../hooks/useResponsive';
 
 export default function AdminLogin() {
+  const { isMobile } = useResponsive();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -67,7 +69,9 @@ export default function AdminLogin() {
         alignItems: 'center',
         justifyContent: 'center',
         background: 'linear-gradient(135deg, #361906 0%, #9c6649 50%, #361906 100%)',
-        padding: 20,
+        padding: isMobile
+          ? 'max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left))'
+          : 20,
       }}
     >
       <motion.div
@@ -79,7 +83,7 @@ export default function AdminLogin() {
           backdropFilter: 'blur(20px)',
           border: '1px solid rgba(255, 255, 255, 0.1)',
           borderRadius: 24,
-          padding: 40,
+          padding: isMobile ? 24 : 40,
           width: '100%',
           maxWidth: 420,
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',

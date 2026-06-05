@@ -2,6 +2,8 @@
 
 **Authoritative reference:** [`../info.md`](../info.md) — full system description, security, payments, API summary, and environment variables.
 
+**Maintenance:** Code changes should update `info.md` and the affected guides below. Agents follow [`.cursor/rules/documentation-sync.mdc`](../.cursor/rules/documentation-sync.mdc).
+
 ---
 
 ## Getting started
@@ -78,7 +80,7 @@
 |----------|---------|
 | [PROJECT_STATUS.md](./PROJECT_STATUS.md) | Current system capabilities |
 | [README.md](./README.md) | Documentation folder overview |
-| [CHANGELOG.md](./CHANGELOG.md) | Version and capability reference |
+| [SETUP_ORDER_TRACKING.md](./SETUP_ORDER_TRACKING.md) | Customer order lookup configuration |
 
 ---
 

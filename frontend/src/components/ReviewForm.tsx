@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Send, X, Plus, CheckCircle, AlertCircle, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { apiFetch } from '../config';
 import StarRatingInput from './StarRatingInput';
+import { useResponsive } from '../hooks/useResponsive';
+import { gridCols } from '../lib/responsive';
 
 interface ReviewFormProps {
   productId: number;
@@ -45,6 +47,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
+  const { isMobile } = useResponsive();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -181,7 +184,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
       </div>
 
       {/* Customer Info */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: gridCols(isMobile, '1fr', '1fr 1fr'), gap: 16, marginBottom: 20 }}>
         <div>
           <label style={{ display: 'block', fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>
             Your Name *
@@ -274,7 +277,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
       </div>
 
       {/* Pros & Cons */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: gridCols(isMobile, '1fr', '1fr 1fr'), gap: 16, marginBottom: 20 }}>
         {/* Pros */}
         <div>
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#10b981' }}>

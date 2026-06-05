@@ -10,21 +10,33 @@ Detailed local and staging configuration for Lab Door Customs.
 
 ```
 LabDoor_customs/
-├── backend/          Express API
+├── package.json      Root workspace — dev, build, start, test
+├── railway.json      Production deploy config
+├── backend/          Express API + static SPA hosting
 │   ├── src/
 │   │   ├── server.ts
 │   │   ├── routes/
 │   │   ├── lib/
 │   │   ├── middleware/
 │   │   └── database/
-├── frontend/         React SPA
+├── frontend/         React SPA (Vite)
 │   ├── src/
 │   └── scripts/
-├── Tests/            Vitest + Playwright test suites
+├── Tests/            Vitest + Playwright
 │   ├── backend/
 │   ├── api/
 │   └── frontend/
 └── documentation/
+```
+
+---
+
+## Installation
+
+```bash
+cp backend/env.template backend/.env
+cp frontend/env.template frontend/.env
+npm install
 ```
 
 ---
@@ -56,16 +68,20 @@ See [PAYPAL_SETUP_GUIDE.md](./PAYPAL_SETUP_GUIDE.md).
 Generate a bcrypt hash:
 
 ```bash
+node backend/scripts/generate-admin-hash.mjs "your-secure-password"
+```
+
+For local development only, you may also use:
+
+```bash
 curl -X POST http://localhost:5000/api/admin/generate-hash \
   -H "Content-Type: application/json" \
   -d '{"password":"your_secure_password"}'
 ```
 
-For production, set `ADMIN_PASSWORD_HASH` instead of plaintext `ADMIN_PASSWORD`.
+Set `ADMIN_PASSWORD_HASH` in production (not plaintext `ADMIN_PASSWORD`).
 
 ### Email (Resend)
-
-Sign up at [resend.com](https://resend.com), verify your domain, set:
 
 ```
 RESEND_API_KEY=re_xxx
@@ -82,14 +98,14 @@ REDIS_URL=redis://localhost:6379
 
 Without Redis locally, the app uses in-memory cache and rate limit fallbacks.
 
-### Logging
+### Static SPA hosting
 
-```
-LOG_LEVEL=debug    # development
-LOG_LEVEL=info     # production
-```
+| Variable | Purpose |
+|----------|---------|
+| `SERVE_FRONTEND` | `true` forces static hosting when `frontend/dist` exists; `false` disables |
+| `FRONTEND_DIST_PATH` | Override path to built SPA (default: `frontend/dist`) |
 
-Pino outputs pretty logs in development and JSON in production.
+In production, static hosting is enabled automatically when `frontend/dist/index.html` exists after `npm run build`.
 
 ---
 
@@ -98,9 +114,10 @@ Pino outputs pretty logs in development and JSON in production.
 Copy `frontend/env.template` to `frontend/.env`:
 
 ```
-VITE_API_BASE_URL=http://localhost:5000/api
-VITE_BACKEND_URL=http://localhost:5000
+VITE_API_BASE_URL=/api
 ```
+
+Vite proxies `/api` to the backend during `npm run dev`.
 
 Optional:
 
@@ -110,7 +127,7 @@ VITE_GSC_VERIFICATION=verification_token
 VITE_SITE_URL=http://localhost:5173
 ```
 
-Strict env validation (`validate-env.mjs`) only runs when `CI=true` or `NODE_ENV=production`.
+Strict env validation (`validate-env.mjs`) runs when `CI=true` or `NODE_ENV=production`.
 
 ---
 
@@ -118,14 +135,15 @@ Strict env validation (`validate-env.mjs`) only runs when `CI=true` or `NODE_ENV
 
 | Command | Location | Purpose |
 |---------|----------|---------|
-| `npm run dev` | backend | Nodemon + ts-node |
-| `npm run build` | backend | TypeScript compile |
-| `npm start` | backend | Run `dist/server.js` |
-| `npm test` | backend | Vitest |
-| `npm run dev` | frontend | Vite dev server |
-| `npm run build` | frontend | validate-env + sitemap + build |
-| `npm run test:e2e` | frontend | Playwright |
-| `npm run links:check` | root | Doc link checker |
+| `npm run dev` | root | API (5000) + Vite (5173) in parallel |
+| `npm run build` | root | Frontend build, then backend compile |
+| `npm start` | root | Express server (API + static SPA in production) |
+| `npm test` | root | Vitest (backend) |
+| `npm run validate-env` | root | Backend + frontend env validation |
+| `npm run test:frontend` | root | Playwright smoke tests |
+| `npm run links:check` | root | Documentation link checker |
+
+Workspace-specific commands: `npm run dev -w backend`, `npm run build -w frontend`, etc.
 
 ---
 
@@ -133,10 +151,11 @@ Strict env validation (`validate-env.mjs`) only runs when `CI=true` or `NODE_ENV
 
 | Issue | Check |
 |-------|-------|
-| CORS errors | `FRONTEND_URL` matches frontend origin |
+| CORS errors | `FRONTEND_URL` matches the browser origin |
 | CSRF 403 | Call `/api/csrf-token` first; cookies enabled |
 | PayPal redirect fails | `FRONTEND_URL` and PayPal return URLs |
 | DB connection | Pooler URL, SSL settings, Supabase status |
 | Empty products | Run schema.sql and seed data |
+| SPA routes 404 in production | Run `npm run build`; check `frontend/dist` exists |
 
 See [DEBUG_FETCH_ERROR.md](./DEBUG_FETCH_ERROR.md) and [diagnose-paypal-issue.md](./diagnose-paypal-issue.md).

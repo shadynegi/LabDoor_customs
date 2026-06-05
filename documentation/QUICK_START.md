@@ -18,12 +18,9 @@ Get Lab Door Customs running locally in about 10 minutes.
 ## 1. Clone and install
 
 ```bash
-cd LabDoor_customs/backend
-cp env.template .env
-npm install
-
-cd ../frontend
-cp env.template .env
+cd LabDoor_customs
+cp backend/env.template backend/.env
+cp frontend/env.template frontend/.env
 npm install
 ```
 
@@ -57,37 +54,43 @@ Apply the database schema:
 
 ---
 
-## 3. Configure frontend (`.env`)
+## 3. Configure frontend (`frontend/.env`)
 
 ```env
-VITE_API_BASE_URL=http://localhost:5000/api
-VITE_BACKEND_URL=http://localhost:5000
+VITE_API_BASE_URL=/api
 ```
+
+Vite proxies `/api` to the backend during development.
 
 ---
 
-## 4. Start servers
+## 4. Start development
 
 ```bash
-# Terminal 1
-cd backend && npm run dev
-
-# Terminal 2
-cd frontend && npm run dev
+npm run dev
 ```
 
+Starts the API (port 5000) and Vite dev server (port 5173) together.
+
 - Storefront: http://localhost:5173
-- API health: http://localhost:5000/api/health
+- API health: http://localhost:5000/api/health (or http://localhost:5173/api/health via proxy)
 - Admin login: http://localhost:5173/admin/login
-- Admin dashboard: http://localhost:5173/adminshivamdashboard
+
+**Production-like single server** (optional):
+
+```bash
+npm run build
+cd backend && SERVE_FRONTEND=true npm start
+# → http://localhost:5000
+```
 
 ---
 
 ## 5. Verify
 
 ```bash
-cd backend && npm test
-cd frontend && npm run build   # skips strict env in dev
+npm test
+npm run build
 ```
 
 ---
