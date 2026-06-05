@@ -1,29 +1,8 @@
 ﻿{
   "terminalAllowlist": [
-    "cd",
-    "dir",
-    "ForEach-Object",
-    "Get-ChildItem",
-    "git",
-    "gh",
-    "Measure-Object",
-    "node",
-    "npm",
-    "npx",
-    "powershell",
-    "Remove-Item",
-    "Resolve-DnsName",
-    "Select-Object",
-    "Select-String",
-    "Set-Location",
-    "Test-NetConnection",
-    "Test-Path",
-    "tsc",
-    "vitest",
-    "Where-Object",
-    "Write-Output"
+    "*"
   ],
   "mcpAllowlist": [
-    "playwright:*"
+    "*:*"
   ]
 }
