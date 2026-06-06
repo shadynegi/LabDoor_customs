@@ -18,6 +18,7 @@ async function runInitialMaintenance(): Promise<void> {
     logger.info('Maintenance: reaping stuck idempotency keys');
     await reapStuckIdempotencyKeys();
     logger.info(`Maintenance: initial run complete (${Date.now() - started}ms)`);
+    logger.info('Startup finished — server idle until API traffic or scheduled maintenance');
   } catch (err) {
     logger.warn('Initial maintenance run skipped (DB not ready):', err);
   }
@@ -48,8 +49,9 @@ export function startMaintenanceJobs(): void {
     );
   }, fifteenMinMs);
 
-  // Defer first run and ping DB so pooler connections are fresh after bootstrap.
-  const deferMs = parseInt(process.env.MAINTENANCE_DEFER_MS || '120000', 10);
+  // Defer first run so pooler connections are fresh after bootstrap (30s dev, 120s prod).
+  const defaultDeferMs = process.env.NODE_ENV === 'development' ? '30000' : '120000';
+  const deferMs = parseInt(process.env.MAINTENANCE_DEFER_MS || defaultDeferMs, 10);
   setTimeout(() => {
     runInitialMaintenance().catch((err) =>
       logger.warn('Initial maintenance run failed:', err)

@@ -242,6 +242,18 @@ export async function failIdempotencyKey(key: string, operation: string): Promis
 export async function reapStuckIdempotencyKeys(
   staleMinutes = parseInt(process.env.IDEMPOTENCY_STALE_MINUTES || '5', 10)
 ): Promise<number> {
+  if (process.env.MAINTENANCE_SKIP_IDEMPOTENCY_REAP === 'true') {
+    logger.info('Maintenance: idempotency reaper disabled (MAINTENANCE_SKIP_IDEMPOTENCY_REAP)');
+    return 0;
+  }
+
+  if (!(await processingReaperIndexExists())) {
+    logger.info(
+      'Maintenance: skipping idempotency reaper — create idx_payment_idempotency_processing_created in Supabase (see migration-payment-idempotency.sql)'
+    );
+    return 0;
+  }
+
   const batchSize = parseInt(process.env.IDEMPOTENCY_REAP_BATCH_SIZE || '50', 10);
   const maxBatches = parseInt(process.env.IDEMPOTENCY_REAP_MAX_BATCHES || '10', 10);
   let total = 0;
