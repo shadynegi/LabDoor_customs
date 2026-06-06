@@ -34,77 +34,66 @@ const SERVICE_ROLE_ONLY_TABLES = [
   'review_votes',
 ] as const;
 
-async function enableRowLevelSecurity(table: string): Promise<void> {
-  await sql`
-    DO $rls$
-    DECLARE
-      tbl text := ${table};
-    BEGIN
-      IF EXISTS (
-        SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = tbl
-      ) THEN
-        EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', tbl);
-      END IF;
-    END
-    $rls$
+const ALL_RLS_TABLES = new Set<string>([
+  ...CLIENT_REVOKED_TABLES,
+  ...SERVICE_ROLE_ONLY_TABLES,
+]);
+
+/** Quote a SQL identifier (table/policy names from whitelists only). */
+function quoteIdent(ident: string): string {
+  return `"${ident.replace(/"/g, '""')}"`;
+}
+
+function assertAllowedTable(table: string): void {
+  if (!ALL_RLS_TABLES.has(table)) {
+    throw new Error(`Invalid RLS table name: ${table}`);
+  }
+}
+
+async function tableExists(table: string): Promise<boolean> {
+  assertAllowedTable(table);
+  const rows = await sql`
+    SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = ${table}
   `;
+  return rows.length > 0;
+}
+
+async function enableRowLevelSecurity(table: string): Promise<void> {
+  if (!(await tableExists(table))) return;
+  await sql.unsafe(
+    `ALTER TABLE public.${quoteIdent(table)} ENABLE ROW LEVEL SECURITY`
+  );
 }
 
 async function grantServiceRole(table: string): Promise<void> {
-  await sql`
-    DO $grant$
-    DECLARE
-      tbl text := ${table};
-    BEGIN
-      IF EXISTS (
-        SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = tbl
-      ) THEN
-        EXECUTE format('GRANT ALL ON %I TO service_role', tbl);
-      END IF;
-    END
-    $grant$
-  `;
+  if (!(await tableExists(table))) return;
+  await sql.unsafe(`GRANT ALL ON TABLE public.${quoteIdent(table)} TO service_role`);
 }
 
 async function revokeClientRoleGrants(table: string): Promise<void> {
-  await sql`
-    DO $revoke$
-    DECLARE
-      tbl text := ${table};
-    BEGIN
-      IF EXISTS (
-        SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = tbl
-      ) THEN
-        EXECUTE format('REVOKE ALL ON TABLE public.%I FROM anon, authenticated', tbl);
-        EXECUTE format('GRANT ALL ON TABLE public.%I TO service_role', tbl);
-      END IF;
-    END
-    $revoke$
-  `;
+  if (!(await tableExists(table))) return;
+  await sql.unsafe(
+    `REVOKE ALL ON TABLE public.${quoteIdent(table)} FROM anon, authenticated`
+  );
+  await sql.unsafe(`GRANT ALL ON TABLE public.${quoteIdent(table)} TO service_role`);
 }
 
 async function ensureServiceRolePolicy(table: string, policyName: string): Promise<void> {
-  await sql`
-    DO $policy$
-    DECLARE
-      tbl text := ${table};
-      pol text := ${policyName};
-    BEGIN
-      IF EXISTS (
-        SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = tbl
-      ) AND NOT EXISTS (
-        SELECT 1 FROM pg_policies
-        WHERE schemaname = 'public' AND tablename = tbl AND policyname = pol
-      ) THEN
-        EXECUTE format(
-          'CREATE POLICY %I ON %I FOR ALL USING ((select auth.role()) = ''service_role'') WITH CHECK ((select auth.role()) = ''service_role'')',
-          pol,
-          tbl
-        );
-      END IF;
-    END
-    $policy$
+  assertAllowedTable(table);
+  if (!(await tableExists(table))) return;
+
+  const existing = await sql`
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = ${table} AND policyname = ${policyName}
   `;
+  if (existing.length > 0) return;
+
+  await sql.unsafe(`
+    CREATE POLICY ${quoteIdent(policyName)} ON public.${quoteIdent(table)}
+      FOR ALL
+      USING ((select auth.role()) = 'service_role')
+      WITH CHECK ((select auth.role()) = 'service_role')
+  `);
 }
 
 /** Idempotent Supabase RLS tighten — backend uses service_role; limits direct PostgREST abuse. */
