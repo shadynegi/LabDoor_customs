@@ -10,7 +10,12 @@ import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import compression from "compression";
 import { emailService } from './lib/email';
-import sql, { withRetry, getPoolStats, runBootstrapTask } from './lib/db';
+import sql, {
+  withRetry,
+  getPoolStats,
+  runBootstrapTask,
+  pingDatabaseWithTimeout,
+} from './lib/db';
 import { getLanIPv4Addresses, getPrimaryLanIPv4 } from './lib/lanAddress';
 import { sanitizeCustomerInfo } from './utils/sanitizeCustomer';
 import { clientErrorMessage } from './lib/safeError';
@@ -1529,15 +1534,30 @@ if (require.main === module) {
   server = startHttpServer();
   registerGracefulShutdown(server);
 
+  const blockApiUntilBootstrap =
+    isProduction || process.env.BOOTSTRAP_BLOCK_API === 'true';
+
+  if (!blockApiUntilBootstrap) {
+    serverReady = true;
+    logger.info('API ready — bootstrap continues in background (dev only)');
+  }
+
   bootstrap()
     .then(() => {
-      serverReady = true;
-      logger.info('Bootstrap complete — API ready');
+      if (blockApiUntilBootstrap) {
+        serverReady = true;
+        logger.info('Bootstrap complete — API ready');
+      } else {
+        logger.info('Bootstrap complete (background)');
+      }
       startMaintenanceJobs();
     })
     .catch((err) => {
       logger.error('Startup failed:', err);
-      process.exit(1);
+      if (blockApiUntilBootstrap) {
+        process.exit(1);
+      }
+      logger.error('Bootstrap failed in dev — API stays up; fix DATABASE_URL or set BOOTSTRAP_SKIP_DDL=true');
     });
 }
 
@@ -1554,6 +1574,8 @@ async function runDeferredBootstrap(): Promise<void> {
 
 async function bootstrap(): Promise<void> {
   logger.info('Bootstrap started');
+  await pingDatabaseWithTimeout();
+  logger.info('Bootstrap: database reachable');
   if (process.env.REDIS_URL?.trim()) {
     try {
       await connectRedis();

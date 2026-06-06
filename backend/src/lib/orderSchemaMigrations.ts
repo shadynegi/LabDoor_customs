@@ -1,9 +1,23 @@
 import sql from './db';
+import {
+  logBootstrapDdlSkipped,
+  publicColumnExists,
+  publicTableExists,
+  shouldSkipBootstrapDdl,
+} from './bootstrapSchema';
 import { logger } from './logger';
 import { ensureProcessedRefundEventsTable } from './refundIdempotency';
 
 /** Apply idempotent order/payment schema patches at startup. */
 export async function ensureOrderPaymentSchema(): Promise<void> {
+  if (
+    shouldSkipBootstrapDdl() ||
+    ((await publicColumnExists('orders', 'refunded_amount')) &&
+      (await publicTableExists('processed_refund_events')))
+  ) {
+    logBootstrapDdlSkipped('order_payment_schema');
+    return;
+  }
   await sql`
     ALTER TABLE orders
     ADD COLUMN IF NOT EXISTS refunded_amount DECIMAL(10, 2) NOT NULL DEFAULT 0

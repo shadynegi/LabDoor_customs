@@ -1,0 +1,35 @@
+import sql from './db';
+import { logger } from './logger';
+
+export function shouldSkipBootstrapDdl(): boolean {
+  return process.env.BOOTSTRAP_SKIP_DDL === 'true';
+}
+
+export async function publicTableExists(tableName: string): Promise<boolean> {
+  const rows = await sql`
+    SELECT 1
+    FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = ${tableName}
+    LIMIT 1
+  `;
+  return rows.length > 0;
+}
+
+export async function publicColumnExists(
+  tableName: string,
+  columnName: string
+): Promise<boolean> {
+  const rows = await sql`
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = ${tableName}
+      AND column_name = ${columnName}
+    LIMIT 1
+  `;
+  return rows.length > 0;
+}
+
+export function logBootstrapDdlSkipped(label: string): void {
+  logger.info(`Bootstrap: skipping ${label} DDL (already applied or BOOTSTRAP_SKIP_DDL)`);
+}

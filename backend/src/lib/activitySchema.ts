@@ -1,8 +1,17 @@
 import sql from './db';
+import {
+  logBootstrapDdlSkipped,
+  publicTableExists,
+  shouldSkipBootstrapDdl,
+} from './bootstrapSchema';
 import { logger } from './logger';
 
 /** Idempotent activity_logs + product metric columns (see migration-activity-logs.sql). */
 export async function ensureActivityLogsTable(): Promise<void> {
+  if (shouldSkipBootstrapDdl() || (await publicTableExists('activity_logs'))) {
+    logBootstrapDdlSkipped('activity_logs');
+    return;
+  }
   await sql`
     ALTER TABLE products
     ADD COLUMN IF NOT EXISTS view_count INTEGER DEFAULT 0,

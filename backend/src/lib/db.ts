@@ -131,6 +131,26 @@ export async function pingDatabase(): Promise<void> {
   await withRetry(() => sql`SELECT 1`, { retries: 3, baseMs: 500 });
 }
 
+/** Fail fast when the pooler link is down (bootstrap should not hang silently). */
+export async function pingDatabaseWithTimeout(
+  timeoutMs = parseInt(process.env.BOOTSTRAP_PING_TIMEOUT_MS || '20000', 10)
+): Promise<void> {
+  await Promise.race([
+    pingDatabase(),
+    new Promise<never>((_, reject) => {
+      setTimeout(
+        () =>
+          reject(
+            new Error(
+              `Database ping timed out after ${timeoutMs}ms — check DATABASE_URL and Supabase pooler (port 6543)`
+            )
+          ),
+        timeoutMs
+      );
+    }),
+  ]);
+}
+
 /**
  * Exponential backoff + jitter for transient failures.
  */
@@ -170,14 +190,19 @@ export async function runBootstrapTask<T>(
 ): Promise<T> {
   const started = Date.now();
   logger.info(`Bootstrap: starting ${label}`);
+  const heartbeat = setInterval(() => {
+    logger.info(`Bootstrap: still running ${label} (${Date.now() - started}ms elapsed)`);
+  }, 15_000);
   try {
-    const result = await withRetry(fn, { retries: 3, baseMs: 2000 });
+    const result = await withRetry(fn, { retries: 2, baseMs: 2000 });
     logger.info(`Bootstrap: finished ${label} (${Date.now() - started}ms)`);
     return result;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     logger.error(`Bootstrap: failed ${label} after ${Date.now() - started}ms`);
     throw new Error(`Bootstrap step failed (${label}): ${message}`);
+  } finally {
+    clearInterval(heartbeat);
   }
 }
 

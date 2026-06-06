@@ -1,5 +1,10 @@
 import crypto from 'crypto';
 import sql from './db';
+import {
+  logBootstrapDdlSkipped,
+  publicTableExists,
+  shouldSkipBootstrapDdl,
+} from './bootstrapSchema';
 import { logger } from './logger';
 import { hashOrderAccessToken } from './orderTokens';
 import { encryptOrderAccessToken, decryptOrderAccessToken } from './orderTokenEncryption';
@@ -11,6 +16,10 @@ export function hashOrderAccessExchangeCode(code: string): string {
 }
 
 export async function ensureOrderAccessExchangeTable(): Promise<void> {
+  if (shouldSkipBootstrapDdl() || (await publicTableExists('order_access_exchanges'))) {
+    logBootstrapDdlSkipped('order_access_exchanges');
+    return;
+  }
   await sql`
     CREATE TABLE IF NOT EXISTS order_access_exchanges (
       code_hash VARCHAR(64) PRIMARY KEY,
