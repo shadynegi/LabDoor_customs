@@ -205,6 +205,26 @@ router.get('/category/:category', async (req: Request, res: Response) => {
   }
 });
 
+// GET product URLs for sitemap generation
+router.get('/sitemap-urls', async (_req: Request, res: Response) => {
+  try {
+    const products = await sql`
+      SELECT id, updated_at FROM products ORDER BY id ASC
+    `;
+    res.json({
+      success: true,
+      data: (products || []).map((p) => ({
+        id: p.id,
+        path: `/product/${p.id}`,
+        updated_at: p.updated_at,
+      })),
+    });
+  } catch (error: unknown) {
+    logger.error('Error fetching sitemap URLs:', error);
+    respond500(res, error, 'Request failed');
+  }
+});
+
 // GET single product by ID
 router.get('/:id', async (req: Request, res: Response) => {
   try {

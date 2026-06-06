@@ -10,7 +10,7 @@ export default function Cancel() {
 
   useEffect(() => {
     sessionStorage.removeItem("pendingOrder");
-    sessionStorage.removeItem("checkoutRecovery");
+    sessionStorage.removeItem("paypalReturnCode");
     localStorage.removeItem("pendingOrder");
   }, []);
 

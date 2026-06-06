@@ -193,16 +193,4 @@ export async function query<T>(queryFn: () => Promise<T>, label?: string): Promi
   }
 }
 
-process.on('SIGTERM', async () => {
-  logger.info('Closing database connections...');
-  await sql.end();
-  process.exit(0);
-});
-
-process.on('SIGINT', async () => {
-  logger.info('Closing database connections...');
-  await sql.end();
-  process.exit(0);
-});
-
 export default sql;

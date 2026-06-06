@@ -213,17 +213,6 @@ export function mountRateLimits(app: Express): void {
       handler: rateLimit429('Too many tracking link attempts. Please try again later.'),
     })
   );
-
-  app.get(
-    '/api/reviews/check/:productId/:email',
-    rateLimit({
-      ...common,
-      store: storeFor('rl:review-check'),
-      windowMs: 15 * 60 * 1000,
-      max: 20,
-      handler: rateLimit429('Too many eligibility checks. Please try again later.'),
-    })
-  );
 }
 
 /** Reset for tests only. */

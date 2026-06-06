@@ -4,6 +4,7 @@ import { apiFetch } from '../config';
 import { toast } from 'sonner';
 import { logError } from '../lib/logger';
 import { useResponsive } from '../hooks/useResponsive';
+import AdminActionDialog from './AdminActionDialog';
 
 interface Coupon {
   id: string;
@@ -28,6 +29,7 @@ export default function AdminCouponsTab() {
   const [customCode, setCustomCode] = useState('');
   const [customPercent, setCustomPercent] = useState(10);
   const [editingCoupon, setEditingCoupon] = useState<Coupon | null>(null);
+  const [couponToDelete, setCouponToDelete] = useState<Coupon | null>(null);
   const [editDescription, setEditDescription] = useState('');
   const [editMaxUses, setEditMaxUses] = useState('');
   const [editValidUntil, setEditValidUntil] = useState('');
@@ -152,8 +154,7 @@ export default function AdminCouponsTab() {
     }
   };
 
-  const deleteCoupon = async (coupon: Coupon) => {
-    if (!window.confirm(`Delete coupon ${coupon.code}?`)) return;
+  const executeDeleteCoupon = async (coupon: Coupon) => {
     try {
       const response = await apiFetch(`/coupons/${coupon.id}`, { method: 'DELETE' });
       const data = await response.json();
@@ -326,7 +327,7 @@ export default function AdminCouponsTab() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => deleteCoupon(coupon)}
+                        onClick={() => setCouponToDelete(coupon)}
                         title="Delete"
                         style={{ padding: 8, background: '#fee2e2', border: 'none', borderRadius: 8, cursor: 'pointer' }}
                       >
@@ -439,6 +440,22 @@ export default function AdminCouponsTab() {
             </div>
           </div>
         </div>
+      )}
+
+      {couponToDelete && (
+        <AdminActionDialog
+          open
+          variant="confirm"
+          title="Delete coupon"
+          message={`Delete coupon ${couponToDelete.code}?`}
+          confirmLabel="Delete"
+          onCancel={() => setCouponToDelete(null)}
+          onConfirm={() => {
+            const coupon = couponToDelete;
+            setCouponToDelete(null);
+            void executeDeleteCoupon(coupon);
+          }}
+        />
       )}
     </div>
   );

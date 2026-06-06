@@ -5,6 +5,7 @@ import {
   reapStuckIdempotencyKeys,
 } from './paymentIdempotency';
 import { cleanupExpiredCheckoutExchanges } from './orderCheckoutExchange';
+import { cleanupExpiredOrderAccessExchanges } from './orderAccessExchange';
 
 export function startMaintenanceJobs(): void {
   const hourMs = 60 * 60 * 1000;
@@ -19,6 +20,9 @@ export function startMaintenanceJobs(): void {
     );
     cleanupExpiredCheckoutExchanges().catch((err) =>
       logger.warn('Checkout exchange cleanup failed:', err)
+    );
+    cleanupExpiredOrderAccessExchanges().catch((err) =>
+      logger.warn('Order access exchange cleanup failed:', err)
     );
   }, hourMs);
 

@@ -17,6 +17,7 @@ import { validateJwtSecretComplexity } from '../lib/jwtSecret';
 import { MAX_BULK_IDS, validateStatusTransition, type OrderStatus } from '../lib/orderStatus';
 import { stripOrderSecrets } from '../lib/orderTokens';
 import { respond500 } from '../lib/safeError';
+import { fetchAdminAnalytics } from '../lib/adminAnalytics';
 
 const router = Router();
 
@@ -134,7 +135,10 @@ const verifyToken = (token: string): { valid: boolean; username?: string } => {
       .update(payloadBase64)
       .digest('hex');
 
-    if (signature !== expectedSignature) return { valid: false };
+    const sigBuf = Buffer.from(signature);
+    const expectedBuf = Buffer.from(expectedSignature);
+    if (sigBuf.length !== expectedBuf.length) return { valid: false };
+    if (!crypto.timingSafeEqual(sigBuf, expectedBuf)) return { valid: false };
 
     const payload = JSON.parse(Buffer.from(payloadBase64, 'base64').toString());
     if (payload.exp < Date.now()) return { valid: false };
@@ -363,6 +367,28 @@ router.get('/verify', verifyAdmin, (req: Request, res: Response) => {
   });
 });
 
+// GET /admin/analytics — dashboard summary
+router.get('/analytics', verifyAdmin, async (_req: Request, res: Response) => {
+  try {
+    const data = await fetchAdminAnalytics();
+    res.json({ success: true, data });
+  } catch (error: unknown) {
+    logger.error('Analytics error:', error);
+    respond500(res, error, 'Failed to fetch analytics');
+  }
+});
+
+// POST /admin/sessions/cleanup — purge expired admin sessions
+router.post('/sessions/cleanup', verifyAdmin, async (_req: Request, res: Response) => {
+  try {
+    const result = await cleanupExpiredSessions();
+    res.json({ success: true, data: result, message: `Removed ${result.deleted} expired session(s)` });
+  } catch (error: unknown) {
+    logger.error('Session cleanup error:', error);
+    respond500(res, error, 'Failed to clean up sessions');
+  }
+});
+
 // GET /admin/sessions - Get active sessions info
 router.get('/sessions', verifyAdmin, async (req: Request, res: Response) => {
   try {
@@ -390,7 +416,29 @@ router.get('/sessions', verifyAdmin, async (req: Request, res: Response) => {
       },
     });
   } catch (error: unknown) {
-    logger.error('Analytics error:', error);
+    logger.error('Session list error:', error);
+    respond500(res, error, 'Failed to fetch admin sessions');
+  }
+});
+
+// POST /admin/customers/:id/restore — undo soft-delete
+router.post('/customers/:id/restore', verifyAdmin, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const result = await sql`
+      UPDATE customers
+      SET is_deleted = false, deleted_at = NULL, updated_at = NOW()
+      WHERE id = ${id}::uuid
+      RETURNING id, email, name, is_deleted
+    `;
+
+    if (!result.length) {
+      return res.status(404).json({ success: false, error: 'Customer not found' });
+    }
+
+    res.json({ success: true, data: result[0], message: 'Customer restored' });
+  } catch (error: unknown) {
+    logger.error('Customer restore error:', error);
     respond500(res, error, 'Failed to restore customer');
   }
 });

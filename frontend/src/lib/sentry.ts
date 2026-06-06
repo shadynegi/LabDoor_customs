@@ -1,10 +1,11 @@
 import * as Sentry from '@sentry/react';
+import { hasMonitoringConsent } from './monitoring';
 
 let initialized = false;
 
 export function initSentry(): void {
   const dsn = import.meta.env.VITE_SENTRY_DSN;
-  if (!dsn || initialized) return;
+  if (!dsn || initialized || !hasMonitoringConsent()) return;
 
   Sentry.init({
     dsn,

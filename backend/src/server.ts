@@ -43,6 +43,7 @@ import { warmCaches } from './lib/cacheWarm';
 import { connectRedis, isRedisEnabled, getRedisClient } from './lib/redis';
 import { mountRateLimits } from './middleware/rateLimits';
 import { startMaintenanceJobs } from './lib/maintenanceJobs';
+import { registerGracefulShutdown } from './lib/gracefulShutdown';
 import { syncOrderAfterRefund, isFullRefundAmount, validateAdminRefundAmount } from './lib/refundSync';
 import { buildPayPalRefundDedupeKey } from './lib/refundIdempotency';
 import {
@@ -53,6 +54,7 @@ import {
   completeOrderPaymentCapture,
   revertCaptureAmountMismatch,
 } from './lib/paymentReconciliation';
+import { sendPostCaptureNotifications } from './lib/postPaymentCapture';
 import { createPayPalWebhookHandler } from './lib/paypalWebhookHandler';
 import { ensureOrderPaymentSchema } from './lib/orderSchemaMigrations';
 import {
@@ -332,7 +334,7 @@ app.post(
   createPayPalWebhookHandler(isProduction)
 );
 
-app.use(express.json({ limit: "10mb" }));
+app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(cookieParser());
 
@@ -507,20 +509,38 @@ app.get("/api/health", async (req: Request, res: Response) => {
   
   res.status(isHealthy ? 200 : 503).json({
     status: isHealthy ? "OK" : "DEGRADED",
-    message: isHealthy ? "All systems operational" : "Some services unavailable",
+    timestamp: new Date().toISOString(),
+    responseTime_ms: Date.now() - startTime,
+  });
+});
+
+app.get("/api/health/detail", verifyAdmin, async (_req: Request, res: Response) => {
+  const startTime = Date.now();
+  let dbStatus = "unknown";
+  let dbLatency = 0;
+
+  try {
+    const dbStart = Date.now();
+    await sql`SELECT 1`;
+    dbLatency = Date.now() - dbStart;
+    dbStatus = "connected";
+  } catch (error) {
+    dbStatus = "disconnected";
+    logger.error("Health detail - DB error:", error);
+  }
+
+  const redisConnected = Boolean(getRedisClient());
+  const redisRequired = isProduction && Boolean(process.env.REDIS_URL?.trim());
+  const redisOk = !redisRequired || redisConnected;
+
+  res.json({
+    status: dbStatus === "connected" && redisOk ? "OK" : "DEGRADED",
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     environment: process.env.NODE_ENV || "development",
     services: {
-      database: {
-        status: dbStatus,
-        latency_ms: dbLatency,
-        ...getPoolStats(),
-      },
-      paypal: {
-        mode: process.env.PAYPAL_MODE || "sandbox",
-        api: PAYPAL_API,
-      },
+      database: { status: dbStatus, latency_ms: dbLatency, ...getPoolStats() },
+      paypal: { mode: process.env.PAYPAL_MODE || "sandbox", api: PAYPAL_API },
       redis: {
         enabled: isRedisEnabled(),
         connected: redisConnected,
@@ -692,12 +712,11 @@ app.post("/api/paypal/create-payment", async (req: Request, res: Response) => {
       }
     }
 
-    logger.info("Creating PayPal payment for bound order:", {
+    logger.info('Creating PayPal payment for bound order:', {
       serverOrderId: pending.order.id,
       orderNumber: pending.orderNumber,
       total: pricing.total,
       itemCount: lineItems.length,
-      email: customerInfo.email,
     });
 
     const accessToken = await getPayPalAccessToken();
@@ -1117,31 +1136,11 @@ app.post("/api/paypal/capture-payment/:orderId", async (req: Request, res: Respo
 
     const orderRecord = updatedOrder as Record<string, unknown>;
 
-    if (accessToken) {
-      emailService.sendOrderConfirmation({
-        customerName: String(orderRecord.customer_name),
-        customerEmail: String(orderRecord.customer_email),
-        orderNumber: String(orderRecord.order_number),
-        items: items.map((item: any) => ({
-          product_name: item.product_name,
-          product_image: item.product_image || item.image,
-          quantity: item.quantity,
-          price: parseFloat(item.price?.toString() || '0'),
-          size_value: item.size_value,
-          size_system: item.size_system,
-        })),
-        subtotal: parseFloat(String(orderRecord.subtotal ?? '0')),
-        shipping_cost: parseFloat(String(orderRecord.shipping_cost ?? '0')),
-        tax: parseFloat(String(orderRecord.tax ?? '0')),
-        total: parseFloat(String(orderRecord.total ?? '0')),
-        shippingAddress,
-        orderDate: new Date().toISOString(),
-        orderId: serverOrderId,
-        accessToken,
-      }).catch((err) => logger.error('Confirmation email error after capture:', err));
+    if (updated) {
+      await sendPostCaptureNotifications(orderRecord, { accessToken: accessToken ?? undefined });
     }
 
-    logger.info("✅ Payment captured and order updated:", captureId);
+    logger.info('Payment captured and order updated', { serverOrderId, captureId });
 
     const captureResponse = {
       success: true,
@@ -1551,21 +1550,3 @@ function logServerBanner(mode: string, port: number | string, sslEnabled: boolea
   logger.info(`⏰ Started: ${new Date().toLocaleString()}`);
 }
 
-function registerGracefulShutdown(httpServer: ReturnType<typeof app.listen>) {
-  const closeServer = () => {
-    httpServer.close(() => {
-      logger.info('HTTP server closed');
-    });
-  };
-
-  process.on('SIGTERM', () => {
-    logger.info('SIGTERM signal received: closing HTTP server');
-    closeServer();
-  });
-
-  process.on('SIGINT', () => {
-    logger.info('SIGINT signal received: closing HTTP server');
-    closeServer();
-    process.exit(0);
-  });
-}

@@ -35,6 +35,7 @@ import LiquidModal from '../components/LiquidModal';
 import AdminProductFormModal, { type AdminProduct } from '../components/AdminProductFormModal';
 import AdminCouponsTab from '../components/AdminCouponsTab';
 import AdminReviewsTab from '../components/AdminReviewsTab';
+import AdminActionDialog from '../components/AdminActionDialog';
 import { clearProductCatalogCache } from '../lib/productCatalogCache';
 import { DashboardSkeleton, SkeletonStyles } from '../components/Skeletons';
 import { logError } from '../lib/logger';
@@ -111,6 +112,13 @@ interface Analytics {
 
 type Tab = 'analytics' | 'products' | 'orders' | 'messages' | 'customers' | 'coupons' | 'reviews';
 
+type AdminDialog =
+  | { kind: 'markPaid'; orderId: string }
+  | { kind: 'cancelOrder'; orderId: string }
+  | { kind: 'deleteCustomer'; customer: Customer }
+  | { kind: 'deleteProduct'; product: Product }
+  | null;
+
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<Tab>('analytics');
@@ -167,6 +175,7 @@ export default function AdminDashboard() {
   const [selectedMessages, setSelectedMessages] = useState<Set<string>>(new Set());
   const [productFormOpen, setProductFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [adminDialog, setAdminDialog] = useState<AdminDialog>(null);
 
   useEffect(() => {
     loadData();
@@ -361,19 +370,16 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleMarkPaid = async (orderId: string) => {
-    if (!window.confirm('Mark this order as paid without PayPal capture?')) return;
-    const adminNote = window.prompt('Reason for manual payment (required, min 3 characters):');
-    if (adminNote === null) return;
-    if (!adminNote.trim() || adminNote.trim().length < 3) {
-      toast.error('A reason of at least 3 characters is required');
-      return;
-    }
+  const executeMarkPaid = async (orderId: string, paymentId: string, adminNote: string) => {
     setOrderActionLoading(true);
     try {
       const response = await apiFetch(`/orders/${orderId}/payment-status`, {
         method: 'PATCH',
-        body: JSON.stringify({ payment_status: 'completed', admin_note: adminNote.trim() }),
+        body: JSON.stringify({
+          payment_status: 'completed',
+          payment_id: paymentId,
+          admin_note: adminNote,
+        }),
       });
       const data = await response.json();
       if (data.success) {
@@ -437,10 +443,7 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleCancelOrder = async (orderId: string) => {
-    const reasonRaw = window.prompt('Cancellation reason (optional):');
-    if (reasonRaw === null) return;
-    const reason = reasonRaw.trim() || undefined;
+  const executeCancelOrder = async (orderId: string, reason?: string) => {
     setOrderActionLoading(true);
     try {
       const response = await apiFetch(`/orders/${orderId}/cancel`, {
@@ -462,8 +465,7 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleDeleteCustomer = async (customer: Customer) => {
-    if (!window.confirm(`Soft-delete customer ${customer.email}?`)) return;
+  const executeDeleteCustomer = async (customer: Customer) => {
     try {
       const response = await apiFetch(`/admin/customers/${customer.id}`, { method: 'DELETE' });
       const data = await response.json();
@@ -622,10 +624,7 @@ export default function AdminDashboard() {
     setProductFormOpen(true);
   };
 
-  const handleDeleteProduct = async (product: Product) => {
-    if (!window.confirm(`Delete "${product.name}" (${product.size || 'no size'})? This cannot be undone.`)) {
-      return;
-    }
+  const executeDeleteProduct = async (product: Product) => {
     try {
       const response = await apiFetch(`/products/${product.id}`, { method: 'DELETE' });
       const data = await response.json();
@@ -885,7 +884,7 @@ export default function AdminDashboard() {
                     <button type="button" onClick={() => openEditProduct(product)} style={{ padding: 8, minHeight: 44, minWidth: 44, background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
                       <Pencil size={16} color="#374151" />
                     </button>
-                    <button type="button" onClick={() => handleDeleteProduct(product)} style={{ padding: 8, minHeight: 44, minWidth: 44, background: '#fee2e2', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
+                    <button type="button" onClick={() => setAdminDialog({ kind: 'deleteProduct', product })} style={{ padding: 8, minHeight: 44, minWidth: 44, background: '#fee2e2', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
                       <Trash2 size={16} color="#dc2626" />
                     </button>
                   </div>
@@ -972,7 +971,7 @@ export default function AdminDashboard() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleDeleteProduct(product)}
+                      onClick={() => setAdminDialog({ kind: 'deleteProduct', product })}
                       title="Delete"
                       style={{ padding: 8, background: '#fee2e2', border: 'none', borderRadius: 8, cursor: 'pointer' }}
                     >
@@ -1185,7 +1184,7 @@ export default function AdminDashboard() {
                         Restore
                       </button>
                     ) : (
-                      <button type="button" onClick={() => handleDeleteCustomer(customer)}
+                      <button type="button" onClick={() => setAdminDialog({ kind: 'deleteCustomer', customer })}
                         style={{ padding: '8px 16px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
                         Delete
                       </button>
@@ -1350,13 +1349,13 @@ export default function AdminDashboard() {
                 </button>
               )}
               {selectedOrder.payment_status === 'pending' && selectedOrder.status !== 'cancelled' && (
-                <button type="button" disabled={orderActionLoading} onClick={() => handleMarkPaid(selectedOrder.id)}
+                <button type="button" disabled={orderActionLoading} onClick={() => setAdminDialog({ kind: 'markPaid', orderId: selectedOrder.id })}
                   style={{ padding: '10px 16px', background: '#16a34a', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
                   Mark paid
                 </button>
               )}
               {selectedOrder.status !== 'cancelled' && selectedOrder.status !== 'delivered' && (
-                <button type="button" disabled={orderActionLoading} onClick={() => handleCancelOrder(selectedOrder.id)}
+                <button type="button" disabled={orderActionLoading} onClick={() => setAdminDialog({ kind: 'cancelOrder', orderId: selectedOrder.id })}
                   style={{ padding: '10px 16px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
                   <Ban size={16} /> Cancel order
                 </button>
@@ -1445,6 +1444,79 @@ export default function AdminDashboard() {
             </div>
           </div>
         </LiquidModal>
+      )}
+
+      {adminDialog?.kind === 'markPaid' && (
+        <AdminActionDialog
+          open
+          variant="prompt"
+          title="Mark order as paid"
+          message="Enter the PayPal capture ID and a reason. The capture is verified against PayPal before the order is completed."
+          confirmLabel="Mark paid"
+          inputLabel="PayPal capture ID"
+          inputPlaceholder="e.g. 8AB12345CD678901E"
+          secondInputLabel="Reason for manual payment"
+          secondInputPlaceholder="e.g. PayPal dashboard capture confirmed"
+          minLength={5}
+          secondaryMinLength={3}
+          onCancel={() => setAdminDialog(null)}
+          onConfirm={({ primary, secondary }) => {
+            const orderId = adminDialog.orderId;
+            setAdminDialog(null);
+            if (primary && secondary) {
+              void executeMarkPaid(orderId, primary, secondary);
+            }
+          }}
+        />
+      )}
+      {adminDialog?.kind === 'cancelOrder' && (
+        <AdminActionDialog
+          open
+          variant="prompt"
+          title="Cancel order"
+          message="Optionally provide a cancellation reason. A refund will be processed when applicable."
+          confirmLabel="Cancel order"
+          inputLabel="Cancellation reason (optional)"
+          inputPlaceholder="Optional"
+          inputRequired={false}
+          minLength={0}
+          onCancel={() => setAdminDialog(null)}
+          onConfirm={({ primary }) => {
+            const orderId = adminDialog.orderId;
+            setAdminDialog(null);
+            void executeCancelOrder(orderId, primary || undefined);
+          }}
+        />
+      )}
+      {adminDialog?.kind === 'deleteCustomer' && (
+        <AdminActionDialog
+          open
+          variant="confirm"
+          title="Soft-delete customer"
+          message={`Soft-delete customer ${adminDialog.customer.email}? Their order history is retained.`}
+          confirmLabel="Delete"
+          onCancel={() => setAdminDialog(null)}
+          onConfirm={() => {
+            const customer = adminDialog.customer;
+            setAdminDialog(null);
+            void executeDeleteCustomer(customer);
+          }}
+        />
+      )}
+      {adminDialog?.kind === 'deleteProduct' && (
+        <AdminActionDialog
+          open
+          variant="confirm"
+          title="Delete product"
+          message={`Delete "${adminDialog.product.name}" (${adminDialog.product.size || 'no size'})? This cannot be undone.`}
+          confirmLabel="Delete"
+          onCancel={() => setAdminDialog(null)}
+          onConfirm={() => {
+            const product = adminDialog.product;
+            setAdminDialog(null);
+            void executeDeleteProduct(product);
+          }}
+        />
       )}
 
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>

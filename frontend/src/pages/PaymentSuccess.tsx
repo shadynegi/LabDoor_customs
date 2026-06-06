@@ -36,6 +36,16 @@ interface PendingOrderContext {
   coupon?: { id?: string; discount_amount?: number } | null;
 }
 
+const PENDING_ORDER_KEY = 'pendingOrder';
+
+function persistPendingOrder(order: PendingOrderContext): void {
+  try {
+    sessionStorage.setItem(PENDING_ORDER_KEY, JSON.stringify(order));
+  } catch (error) {
+    logError('Failed to persist pending order for capture retry:', error);
+  }
+}
+
 const PAYMENT_STEPS = [
   { id: 'verifying', label: 'Verifying Payment', icon: ShieldCheck },
   { id: 'capturing', label: 'Processing Transaction', icon: CreditCard },
@@ -47,8 +57,13 @@ const PAYMENT_STEPS = [
 function PaymentProgress({ currentStep, isMobile }: { currentStep: PaymentStep; isMobile: boolean }) {
   const stepIndex = PAYMENT_STEPS.findIndex(s => s.id === currentStep);
 
+  const stepLabel = PAYMENT_STEPS[stepIndex]?.label ?? 'Processing';
+
   return (
     <motion.div
+      role="status"
+      aria-live="polite"
+      aria-label={`Payment progress: ${stepLabel}`}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       style={{
@@ -62,6 +77,7 @@ function PaymentProgress({ currentStep, isMobile }: { currentStep: PaymentStep; 
       }}
     >
       <motion.div
+        aria-hidden="true"
         animate={{ rotate: 360 }}
         transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
         style={{
@@ -177,11 +193,20 @@ export default function PaymentSuccess() {
   const [isLoading, setIsLoading] = useState(true);
   const [paymentStep, setPaymentStep] = useState<PaymentStep>('verifying');
   const [captureError, setCaptureError] = useState<string | null>(null);
+  const [retryAttempt, setRetryAttempt] = useState(0);
   const { isMobile } = useResponsive();
 
   const token = searchParams.get('token');
   const payerId = searchParams.get('PayerID');
   const capturedRef = useRef(false);
+
+  const handleRetryCapture = () => {
+    setCaptureError(null);
+    setIsLoading(true);
+    setPaymentStep('verifying');
+    capturedRef.current = false;
+    setRetryAttempt((n) => n + 1);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -271,6 +296,7 @@ export default function PaymentSuccess() {
                   }
                 : pendingOrder?.coupon ?? null,
             };
+            persistPendingOrder(pendingOrder);
           }
         }
 
@@ -305,6 +331,7 @@ export default function PaymentSuccess() {
                   }
                 : null,
             };
+            persistPendingOrder(pendingOrder);
           }
         }
 
@@ -317,6 +344,8 @@ export default function PaymentSuccess() {
           setPaymentStep('error');
           throw new Error('Missing server order binding');
         }
+
+        persistPendingOrder(pendingOrder);
 
         // Step 2: Capturing payment (bound to server order)
         setPaymentStep('capturing');
@@ -436,7 +465,7 @@ export default function PaymentSuccess() {
     return () => {
       cancelled = true;
     };
-  }, [token, payerId, navigate, clearCart, searchParams]);
+  }, [token, payerId, navigate, clearCart, searchParams, retryAttempt]);
 
   const displayEmail =
     orderDetails?.customer_email ||
@@ -484,7 +513,7 @@ export default function PaymentSuccess() {
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
             <button
               type="button"
-              onClick={() => window.location.reload()}
+              onClick={handleRetryCapture}
               style={{ padding: '12px 20px', background: '#9c6649', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}
             >
               Try again

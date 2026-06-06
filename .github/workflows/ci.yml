@@ -35,6 +35,8 @@ jobs:
           PAYPAL_SECRET: ci-paypal-secret
           TRUST_CLOUDFLARE: 'true'
           REQUIRE_PAYPAL_LIVE: 'false'
+          ORDER_TOKEN_ENCRYPTION_KEY: ci-order-token-encryption-key-32chars
+          IP_SALT: ci-ip-salt-for-tests-only
       - name: Require VITE_SENTRY_DSN secret
         env:
           VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
@@ -51,17 +53,8 @@ jobs:
           VITE_API_BASE_URL: /api
           VITE_SITE_URL: https://www.labdoorcustoms.com
           VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
-      - name: Backend tests
+      - name: All tests (backend unit, API, Playwright UI)
         run: npm test
-      - name: Install E2E test runner
-        working-directory: Tests
-        run: npm ci
-      - name: Install Playwright browser
-        working-directory: Tests
-        run: npx playwright install chromium --with-deps
-      - name: Run storefront E2E smoke tests
-        working-directory: Tests
-        run: npm run test:frontend
         env:
           CI: true
 

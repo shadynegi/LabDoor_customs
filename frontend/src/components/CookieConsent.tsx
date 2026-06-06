@@ -348,7 +348,7 @@ export default function CookieConsent() {
                 <CookieOption
                   id="essential"
                   title="Essential Cookies"
-                  description="Required for the website to function properly. These cannot be disabled."
+                  description="Required for the website to function properly, including checkout security, session cookies, and anonymous error monitoring (Sentry). These cannot be disabled."
                   checked={preferences.essential}
                   disabled={true}
                   onChange={() => {}}

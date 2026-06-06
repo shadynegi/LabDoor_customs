@@ -21,6 +21,8 @@ import { getClientIp } from '../lib/clientIp';
 import { validateStatusTransition, type OrderStatus } from '../lib/orderStatus';
 import { verifyPayPalCaptureForOrder } from '../lib/paypalCaptureVerify';
 import { redeemOrderAccessExchangeCode } from '../lib/orderAccessExchange';
+import { completeOrderPaymentCapture } from '../lib/paymentReconciliation';
+import { sendPostCaptureNotifications } from '../lib/postPaymentCapture';
 
 const router = Router();
 
@@ -737,6 +739,71 @@ router.patch('/:id/payment-status', verifyAdmin, async (req: Request, res: Respo
       });
     }
 
+    if (
+      payment_status === 'failed' &&
+      currentOrder[0].payment_status === 'pending'
+    ) {
+      const restored = await cancelPendingOrderAndRestoreStock(id);
+      if (!restored) {
+        return res.status(409).json({
+          success: false,
+          error: 'Could not mark order failed — order may not be pending',
+        });
+      }
+      const failedRow = await sql`SELECT * FROM orders WHERE id = ${id} LIMIT 1`;
+      const parsedFailed = parseOrderRow(failedRow[0] as Record<string, unknown>) as Order;
+      return res.json({
+        success: true,
+        data: parsedFailed,
+        message: 'Order marked failed and inventory restored',
+      });
+    }
+
+    if (
+      payment_status === 'completed' &&
+      currentOrder[0].payment_status === 'pending'
+    ) {
+      const captureId = String(payment_id).trim();
+      const { updated, order: completedOrder } = await completeOrderPaymentCapture(id, captureId);
+
+      if (!completedOrder) {
+        return res.status(404).json({ success: false, error: 'Order not found' });
+      }
+
+      if (!updated && completedOrder.payment_status !== 'completed') {
+        return res.status(409).json({
+          success: false,
+          error: 'Could not mark order paid',
+        });
+      }
+
+      if (updated) {
+        await sendPostCaptureNotifications(completedOrder);
+      }
+
+      await sql`
+        INSERT INTO activity_logs (action_type, metadata, ip_address, user_agent)
+        VALUES (
+          'admin_mark_paid',
+          ${JSON.stringify({
+            order_id: id,
+            order_number: currentOrder[0].order_number,
+            admin: adminUser,
+            admin_note: String(admin_note).trim(),
+          })},
+          ${getClientIp(req)},
+          ${req.get('user-agent') || 'admin'}
+        )
+      `.catch((err) => logger.warn('Failed to log admin mark paid:', err));
+
+      const parsedCompleted = parseOrderRow(completedOrder as Record<string, unknown>) as Order;
+      return res.json({
+        success: true,
+        data: parsedCompleted,
+        message: 'Payment status updated successfully',
+      });
+    }
+
     const captureIdForUpdate =
       payment_status === 'completed' && payment_id
         ? String(payment_id).trim()
@@ -759,28 +826,7 @@ router.patch('/:id/payment-status', verifyAdmin, async (req: Request, res: Respo
       });
     }
 
-    // Parse JSON fields if they are strings
-const parsedResult = parseOrderRow(result[0] as Record<string, unknown>) as Order;
-
-    if (
-      payment_status === 'completed' &&
-      currentOrder[0].payment_status === 'pending'
-    ) {
-      await sql`
-        INSERT INTO activity_logs (action_type, metadata, ip_address, user_agent)
-        VALUES (
-          'admin_mark_paid',
-          ${JSON.stringify({
-            order_id: id,
-            order_number: currentOrder[0].order_number,
-            admin: adminUser,
-            admin_note: String(admin_note).trim(),
-          })},
-          ${getClientIp(req)},
-          ${req.get('user-agent') || 'admin'}
-        )
-      `.catch((err) => logger.warn('Failed to log admin mark paid:', err));
-    }
+    const parsedResult = parseOrderRow(result[0] as Record<string, unknown>) as Order;
 
     res.json({
       success: true,

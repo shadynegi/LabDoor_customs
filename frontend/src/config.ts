@@ -22,9 +22,7 @@ function resolveApiBaseUrl(): string {
 
 export const config = {
   apiBaseUrl: resolveApiBaseUrl(),
-  backendUrl:
-    import.meta.env.VITE_BACKEND_URL?.trim() ||
-    (import.meta.env.DEV ? '' : 'http://localhost:5000'),
+  backendUrl: import.meta.env.VITE_BACKEND_URL?.trim() || '',
   apiTimeoutMs: parseInt(import.meta.env.VITE_API_TIMEOUT_MS || '15000', 10),
 } as const;
 
@@ -40,6 +38,11 @@ export interface ApiFetchOptions extends RequestInit {
 }
 
 let csrfInitialized = false;
+let unauthorizedHandler: (() => void) | null = null;
+
+export function setUnauthorizedHandler(handler: (() => void) | null): void {
+  unauthorizedHandler = handler;
+}
 
 export const resetCsrfInitialization = (): void => {
   resetCsrfSession();
@@ -150,6 +153,10 @@ export const apiFetch = async (
         const delay = 200 * Math.pow(2, attempt) + Math.random() * 100;
         await new Promise((r) => setTimeout(r, delay));
         continue;
+      }
+
+      if (response.status === 401 && endpoint.includes('/admin')) {
+        unauthorizedHandler?.();
       }
 
       return response;

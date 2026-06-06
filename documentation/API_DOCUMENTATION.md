@@ -179,7 +179,6 @@ Public list/submit/vote responses use `toPublicReview()` — **`customer_email`,
 | POST | `/` | Public | Submit review — always `pending`; response PII stripped |
 | POST | `/:id/vote` | Public + CSRF | Vote on **approved** reviews only (rate-limited; voter ID derived server-side from IP) |
 | POST | `/check` | Public + CSRF | Body: `{ product_id, email }` → `{ can_review: boolean }` |
-| GET | `/check/:productId/:email` | Public | **Deprecated** — use POST `/check` |
 | GET | `/` | Admin | All reviews **including `customer_email`** |
 | POST | `/admin` | Admin + CSRF | Create review |
 | PATCH | `/:id` | Admin + CSRF | Edit fields or approve/reject |

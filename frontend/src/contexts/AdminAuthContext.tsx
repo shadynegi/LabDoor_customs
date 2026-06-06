@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
-import { apiFetch } from '../config';
+import { useNavigate } from 'react-router-dom';
+import { apiFetch, setUnauthorizedHandler } from '../config';
 
 interface AdminAuthContextValue {
   isAuthenticated: boolean | null;
@@ -11,6 +12,7 @@ interface AdminAuthContextValue {
 const AdminAuthContext = createContext<AdminAuthContextValue | undefined>(undefined);
 
 export function AdminAuthProvider({ children }: { children: ReactNode }) {
+  const navigate = useNavigate();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
 
   const verify = useCallback(async () => {
@@ -37,6 +39,14 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void verify();
   }, [verify]);
+
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      setIsAuthenticated(false);
+      navigate('/admin/login', { replace: true });
+    });
+    return () => setUnauthorizedHandler(null);
+  }, [navigate]);
 
   return (
     <AdminAuthContext.Provider

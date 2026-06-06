@@ -34,7 +34,11 @@ const ShippingPolicy = lazy(() => import("./pages/ShippingPolicy"));
 
 // Loading fallback component
 const PageLoader = () => (
-  <div style={{ 
+  <div
+    role="status"
+    aria-live="polite"
+    aria-label="Loading page"
+    style={{ 
     minHeight: '100vh', 
     display: 'flex', 
     alignItems: 'center', 
@@ -219,7 +223,8 @@ function Navigation() {
           {!isMobile && "Orders"}
         </Link>
         <Link 
-          to="/cart" 
+          to="/cart"
+          aria-label={cartCount > 0 ? `Cart, ${cartCount} item${cartCount === 1 ? '' : 's'}` : 'Cart'}
           style={{ 
             textDecoration: "none",
             color: location.pathname === '/cart' ? "#9c6649" : "#6b7280",
@@ -277,9 +282,42 @@ function AppShell() {
       flexDirection: "column",
       position: "relative",
     }}>
+      <a
+        href="#main-content"
+        style={{
+          position: 'absolute',
+          left: -9999,
+          top: 'auto',
+          width: 1,
+          height: 1,
+          overflow: 'hidden',
+        }}
+        onFocus={(e) => {
+          e.currentTarget.style.left = '16px';
+          e.currentTarget.style.top = '16px';
+          e.currentTarget.style.width = 'auto';
+          e.currentTarget.style.height = 'auto';
+          e.currentTarget.style.overflow = 'visible';
+          e.currentTarget.style.zIndex = '9999';
+          e.currentTarget.style.padding = '12px 16px';
+          e.currentTarget.style.background = '#fff';
+          e.currentTarget.style.color = '#361906';
+          e.currentTarget.style.borderRadius = '8px';
+          e.currentTarget.style.fontWeight = '600';
+          e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+        }}
+        onBlur={(e) => {
+          e.currentTarget.style.left = '-9999px';
+          e.currentTarget.style.width = '1px';
+          e.currentTarget.style.height = '1px';
+          e.currentTarget.style.overflow = 'hidden';
+        }}
+      >
+        Skip to main content
+      </a>
       <Navigation />
 
-      <main style={{
+      <main id="main-content" style={{
         flex: 1,
       }}>
         <PageViewTracker />
@@ -288,15 +326,15 @@ function AppShell() {
             <Route path="/" element={<RouteErrorBoundary title="Home page error"><Home /></RouteErrorBoundary>} />
             <Route path="/products" element={<RouteErrorBoundary title="Products page error"><ProductsPage /></RouteErrorBoundary>} />
             <Route path="/product/:id" element={<RouteErrorBoundary title="Product page error"><ProductDetailPage /></RouteErrorBoundary>} />
-            <Route path="/about" element={<AboutUs />} />
-            <Route path="/contact" element={<ContactUs />} />
-            <Route path="/help" element={<HelpCenter />} />
-            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-            <Route path="/terms-of-service" element={<TermsOfService />} />
-            <Route path="/returns-policy" element={<ReturnsPolicy />} />
-            <Route path="/shipping-policy" element={<ShippingPolicy />} />
+            <Route path="/about" element={<RouteErrorBoundary title="About page error"><AboutUs /></RouteErrorBoundary>} />
+            <Route path="/contact" element={<RouteErrorBoundary title="Contact page error"><ContactUs /></RouteErrorBoundary>} />
+            <Route path="/help" element={<RouteErrorBoundary title="Help page error"><HelpCenter /></RouteErrorBoundary>} />
+            <Route path="/privacy-policy" element={<RouteErrorBoundary title="Privacy policy error"><PrivacyPolicy /></RouteErrorBoundary>} />
+            <Route path="/terms-of-service" element={<RouteErrorBoundary title="Terms of service error"><TermsOfService /></RouteErrorBoundary>} />
+            <Route path="/returns-policy" element={<RouteErrorBoundary title="Returns policy error"><ReturnsPolicy /></RouteErrorBoundary>} />
+            <Route path="/shipping-policy" element={<RouteErrorBoundary title="Shipping policy error"><ShippingPolicy /></RouteErrorBoundary>} />
             <Route path="/orders" element={<RouteErrorBoundary title="Orders page error"><MyOrders /></RouteErrorBoundary>} />
-            <Route path="/admin/login" element={<AdminLogin />} />
+            <Route path="/admin/login" element={<RouteErrorBoundary title="Admin login error"><AdminLogin /></RouteErrorBoundary>} />
             <Route path="/adminshivamdashboard" element={
               <ProtectedAdminRoute>
                 <RouteErrorBoundary title="Admin dashboard error">
@@ -307,7 +345,7 @@ function AppShell() {
             <Route path="/cart" element={<RouteErrorBoundary title="Cart error"><CartPage /></RouteErrorBoundary>} />
             <Route path="/checkout" element={<RouteErrorBoundary title="Checkout error"><Checkout /></RouteErrorBoundary>} />
             <Route path="/payment/success" element={<RouteErrorBoundary title="Payment error"><PaymentSuccess /></RouteErrorBoundary>} />
-            <Route path="/payment/cancel" element={<Cancel />} />
+            <Route path="/payment/cancel" element={<RouteErrorBoundary title="Payment cancel error"><Cancel /></RouteErrorBoundary>} />
                 <Route path="*" element={
                 <div style={{ 
                   display: "flex", 

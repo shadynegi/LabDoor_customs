@@ -164,12 +164,13 @@ const InputField = React.memo(({
 InputField.displayName = 'InputField';
 
 export default function Checkout() {
-  const { state } = useCart();
+  const { state, cartValidationError, isCartValidating } = useCart();
   const navigate = useNavigate();
   const { isMobile } = useResponsive();
   const [isProcessing, setIsProcessing] = useState(false);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
   const paymentIdempotencyKey = useRef(crypto.randomUUID());
+  const checkoutBlocked = Boolean(cartValidationError) || isCartValidating;
   const [errors, setErrors] = useState<FormErrors>({});
   
   const [formData, setFormData] = useState<FormData>({
@@ -1091,13 +1092,30 @@ export default function Checkout() {
                 </div>
               </div>
 
+              {cartValidationError && (
+                <div
+                  role="alert"
+                  style={{
+                    marginBottom: 12,
+                    padding: 14,
+                    background: '#fef2f2',
+                    border: '1px solid #fecaca',
+                    borderRadius: 12,
+                    color: '#991b1b',
+                    fontSize: 14,
+                  }}
+                >
+                  {cartValidationError}
+                </div>
+              )}
+
               <button
                 onClick={handlePayPalPayment}
-                disabled={isProcessing}
+                disabled={isProcessing || checkoutBlocked}
                 style={{
                   width: "100%",
                   padding: "16px",
-                  background: isProcessing
+                  background: isProcessing || checkoutBlocked
                     ? "#9ca3af"
                     : "linear-gradient(135deg, #0070ba 0%, #1546a0 100%)",
                   color: "white",
@@ -1105,7 +1123,7 @@ export default function Checkout() {
                   borderRadius: 12,
                   fontSize: 16,
                   fontWeight: 600,
-                  cursor: isProcessing ? "not-allowed" : "pointer",
+                  cursor: isProcessing || checkoutBlocked ? "not-allowed" : "pointer",
                   display: isMobile ? "none" : "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -1161,7 +1179,7 @@ export default function Checkout() {
           amount={`$${total.toFixed(2)}`}
           label={isProcessing ? "Processing…" : "Pay with PayPal"}
           onClick={handlePayPalPayment}
-          disabled={isProcessing}
+          disabled={isProcessing || checkoutBlocked}
           keyboardOffset={keyboardOffset}
           ariaLabel="Complete payment"
         />

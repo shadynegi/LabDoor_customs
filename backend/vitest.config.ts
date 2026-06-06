@@ -10,7 +10,7 @@ export default defineConfig({
       DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/postgres',
       JWT_SECRET: 'TestJwtSecretWithComplexity1!@#Aa',
       ADMIN_USERNAME: 'admin',
-      ADMIN_PASSWORD: 'test-admin-password',
+      ADMIN_PASSWORD_HASH: '$2b$12$ci.placeholder.hash.for.validation.only',
       FRONTEND_URL: 'http://localhost:5173',
       PAYPAL_CLIENT_ID: 'test-client-id',
       PAYPAL_SECRET: 'test-client-secret',

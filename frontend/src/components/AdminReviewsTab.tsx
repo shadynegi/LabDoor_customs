@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { logError } from '../lib/logger';
 import { useResponsive } from '../hooks/useResponsive';
 import LiquidModal from './LiquidModal';
+import AdminActionDialog from './AdminActionDialog';
 
 interface Review {
   id: string;
@@ -49,6 +50,7 @@ export default function AdminReviewsTab() {
   const [editingReview, setEditingReview] = useState<Review | null>(null);
   const [form, setForm] = useState(emptyForm());
   const [saving, setSaving] = useState(false);
+  const [reviewToDelete, setReviewToDelete] = useState<Review | null>(null);
 
   const fetchReviews = useCallback(async () => {
     setLoading(true);
@@ -204,9 +206,7 @@ export default function AdminReviewsTab() {
     }
   };
 
-  const handleDelete = async (review: Review) => {
-    if (!window.confirm(`Delete review by ${review.customer_name}?`)) return;
-
+  const executeDelete = async (review: Review) => {
     try {
       const response = await apiFetch(`/reviews/${review.id}`, { method: 'DELETE' });
       const data = await response.json();
@@ -446,7 +446,7 @@ export default function AdminReviewsTab() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleDelete(review)}
+                  onClick={() => setReviewToDelete(review)}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -631,6 +631,22 @@ export default function AdminReviewsTab() {
           </form>
         </div>
       </LiquidModal>
+
+      {reviewToDelete && (
+        <AdminActionDialog
+          open
+          variant="confirm"
+          title="Delete review"
+          message={`Delete review by ${reviewToDelete.customer_name}?`}
+          confirmLabel="Delete"
+          onCancel={() => setReviewToDelete(null)}
+          onConfirm={() => {
+            const review = reviewToDelete;
+            setReviewToDelete(null);
+            void executeDelete(review);
+          }}
+        />
+      )}
     </div>
   );
 }

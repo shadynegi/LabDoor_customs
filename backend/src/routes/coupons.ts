@@ -209,6 +209,46 @@ router.post('/validate', async (req: Request, res: Response) => {
   }
 });
 
+// POST /use — deprecated; coupon usage is recorded at payment capture
+router.post('/use', (_req: Request, res: Response) => {
+  res.status(410).json({
+    success: false,
+    error: 'Gone',
+    message: 'Coupon usage is recorded automatically during payment capture',
+  });
+});
+
+// GET list coupons (Admin only) — must be before /:id
+router.get('/', verifyAdmin, async (req: Request, res: Response) => {
+  try {
+    const parsed = parsePagination(req.query);
+    if (!parsed.ok) {
+      return res.status(parsed.status).json({ success: false, error: parsed.error });
+    }
+    const { limit, offset } = parsed.params;
+
+    const [coupons, countResult] = await Promise.all([
+      sql`
+        SELECT * FROM coupons
+        ORDER BY created_at DESC
+        LIMIT ${limit} OFFSET ${offset}
+      `,
+      sql`SELECT COUNT(*) as total FROM coupons`,
+    ]);
+
+    const total = parseInt(countResult[0]?.total || '0');
+
+    res.json({
+      success: true,
+      data: coupons,
+      pagination: paginationMeta(total, parsed.params),
+    });
+  } catch (error: unknown) {
+    logger.error('Error listing coupons:', error);
+    respond500(res, error, 'Request failed');
+  }
+});
+
 // GET single coupon by ID (Admin only)
 router.get('/:id', verifyAdmin, async (req: Request, res: Response) => {
   try {

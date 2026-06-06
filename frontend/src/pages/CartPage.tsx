@@ -8,7 +8,14 @@ import { calculateCheckoutPricing, FREE_SHIPPING_MESSAGE, VOLUME_DISCOUNT_INFO }
 import { optimizeImageUrl } from "../utils/imageUrl";
 
 export default function CartPage() {
-  const { state, incrementQuantity, decrementQuantity, removeFromCart } = useCart();
+  const {
+    state,
+    incrementQuantity,
+    decrementQuantity,
+    removeFromCart,
+    cartValidationError,
+    isCartValidating,
+  } = useCart();
   const navigate = useNavigate();
   const { isMobile } = useResponsive();
   
@@ -18,6 +25,7 @@ export default function CartPage() {
   const { subtotal, shipping, total, volumeDiscount, volumeDiscountPercent } = pricing;
 
   const hasItems = state.items.length > 0;
+  const checkoutBlocked = Boolean(cartValidationError) || isCartValidating;
 
   return (
     <div
@@ -163,6 +171,8 @@ export default function CartPage() {
                       border: "1px solid #e5e7eb"
                     }}>
                       <button 
+                        type="button"
+                        aria-label={`Decrease quantity of ${item.name}`}
                         onClick={() => decrementQuantity(item.id, item.size)}
                         style={{ 
                           width: isMobile ? 44 : 36,
@@ -193,6 +203,8 @@ export default function CartPage() {
                         {item.quantity}
                       </span>
                       <button 
+                        type="button"
+                        aria-label={`Increase quantity of ${item.name}`}
                         onClick={() => incrementQuantity(item.id, item.size)}
                         style={{ 
                           width: isMobile ? 44 : 36,
@@ -319,6 +331,23 @@ export default function CartPage() {
             </div>
           </div>
 
+          {cartValidationError && (
+            <div
+              role="alert"
+              style={{
+                marginTop: 16,
+                padding: 14,
+                background: '#fef2f2',
+                border: '1px solid #fecaca',
+                borderRadius: 12,
+                color: '#991b1b',
+                fontSize: 14,
+              }}
+            >
+              {cartValidationError}
+            </div>
+          )}
+
           {/* Action Buttons — hide primary CTA on mobile when sticky bar is shown */}
           <div style={{ 
             marginTop: isMobile ? 20 : 24, 
@@ -328,29 +357,35 @@ export default function CartPage() {
           }}>
             <button 
               onClick={() => navigate("/checkout")}
+              disabled={checkoutBlocked}
               style={{ 
                 flex: 1, 
                 padding: isMobile ? "14px 24px" : "16px 32px",
-                background: "linear-gradient(135deg, #361906 0%, #9c6649 100%)",
+                background: checkoutBlocked
+                  ? "#9ca3af"
+                  : "linear-gradient(135deg, #361906 0%, #9c6649 100%)",
                 color: "white", 
                 border: "none", 
                 borderRadius: 12, 
                 fontSize: isMobile ? 15 : 16, 
                 fontWeight: 700, 
-                cursor: "pointer",
+                cursor: checkoutBlocked ? "not-allowed" : "pointer",
+                opacity: checkoutBlocked ? 0.85 : 1,
                 boxShadow: "0 4px 6px -1px rgba(102,126,234,0.3)",
                 transition: "all 0.2s"
               }}
               onMouseEnter={(e) => {
+                if (checkoutBlocked) return;
                 e.currentTarget.style.transform = "translateY(-2px)";
                 e.currentTarget.style.boxShadow = "0 8px 12px -2px rgba(102,126,234,0.4)";
               }}
               onMouseLeave={(e) => {
+                if (checkoutBlocked) return;
                 e.currentTarget.style.transform = "translateY(0)";
                 e.currentTarget.style.boxShadow = "0 4px 6px -1px rgba(102,126,234,0.3)";
               }}
             >
-              Proceed to Checkout
+              {isCartValidating ? 'Validating cart…' : 'Proceed to Checkout'}
             </button>
             <button 
               onClick={() => navigate("/")}
@@ -383,7 +418,8 @@ export default function CartPage() {
         <MobileStickyCta
           amount={`$${total.toFixed(2)}`}
           label="Checkout"
-          onClick={() => navigate("/checkout")}
+          onClick={() => !checkoutBlocked && navigate("/checkout")}
+          disabled={checkoutBlocked}
           secondaryLabel="Continue Shopping"
           onSecondaryClick={() => navigate("/products")}
           stacked

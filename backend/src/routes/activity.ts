@@ -9,6 +9,7 @@ import { verifyAdmin } from './admin';
 import { getClientIp } from '../lib/clientIp';
 import { sanitizeActivityPayload } from '../lib/activitySanitize';
 import { canBumpProductMetric } from '../lib/activityMetricLimiter';
+import { getIpSalt } from '../lib/ipSalt';
 
 const MAX_BATCH_SIZE = 20;
 
@@ -28,7 +29,7 @@ const anonymizeIp = (ip: string): string => {
   if (!ip || ip === 'unknown') return 'anonymous';
 
   const dailySalt = new Date().toISOString().split('T')[0];
-  const salt = process.env.IP_SALT || 'default-salt';
+  const salt = getIpSalt();
   const hash = crypto.createHash('sha256')
     .update(ip + dailySalt + salt)
     .digest('hex')

@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useReducer, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { toast } from 'sonner';
 import { logError, logDebug } from '../lib/logger';
 import { trackAddToCart, trackRemoveFromCart } from '../utils/activityTracker';
 import { apiFetch } from '../config';
@@ -44,6 +45,8 @@ interface CartContextType {
   decrementQuantity: (id: number, size?: ShoeSize) => void;
   clearCart: () => void;
   getItemQuantity: (id: number) => number;
+  cartValidationError: string | null;
+  isCartValidating: boolean;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -232,6 +235,8 @@ const CART_CHANNEL_NAME = 'labdoor_cart_sync';
 
 export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(cartReducer, { items: [], total: 0 }, loadCartFromStorage);
+  const [cartValidationError, setCartValidationError] = useState<string | null>(null);
+  const [isCartValidating, setIsCartValidating] = useState(false);
   const channelRef = useRef<BroadcastChannel | null>(null);
   const isLocalUpdate = useRef(false);
   const hydratedRef = useRef(false);
@@ -284,9 +289,14 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // Revalidate cart prices from server when cart contents change
   useEffect(() => {
-    if (state.items.length === 0) return;
+    if (state.items.length === 0) {
+      setCartValidationError(null);
+      setIsCartValidating(false);
+      return;
+    }
 
     const validatePrices = async () => {
+      setIsCartValidating(true);
       try {
         const response = await apiFetch('/products/validate-cart', {
           method: 'POST',
@@ -300,15 +310,26 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           }),
         });
 
-        if (!response.ok) return;
+        const data = await response.json().catch(() => ({}));
 
-        const data = await response.json();
-        if (data.success && Array.isArray(data.items)) {
+        if (!response.ok || !data.success) {
+          const message =
+            data.message || data.error || 'Some items in your cart are unavailable. Please review your cart.';
+          setCartValidationError(message);
+          toast.error('Cart validation failed', { description: message, duration: 6000 });
+          return;
+        }
+
+        setCartValidationError(null);
+        if (Array.isArray(data.items)) {
           userActionRef.current = true;
           dispatch({ type: 'REFRESH_PRICES', payload: data.items });
         }
       } catch (error) {
         logError('Cart price validation failed:', error);
+        setCartValidationError('Unable to validate cart. Check your connection and try again.');
+      } finally {
+        setIsCartValidating(false);
       }
     };
 
@@ -394,6 +415,8 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         decrementQuantity,
         clearCart,
         getItemQuantity,
+        cartValidationError,
+        isCartValidating,
       }}
     >
       {children}

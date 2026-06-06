@@ -12,6 +12,7 @@ import {
   toPublicReview,
 } from '../lib/reviewHelpers';
 import { respond500 } from '../lib/safeError';
+import { getOrderAccessTokenFromRequest } from '../lib/orderTokens';
 
 const router = Router();
 
@@ -267,8 +268,9 @@ router.post('/', async (req: Request, res: Response) => {
       });
     }
 
+    const orderAccessToken = getOrderAccessTokenFromRequest(req);
     const isVerified = order_id
-      ? await checkVerifiedPurchase(normalizedEmail, product_id, order_id)
+      ? await checkVerifiedPurchase(normalizedEmail, product_id, order_id, orderAccessToken)
       : false;
 
     const sanitizedTitle = title ? sanitizeString(title) : null;
@@ -636,9 +638,15 @@ async function checkReviewEligibility(productId: number, email: string) {
     LIMIT 1
   `;
 
+  const canReview = existingReview.length === 0;
   return {
     status: 200 as const,
-    data: { can_review: existingReview.length === 0 },
+    data: {
+      can_review: canReview,
+      message: canReview
+        ? 'You may submit a review for this product.'
+        : 'A review may already exist for this product and email, or eligibility could not be confirmed.',
+    },
   };
 }
 
@@ -660,23 +668,6 @@ router.post('/check', async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: result.error });
     }
 
-    res.json({ success: true, data: result.data });
-  } catch (error: unknown) {
-    logger.error('Error checking review eligibility:', error);
-    respond500(res, error, 'Failed to check review eligibility');
-  }
-});
-
-/** @deprecated Use POST /check — email in URL leaks to logs */
-router.get('/check/:productId/:email', async (req: Request, res: Response) => {
-  try {
-    const productId = parseInt(req.params.productId, 10);
-    const result = await checkReviewEligibility(productId, req.params.email);
-    res.setHeader('Deprecation', 'true');
-    res.setHeader('Link', '</api/reviews/check>; rel="successor-version"');
-    if (result.status === 400) {
-      return res.status(400).json({ success: false, error: result.error });
-    }
     res.json({ success: true, data: result.data });
   } catch (error: unknown) {
     logger.error('Error checking review eligibility:', error);

@@ -101,3 +101,13 @@ export async function redeemOrderAccessExchangeCode(
     orderNumber: order[0].order_number as string,
   };
 }
+
+/** Remove expired order access exchange rows (email tracking codes). */
+export async function cleanupExpiredOrderAccessExchanges(): Promise<number> {
+  const result = await sql`
+    DELETE FROM order_access_exchanges
+    WHERE expires_at < NOW()
+    RETURNING code_hash
+  `;
+  return result.length;
+}

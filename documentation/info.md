@@ -417,7 +417,7 @@ At create-payment, a row in `coupon_usage` reserves the coupon for the pending o
 - DB TLS verification in production (`DB_SSL_CA_PATH`; `rejectUnauthorized` defaults true).
 - PayPal order/capture IDs have partial unique indexes to prevent duplicate binding.
 - Product images validated on admin create/update: HTTPS/relative URLs or data URLs ≤512KB (`lib/productImage.ts`).
-- Supabase RLS at startup (`ensureRlsPolicies()`): all 13 application tables use **service_role-only** policies; `anon` and `authenticated` grants are revoked — no public product read via PostgREST/GraphQL; all data access goes through Express.
+- Supabase RLS at startup (`ensureRlsPolicies()`): all **14** application tables (including `order_access_exchanges`) use **service_role-only** policies; `anon` and `authenticated` grants are revoked — no public product read via PostgREST/GraphQL; all data access goes through Express.
 
 ### Production environment gates
 
@@ -450,7 +450,7 @@ Redis connection failure in production prevents server startup.
 | Layer | Package | Configuration |
 |-------|---------|---------------|
 | Backend | `@sentry/node` | `SENTRY_DSN` required in production; optional `SENTRY_RELEASE`; 10% trace sample rate |
-| Frontend | `@sentry/react` | `VITE_SENTRY_DSN` required in CI/production builds; browser tracing; optional `VITE_SENTRY_RELEASE` |
+| Frontend | `@sentry/react` | `VITE_SENTRY_DSN` required in CI/production builds; loads after cookie consent (`onMonitoringConsentReady`); browser tracing; optional `VITE_SENTRY_RELEASE` |
 
 - Global Express error handler calls `captureException` with request ID, method, path.
 - React `ErrorBoundary` captures render errors.
@@ -458,14 +458,9 @@ Redis connection failure in production prevents server startup.
 
 ### Health check
 
-`GET /api/health` returns:
+`GET /api/health` (public) returns a minimal payload (`status`, `timestamp`, `responseTime_ms`) for load balancers. Returns **503** if the database is unreachable or Redis is required but disconnected.
 
-- Database latency and pool stats
-- PayPal mode (sandbox/live)
-- Redis connection status (`required: true` in production when `REDIS_URL` is set)
-- Uptime
-
-Returns **503** if database is unreachable **or** Redis is required but disconnected.
+`GET /api/health/detail` (admin) returns database latency, pool stats, PayPal mode, Redis status, and uptime.
 
 ---
 
@@ -605,7 +600,8 @@ Expanded request/response docs: [`API_DOCUMENTATION.md`](API_DOCUMENTATION.md)
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | GET | `/api/csrf-token` | Public | Issue CSRF cookie + token for SPA |
-| GET | `/api/health` | Public | Health check (DB ping); used by Railway |
+| GET | `/api/health` | Public | Minimal health check (DB ping); used by Railway |
+| GET | `/api/health/detail` | Admin | Full service diagnostics |
 | POST | `/api/paypal/webhook` | PayPal | PayPal event webhook (raw JSON body) |
 | GET | `/api/paypal/test` | Admin | PayPal API connectivity test |
 | POST | `/api/paypal/create-payment` | Public + CSRF | Create pending order + PayPal order |
@@ -672,8 +668,7 @@ Any unmatched `/api/*` path returns **404** JSON `{ error: "Route not found" }`.
 | GET | `/api/reviews/product/:productId` | Public | Approved reviews — **`customer_email` stripped** via `toPublicReview()` |
 | POST | `/api/reviews` | Public + CSRF | Submit review (pending; response stripped of email) |
 | POST | `/api/reviews/:id/vote` | Public + CSRF | Vote on **approved** reviews only |
-| POST | `/api/reviews/check` | Public + CSRF | Body `{ product_id, email }` → `{ can_review }` |
-| GET | `/api/reviews/check/:productId/:email` | Public | **Deprecated** — use POST |
+| POST | `/api/reviews/check` | Public + CSRF | Body `{ product_id, email }` → generic `{ can_review }` (no email enumeration) |
 | GET | `/api/reviews` | Admin | List all reviews **including `customer_email`** |
 | POST | `/api/reviews/admin` | Admin + CSRF | Create review (name, rating, text, optional email) |
 | PATCH | `/api/reviews/:id` | Admin + CSRF | Edit review fields and status |
@@ -719,7 +714,7 @@ Any unmatched `/api/*` path returns **404** JSON `{ error: "Route not found" }`.
 | POST | `/api/admin/orders/bulk-update` | Admin + CSRF | Bulk order status updates |
 | POST | `/api/admin/messages/bulk-update` | Admin + CSRF | Bulk contact message status updates |
 
-**Endpoint count:** 73 routes (71 active + 2 deprecated **410** responses).
+**Endpoint count:** 72 routes (70 active + 2 deprecated **410** responses: `POST /api/orders`, `POST /api/coupons/use`).
 
 ---
 
@@ -908,6 +903,8 @@ npm run links:check
 |-------|------|----------|
 | Backend unit/API | Vitest | Checkout validation, payment idempotency, order tokens, checkout exchange, order token encryption, webhook errors, product images, admin session hashing, PayPal utils, refund idempotency |
 | Frontend E2E / UI | Playwright | Storefront smoke, products/cart/checkout/contact UI, navigation, cookie consent, mobile viewport (22 tests; mocked API) |
+
+**Total automated tests:** 99 (61 backend unit + 16 API + 22 Playwright UI).
 | Link check | Custom script | Documentation internal links |
 
 API tests mock the database layer (`Tests/setup.ts`) for fast isolated runs.

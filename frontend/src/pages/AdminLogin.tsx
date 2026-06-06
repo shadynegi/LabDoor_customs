@@ -1,5 +1,5 @@
 // AdminLogin.tsx - Admin login page
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useId } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Lock, User, Eye, EyeOff, AlertCircle, Shield } from 'lucide-react';
@@ -18,6 +18,8 @@ export default function AdminLogin() {
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
   const { isAuthenticated, setAuthenticated, verify } = useAdminAuth();
+  const usernameId = useId();
+  const passwordId = useId();
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -144,6 +146,7 @@ export default function AdminLogin() {
           {/* Username */}
           <div style={{ marginBottom: 20 }}>
             <label
+              htmlFor={usernameId}
               style={{
                 display: 'block',
                 color: 'rgba(255, 255, 255, 0.7)',
@@ -159,8 +162,10 @@ export default function AdminLogin() {
                 size={20}
                 color="rgba(255, 255, 255, 0.4)"
                 style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)' }}
+                aria-hidden="true"
               />
               <input
+                id={usernameId}
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
@@ -192,6 +197,7 @@ export default function AdminLogin() {
           {/* Password */}
           <div style={{ marginBottom: 28 }}>
             <label
+              htmlFor={passwordId}
               style={{
                 display: 'block',
                 color: 'rgba(255, 255, 255, 0.7)',
@@ -207,8 +213,10 @@ export default function AdminLogin() {
                 size={20}
                 color="rgba(255, 255, 255, 0.4)"
                 style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)' }}
+                aria-hidden="true"
               />
               <input
+                id={passwordId}
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -236,6 +244,7 @@ export default function AdminLogin() {
               />
               <button
                 type="button"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
                 onClick={() => setShowPassword(!showPassword)}
                 style={{
                   position: 'absolute',

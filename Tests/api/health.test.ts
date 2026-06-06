@@ -14,7 +14,9 @@ describe('GET /api/health', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.status).toBe('OK');
-    expect(res.body.services.database.status).toBe('connected');
+    expect(res.body.timestamp).toBeDefined();
+    expect(res.body.responseTime_ms).toBeDefined();
+    expect(res.body.services).toBeUndefined();
     expect(res.headers['x-request-id']).toBeDefined();
   });
 
