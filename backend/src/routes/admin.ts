@@ -359,11 +359,22 @@ router.post('/logout', verifyAdmin, async (req: Request, res: Response) => {
   }
 });
 
-// GET /admin/verify - Verify token is valid
-router.get('/verify', verifyAdmin, (req: Request, res: Response) => {
+// GET /admin/verify — session probe (always 200; not an error when logged out)
+router.get('/verify', async (req: Request, res: Response) => {
+  const token = extractAdminToken(req);
+  if (!token) {
+    return res.json({ success: true, authenticated: false });
+  }
+
+  const result = await validateAdminSession(token);
+  if (!result.valid) {
+    return res.json({ success: true, authenticated: false });
+  }
+
   res.json({
     success: true,
-    admin: (req as any).admin,
+    authenticated: true,
+    admin: { username: result.username },
   });
 });
 

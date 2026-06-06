@@ -702,7 +702,7 @@ Any unmatched `/api/*` path returns **404** JSON `{ error: "Route not found" }`.
 | POST | `/api/admin/login` | Public + CSRF | Admin login; sets `admin_session` cookie |
 | POST | `/api/admin/generate-hash` | Public (dev only) | Generate bcrypt hash — **403 in production**; use `scripts/generate-admin-hash.mjs` |
 | POST | `/api/admin/logout` | Admin + CSRF | Logout; clears session |
-| GET | `/api/admin/verify` | Admin | Verify current session |
+| GET | `/api/admin/verify` | Public | Session probe — always **200** with `{ authenticated: true \| false }` (not 401 when logged out) |
 | GET | `/api/admin/sessions` | Admin | List active admin sessions |
 | POST | `/api/admin/sessions/cleanup` | Admin + CSRF | Purge expired sessions |
 | GET | `/api/admin/analytics` | Admin | Dashboard analytics payload |

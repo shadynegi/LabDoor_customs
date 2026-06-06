@@ -217,7 +217,7 @@ Public list/submit/vote responses use `toPublicReview()` — **`customer_email`,
 |--------|------|------|-------------|
 | POST | `/login` | Public | Admin login (rate limited) |
 | POST | `/logout` | Admin | End session |
-| GET | `/verify` | Admin | Verify session |
+| GET | `/verify` | Public | Session probe — **200** `{ success, authenticated, admin? }` |
 | POST | `/generate-hash` | Public (dev only) | Generate bcrypt hash — **403 in production**; use `backend/scripts/generate-admin-hash.mjs` |
 | GET | `/sessions` | Admin | List active sessions |
 | POST | `/sessions/cleanup` | Admin | Remove expired sessions |

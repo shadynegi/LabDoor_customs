@@ -1,8 +1,13 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { apiFetch, setUnauthorizedHandler } from '../config';
 
 const ADMIN_DASHBOARD_PATH = '/adminshivamdashboard';
+const ADMIN_LOGIN_PATH = '/admin/login';
+
+function isAdminRoute(pathname: string): boolean {
+  return pathname === ADMIN_LOGIN_PATH || pathname === ADMIN_DASHBOARD_PATH;
+}
 
 interface AdminAuthContextValue {
   isAuthenticated: boolean | null;
@@ -15,12 +20,14 @@ const AdminAuthContext = createContext<AdminAuthContextValue | undefined>(undefi
 
 export function AdminAuthProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
 
   const verify = useCallback(async () => {
     try {
       const response = await apiFetch('/admin/verify');
-      const ok = response.ok;
+      const data = await response.json().catch(() => ({}));
+      const ok = response.ok && data.authenticated === true;
       setIsAuthenticated(ok);
       return ok;
     } catch {
@@ -39,8 +46,12 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    void verify();
-  }, [verify]);
+    if (isAdminRoute(location.pathname)) {
+      void verify();
+    } else {
+      setIsAuthenticated(false);
+    }
+  }, [location.pathname, verify]);
 
   useEffect(() => {
     setUnauthorizedHandler(() => {
