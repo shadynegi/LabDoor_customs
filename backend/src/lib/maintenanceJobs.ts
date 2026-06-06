@@ -32,8 +32,16 @@ export function startMaintenanceJobs(): void {
     );
   }, fifteenMinMs);
 
-  expireStalePendingOrders().catch(() => {});
-  reapStuckIdempotencyKeys().catch(() => {});
+  // Defer first run so Supabase pooler connections are warm (avoids CONNECTION_ENDED on boot).
+  const deferMs = parseInt(process.env.MAINTENANCE_DEFER_MS || '60000', 10);
+  setTimeout(() => {
+    expireStalePendingOrders().catch((err) =>
+      logger.warn('Stale pending order cleanup failed:', err)
+    );
+    reapStuckIdempotencyKeys().catch((err) =>
+      logger.warn('Stuck idempotency reaper failed:', err)
+    );
+  }, deferMs);
 
   logger.info('Maintenance jobs scheduled (pending orders, idempotency)');
 }
