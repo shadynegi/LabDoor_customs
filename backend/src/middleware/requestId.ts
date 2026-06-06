@@ -10,6 +10,7 @@ export function requestIdMiddleware(req: Request, res: Response, next: NextFunct
       : crypto.randomUUID();
 
   req.requestId = requestId;
+  req.requestStartMs = Date.now();
   req.log = createRequestLogger(requestId);
   res.setHeader('X-Request-Id', requestId);
   next();

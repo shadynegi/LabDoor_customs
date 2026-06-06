@@ -36,6 +36,8 @@ import { getClientIp } from './lib/clientIp';
 import { logger } from './lib/logger';
 import { initSentry, captureException } from './lib/sentry';
 import { requestIdMiddleware } from './middleware/requestId';
+import { requestLogMiddleware } from './middleware/requestLog';
+import { getRequestPath, getRequestTimeoutMs } from './lib/requestTiming';
 import {
   buildCreatePaymentKey,
   buildCapturePaymentKey,
@@ -357,48 +359,41 @@ app.use(compression({
   threshold: 1024, // Only compress responses larger than 1KB
 }));
 
-const REQUEST_TIMEOUT_MS = parseInt(process.env.REQUEST_TIMEOUT_MS || '60000', 10);
-const SLOW_REQUEST_TIMEOUT_MS = parseInt(
-  process.env.SLOW_REQUEST_TIMEOUT_MS ||
-    process.env.CATALOG_REQUEST_TIMEOUT_MS ||
-    '180000',
-  10
-);
-
-function isCatalogReadRequest(req: Request): boolean {
-  if (req.method !== 'GET') return false;
-  const path = req.path;
-  if (
-    path === '/api/products' ||
-    path === '/api/products/filters' ||
-    path === '/api/products/sitemap-urls'
-  ) {
-    return true;
-  }
-  if (path.startsWith('/api/products/category/')) return true;
-  return /^\/api\/products\/[^/]+$/.test(path);
-}
-
-function isSlowApiRequest(req: Request): boolean {
-  const path = req.path;
-  if (isCatalogReadRequest(req)) return true;
-  if (path === '/api/admin/analytics') return true;
-  if (path === '/api/activity/batch' || path === '/api/activity/log') return true;
-  return false;
-}
-
 app.use((req: Request, res: Response, next: NextFunction) => {
-  const timeoutMs = isSlowApiRequest(req) ? SLOW_REQUEST_TIMEOUT_MS : REQUEST_TIMEOUT_MS;
-  const loggedPath = req.originalUrl.split('?')[0];
+  const path = getRequestPath(req);
+  const timeoutMs = getRequestTimeoutMs(req);
 
   const sendTimeout = () => {
+    const elapsedMs = Date.now() - (req.requestStartMs ?? Date.now());
     if (!res.headersSent) {
-      req.log?.warn({ method: req.method, path: loggedPath, timeoutMs }, 'Request timeout');
+      req.log?.warn(
+        {
+          method: req.method,
+          path,
+          timeoutMs,
+          elapsedMs,
+          headersSent: res.headersSent,
+          pool: getPoolStats(),
+        },
+        'Request timeout'
+      );
       res.status(504).json({
         success: false,
         error: 'Gateway Timeout',
         message: 'The request took too long to process. Please try again.',
       });
+    } else {
+      req.log?.warn(
+        {
+          method: req.method,
+          path,
+          timeoutMs,
+          elapsedMs,
+          headersSent: true,
+          pool: getPoolStats(),
+        },
+        'Request timeout (response already sent)'
+      );
     }
   };
 
@@ -434,11 +429,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   });
 });
 
-// Request logging middleware
-app.use((req: Request, res: Response, next: NextFunction) => {
-  req.log?.info({ method: req.method, path: req.path }, 'Incoming request');
-  next();
-});
+app.use(requestLogMiddleware);
 
 // Types
 interface PayPalItem {
@@ -1511,18 +1502,37 @@ if (!frontendMounted) {
 
 // Error handling middleware - MUST have 4 parameters
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
-  logger.error({ err }, 'Unhandled server error');
+  const path = getRequestPath(req);
+  const durationMs = req.requestStartMs ? Date.now() - req.requestStartMs : undefined;
+  const errCode = (err as NodeJS.ErrnoException).code;
+
+  req.log?.error(
+    {
+      err,
+      method: req.method,
+      path,
+      durationMs,
+      code: errCode,
+      headersSent: res.headersSent,
+      pool: getPoolStats(),
+    },
+    'Unhandled server error'
+  );
+
   captureException(err, {
     requestId: req.requestId,
     method: req.method,
-    path: req.path,
+    path,
   });
+
+  if (res.headersSent) return;
 
   const isDev = process.env.NODE_ENV === 'development';
   res.status(500).json({
     success: false,
     error: isDev ? (err.message || 'Internal server error') : 'Internal server error',
     ...(isDev && { stack: err.stack }),
+    ...(isDev && req.requestId ? { requestId: req.requestId } : {}),
   });
 });
 

@@ -8,19 +8,35 @@ import {
 import { cleanupExpiredCheckoutExchanges } from './orderCheckoutExchange';
 import { cleanupExpiredOrderAccessExchanges } from './orderAccessExchange';
 
+async function runMaintenanceStep<T>(
+  label: string,
+  fn: () => Promise<T>
+): Promise<T> {
+  const started = Date.now();
+  logger.info({ step: label }, 'Maintenance: step started');
+  try {
+    const result = await fn();
+    logger.info({ step: label, durationMs: Date.now() - started, result }, 'Maintenance: step finished');
+    return result;
+  } catch (err) {
+    logger.warn(
+      { step: label, durationMs: Date.now() - started, err },
+      'Maintenance: step failed'
+    );
+    throw err;
+  }
+}
+
 async function runInitialMaintenance(): Promise<void> {
   const started = Date.now();
   try {
     logger.info('Maintenance: starting initial run');
-    await pingDatabase();
-    logger.info('Maintenance: expiring stale pending orders');
-    await expireStalePendingOrders();
-    logger.info('Maintenance: reaping stuck idempotency keys');
-    await reapStuckIdempotencyKeys();
-    logger.info(`Maintenance: initial run complete (${Date.now() - started}ms)`);
-    logger.info('Startup finished — server idle until API traffic or scheduled maintenance');
+    await runMaintenanceStep('ping_database', () => pingDatabase());
+    await runMaintenanceStep('expire_stale_orders', () => expireStalePendingOrders());
+    await runMaintenanceStep('reap_idempotency', () => reapStuckIdempotencyKeys());
+    logger.info({ durationMs: Date.now() - started }, 'Maintenance: initial run complete');
   } catch (err) {
-    logger.warn('Initial maintenance run skipped (DB not ready):', err);
+    logger.warn({ durationMs: Date.now() - started, err }, 'Maintenance: initial run aborted');
   }
 }
 
@@ -49,9 +65,8 @@ export function startMaintenanceJobs(): void {
     );
   }, fifteenMinMs);
 
-  // Defer first run so pooler connections are fresh after bootstrap (30s dev, 120s prod).
-  const defaultDeferMs = process.env.NODE_ENV === 'development' ? '30000' : '120000';
-  const deferMs = parseInt(process.env.MAINTENANCE_DEFER_MS || defaultDeferMs, 10);
+  // Defer first run and ping DB so pooler connections are fresh after bootstrap.
+  const deferMs = parseInt(process.env.MAINTENANCE_DEFER_MS || '120000', 10);
   setTimeout(() => {
     runInitialMaintenance().catch((err) =>
       logger.warn('Initial maintenance run failed:', err)

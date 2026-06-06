@@ -100,6 +100,8 @@ const sql: Sql = postgres(connectionString, {
 export interface WithRetryOptions {
   retries?: number;
   baseMs?: number;
+  /** Included in retry warnings for easier debugging */
+  label?: string;
 }
 
 function isRetryableError(error: unknown): boolean {
@@ -158,7 +160,7 @@ export async function withRetry<T>(
   fn: () => Promise<T>,
   options: WithRetryOptions = {}
 ): Promise<T> {
-  const { retries = 3, baseMs = 200 } = options;
+  const { retries = 3, baseMs = 200, label } = options;
   let lastError: Error | undefined;
 
   for (let attempt = 0; attempt <= retries; attempt++) {
@@ -166,15 +168,34 @@ export async function withRetry<T>(
       return await fn();
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
+      const pgCode = (lastError as Error & { code?: string }).code;
 
       if (attempt >= retries || !isRetryableError(error)) {
+        logger.error(
+          {
+            label,
+            attempt: attempt + 1,
+            maxAttempts: retries + 1,
+            code: pgCode,
+            err: lastError.message,
+            pool: getPoolStats(),
+          },
+          '[withRetry] giving up'
+        );
         throw lastError;
       }
 
       const delay = baseMs * Math.pow(2, attempt) + Math.random() * baseMs;
       logger.warn(
-        `[withRetry] attempt ${attempt + 1}/${retries} failed, retrying in ${Math.round(delay)}ms:`,
-        lastError.message
+        {
+          label,
+          attempt: attempt + 1,
+          maxAttempts: retries + 1,
+          retryInMs: Math.round(delay),
+          code: pgCode,
+          err: lastError.message,
+        },
+        '[withRetry] transient failure, retrying'
       );
       await new Promise((resolve) => setTimeout(resolve, delay));
     }
@@ -199,7 +220,11 @@ export async function runBootstrapTask<T>(
     return result;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    logger.error(`Bootstrap: failed ${label} after ${Date.now() - started}ms`);
+    const code = error instanceof Error ? (error as Error & { code?: string }).code : undefined;
+    logger.error(
+      { label, durationMs: Date.now() - started, code, err: message, pool: getPoolStats() },
+      'Bootstrap: step failed'
+    );
     throw new Error(`Bootstrap step failed (${label}): ${message}`);
   } finally {
     clearInterval(heartbeat);
@@ -244,8 +269,12 @@ export async function query<T>(queryFn: () => Promise<T>, label?: string): Promi
   } finally {
     activeConnections--;
     const duration = Date.now() - startTime;
-    if (isProduction && duration > 1000) {
-      logger.warn(`[Slow Query] ${label || 'Unknown'}: ${duration}ms`);
+    const slowQueryMs = parseInt(process.env.DB_SLOW_QUERY_LOG_MS || '2000', 10);
+    if (duration >= slowQueryMs) {
+      logger.warn(
+        { label: label || 'unknown', durationMs: duration, pool: getPoolStats() },
+        '[DB] slow query'
+      );
     }
   }
 }

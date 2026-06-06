@@ -444,6 +444,9 @@ Redis connection failure in production prevents server startup.
 - JSON structured logs in production; `pino-pretty` in development.
 - Log level: `LOG_LEVEL` env or `info` (prod) / `debug` (dev).
 - Every request gets a child logger with `X-Request-Id` (UUID).
+- **Request lifecycle:** `Request started` (method, path, IP, timeout tier) and `Request finished` (status, duration). Slow requests log at `warn` when duration ≥ `REQUEST_LOG_SLOW_MS` (default 3s).
+- **DB:** `[withRetry]` logs include operation `label`, Postgres `code`, and pool stats on failure; queries ≥ `DB_SLOW_QUERY_LOG_MS` (default 2s) log as `[DB] slow query`.
+- **Timeouts:** `Request timeout` includes `elapsedMs`, path, and pool stats.
 
 ### Sentry
 
@@ -818,6 +821,8 @@ Templates: `backend/env.template`, `frontend/env.template`
 | `VITE_API_TIMEOUT_MS` | 60000 | Frontend default `apiFetch` timeout |
 | `VITE_EXTENDED_API_TIMEOUT_MS` | 180000 | Frontend `slowApiFetch` (catalog, analytics, activity) |
 | `LOG_LEVEL` | info/debug | Pino log level |
+| `REQUEST_LOG_SLOW_MS` | 3000 | Warn when a request exceeds this duration |
+| `DB_SLOW_QUERY_LOG_MS` | 2000 | Log slow database queries at warn |
 | `RESEND_API_KEY` | — | Email sender (required in production) |
 | `ORDER_TOKEN_ENCRYPTION_KEY` | — | AES-256-GCM key for checkout exchange token encryption (required in production) |
 | `IP_SALT` | — | Activity log IP anonymization and review voter IDs (required in production) |

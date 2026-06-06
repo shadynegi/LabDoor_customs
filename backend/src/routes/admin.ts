@@ -167,7 +167,7 @@ async function validateAdminSession(
         AND expires_at > NOW()
         LIMIT 1
       `,
-      { retries: 2, baseMs: 500 }
+      { retries: 2, baseMs: 500, label: 'validateAdminSession' }
     );
 
     if (!sessions || sessions.length === 0) {
@@ -229,7 +229,11 @@ export const verifyAdmin = async (req: Request, res: Response, next: NextFunctio
     (req as any).admin = { username: result.username };
     next();
   } catch (error) {
-    logger.error('verifyAdmin error:', error);
+    const code = error instanceof Error ? (error as Error & { code?: string }).code : undefined;
+    req.log?.error(
+      { err: error, code, path: req.originalUrl.split('?')[0], headersSent: res.headersSent },
+      'verifyAdmin failed'
+    );
     if (!res.headersSent) {
       res.status(503).json({
         success: false,
