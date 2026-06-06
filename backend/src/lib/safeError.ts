@@ -9,6 +9,7 @@ export function clientErrorMessage(err: unknown, fallback = 'Internal server err
 }
 
 export function respond500(res: Response, err: unknown, fallback: string): void {
+  if (res.headersSent) return;
   res.status(500).json({
     success: false,
     error: clientErrorMessage(err, fallback),

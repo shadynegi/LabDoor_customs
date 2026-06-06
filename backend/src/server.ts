@@ -389,10 +389,11 @@ function isSlowApiRequest(req: Request): boolean {
 
 app.use((req: Request, res: Response, next: NextFunction) => {
   const timeoutMs = isSlowApiRequest(req) ? SLOW_REQUEST_TIMEOUT_MS : REQUEST_TIMEOUT_MS;
+  const loggedPath = req.originalUrl.split('?')[0];
 
   const sendTimeout = () => {
     if (!res.headersSent) {
-      req.log?.warn({ method: req.method, path: req.path, timeoutMs }, 'Request timeout');
+      req.log?.warn({ method: req.method, path: loggedPath, timeoutMs }, 'Request timeout');
       res.status(504).json({
         success: false,
         error: 'Gateway Timeout',

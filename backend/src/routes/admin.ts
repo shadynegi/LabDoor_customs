@@ -1,7 +1,7 @@
 // backend/src/routes/admin.ts - Admin authentication and management
 import { logger } from '../lib/logger';
 import { Router, Request, Response, NextFunction } from 'express';
-import sql, { runInChunks } from '../lib/db';
+import sql, { runInChunks, withRetry } from '../lib/db';
 import { invalidateProductCaches } from '../lib/cacheKeys';
 import { parsePagination, paginationMeta } from '../lib/pagination';
 import crypto from 'crypto';
@@ -160,12 +160,15 @@ async function validateAdminSession(
 
   try {
     const tokenHash = hashAdminSessionToken(token);
-    const sessions = await sql`
-      SELECT username FROM admin_sessions
-      WHERE token = ${tokenHash}
-      AND expires_at > NOW()
-      LIMIT 1
-    `;
+    const sessions = await withRetry(
+      () => sql`
+        SELECT username FROM admin_sessions
+        WHERE token = ${tokenHash}
+        AND expires_at > NOW()
+        LIMIT 1
+      `,
+      { retries: 2, baseMs: 500 }
+    );
 
     if (!sessions || sessions.length === 0) {
       return { valid: false };
@@ -203,25 +206,37 @@ export async function isAdminAuthenticated(req: Request): Promise<boolean> {
 
 // Middleware to verify admin authentication
 export const verifyAdmin = async (req: Request, res: Response, next: NextFunction) => {
-  const token = extractAdminToken(req);
-  if (!token) {
-    return res.status(401).json({
-      success: false,
-      error: 'Not authenticated',
-    });
+  try {
+    const token = extractAdminToken(req);
+    if (!token) {
+      if (res.headersSent) return;
+      return res.status(401).json({
+        success: false,
+        error: 'Not authenticated',
+      });
+    }
+
+    const result = await validateAdminSession(token);
+
+    if (!result.valid) {
+      if (res.headersSent) return;
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid or expired token',
+      });
+    }
+
+    (req as any).admin = { username: result.username };
+    next();
+  } catch (error) {
+    logger.error('verifyAdmin error:', error);
+    if (!res.headersSent) {
+      res.status(503).json({
+        success: false,
+        error: 'Authentication service temporarily unavailable',
+      });
+    }
   }
-
-  const result = await validateAdminSession(token);
-
-  if (!result.valid) {
-    return res.status(401).json({
-      success: false,
-      error: 'Invalid or expired token',
-    });
-  }
-
-  (req as any).admin = { username: result.username };
-  next();
 };
 
 // POST /admin/login - Admin login

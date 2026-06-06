@@ -1,4 +1,8 @@
-import sql from './db';
+import sql, { withRetry } from './db';
+
+function analyticsQuery<T>(queryFn: () => Promise<T>): Promise<T> {
+  return withRetry(queryFn, { retries: 2, baseMs: 500 });
+}
 
 export async function fetchAdminAnalytics() {
   const [
@@ -14,47 +18,49 @@ export async function fetchAdminAnalytics() {
     dailyTrend,
     messageStats,
   ] = await Promise.all([
-    sql`
+    analyticsQuery(() => sql`
       SELECT
         COUNT(*)::int AS total_orders,
         COALESCE(SUM(CASE WHEN payment_status = 'completed' THEN total ELSE 0 END), 0)::float AS total_revenue
       FROM orders
-    `,
-    sql`
+    `),
+    analyticsQuery(() => sql`
       SELECT
         COUNT(*)::int AS orders_last_30_days,
         COALESCE(SUM(CASE WHEN payment_status = 'completed' THEN total ELSE 0 END), 0)::float AS revenue_last_30_days
       FROM orders
       WHERE created_at >= NOW() - INTERVAL '30 days'
-    `,
-    sql`SELECT COUNT(*)::int AS total_customers FROM customers WHERE is_deleted = false OR is_deleted IS NULL`,
-    sql`
+    `),
+    analyticsQuery(() => sql`
+      SELECT COUNT(*)::int AS total_customers FROM customers WHERE is_deleted = false OR is_deleted IS NULL
+    `),
+    analyticsQuery(() => sql`
       SELECT COUNT(*)::int AS new_customers_30_days
       FROM customers
       WHERE created_at >= NOW() - INTERVAL '30 days'
         AND (is_deleted = false OR is_deleted IS NULL)
-    `,
-    sql`
+    `),
+    analyticsQuery(() => sql`
       SELECT
         COUNT(*)::int AS total_products,
         COUNT(*) FILTER (WHERE is_out_of_stock = true OR stock <= 0)::int AS out_of_stock_products,
         COALESCE(SUM(view_count), 0)::int AS total_views,
         COALESCE(SUM(cart_count), 0)::int AS total_cart_adds
       FROM products
-    `,
-    sql`
+    `),
+    analyticsQuery(() => sql`
       SELECT id, name, COALESCE(view_count, 0)::int AS view_count
       FROM products
       ORDER BY view_count DESC NULLS LAST, id ASC
       LIMIT 5
-    `,
-    sql`
+    `),
+    analyticsQuery(() => sql`
       SELECT id, name, COALESCE(cart_count, 0)::int AS cart_count
       FROM products
       ORDER BY cart_count DESC NULLS LAST, id ASC
       LIMIT 5
-    `,
-    sql`
+    `),
+    analyticsQuery(() => sql`
       SELECT
         COALESCE(shipping_address->>'country', 'Unknown') AS country,
         COUNT(*)::int AS order_count,
@@ -64,14 +70,14 @@ export async function fetchAdminAnalytics() {
       GROUP BY 1
       ORDER BY order_count DESC
       LIMIT 12
-    `,
-    sql`
+    `),
+    analyticsQuery(() => sql`
       SELECT id, order_number, customer_name, customer_email, total, status, payment_status, created_at
       FROM orders
       ORDER BY created_at DESC
       LIMIT 8
-    `,
-    sql`
+    `),
+    analyticsQuery(() => sql`
       SELECT
         DATE(created_at) AS date,
         COUNT(*)::int AS orders,
@@ -80,8 +86,8 @@ export async function fetchAdminAnalytics() {
       WHERE created_at >= NOW() - INTERVAL '30 days'
       GROUP BY DATE(created_at)
       ORDER BY date DESC
-    `,
-    sql`
+    `),
+    analyticsQuery(() => sql`
       SELECT
         COUNT(*)::int AS total,
         COUNT(*) FILTER (WHERE status = 'new')::int AS new,
@@ -89,7 +95,7 @@ export async function fetchAdminAnalytics() {
         COUNT(*) FILTER (WHERE status = 'replied')::int AS replied,
         COUNT(*) FILTER (WHERE status = 'archived')::int AS archived
       FROM contact_messages
-    `,
+    `),
   ]);
 
   const ga4Id = process.env.VITE_GA4_MEASUREMENT_ID?.trim() || null;
