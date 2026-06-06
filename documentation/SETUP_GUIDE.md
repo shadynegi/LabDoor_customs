@@ -2,7 +2,7 @@
 
 Detailed local and staging configuration for Lab Door Customs.
 
-**Quick start:** [QUICK_START.md](./QUICK_START.md) | **Full reference:** [`../info.md`](../info.md)
+**Quick start:** [QUICK_START.md](./QUICK_START.md) | **Full reference:** [`info.md`](info.md)
 
 ---
 
@@ -80,6 +80,15 @@ curl -X POST http://localhost:5000/api/admin/generate-hash \
 ```
 
 Set `ADMIN_PASSWORD_HASH` in production (not plaintext `ADMIN_PASSWORD`).
+
+### Order tokens and activity privacy
+
+```
+ORDER_TOKEN_ENCRYPTION_KEY=your_32_char_key_for_aes_gcm_checkout_exchange
+IP_SALT=random_salt_for_ip_anonymization_and_review_votes
+```
+
+Both are required in production (`validate-env.mjs`). `ORDER_TOKEN_ENCRYPTION_KEY` encrypts access tokens in `order_checkout_exchanges`; `IP_SALT` salts activity IP anonymization and review voter ID derivation.
 
 ### Email (Resend)
 

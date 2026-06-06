@@ -10,7 +10,7 @@ export interface ResponsiveState {
 }
 
 export const BREAKPOINTS = {
-  smallMobile: 375,
+  smallMobile: 390,
   mobile: 768,
   tablet: 1024,
   desktop: 1280,

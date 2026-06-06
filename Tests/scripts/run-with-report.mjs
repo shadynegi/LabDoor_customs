@@ -1,8 +1,15 @@
 #!/usr/bin/env node
 /**
- * Runs Vitest or Playwright and writes a timestamped report to Tests/test-results/.
+ * Unified test runner with per-suite timestamped reports.
  *
- * Usage: node run-with-report.mjs <vitest|unit|api|frontend|all>
+ * Usage: node run-with-report.mjs <suite>
+ *
+ * Suites:
+ *   all        — backend unit + API + frontend UI (3 reports + summary)
+ *   unit       — backend unit tests only (Tests/backend/)
+ *   api        — API integration tests only (Tests/api/)
+ *   vitest     — backend unit + API together (single backend report)
+ *   frontend   — Playwright UI tests (Tests/frontend/)
  */
 
 import { spawnSync } from 'node:child_process';
@@ -20,15 +27,22 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const testsRoot = join(__dirname, '..');
 const repoRoot = join(testsRoot, '..');
 const backendRoot = join(repoRoot, 'backend');
-const resultsDir = join(testsRoot, 'test-results');
+const frontendDist = join(repoRoot, 'frontend', 'dist', 'index.html');
+const resultsDir = join(repoRoot, 'documentation', 'test-results');
 
-const suite = process.argv[2] ?? 'vitest';
+const suite = process.argv[2] ?? 'all';
+
+const SUITE_SLUG = {
+  unit: 'backend-unit',
+  api: 'api',
+  vitest: 'backend',
+  frontend: 'frontend-ui',
+};
 
 function pad(n) {
   return String(n).padStart(2, '0');
 }
 
-/** Filename-safe local timestamp at report completion time. */
 function formatTimestamp(date = new Date()) {
   return [
     date.getFullYear(),
@@ -43,6 +57,7 @@ function formatDisplayDate(date = new Date()) {
 
 function runCommand(label, command, args, options = {}) {
   const started = Date.now();
+  console.log(`\n▶ ${label}…`);
   const result = spawnSync(command, args, {
     encoding: 'utf8',
     shell: process.platform === 'win32',
@@ -52,6 +67,8 @@ function runCommand(label, command, args, options = {}) {
   const stdout = result.stdout ?? '';
   const stderr = result.stderr ?? '';
   const exitCode = result.status ?? 1;
+  const status = exitCode === 0 ? 'PASS' : 'FAIL';
+  console.log(`  ${status} (${formatDuration(durationMs)}, exit ${exitCode})`);
   return { label, command, args, stdout, stderr, exitCode, durationMs };
 }
 
@@ -132,18 +149,18 @@ function parseVitestJson(jsonPath) {
 }
 
 function walkPlaywrightSuites(suites, filePath = '', entries = []) {
-  for (const suite of suites ?? []) {
-    const suiteTitle = suite.title ?? '';
+  for (const suiteEntry of suites ?? []) {
+    const suiteTitle = suiteEntry.title ?? '';
     const nextPath = filePath ? `${filePath} > ${suiteTitle}` : suiteTitle;
 
-    for (const spec of suite.specs ?? []) {
+    for (const spec of suiteEntry.specs ?? []) {
       const specTitle = spec.title ?? 'unnamed spec';
       const fullTitle = nextPath ? `${nextPath} > ${specTitle}` : specTitle;
 
       for (const test of spec.tests ?? []) {
         for (const result of test.results ?? []) {
           entries.push({
-            file: spec.file ?? suite.file ?? 'unknown',
+            file: spec.file ?? suiteEntry.file ?? 'unknown',
             title: fullTitle,
             status: result.status ?? 'unknown',
             duration: result.duration ?? null,
@@ -153,7 +170,7 @@ function walkPlaywrightSuites(suites, filePath = '', entries = []) {
       }
     }
 
-    walkPlaywrightSuites(suite.suites, nextPath, entries);
+    walkPlaywrightSuites(suiteEntry.suites, nextPath, entries);
   }
   return entries;
 }
@@ -222,21 +239,78 @@ function runVitest(scope) {
   if (scope === 'unit') args.push('../Tests/backend');
   else if (scope === 'api') args.push('../Tests/api');
 
-  const run = runCommand('Vitest (backend + API)', 'npx', args, { cwd: backendRoot });
+  const label =
+    scope === 'unit'
+      ? 'Backend unit (Vitest)'
+      : scope === 'api'
+        ? 'API integration (Vitest)'
+        : 'Backend + API (Vitest)';
+
+  const run = runCommand(label, 'npx', args, { cwd: backendRoot });
   const parsed = parseVitestJson(tmpJson);
   if (existsSync(tmpJson)) unlinkSync(tmpJson);
 
   return {
-    name: scope === 'unit' ? 'Backend unit (Vitest)' : scope === 'api' ? 'API (Vitest)' : 'Backend + API (Vitest)',
+    name: label,
+    slug: SUITE_SLUG[scope] ?? 'backend',
+    scope,
     ...run,
     ...parsed,
   };
 }
 
+function ensureFrontendBuild() {
+  if (existsSync(frontendDist)) return null;
+  return runCommand('Frontend build (required for UI tests)', 'npm', ['run', 'build', '-w', 'frontend'], {
+    cwd: repoRoot,
+  });
+}
+
+function ensurePlaywrightInstalled() {
+  const playwrightPkg = join(testsRoot, 'node_modules', '@playwright', 'test');
+  if (existsSync(playwrightPkg)) return null;
+
+  console.log('\n⚠ Playwright not installed in Tests/ — running npm install…');
+  const install = runCommand('Tests npm install', 'npm', ['install'], { cwd: testsRoot });
+  if (install.exitCode !== 0) return install;
+
+  return runCommand('Playwright Chromium install', 'npx', ['playwright', 'install', 'chromium'], {
+    cwd: testsRoot,
+  });
+}
+
 function runPlaywright() {
+  const prep = ensurePlaywrightInstalled();
+  if (prep && prep.exitCode !== 0) {
+    return {
+      name: 'Frontend UI (Playwright)',
+      slug: SUITE_SLUG.frontend,
+      scope: 'frontend',
+      ...prep,
+      passed: [],
+      failed: [],
+      skipped: [],
+      parseError: 'Playwright setup failed before tests could run.',
+    };
+  }
+
+  const build = ensureFrontendBuild();
+  if (build && build.exitCode !== 0) {
+    return {
+      name: 'Frontend UI (Playwright)',
+      slug: SUITE_SLUG.frontend,
+      scope: 'frontend',
+      ...build,
+      passed: [],
+      failed: [],
+      skipped: [],
+      parseError: 'Frontend build failed before Playwright could run.',
+    };
+  }
+
   const tmpJson = join(resultsDir, `.tmp-playwright-${Date.now()}.json`);
   const run = runCommand(
-    'Frontend E2E (Playwright)',
+    'Frontend UI (Playwright)',
     'npx',
     ['playwright', 'test'],
     {
@@ -253,7 +327,9 @@ function runPlaywright() {
   if (existsSync(tmpJson)) unlinkSync(tmpJson);
 
   return {
-    name: 'Frontend E2E (Playwright)',
+    name: 'Frontend UI (Playwright)',
+    slug: SUITE_SLUG.frontend,
+    scope: 'frontend',
     ...run,
     ...parsed,
   };
@@ -295,8 +371,83 @@ function renderFailures(entries) {
     .join('\n');
 }
 
-function buildMarkdown({ completedAt, suiteArg, runs, git, overallExitCode }) {
-  const stamp = formatTimestamp(completedAt);
+function buildSuiteMarkdown({ completedAt, runId, suiteArg, run, git }) {
+  const slug = run.slug ?? 'unknown';
+  const passed = run.passed?.length ?? 0;
+  const failed = run.failed?.length ?? 0;
+  const skipped = run.skipped?.length ?? 0;
+  const overallPass = run.exitCode === 0 && failed === 0;
+
+  const lines = [
+    '# Lab Door Customs — Test Report',
+    '',
+    `**Suite:** ${run.name}`,
+    `**Completed:** ${formatDisplayDate(completedAt)}`,
+    `**Run ID:** \`${runId}\``,
+    `**Report slug:** \`${slug}\``,
+    `**Command:** \`node Tests/scripts/run-with-report.mjs ${suiteArg}\``,
+    `**Result:** ${overallPass ? 'PASS' : 'FAIL'}`,
+    '',
+    '## Environment',
+    '',
+    '| Key | Value |',
+    '|-----|-------|',
+    `| Node | ${process.version} |`,
+    `| Platform | ${process.platform} |`,
+    `| Git branch | \`${git.branch}\` |`,
+    `| Git commit | \`${git.commit}\` |`,
+    `| Markdown report | \`${slug}-${runId}.md\` |`,
+    `| JSON report | \`${slug}-${runId}.json\` |`,
+    '',
+    '## Summary',
+    '',
+    '| Metric | Count |',
+    '|--------|-------|',
+    `| Passed | ${passed} |`,
+    `| Failed | ${failed} |`,
+    `| Skipped | ${skipped} |`,
+    `| Command duration | ${formatDuration(run.durationMs)} |`,
+    `| Exit code | ${run.exitCode} |`,
+    '',
+    `## ${run.name}`,
+    '',
+    '| Passed | Failed | Skipped | Duration | Exit code |',
+    '|--------|--------|---------|----------|-----------|',
+    `| ${passed} | ${failed} | ${skipped} | ${formatDuration(run.durationMs)} | ${run.exitCode} |`,
+    '',
+  ];
+
+  if (run.parseError) {
+    lines.push('> **Parse warning:** ' + run.parseError, '');
+  }
+
+  lines.push('### Passed tests', '', renderTestList(run.passed ?? []));
+  lines.push('### Failed tests', '', renderTestList(run.failed ?? []));
+
+  if (run.skipped?.length) {
+    lines.push('### Skipped tests', '', renderTestList(run.skipped));
+  }
+
+  lines.push('### Failure logs (debug)', '', renderFailures(run.failed ?? []));
+
+  if (run.stderr?.trim()) {
+    lines.push('### Command stderr', '', '```', run.stderr.trim(), '```', '');
+  }
+
+  if (run.failed?.length && run.stdout?.trim()) {
+    lines.push('### Command stdout (failed run)', '', '```', run.stdout.trim().slice(-8000), '```', '');
+  }
+
+  lines.push(
+    '',
+    '_Generated by `Tests/scripts/run-with-report.mjs`. See `documentation/test_guidelines.md`._',
+    '',
+  );
+
+  return lines.join('\n');
+}
+
+function buildSummaryMarkdown({ completedAt, runId, runs, git, overallExitCode }) {
   let totalPassed = 0;
   let totalFailed = 0;
   let totalSkipped = 0;
@@ -308,129 +459,145 @@ function buildMarkdown({ completedAt, suiteArg, runs, git, overallExitCode }) {
   }
 
   const lines = [
-    '# Lab Door Customs — Test Report',
+    '# Lab Door Customs — Full Test Run Summary',
     '',
     `**Completed:** ${formatDisplayDate(completedAt)}`,
-    `**Report ID:** \`${stamp}\``,
-    `**Suite command:** \`${suiteArg}\``,
+    `**Run ID:** \`${runId}\``,
+    `**Command:** \`npm run test:all\` (or \`node Tests/scripts/run-with-report.mjs all\`)`,
     `**Overall result:** ${overallExitCode === 0 ? 'PASS' : 'FAIL'}`,
     '',
     '## Environment',
     '',
-    `| Key | Value |`,
-    `|-----|-------|`,
+    '| Key | Value |',
+    '|-----|-------|',
     `| Node | ${process.version} |`,
     `| Platform | ${process.platform} |`,
     `| Git branch | \`${git.branch}\` |`,
     `| Git commit | \`${git.commit}\` |`,
-    `| Report path | \`Tests/test-results/report-${stamp}.md\` |`,
     '',
-    '## Summary',
+    '## Totals',
     '',
-    `| Metric | Count |`,
-    `|--------|-------|`,
+    '| Metric | Count |',
+    '|--------|-------|',
     `| Passed | ${totalPassed} |`,
     `| Failed | ${totalFailed} |`,
     `| Skipped | ${totalSkipped} |`,
     `| Exit code | ${overallExitCode} |`,
     '',
+    '## Per-suite reports',
+    '',
+    '| Suite | Passed | Failed | Skipped | Duration | Exit | Individual report |',
+    '|-------|--------|--------|---------|----------|------|-------------------|',
   ];
 
   for (const run of runs) {
-    lines.push(`## ${run.name}`, '');
+    const slug = run.slug ?? 'unknown';
     lines.push(
-      `| Passed | Failed | Skipped | Command duration | Exit code |`,
-      `|--------|--------|---------|------------------|-----------|`,
-      `| ${run.passed?.length ?? 0} | ${run.failed?.length ?? 0} | ${run.skipped?.length ?? 0} | ${formatDuration(run.durationMs)} | ${run.exitCode} |`,
-      '',
+      `| ${run.name} | ${run.passed?.length ?? 0} | ${run.failed?.length ?? 0} | ${run.skipped?.length ?? 0} | ${formatDuration(run.durationMs)} | ${run.exitCode} | \`${slug}-${runId}.md\` |`,
     );
+  }
 
+  lines.push('', '## Suite details', '');
+
+  for (const run of runs) {
+    lines.push(`### ${run.name}`, '');
     if (run.parseError) {
       lines.push('> **Parse warning:** ' + run.parseError, '');
     }
-
-    lines.push('### Passed tests', '', renderTestList(run.passed ?? []));
-    lines.push('### Failed tests', '', renderTestList(run.failed ?? []));
-
-    if (run.skipped?.length) {
-      lines.push('### Skipped tests', '', renderTestList(run.skipped));
-    }
-
-    lines.push('### Failure logs (debug)', '', renderFailures(run.failed ?? []));
-
-    if (run.stderr?.trim()) {
-      lines.push('### Command stderr', '', '```', run.stderr.trim(), '```', '');
-    }
-
-    if (run.failed?.length && run.stdout?.trim()) {
-      lines.push('### Command stdout (failed run)', '', '```', run.stdout.trim().slice(-8000), '```', '');
-    }
-
+    lines.push('#### Failed tests', '', renderTestList(run.failed ?? []));
+    lines.push('#### Failure logs', '', renderFailures(run.failed ?? []));
     lines.push('---', '');
   }
 
   lines.push(
-    '_Generated by `Tests/scripts/run-with-report.mjs`. Re-run tests only when explicitly requested (see test_guidelines.md)._',
+    '_Generated by `Tests/scripts/run-with-report.mjs`. Individual suite reports are saved alongside this summary._',
     '',
   );
 
-  return { stamp, markdown: lines.join('\n'), summary: { totalPassed, totalFailed, totalSkipped, overallExitCode } };
+  return {
+    markdown: lines.join('\n'),
+    summary: { totalPassed, totalFailed, totalSkipped, overallExitCode },
+  };
 }
 
-function main() {
-  mkdirSync(resultsDir, { recursive: true });
+function writeSuiteReport(run, { runId, completedAt, suiteArg, git }) {
+  const slug = run.slug ?? 'unknown';
+  const baseName = `${slug}-${runId}`;
+  const mdPath = join(resultsDir, `${baseName}.md`);
+  const jsonPath = join(resultsDir, `${baseName}.json`);
 
-  const runs = [];
-  let overallExitCode = 0;
-
-  if (suite === 'all') {
-    runs.push(runVitest('vitest'));
-    runs.push(runPlaywright());
-    overallExitCode = runs.some((r) => r.exitCode !== 0)
-      ? runs.find((r) => r.exitCode !== 0).exitCode
-      : 0;
-  } else if (suite === 'frontend') {
-    runs.push(runPlaywright());
-    overallExitCode = runs[0].exitCode;
-  } else if (suite === 'unit' || suite === 'api' || suite === 'vitest') {
-    runs.push(runVitest(suite));
-    overallExitCode = runs[0].exitCode;
-  } else {
-    console.error(`Unknown suite "${suite}". Use: vitest | unit | api | frontend | all`);
-    process.exit(1);
-  }
-
-  const completedAt = new Date();
-  const git = gitInfo();
-  const { stamp, markdown, summary } = buildMarkdown({
-    completedAt,
-    suiteArg: suite,
-    runs,
-    git,
-    overallExitCode,
-  });
-
-  const reportBase = join(resultsDir, `report-${stamp}`);
-  const mdPath = `${reportBase}.md`;
-  const jsonPath = `${reportBase}.json`;
+  const markdown = buildSuiteMarkdown({ completedAt, runId, suiteArg, run, git });
+  const passed = run.passed?.length ?? 0;
+  const failed = run.failed?.length ?? 0;
+  const skipped = run.skipped?.length ?? 0;
 
   writeFileSync(mdPath, markdown, 'utf8');
   writeFileSync(
     jsonPath,
     JSON.stringify(
       {
+        runId,
         completedAt: completedAt.toISOString(),
-        suite,
+        suite: suiteArg,
+        slug,
+        name: run.name,
         git,
-        summary,
-        runs: runs.map(({ name, exitCode, durationMs, passed, failed, skipped, parseError }) => ({
-          name,
-          exitCode,
-          durationMs,
+        summary: {
           passed,
           failed,
           skipped,
-          parseError,
+          exitCode: run.exitCode,
+          durationMs: run.durationMs,
+        },
+        passed: run.passed ?? [],
+        failed: run.failed ?? [],
+        skipped: run.skipped ?? [],
+        parseError: run.parseError ?? null,
+      },
+      null,
+      2,
+    ),
+    'utf8',
+  );
+
+  return { mdPath, jsonPath, passed, failed };
+}
+
+function writeSummaryReport(runs, { runId, completedAt, git, overallExitCode }) {
+  const baseName = `summary-${runId}`;
+  const mdPath = join(resultsDir, `${baseName}.md`);
+  const jsonPath = join(resultsDir, `${baseName}.json`);
+  const latestPath = join(resultsDir, 'latest-summary.json');
+
+  const { markdown, summary } = buildSummaryMarkdown({
+    completedAt,
+    runId,
+    runs,
+    git,
+    overallExitCode,
+  });
+
+  writeFileSync(mdPath, markdown, 'utf8');
+  writeFileSync(
+    jsonPath,
+    JSON.stringify(
+      {
+        runId,
+        completedAt: completedAt.toISOString(),
+        suite: 'all',
+        git,
+        summary,
+        suites: runs.map(({ name, slug, exitCode, durationMs, passed, failed, skipped, parseError }) => ({
+          name,
+          slug,
+          exitCode,
+          durationMs,
+          reportMarkdown: `${slug}-${runId}.md`,
+          reportJson: `${slug}-${runId}.json`,
+          passed: passed?.length ?? 0,
+          failed: failed?.length ?? 0,
+          skipped: skipped?.length ?? 0,
+          parseError: parseError ?? null,
         })),
       },
       null,
@@ -439,9 +606,101 @@ function main() {
     'utf8',
   );
 
-  console.log(`\nTest report written to ${relPath(mdPath)}`);
-  console.log(`JSON summary: ${relPath(jsonPath)}`);
-  console.log(`Result: ${summary.overallExitCode === 0 ? 'PASS' : 'FAIL'} (${summary.totalPassed} passed, ${summary.totalFailed} failed)\n`);
+  writeFileSync(
+    latestPath,
+    JSON.stringify(
+      {
+        runId,
+        completedAt: completedAt.toISOString(),
+        summary,
+        summaryMarkdown: `${baseName}.md`,
+        suites: runs.map((r) => ({
+          slug: r.slug,
+          report: `${r.slug}-${runId}.md`,
+          exitCode: r.exitCode,
+          passed: r.passed?.length ?? 0,
+          failed: r.failed?.length ?? 0,
+        })),
+      },
+      null,
+      2,
+    ),
+    'utf8',
+  );
+
+  return { mdPath, jsonPath, summary };
+}
+
+function resolveRuns(suiteArg) {
+  if (suiteArg === 'all') {
+    return [
+      runVitest('unit'),
+      runVitest('api'),
+      runPlaywright(),
+    ];
+  }
+  if (suiteArg === 'frontend') {
+    return [runPlaywright()];
+  }
+  if (suiteArg === 'unit' || suiteArg === 'api' || suiteArg === 'vitest') {
+    return [runVitest(suiteArg)];
+  }
+  return null;
+}
+
+function main() {
+  mkdirSync(resultsDir, { recursive: true });
+
+  const runs = resolveRuns(suite);
+  if (!runs) {
+    console.error(`Unknown suite "${suite}". Use: all | unit | api | vitest | frontend`);
+    process.exit(1);
+  }
+
+  const runId = formatTimestamp(new Date());
+  const git = gitInfo();
+  const completedAt = new Date();
+  const reportPaths = [];
+
+  let totalPassed = 0;
+  let totalFailed = 0;
+
+  for (const run of runs) {
+    const suiteArg = runs.length === 1 ? suite : run.scope ?? suite;
+    const { mdPath, jsonPath, passed, failed } = writeSuiteReport(run, {
+      runId,
+      completedAt,
+      suiteArg,
+      git,
+    });
+    reportPaths.push({ slug: run.slug, mdPath, jsonPath });
+    totalPassed += passed;
+    totalFailed += failed;
+  }
+
+  const overallExitCode = runs.some((r) => r.exitCode !== 0)
+    ? runs.find((r) => r.exitCode !== 0).exitCode
+    : 0;
+
+  let summaryInfo = null;
+  if (suite === 'all') {
+    summaryInfo = writeSummaryReport(runs, { runId, completedAt, git, overallExitCode });
+  }
+
+  console.log('\n── Test reports ──');
+  for (const { slug, mdPath, jsonPath } of reportPaths) {
+    console.log(`  ${slug}: ${relPath(mdPath)}`);
+    console.log(`         ${relPath(jsonPath)}`);
+  }
+  if (summaryInfo) {
+    console.log(`  summary: ${relPath(summaryInfo.mdPath)}`);
+    console.log(`           ${relPath(summaryInfo.jsonPath)}`);
+    console.log(`  latest:  documentation/test-results/latest-summary.json`);
+  }
+
+  console.log(
+    `\nResult: ${overallExitCode === 0 ? 'PASS' : 'FAIL'} (${totalPassed} passed, ${totalFailed} failed)\n`,
+  );
 
   process.exit(overallExitCode);
 }

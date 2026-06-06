@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { apiFetch } from '../config';
 import type { Product } from './useProducts';
-import { getProductCatalog } from '../lib/productCatalogCache';
+import { CATALOG_CLEARED_EVENT, getProductCatalog } from '../lib/productCatalogCache';
 import {
   createProductFuse,
   fuseSearchProducts,
@@ -11,6 +11,7 @@ import {
 } from '../lib/productFuseSearch';
 import type { SearchFilters, FilterOptions, SortOption } from '../types/productSearch';
 import { logError } from '../lib/logger';
+import { trackFilterApply, trackSearch } from '../utils/activityTracker';
 
 export type { SearchFilters, FilterOptions, SortOption };
 
@@ -33,6 +34,8 @@ interface UseProductSearchResult {
   filterOptions: FilterOptions | null;
   loadingFilterOptions: boolean;
   activeFilterCount: number;
+  ensureCatalogLoaded: () => Promise<void>;
+  ensureFilterOptionsLoaded: () => Promise<void>;
 }
 
 const DEFAULT_FILTERS: SearchFilters = {};
@@ -53,6 +56,8 @@ export const useProductSearch = (debounceMs: number = 300): UseProductSearchResu
   const [filterOptions, setFilterOptions] = useState<FilterOptions | null>(null);
   const [loadingFilterOptions, setLoadingFilterOptions] = useState(false);
   const fuseRef = useRef<ReturnType<typeof createProductFuse> | null>(null);
+  const catalogLoadedRef = useRef(false);
+  const filtersLoadedRef = useRef(false);
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
@@ -67,73 +72,75 @@ export const useProductSearch = (debounceMs: number = 300): UseProductSearchResu
 
   const isFiltering = activeFilterCount > 0 || (filters.sortBy !== undefined && filters.sortBy !== 'default');
 
-  useEffect(() => {
-    let cancelled = false;
+  const ensureCatalogLoaded = useCallback(async (force = false) => {
+    if (catalogLoadedRef.current && !force) return;
 
-    const loadCatalog = async () => {
-      try {
-        setCatalogLoading(true);
-        setError(null);
-        const products = await getProductCatalog();
-        if (!cancelled) {
-          setCatalog(products);
-          fuseRef.current = createProductFuse(products);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Failed to load products');
-          setCatalog([]);
-          fuseRef.current = null;
-        }
-      } finally {
-        if (!cancelled) setCatalogLoading(false);
+    try {
+      setCatalogLoading(true);
+      setError(null);
+      const products = await getProductCatalog(force);
+      catalogLoadedRef.current = true;
+      setCatalog(products);
+      fuseRef.current = createProductFuse(products);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load products');
+      setCatalog([]);
+      fuseRef.current = null;
+      catalogLoadedRef.current = false;
+    } finally {
+      setCatalogLoading(false);
+    }
+  }, []);
+
+  const ensureFilterOptionsLoaded = useCallback(async () => {
+    if (filtersLoadedRef.current) return;
+
+    try {
+      setLoadingFilterOptions(true);
+      const response = await apiFetch('/products/filters');
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch filter options');
       }
-    };
 
-    loadCatalog();
-    return () => {
-      cancelled = true;
-    };
+      const data = await response.json();
+      if (data.success && data.data) {
+        setFilterOptions(data.data);
+      }
+      filtersLoadedRef.current = true;
+    } catch (err) {
+      logError('Error fetching filter options:', err);
+      setFilterOptions({
+        categories: [],
+        sizes: [],
+        colors: [],
+        priceRange: { min: 0, max: 500 },
+        ratingRange: { min: 0, max: 5, avg: 0 },
+        sortOptions: [
+          { value: 'default', label: 'Default' },
+          { value: 'price_asc', label: 'Price: Low to High' },
+          { value: 'price_desc', label: 'Price: High to Low' },
+          { value: 'rating_desc', label: 'Highest Rated' },
+          { value: 'newest', label: 'Newest First' },
+          { value: 'oldest', label: 'Oldest First' },
+        ],
+      });
+      filtersLoadedRef.current = true;
+    } finally {
+      setLoadingFilterOptions(false);
+    }
   }, []);
 
   useEffect(() => {
-    const fetchFilterOptions = async () => {
-      try {
-        setLoadingFilterOptions(true);
-        const response = await apiFetch('/products/filters');
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch filter options');
-        }
-
-        const data = await response.json();
-        if (data.success && data.data) {
-          setFilterOptions(data.data);
-        }
-      } catch (err) {
-        logError('Error fetching filter options:', err);
-        setFilterOptions({
-          categories: [],
-          sizes: [],
-          colors: [],
-          priceRange: { min: 0, max: 500 },
-          ratingRange: { min: 0, max: 5, avg: 0 },
-          sortOptions: [
-            { value: 'default', label: 'Default' },
-            { value: 'price_asc', label: 'Price: Low to High' },
-            { value: 'price_desc', label: 'Price: High to Low' },
-            { value: 'rating_desc', label: 'Highest Rated' },
-            { value: 'newest', label: 'Newest First' },
-            { value: 'oldest', label: 'Oldest First' },
-          ],
-        });
-      } finally {
-        setLoadingFilterOptions(false);
-      }
+    const onCatalogCleared = () => {
+      catalogLoadedRef.current = false;
+      filtersLoadedRef.current = false;
+      void ensureCatalogLoaded(true);
+      void ensureFilterOptionsLoaded();
     };
-
-    fetchFilterOptions();
-  }, []);
+    window.addEventListener(CATALOG_CLEARED_EVENT, onCatalogCleared);
+    return () => window.removeEventListener(CATALOG_CLEARED_EVENT, onCatalogCleared);
+  }, [ensureCatalogLoaded, ensureFilterOptionsLoaded]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -142,6 +149,15 @@ export const useProductSearch = (debounceMs: number = 300): UseProductSearchResu
 
     return () => clearTimeout(timer);
   }, [searchQuery, debounceMs]);
+
+  useEffect(() => {
+    if (debouncedQuery.trim() || isFiltering) {
+      void ensureCatalogLoaded();
+    }
+    if (isFiltering) {
+      void ensureFilterOptionsLoaded();
+    }
+  }, [debouncedQuery, isFiltering, ensureCatalogLoaded, ensureFilterOptionsLoaded]);
 
   const suggestions = useMemo(() => {
     if (!searchQuery.trim() || !fuseRef.current) return [];
@@ -181,6 +197,12 @@ export const useProductSearch = (debounceMs: number = 300): UseProductSearchResu
         hasFilters
       );
       setResults(nextResults);
+      if (hasQuery) {
+        trackSearch(debouncedQuery.trim(), nextResults.length);
+      }
+      if (hasFilters) {
+        trackFilterApply(filters as Record<string, unknown>);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Search failed');
       setResults([]);
@@ -229,5 +251,7 @@ export const useProductSearch = (debounceMs: number = 300): UseProductSearchResu
     filterOptions,
     loadingFilterOptions,
     activeFilterCount,
+    ensureCatalogLoaded,
+    ensureFilterOptionsLoaded,
   };
 };

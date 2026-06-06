@@ -2,7 +2,7 @@
 
 How to use the Lab Door Customs admin dashboard.
 
-**Full reference:** [`../info.md`](../info.md)
+**Full reference:** [`info.md`](info.md)
 
 ---
 
@@ -65,12 +65,12 @@ Click an order card to open fulfillment actions:
 - **Tracking** — save tracking number, carrier, optional tracking URL
 - **Notify shipped** — `POST /api/orders/:id/notify-shipped` (requires tracking number)
 - **Status** — Mark processing, shipped, or delivered (valid transitions enforced)
-- **Mark paid** — prompts for a reason, then `PATCH /api/orders/:id/payment-status` with `completed` and `admin_note` (manual/offline payments; logged to activity)
+- **Mark paid** — prompts for a reason, then `PATCH /api/orders/:id/payment-status` with `completed`, `admin_note` (≥3 chars), and `payment_id` (external reference or capture ID, ≥5 chars); logged to `activity_logs` as `admin_mark_paid`
 - **Cancel order** — prompts for optional reason; dismiss the prompt to abort. Uses `POST /api/orders/:id/cancel` with optional PayPal refund
 
 ### Bulk updates
 
-Bulk status dropdown supports processing, shipped, and delivered only. **Cancelled** is not available in bulk — use the order modal cancel action.
+Bulk status dropdown supports processing, shipped, and delivered only. **Cancelled** is not available in bulk — use the order modal cancel action. Bulk endpoints accept at most **500** order IDs per request; each order's status transition is validated server-side. `payment_status` cannot be changed via bulk update.
 
 ### Cancel orders
 
@@ -128,13 +128,29 @@ Aggregated customer data from the `customers` table (updated on order capture).
 
 ---
 
+## Reviews tab
+
+Manage customer reviews from the **Reviews** tab.
+
+- **Customer email is admin-only** — the public product page and public review API never expose `customer_email`; only this tab and admin API routes include it.
+- View all reviews with **customer name**, **email**, rating, product, status, and text
+- Filter by status (pending, approved, rejected, flagged)
+- **Quick Approve / Reject** for pending reviews
+- Pagination — 50 reviews per page
+- **Create Review** — modal to add a review with customer name, optional email, product, rating, title, body, status, and verified-purchase badge
+- **Edit** — update any review field or status
+- **Delete** — remove a review permanently
+
+API: `GET /api/reviews`, `POST /api/reviews/admin`, `PATCH /api/reviews/:id`, `DELETE /api/reviews/:id`
+
+---
+
 ## API-only admin features
 
 These are available via API but do not have dedicated dashboard tabs:
 
 | Feature | Endpoints |
 |---------|-----------|
-| Reviews | `GET /api/reviews`, `PATCH /api/reviews/:id/status` |
 | Activity logs | `GET /api/activity/logs`, `/export` |
 | PayPal refunds | `POST /api/paypal/refund/:captureId` |
 | PayPal test | `GET /api/paypal/test` |

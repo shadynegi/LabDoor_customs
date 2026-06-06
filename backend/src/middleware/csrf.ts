@@ -45,7 +45,8 @@ export const csrfProtection = (req: Request, res: Response, next: NextFunction) 
 
   // Skip CSRF for certain paths (webhooks, public APIs)
   const skipPaths = [
-    '/api/paypal/webhook',      // PayPal webhooks have their own verification
+    '/api/paypal/webhook',
+    '/api/activity/batch', // sendBeacon cannot attach CSRF headers; rate-limited separately
   ];
   
   if (skipPaths.some(path => req.path.startsWith(path))) {
@@ -68,7 +69,15 @@ export const csrfProtection = (req: Request, res: Response, next: NextFunction) 
     });
   }
 
-  // Constant-time comparison to prevent timing attacks
+  if (cookieToken.length !== headerToken.length) {
+    logger.warn('CSRF validation failed: Token length mismatch');
+    return res.status(403).json({
+      success: false,
+      error: 'CSRF token invalid',
+      message: 'Security validation failed. Please refresh the page and try again',
+    });
+  }
+
   if (!crypto.timingSafeEqual(Buffer.from(cookieToken), Buffer.from(headerToken))) {
     logger.warn('CSRF validation failed: Token mismatch');
     return res.status(403).json({

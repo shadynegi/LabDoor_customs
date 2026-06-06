@@ -3,11 +3,22 @@ import crypto from 'crypto';
 const ALGO = 'aes-256-gcm';
 
 function getEncryptionKey(): Buffer {
-  const secret =
-    process.env.ORDER_TOKEN_ENCRYPTION_KEY?.trim() ||
-    process.env.JWT_SECRET?.trim() ||
-    'dev-only-insecure-key-do-not-use-in-production';
-  return crypto.createHash('sha256').update(secret).digest();
+  const dedicated = process.env.ORDER_TOKEN_ENCRYPTION_KEY?.trim();
+  if (dedicated) {
+    return crypto.createHash('sha256').update(dedicated).digest();
+  }
+
+  const isProd = process.env.NODE_ENV === 'production';
+  if (isProd) {
+    throw new Error('ORDER_TOKEN_ENCRYPTION_KEY must be set in production');
+  }
+
+  const jwtFallback = process.env.JWT_SECRET?.trim();
+  if (!jwtFallback) {
+    throw new Error('ORDER_TOKEN_ENCRYPTION_KEY or JWT_SECRET required for order token encryption');
+  }
+
+  return crypto.createHash('sha256').update(jwtFallback).digest();
 }
 
 /** Encrypt order access token for short-lived storage (checkout exchange table). */

@@ -12,7 +12,9 @@ DECLARE
     'coupon_usage',
     'payment_idempotency',
     'processed_refund_events',
-    'order_checkout_exchanges'
+    'order_checkout_exchanges',
+    'customers',
+    'activity_logs'
   ];
 BEGIN
   FOREACH tbl IN ARRAY tables

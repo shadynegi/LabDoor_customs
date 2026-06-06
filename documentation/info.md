@@ -2,9 +2,9 @@
 
 **Lab Door Customs** is a full-stack e-commerce application for custom footwear. A React storefront handles browsing, cart, and PayPal checkout; an Express API owns pricing, inventory, orders, admin operations, and PayPal webhooks. PostgreSQL (Supabase) is the system of record.
 
-**Documentation hub:** [`documentation/DOCUMENTATION_INDEX.md`](documentation/DOCUMENTATION_INDEX.md)
+**Documentation hub:** [`DOCUMENTATION_INDEX.md`](DOCUMENTATION_INDEX.md)
 
-**Doc maintenance:** When changing behavior, update this file and the relevant guides under [`documentation/`](documentation/DOCUMENTATION_INDEX.md). Agents follow [`.cursor/rules/documentation-sync.mdc`](.cursor/rules/documentation-sync.mdc).
+**Doc maintenance:** When changing behavior, update this file and the relevant guides in this folder (see [DOCUMENTATION_INDEX.md](DOCUMENTATION_INDEX.md)). Agents follow [`.cursor/rules/documentation-sync.mdc`](../.cursor/rules/documentation-sync.mdc).
 
 ---
 
@@ -67,7 +67,7 @@
 | `backend/` | Express server — API, static SPA hosting, PayPal, jobs, cache |
 | `Tests/` | Vitest + Playwright |
 | `.github/workflows/` | CI, Supabase keep-alive cron |
-| `documentation/` | Setup, deploy, and operational guides |
+| `` | Setup, deploy, and operational guides |
 | `scripts/` | Root link checker, doc sync utilities |
 
 **Local development** runs the Vite dev server (port 5173) and API (port 5000) in parallel via `npm run dev` from the repo root. Vite proxies `/api` to the backend.
@@ -117,11 +117,12 @@
 ### Search and catalog
 
 - **Server:** paginated product list, filters, single-product fetch, sitemap URL export — cached in Redis when available.
-- **Client:** Fuse.js fuzzy search with a 15-minute localStorage catalog cache; shared search bar on Home and Products pages.
+- **Client:** Fuse.js fuzzy search over a full catalog cache — `getProductCatalog()` paginates through all products (`limit=100` per page) and stores results in localStorage for 15 minutes; shared search bar on Home and Products pages.
 
 ### Cart and pricing display
 
-- Cart state persists in browser localStorage.
+- Cart state persists in browser localStorage (synced across tabs via `BroadcastChannel`).
+- On every cart change, `POST /api/products/validate-cart` re-validates each line against the database (product exists, current price, stock) and refreshes displayed prices via `REFRESH_PRICES`.
 - Server recalculates all totals at checkout; client totals are validated against server pricing before PayPal order creation.
 
 ---
@@ -138,12 +139,13 @@
 |-----|-----------|
 | Analytics | Order/revenue stats, product metrics, customer counts, geo breakdown, GA4/GSC config status; error state with retry |
 | Products | List, create, edit, delete; bulk stock updates; image validation (URL or ≤512KB data URL) |
-| Orders | Paginated list (50/page), **server-side search** (`?search=` on order number, email, name), filter by status, bulk status updates (not cancellation); order modal: tracking, notify shipped, status transitions, **mark paid** (manual, requires reason), cancel with refund |
+| Orders | Paginated list (50/page), **server-side search**, filter by status, bulk status updates (not cancellation); order modal: tracking, notify shipped, status transitions, **mark paid** (PayPal capture verified via API + `admin_note` + `payment_id`), cancel with refund (paid orders cannot cancel without refund) |
 | Coupons | Preset percentage coupons (5/10/20/25/50%), custom codes, **edit** (description, max uses, expiry, active), activate/deactivate, delete |
 | Messages | Contact inbox — read, reply status, archive, bulk updates |
 | Customers | Aggregated customer list, detail view, soft delete / restore, show deleted toggle |
+| Reviews | List/create/edit/delete; **customer email visible only here**; filter by status; quick approve/reject; pagination (50/page) |
 
-**API-only admin features** (no dedicated UI tab): review moderation, activity log export, PayPal refund/test endpoints.
+**API-only admin features** (no dedicated UI tab): activity log export, PayPal refund/test endpoints.
 
 ---
 
@@ -280,9 +282,9 @@ Statuses: `processing`, `completed`, `failed`. Stuck `processing` rows are reape
 ### Customer order access
 
 - Each order receives a 64-character hex **access token** at creation; only a SHA-256 hash is stored.
-- Token is embedded in confirmation email tracking URLs.
+- Confirmation emails use a **one-time tracking link** (`/orders?code=...`) redeemed via `GET /api/orders/access-exchange/:code` — no long-lived token in the URL.
 - Customer lookup: `POST /api/orders/lookup` with `{ orderNumber, accessToken }` in the JSON body.
-- Alternate lookup: `GET /api/orders/number/:orderNumber` with token in query or `X-Order-Access-Token` header.
+- Alternate lookup: `GET /api/orders/number/:orderNumber` with `X-Order-Access-Token` header only.
 - Access token is also required for payment capture and checkout context recovery.
 - Public listing of orders by email is blocked (`GET /api/orders/customer/:email` is admin-only).
 
@@ -297,7 +299,8 @@ Statuses: `processing`, `completed`, `failed`. Stuck `processing` rows are reape
 - Cancel pending orders (restores stock automatically).
 - Cancel completed orders with PayPal refund (syncs DB, inventory, customer stats).
 - Send shipping notification email.
-- **Mark paid manually** via `PATCH /api/orders/:id/payment-status` with `payment_status: completed` and `admin_note` (≥3 chars); logged to `activity_logs` as `admin_mark_paid`.
+- **Mark paid manually** via `PATCH /api/orders/:id/payment-status` with `payment_status: completed`, `admin_note` (≥3 chars), and `payment_id` (PayPal capture ID or external reference, ≥5 chars); logged to `activity_logs` as `admin_mark_paid`.
+- **Bulk updates** — `POST /api/admin/*/bulk-update` accepts at most **500** IDs per request; order bulk update validates status transitions and rejects `cancelled` and any `payment_status` change.
 - Hard delete blocked when `payment_status === 'completed'`.
 - Bulk status update rejects `cancelled` — use `POST /api/orders/:id/cancel` instead.
 
@@ -333,9 +336,14 @@ At create-payment, a row in `coupon_usage` reserves the coupon for the pending o
 
 ### Product reviews
 
-- Public: list by product, submit review, vote helpful/not helpful.
+- **Public API** (`GET /api/reviews/product/:productId`, `POST /api/reviews`, `POST /api/reviews/:id/vote`): responses pass through `toPublicReview()` in `backend/src/lib/reviewHelpers.ts`, which **omits `customer_email`**, `order_id`, `status`, and other internal fields. Storefront shows reviewer **name** only.
+- **Admin API** (`GET /api/reviews`, `POST /api/reviews/admin`, `PATCH /api/reviews/:id`) returns full rows including **`customer_email`** for moderation and the admin **Reviews** tab.
+- Public submit: rate-limited; new reviews always start as `pending`; email format and product existence validated server-side.
+- Votes: rate-limited; **only `approved` reviews** accept helpful/not-helpful votes.
+- `POST /api/reviews/check` (email in JSON body) returns only `{ can_review: boolean }`. Legacy `GET .../:email` is deprecated (PII in URL).
+- Voter identity for helpful votes is a server-derived daily hash from client IP + `IP_SALT` (not client-supplied).
 - Verified purchase flag when reviewer email matches a completed order for that product.
-- Admin: list all, approve/reject, delete.
+- Admin dashboard: list, create, edit, delete, quick approve/reject, status filter, pagination.
 - Database trigger maintains product `rating` and `review_count`.
 
 ### Contact form
@@ -350,8 +358,10 @@ At create-payment, a row in `coupon_usage` reserves the coupon for the pending o
 
 ### Client activity tracking
 
-- Batches page views, cart actions, checkout events to `POST /api/activity/batch`.
-- IP addresses anonymized with daily-salted SHA-256 (`IP_SALT`).
+- Frontend batches page views, cart actions, and checkout events to `POST /api/activity/batch` only when analytics cookie consent is granted (`hasAnalyticsConsent()`). Checkout email is stored in `sessionStorage` only when consent is granted (`setUserEmail`); cleared on cookie reject.
+- `POST /api/activity/batch` is **CSRF-exempt** (supports `sendBeacon`) and rate-limited separately; max **20** events per batch.
+- IP addresses anonymized with daily-salted SHA-256 (`IP_SALT`); stored as `anon_{hash}`.
+- `product_view` and `add_to_cart` events can bump product metrics when `canBumpProductMetric()` allows (per-IP per-product rate limit).
 - Admin can query logs and export.
 
 ### Storefront analytics
@@ -369,7 +379,7 @@ At create-payment, a row in `coupon_usage` reserves the coupon for the pending o
 | Actor | Mechanism |
 |-------|-----------|
 | Admin | Bcrypt password hash (`ADMIN_PASSWORD_HASH` in production); HMAC-signed session token in HttpOnly cookie; **SHA-256 hash** stored in `admin_sessions`; optional `Authorization: Bearer` header |
-| Customer orders | Per-order access token (hashed at rest) |
+| Customer orders | Per-order access token (hashed at rest); email links use one-time `order_access_exchanges` code (`GET /api/orders/access-exchange/:code`) |
 | PayPal webhooks | PayPal signature verification via API |
 
 **JWT_SECRET:** used for admin token signing; complexity rules enforced when present (32+ chars, mixed case, number, special character).
@@ -379,13 +389,13 @@ At create-payment, a row in `coupon_usage` reserves the coupon for the pending o
 - Double-submit cookie pattern: `csrf_token` cookie + `X-CSRF-Token` header on mutating requests.
 - `GET /api/csrf-token` initializes token for cross-origin API setups (in-memory cache on frontend).
 - Frontend `apiFetch` retries once on CSRF 403 after refreshing token.
-- Skipped for: GET/HEAD/OPTIONS, `/api/paypal/webhook`.
+- Skipped for: GET/HEAD/OPTIONS, `/api/paypal/webhook`, `/api/activity/batch`.
 
 ### Rate limiting
 
 - Per-route limits via `express-rate-limit`.
 - Redis-backed store when `REDIS_URL` is set; in-memory fallback in development only — **production fails closed** if Redis is required but unavailable.
-- Notable limits: admin login (5 per 15 min), contact, reviews, coupon validate, payment endpoints.
+- Notable limits: admin login (5 per 15 min), contact, reviews (submit/vote/admin/check), coupon validate, payment endpoints, order lookup, product search, checkout exchange, order access exchange, review eligibility check.
 
 ### Network and transport
 
@@ -403,16 +413,17 @@ At create-payment, a row in `coupon_usage` reserves the coupon for the pending o
 - XSS sanitization via `xss` library (`utils/sanitize.ts`).
 - Parameterized SQL only (postgres.js tagged templates).
 - Order secrets stripped from API responses (`stripOrderSecrets`).
+- Review PII stripped from public API responses (`toPublicReview` — no `customer_email` on storefront).
 - DB TLS verification in production (`DB_SSL_CA_PATH`; `rejectUnauthorized` defaults true).
 - PayPal order/capture IDs have partial unique indexes to prevent duplicate binding.
 - Product images validated on admin create/update: HTTPS/relative URLs or data URLs ≤512KB (`lib/productImage.ts`).
-- Supabase RLS tightened at startup: products public read; writes via service role only (`ensureRlsPolicies()`).
+- Supabase RLS at startup (`ensureRlsPolicies()`): all 13 application tables use **service_role-only** policies; `anon` and `authenticated` grants are revoked — no public product read via PostgREST/GraphQL; all data access goes through Express.
 
 ### Production environment gates
 
 Backend exits on startup if missing (mirrors `backend/scripts/validate-env.mjs`):
 
-- `DATABASE_URL`, `FRONTEND_URL`, `ADMIN_PASSWORD_HASH`, `ADMIN_USERNAME`, `JWT_SECRET` (32+ chars), `PAYPAL_WEBHOOK_ID`, `PAYPAL_CLIENT_ID`, `PAYPAL_SECRET`, `RESEND_API_KEY`, `TRUST_CLOUDFLARE=true`, `REDIS_URL`, `SENTRY_DSN`
+- `DATABASE_URL`, `FRONTEND_URL`, `ADMIN_PASSWORD_HASH`, `ADMIN_USERNAME`, `JWT_SECRET` (32+ chars), `PAYPAL_WEBHOOK_ID`, `PAYPAL_CLIENT_ID`, `PAYPAL_SECRET`, `RESEND_API_KEY`, `TRUST_CLOUDFLARE=true`, `REDIS_URL`, `SENTRY_DSN`, `ORDER_TOKEN_ENCRYPTION_KEY`, `IP_SALT`
 
 CI runs `npm run validate-env` in the backend job with `CI_VALIDATE_PRODUCTION=true`.
 
@@ -587,7 +598,7 @@ Started on server boot and run on intervals (`maintenanceJobs.ts`):
 | Order token | Per-order access token via `?token=` query or `X-Order-Access-Token` header |
 | PayPal | Webhook signature verification (`PAYPAL_WEBHOOK_ID`) |
 
-Expanded request/response docs: [`documentation/API_DOCUMENTATION.md`](documentation/API_DOCUMENTATION.md)
+Expanded request/response docs: [`API_DOCUMENTATION.md`](API_DOCUMENTATION.md)
 
 ### Core (`backend/src/server.ts`)
 
@@ -616,6 +627,7 @@ Any unmatched `/api/*` path returns **404** JSON `{ error: "Route not found" }`.
 | GET | `/api/products/category/:category` | Public | Products by category slug |
 | GET | `/api/products/:id` | Public | Single product by ID |
 | POST | `/api/products/search` | Public + CSRF | Fuse.js product search |
+| POST | `/api/products/validate-cart` | Public + CSRF | Validate cart lines (price, stock, existence) |
 | POST | `/api/products` | Admin + CSRF | Create product |
 | PUT | `/api/products/:id` | Admin + CSRF | Update product |
 | DELETE | `/api/products/:id` | Admin + CSRF | Delete product |
@@ -626,6 +638,7 @@ Any unmatched `/api/*` path returns **404** JSON `{ error: "Route not found" }`.
 |--------|------|------|-------------|
 | POST | `/api/orders` | — | **410 Gone** — use `POST /api/paypal/create-payment` |
 | GET | `/api/orders` | Admin | List all orders (pagination, status filters, `?search=` on order number/email/name) |
+| GET | `/api/orders/access-exchange/:code` | Public | Redeem email tracking link (one-time) |
 | POST | `/api/orders/lookup` | Public + CSRF | Lookup order by `orderNumber` + `accessToken` in request body |
 | GET | `/api/orders/stats/summary` | Admin | Order/revenue summary stats |
 | GET | `/api/orders/number/:orderNumber` | Order token or Admin | Lookup by order number |
@@ -656,12 +669,14 @@ Any unmatched `/api/*` path returns **404** JSON `{ error: "Route not found" }`.
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/api/reviews/product/:productId` | Public | Approved reviews for a product |
-| POST | `/api/reviews` | Public + CSRF | Submit a review |
-| POST | `/api/reviews/:id/vote` | Public + CSRF | Helpful/not helpful vote |
-| GET | `/api/reviews/check/:productId/:email` | Public | Check if email already reviewed product |
-| GET | `/api/reviews` | Admin | List reviews (moderation queue) |
-| PATCH | `/api/reviews/:id/status` | Admin + CSRF | Approve/reject review |
+| GET | `/api/reviews/product/:productId` | Public | Approved reviews — **`customer_email` stripped** via `toPublicReview()` |
+| POST | `/api/reviews` | Public + CSRF | Submit review (pending; response stripped of email) |
+| POST | `/api/reviews/:id/vote` | Public + CSRF | Vote on **approved** reviews only |
+| POST | `/api/reviews/check` | Public + CSRF | Body `{ product_id, email }` → `{ can_review }` |
+| GET | `/api/reviews/check/:productId/:email` | Public | **Deprecated** — use POST |
+| GET | `/api/reviews` | Admin | List all reviews **including `customer_email`** |
+| POST | `/api/reviews/admin` | Admin + CSRF | Create review (name, rating, text, optional email) |
+| PATCH | `/api/reviews/:id` | Admin + CSRF | Edit review fields and status |
 | DELETE | `/api/reviews/:id` | Admin + CSRF | Delete review |
 
 ### Contact (`/api/contact` — `backend/src/routes/contact.ts`)
@@ -680,7 +695,7 @@ Any unmatched `/api/*` path returns **404** JSON `{ error: "Route not found" }`.
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | POST | `/api/activity/log` | Public + CSRF | Log single analytics event |
-| POST | `/api/activity/batch` | Public + CSRF | Log batched events |
+| POST | `/api/activity/batch` | Public (CSRF-exempt) | Log batched events (max 20; rate-limited) |
 | GET | `/api/activity/export` | Admin | Export activity logs |
 | GET | `/api/activity/logs` | Admin | Query activity logs |
 | GET | `/api/activity/stats` | Admin | Aggregated activity stats |
@@ -704,7 +719,7 @@ Any unmatched `/api/*` path returns **404** JSON `{ error: "Route not found" }`.
 | POST | `/api/admin/orders/bulk-update` | Admin + CSRF | Bulk order status updates |
 | POST | `/api/admin/messages/bulk-update` | Admin + CSRF | Bulk contact message status updates |
 
-**Endpoint count:** 72 routes (70 active + 2 deprecated **410** responses).
+**Endpoint count:** 73 routes (71 active + 2 deprecated **410** responses).
 
 ---
 
@@ -799,7 +814,8 @@ Templates: `backend/env.template`, `frontend/env.template`
 | `REQUEST_TIMEOUT_MS` | 15000 | HTTP request timeout |
 | `LOG_LEVEL` | info/debug | Pino log level |
 | `RESEND_API_KEY` | — | Email sender (required in production) |
-| `IP_SALT` | — | Activity log IP anonymization |
+| `ORDER_TOKEN_ENCRYPTION_KEY` | — | AES-256-GCM key for checkout exchange token encryption (required in production) |
+| `IP_SALT` | — | Activity log IP anonymization and review voter IDs (required in production) |
 | `DB_SSL_CA_PATH` | — | TLS CA bundle for production DB |
 | `SERVE_FRONTEND` | — | `false` disables static SPA hosting; auto-enabled in production when `frontend/dist` exists |
 | `FRONTEND_DIST_PATH` | `frontend/dist` | Path to built React SPA served by Express |
@@ -849,7 +865,7 @@ Weekly patch/minor updates for Express, PayPal SDK, React, Sentry, GitHub Action
 - **API path:** `/api` on the same host as the storefront
 - **CI secrets:** `PRODUCTION_API_BASE_URL` (sitemap job), `VITE_SENTRY_DSN`, `DATABASE_URL`
 
-See [`documentation/DEPLOYMENT.md`](documentation/DEPLOYMENT.md) and [`documentation/CLOUDFLARE_RAILWAY.md`](documentation/CLOUDFLARE_RAILWAY.md).
+See [`PRE_LAUNCH_CHECKLIST.md`](PRE_LAUNCH_CHECKLIST.md) before first production traffic, plus [`DEPLOYMENT.md`](DEPLOYMENT.md) and [`CLOUDFLARE_RAILWAY.md`](CLOUDFLARE_RAILWAY.md).
 
 ---
 
@@ -875,10 +891,12 @@ cd backend && SERVE_FRONTEND=true npm start   # http://localhost:5000
 **Strict env validation** is skipped locally unless `CI=true` or `NODE_ENV=production`.
 
 ```bash
-npm test                         # Vitest (76 tests)
+npm test                         # All tests: backend unit + API + frontend UI (reports per suite)
+npm run test:backend             # Backend unit only
+npm run test:api                 # API integration only
+npm run test:frontend            # Playwright UI only
 npm run validate-env             # backend + frontend env checks
 npm run build                    # frontend + backend
-npm run test:frontend            # Playwright smoke (from Tests workspace)
 npm run links:check
 ```
 
@@ -889,12 +907,12 @@ npm run links:check
 | Suite | Tool | Coverage |
 |-------|------|----------|
 | Backend unit/API | Vitest | Checkout validation, payment idempotency, order tokens, checkout exchange, order token encryption, webhook errors, product images, admin session hashing, PayPal utils, refund idempotency |
-| Frontend E2E | Playwright | Home, products, checkout shell, contact page render |
+| Frontend E2E / UI | Playwright | Storefront smoke, products/cart/checkout/contact UI, navigation, cookie consent, mobile viewport (22 tests; mocked API) |
 | Link check | Custom script | Documentation internal links |
 
 API tests mock the database layer (`Tests/setup.ts`) for fast isolated runs.
 
-**Detailed runbook:** [Tests/test_guidelines.md](Tests/test_guidelines.md) — automated tests, manual QA, CI, commands, and policy (run tests only when explicitly requested).
+**Detailed runbook:** [test_guidelines.md](test_guidelines.md) — automated tests, manual QA, CI, commands, and policy (run tests only when explicitly requested).
 
 ---
 
@@ -902,12 +920,13 @@ API tests mock the database layer (`Tests/setup.ts`) for fast isolated runs.
 
 | Document | Topic |
 |----------|-------|
-| [Tests/test_guidelines.md](Tests/test_guidelines.md) | Testing — automated, manual QA, CI, when to run |
-| [documentation/QUICK_START.md](documentation/QUICK_START.md) | 10-minute local setup |
-| [documentation/API_DOCUMENTATION.md](documentation/API_DOCUMENTATION.md) | Full REST API |
-| [documentation/DEPLOYMENT.md](documentation/DEPLOYMENT.md) | Production deploy |
-| [documentation/ADMIN_DASHBOARD_GUIDE.md](documentation/ADMIN_DASHBOARD_GUIDE.md) | Admin UI |
-| [documentation/PAYPAL_SETUP_GUIDE.md](documentation/PAYPAL_SETUP_GUIDE.md) | PayPal credentials and webhooks |
-| [documentation/DATABASE_SETUP.md](documentation/DATABASE_SETUP.md) | Schema and migrations |
+| [test_guidelines.md](test_guidelines.md) | Testing — automated, manual QA, CI, when to run |
+| [QUICK_START.md](QUICK_START.md) | 10-minute local setup |
+| [API_DOCUMENTATION.md](API_DOCUMENTATION.md) | Full REST API |
+| [PRE_LAUNCH_CHECKLIST.md](PRE_LAUNCH_CHECKLIST.md) | Go-live checklist |
+| [DEPLOYMENT.md](DEPLOYMENT.md) | Production deploy |
+| [ADMIN_DASHBOARD_GUIDE.md](ADMIN_DASHBOARD_GUIDE.md) | Admin UI |
+| [PAYPAL_SETUP_GUIDE.md](PAYPAL_SETUP_GUIDE.md) | PayPal credentials and webhooks |
+| [DATABASE_SETUP.md](DATABASE_SETUP.md) | Schema and migrations |
 
-**Full index:** [documentation/DOCUMENTATION_INDEX.md](documentation/DOCUMENTATION_INDEX.md)
+**Full index:** [DOCUMENTATION_INDEX.md](DOCUMENTATION_INDEX.md)

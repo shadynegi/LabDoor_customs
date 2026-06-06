@@ -1,7 +1,7 @@
 // ReviewList - Display product reviews with filtering and stats
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ThumbsUp, ThumbsDown, CheckCircle, MessageSquare, Filter } from 'lucide-react';
+import { ThumbsUp, ThumbsDown, CheckCircle, MessageSquare, Filter, AlertCircle, RefreshCw } from 'lucide-react';
 import { apiFetch } from '../config';
 import StarRating from './StarRating';
 import { ReviewListSkeleton } from './Skeletons';
@@ -53,9 +53,11 @@ const ReviewList: React.FC<ReviewListProps> = ({ productId, onWriteReview }) => 
   const [showFilters, setShowFilters] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const fetchReviews = async () => {
     setLoading(true);
+    setFetchError(null);
     try {
       const params = new URLSearchParams({
         sort_by: sortBy,
@@ -72,9 +74,12 @@ const ReviewList: React.FC<ReviewListProps> = ({ productId, onWriteReview }) => 
         setReviews(data.data.reviews);
         setStats(data.data.stats);
         setTotalPages(data.data.pagination.totalPages);
+      } else {
+        setFetchError(data.error || 'Could not load reviews');
       }
     } catch (error) {
       logError('Error fetching reviews:', error);
+      setFetchError('Could not load reviews. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -86,12 +91,10 @@ const ReviewList: React.FC<ReviewListProps> = ({ productId, onWriteReview }) => 
 
   const handleVote = async (reviewId: string, voteType: 'helpful' | 'not_helpful') => {
     try {
-      const voterId = localStorage.getItem('sessionId') || `anon-${Date.now()}`;
-      
       const response = await apiFetch(`/reviews/${reviewId}/vote`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vote_type: voteType, voter_identifier: voterId }),
+        body: JSON.stringify({ vote_type: voteType }),
       });
 
       if (response.ok) {
@@ -288,6 +291,39 @@ const ReviewList: React.FC<ReviewListProps> = ({ productId, onWriteReview }) => 
       {/* Reviews List */}
       {loading ? (
         <ReviewListSkeleton />
+      ) : fetchError ? (
+        <div
+          style={{
+            textAlign: 'center',
+            padding: 40,
+            background: 'white',
+            borderRadius: 16,
+            color: '#6b7280',
+          }}
+        >
+          <AlertCircle size={40} style={{ margin: '0 auto 12px', color: '#dc2626' }} />
+          <p style={{ marginBottom: 16 }}>{fetchError}</p>
+          <button
+            type="button"
+            onClick={() => void fetchReviews()}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '10px 16px',
+              minHeight: 44,
+              border: 'none',
+              borderRadius: 8,
+              background: '#9c6649',
+              color: 'white',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            <RefreshCw size={16} />
+            Retry
+          </button>
+        </div>
       ) : reviews.length === 0 ? (
         <motion.div
           initial={{ opacity: 0 }}
@@ -428,12 +464,16 @@ const ReviewList: React.FC<ReviewListProps> = ({ productId, onWriteReview }) => 
                 <div style={{ display: 'flex', alignItems: 'center', gap: 16, paddingTop: 12, borderTop: '1px solid #f3f4f6' }}>
                   <span style={{ fontSize: 12, color: '#9ca3af' }}>Was this review helpful?</span>
                   <button
+                    type="button"
                     onClick={() => handleVote(review.id, 'helpful')}
+                    aria-label={`Mark review helpful, ${review.helpful_count} votes`}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
                       gap: 4,
-                      padding: '4px 10px',
+                      padding: '8px 12px',
+                      minHeight: 44,
+                      minWidth: 44,
                       background: '#f3f4f6',
                       border: 'none',
                       borderRadius: 6,
@@ -446,12 +486,16 @@ const ReviewList: React.FC<ReviewListProps> = ({ productId, onWriteReview }) => 
                     Yes ({review.helpful_count})
                   </button>
                   <button
+                    type="button"
                     onClick={() => handleVote(review.id, 'not_helpful')}
+                    aria-label={`Mark review not helpful, ${review.not_helpful_count} votes`}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
                       gap: 4,
-                      padding: '4px 10px',
+                      padding: '8px 12px',
+                      minHeight: 44,
+                      minWidth: 44,
                       background: '#f3f4f6',
                       border: 'none',
                       borderRadius: 6,

@@ -52,7 +52,9 @@ const StarRatingInput: React.FC<StarRatingInputProps> = ({
             style={{
               background: 'none',
               border: 'none',
-              padding: 0,
+              padding: 6,
+              minWidth: 44,
+              minHeight: 44,
               cursor: disabled ? 'not-allowed' : 'pointer',
               display: 'flex',
               alignItems: 'center',

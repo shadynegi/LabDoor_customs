@@ -10,7 +10,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
 const DOC_DIR = path.join(ROOT, 'documentation');
 const FRONTEND_SRC = path.join(ROOT, 'frontend', 'src');
-const INFO_MD = path.join(ROOT, 'info.md');
+const INFO_MD = path.join(DOC_DIR, 'info.md');
 
 /** Static React Router paths from frontend/src/App.tsx */
 const VALID_ROUTES = new Set([
@@ -43,13 +43,14 @@ function isExternalLink(target) {
   return /^(?:https?:|mailto:|tel:|javascript:)/i.test(target);
 }
 
-function collectMarkdownFiles() {
-  const files = [INFO_MD].filter((f) => fs.existsSync(f));
-  if (fs.existsSync(DOC_DIR)) {
-    for (const name of fs.readdirSync(DOC_DIR)) {
-      if (name.endsWith('.md')) {
-        files.push(path.join(DOC_DIR, name));
-      }
+function collectMarkdownFiles(dir = DOC_DIR, files = []) {
+  if (!fs.existsSync(dir)) return files;
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (entry.name !== 'node_modules') collectMarkdownFiles(full, files);
+    } else if (entry.name.endsWith('.md')) {
+      files.push(full);
     }
   }
   return files;
@@ -121,7 +122,11 @@ function checkFrontendRoutes() {
 
 function main() {
   console.log('Checking documentation links...');
-  for (const file of collectMarkdownFiles()) {
+  const mdFiles = collectMarkdownFiles();
+  if (fs.existsSync(INFO_MD) && !mdFiles.includes(INFO_MD)) {
+    mdFiles.unshift(INFO_MD);
+  }
+  for (const file of mdFiles) {
     checkMarkdownLinks(file);
   }
 

@@ -3,6 +3,7 @@ import { logger } from './logger';
 import { InsufficientStockError } from './inventory';
 import { generateOrderAccessToken } from './orderTokens';
 import { releaseCouponForOrder } from './couponReservation';
+import { sanitizeCustomerInfo } from '../utils/sanitizeCustomer';
 
 export interface ValidatedLineItem {
   product_id: number;
@@ -47,18 +48,19 @@ function parseOrderItems(items: unknown): ValidatedLineItem[] {
  * Create pending order + decrement inventory in a single DB transaction.
  */
 export async function createPendingPayPalOrderAtomic(input: PendingPayPalOrderInput) {
+  const customerInfo = sanitizeCustomerInfo(input.customerInfo);
   const orderNumber = `GSS-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
   const { token: accessToken, hash: accessTokenHash } = generateOrderAccessToken();
 
   const shippingAddress = {
-    full_name: input.customerInfo.fullName,
-    email: input.customerInfo.email,
-    phone: input.customerInfo.phone,
-    address: input.customerInfo.address,
-    city: input.customerInfo.city,
-    state: input.customerInfo.state,
-    zip_code: input.customerInfo.zipCode,
-    country: input.customerInfo.country,
+    full_name: customerInfo.fullName,
+    email: customerInfo.email,
+    phone: customerInfo.phone,
+    address: customerInfo.address,
+    city: customerInfo.city,
+    state: customerInfo.state,
+    zip_code: customerInfo.zipCode,
+    country: customerInfo.country,
   };
 
   const order = await sql.begin(async (tx) => {
@@ -109,8 +111,8 @@ export async function createPendingPayPalOrderAtomic(input: PendingPayPalOrderIn
         payment_status, payment_method, access_token_hash, status
       ) VALUES (
         ${orderNumber},
-        ${input.customerInfo.email},
-        ${input.customerInfo.fullName},
+        ${customerInfo.email},
+        ${customerInfo.fullName},
         ${JSON.stringify(shippingAddress)},
         ${JSON.stringify(input.lineItems)},
         ${input.pricing.subtotal},

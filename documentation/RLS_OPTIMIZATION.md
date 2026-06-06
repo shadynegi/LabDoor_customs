@@ -1,26 +1,56 @@
 # Row-Level Security
 
-Supabase RLS policies for direct client access.
+How Lab Door Customs uses Supabase RLS and database grants.
 
-**Full reference:** [`../info.md`](../info.md)
+**Full reference:** [`info.md`](info.md)
 
-## Architecture note
+---
 
-The production app routes all data access through the Express API with service-role database credentials. RLS policies apply when using the Supabase JavaScript client directly from the browser.
+## Architecture
 
-## Applied policies (startup migration)
+Production routes **all** data access through the Express API using `DATABASE_URL` with the Supabase **service_role** (or equivalent postgres superuser). The storefront never uses the Supabase JS client against public tables. RLS and revoked grants block direct PostgREST/GraphQL access from `anon` and `authenticated` roles.
 
-The backend runs `ensureRlsPolicies()` at boot (see `backend/src/lib/rlsMigration.ts` and `backend/src/database/migration-rls-tighten.sql`):
+---
 
-- **products:** Public catalog read; all writes via `service_role` only
-- **orders:** `service_role` only (all access through Express API)
-- **contact_messages:** `service_role` only
-- **coupons, coupon_usage, payment_idempotency, processed_refund_events:** RLS enabled; `service_role` only (no anon/authenticated PostgREST access)
+## Tables and access model
 
-Legacy permissive policies for authenticated Supabase users are dropped.
+### Service-role-only RLS (13 tables)
 
-For an immediate fix in Supabase SQL Editor, run `backend/src/database/migration-rls-sensitive-tables.sql`.
+At boot, `ensureRlsPolicies()` (`backend/src/lib/rlsMigration.ts`) enables RLS and creates `service_role` policies on:
 
-## Summary
+| Table | Policy |
+|-------|--------|
+| `products` | Service role manages products |
+| `orders` | Service role manages orders |
+| `contact_messages` | Service role manages contact_messages |
+| `coupons`, `coupon_usage` | Service role manages {table} |
+| `customers`, `activity_logs`, `admin_sessions` | Service role manages {table} |
+| `reviews`, `review_votes` | Service role manages reviews / review_votes |
+| `payment_idempotency`, `processed_refund_events`, `order_checkout_exchanges` | Service role manages {table} |
 
-See [RLS_OPTIMIZATION_SUMMARY.md](./RLS_OPTIMIZATION_SUMMARY.md) for policy overview.
+There is **no** public read policy on `products` via PostgREST. Catalog data is served only through `GET /api/products` and related Express routes.
+
+### Revoked client roles
+
+`migration-revoke-graphql-client-roles.sql` (also applied at boot) revokes `ALL` on all 13 tables from `anon` and `authenticated`, then grants `ALL` to `service_role`. This addresses Supabase linter warnings for unintended GraphQL exposure.
+
+Legacy permissive policies (authenticated product writes, public product read, customer order read, etc.) are dropped at startup.
+
+---
+
+## SQL scripts (manual run)
+
+| File | Purpose |
+|------|------|
+| `migration-rls-sensitive-tables.sql` | RLS on runtime-sensitive tables (skips missing tables) |
+| `migration-revoke-graphql-client-roles.sql` | Revoke anon/authenticated; fix `update_product_rating` search_path |
+| `migration-performance-linter-fixes.sql` | FK indexes; consolidate duplicate RLS policies |
+| `migration-rls-tighten.sql` | Reference SQL mirroring boot migration |
+
+Re-run `migration-rls-sensitive-tables.sql` after first production boot if runtime tables (`payment_idempotency`, etc.) were created after the initial SQL run.
+
+---
+
+## Failure behavior
+
+In production, `ensureRlsPolicies()` failure prevents server startup. In development, a non-Supabase database may log a warning and continue.

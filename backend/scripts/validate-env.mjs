@@ -17,6 +17,8 @@ const requiredProduction = [
   'RESEND_API_KEY',
   'PAYPAL_CLIENT_ID',
   'PAYPAL_SECRET',
+  'ORDER_TOKEN_ENCRYPTION_KEY',
+  'IP_SALT',
 ];
 
 function fail(message) {

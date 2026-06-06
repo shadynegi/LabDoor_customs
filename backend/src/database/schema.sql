@@ -228,87 +228,66 @@ INSERT INTO products (name, price, image, description, background, category, siz
   ('LAB DOOR SPORT', 89.00, '/assets/brown-pink-nike.png', 'Sport performance shoe', '/assets/brown-pink-bg.png', 'Athletic', 'US 9', 'Brown', 45, 4.4, 87)
 ON CONFLICT DO NOTHING;
 
--- Enable Row Level Security (RLS)
+-- Row Level Security: service_role only (Express API is the sole data path)
 ALTER TABLE products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE contact_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE coupons ENABLE ROW LEVEL SECURITY;
 ALTER TABLE coupon_usage ENABLE ROW LEVEL SECURITY;
+ALTER TABLE activity_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE admin_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE customers ENABLE ROW LEVEL SECURITY;
 
--- RLS Policies for products (public read, admin write)
--- Using subqueries for auth functions to prevent re-evaluation per row (performance optimization)
-CREATE POLICY "Allow public read access to products" ON products
-  FOR SELECT USING (true);
+CREATE POLICY "Service role manages products" ON products
+  FOR ALL USING ((select auth.role()) = 'service_role')
+  WITH CHECK ((select auth.role()) = 'service_role');
 
-CREATE POLICY "Allow authenticated users to insert products" ON products
-  FOR INSERT WITH CHECK ((select auth.role()) = 'authenticated');
+CREATE POLICY "Service role manages orders" ON orders
+  FOR ALL USING ((select auth.role()) = 'service_role')
+  WITH CHECK ((select auth.role()) = 'service_role');
 
-CREATE POLICY "Allow authenticated users to update products" ON products
-  FOR UPDATE USING ((select auth.role()) = 'authenticated');
+CREATE POLICY "Service role manages contact_messages" ON contact_messages
+  FOR ALL USING ((select auth.role()) = 'service_role')
+  WITH CHECK ((select auth.role()) = 'service_role');
 
-CREATE POLICY "Allow authenticated users to delete products" ON products
-  FOR DELETE USING ((select auth.role()) = 'authenticated');
+CREATE POLICY "Service role manages coupons" ON coupons
+  FOR ALL USING ((select auth.role()) = 'service_role')
+  WITH CHECK ((select auth.role()) = 'service_role');
 
--- RLS Policies for orders (users can read their own, admin can read all)
--- Using subqueries for auth functions to prevent re-evaluation per row (performance optimization)
-CREATE POLICY "Users can read their own orders" ON orders
-  FOR SELECT USING (
-    (select auth.jwt()) ->> 'email' = customer_email OR
-    (select auth.role()) = 'authenticated'
-  );
+CREATE POLICY "Service role manages coupon_usage" ON coupon_usage
+  FOR ALL USING ((select auth.role()) = 'service_role')
+  WITH CHECK ((select auth.role()) = 'service_role');
 
--- Only service_role (backend) can create orders
--- Order creation goes through the backend API which validates payment first
-CREATE POLICY "Service role can create orders" ON orders
-  FOR INSERT WITH CHECK ((select auth.role()) = 'service_role');
+CREATE POLICY "Service role manages activity_logs" ON activity_logs
+  FOR ALL USING ((select auth.role()) = 'service_role')
+  WITH CHECK ((select auth.role()) = 'service_role');
 
-CREATE POLICY "Allow authenticated users to update orders" ON orders
-  FOR UPDATE USING ((select auth.role()) = 'authenticated');
+CREATE POLICY "Service role manages admin_sessions" ON admin_sessions
+  FOR ALL USING ((select auth.role()) = 'service_role')
+  WITH CHECK ((select auth.role()) = 'service_role');
 
--- RLS Policies for contact messages
--- Using subqueries for auth functions to prevent re-evaluation per row (performance optimization)
+CREATE POLICY "Service role manages customers" ON customers
+  FOR ALL USING ((select auth.role()) = 'service_role')
+  WITH CHECK ((select auth.role()) = 'service_role');
 
--- Only service_role (backend) can insert contact messages
--- Contact form submissions go through the backend API which validates input
-CREATE POLICY "Service role can insert contact messages" ON contact_messages
-  FOR INSERT WITH CHECK ((select auth.role()) = 'service_role');
+-- Revoke direct PostgREST/GraphQL client access (run migration-revoke-graphql-client-roles.sql for full set)
+REVOKE ALL ON products FROM anon, authenticated;
+REVOKE ALL ON orders FROM anon, authenticated;
+REVOKE ALL ON contact_messages FROM anon, authenticated;
+REVOKE ALL ON coupons FROM anon, authenticated;
+REVOKE ALL ON coupon_usage FROM anon, authenticated;
+REVOKE ALL ON activity_logs FROM anon, authenticated;
+REVOKE ALL ON admin_sessions FROM anon, authenticated;
+REVOKE ALL ON customers FROM anon, authenticated;
 
-CREATE POLICY "Only authenticated users can read contact messages" ON contact_messages
-  FOR SELECT USING ((select auth.role()) = 'authenticated');
-
-CREATE POLICY "Only authenticated users can update contact messages" ON contact_messages
-  FOR UPDATE USING ((select auth.role()) = 'authenticated');
-
-CREATE POLICY "Only authenticated users can delete contact messages" ON contact_messages
-  FOR DELETE USING ((select auth.role()) = 'authenticated');
-
--- Grant permissions to service role
 GRANT ALL ON products TO service_role;
 GRANT ALL ON orders TO service_role;
 GRANT ALL ON contact_messages TO service_role;
 GRANT ALL ON coupons TO service_role;
 GRANT ALL ON coupon_usage TO service_role;
+GRANT ALL ON activity_logs TO service_role;
+GRANT ALL ON admin_sessions TO service_role;
+GRANT ALL ON customers TO service_role;
 
--- Coupons: service role only (validated via Express API)
-CREATE POLICY "Service role manages coupons" ON coupons
-  FOR ALL
-  USING ((select auth.role()) = 'service_role')
-  WITH CHECK ((select auth.role()) = 'service_role');
-
-CREATE POLICY "Service role manages coupon_usage" ON coupon_usage
-  FOR ALL
-  USING ((select auth.role()) = 'service_role')
-  WITH CHECK ((select auth.role()) = 'service_role');
-
--- Comment: RLS policy design:
--- - Anyone can read products (public catalog)
--- - Service role (backend) can create orders (after payment validation)
--- - Service role (backend) can insert contact messages (after input validation)
--- - Users can read their own orders
--- - Authenticated users (admin) can manage orders, products, and contact messages
--- 
--- All write operations from the frontend go through the backend API which:
--- 1. Validates input data
--- 2. Uses service_role connection (bypasses RLS)
--- This ensures data integrity while preventing direct database manipulation
+-- Also run migration-*.sql for reviews, payment tables, and ensureRlsPolicies() on first backend boot.
 

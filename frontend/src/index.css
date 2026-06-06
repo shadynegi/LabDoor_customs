@@ -52,8 +52,6 @@ body {
   min-height: -webkit-fill-available;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  position: relative;
 }
 
 /* Typography */
@@ -134,37 +132,29 @@ html {
 
 /* Mobile Optimizations */
 @media (max-width: 768px) {
+  html, body {
+    overflow-x: hidden;
+    min-height: 100dvh;
+  }
+
   body {
-    font-size: 16px; /* Prevent zoom on input focus in iOS */
-    position: fixed;
-    width: 100%;
+    font-size: 16px;
   }
 
   #root {
-    overflow-y: auto;
-    overflow-x: hidden;
-    height: 100vh;
-    height: -webkit-fill-available;
+    min-height: 100dvh;
     -webkit-overflow-scrolling: touch;
-    overscroll-behavior: none;
   }
 
   input, textarea, select {
-    font-size: 16px; /* Prevent zoom on input focus in iOS */
-  }
-
-  /* Fix for iPhone viewport height */
-  html {
-    height: -webkit-fill-available;
-    position: fixed;
-    overflow: hidden;
+    font-size: 16px !important; /* Prevent iOS Safari zoom on focus */
   }
 }
 
-/* Small phones */
-@media (max-width: 375px) {
+/* Small phones — align with useResponsive smallMobile (390px) */
+@media (max-width: 389px) {
   html {
-    font-size: 14px;
+    font-size: 15px;
   }
 }
 

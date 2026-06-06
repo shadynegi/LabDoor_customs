@@ -5,6 +5,13 @@ import sql from '../lib/db';
 import { parsePagination, paginationMeta } from '../lib/pagination';
 import { verifyAdmin } from './admin';
 import { sanitizeString } from '../utils/sanitize';
+import { deriveReviewVoterId } from '../lib/reviewVoterId';
+import {
+  checkVerifiedPurchase,
+  sanitizeReviewImages,
+  toPublicReview,
+} from '../lib/reviewHelpers';
+import { respond500 } from '../lib/safeError';
 
 const router = Router();
 
@@ -31,22 +38,6 @@ interface ReviewFilters {
   verified_only?: boolean;
   sort_by?: 'newest' | 'oldest' | 'highest' | 'lowest' | 'helpful';
 }
-
-// Helper: Check if customer has purchased the product
-const checkVerifiedPurchase = async (email: string, productId: number): Promise<boolean> => {
-  try {
-    const result = await sql`
-      SELECT 1 FROM orders 
-      WHERE customer_email = ${email}
-        AND payment_status = 'completed'
-        AND items::text LIKE ${'%"product_id":' + productId + '%'}
-      LIMIT 1
-    `;
-    return result.length > 0;
-  } catch {
-    return false;
-  }
-};
 
 // GET reviews for a product
 router.get('/product/:productId', async (req: Request, res: Response) => {
@@ -137,7 +128,7 @@ router.get('/product/:productId', async (req: Request, res: Response) => {
     res.json({
       success: true,
       data: {
-        reviews,
+        reviews: (reviews as Record<string, unknown>[]).map(toPublicReview),
         stats: stats[0],
         pagination: paginationMeta(
           parseInt(stats[0].total_reviews as string) || 0,
@@ -145,16 +136,81 @@ router.get('/product/:productId', async (req: Request, res: Response) => {
         )
       }
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Error fetching reviews:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to fetch reviews'
-    });
+    respond500(res, error, 'Failed to fetch reviews');
   }
 });
 
-// POST create a new review
+// POST create review (admin) — approved by default
+router.post('/admin', verifyAdmin, async (req: Request, res: Response) => {
+  try {
+    const {
+      product_id,
+      customer_name,
+      customer_email,
+      rating,
+      title,
+      content,
+      status = 'approved',
+      is_verified_purchase = false,
+    } = req.body;
+
+    if (!product_id || !customer_name || !rating) {
+      return res.status(400).json({
+        success: false,
+        error: 'Product, customer name, and rating are required',
+      });
+    }
+
+    if (rating < 1 || rating > 5) {
+      return res.status(400).json({ success: false, error: 'Rating must be between 1 and 5' });
+    }
+
+    if (!['pending', 'approved', 'rejected', 'flagged'].includes(status)) {
+      return res.status(400).json({ success: false, error: 'Invalid status' });
+    }
+
+    const email =
+      customer_email && String(customer_email).includes('@')
+        ? sanitizeString(String(customer_email)).toLowerCase().slice(0, 255)
+        : `admin-review-${Date.now()}@internal.local`;
+
+    const productExists = await sql`SELECT id FROM products WHERE id = ${product_id} LIMIT 1`;
+    if (!productExists.length) {
+      return res.status(400).json({ success: false, error: 'Product not found' });
+    }
+
+    const sanitizedTitle = title ? sanitizeString(title) : null;
+    const sanitizedContent = content ? sanitizeString(content) : null;
+    const sanitizedName = sanitizeString(customer_name);
+
+    const result = await sql`
+      INSERT INTO reviews (
+        product_id, customer_email, customer_name, rating, title, content,
+        is_verified_purchase, is_recommended, status
+      ) VALUES (
+        ${product_id},
+        ${email},
+        ${sanitizedName},
+        ${rating},
+        ${sanitizedTitle},
+        ${sanitizedContent},
+        ${Boolean(is_verified_purchase)},
+        true,
+        ${status}
+      )
+      RETURNING *
+    `;
+
+    res.status(201).json({ success: true, data: result[0] });
+  } catch (error: unknown) {
+    logger.error('Admin create review error:', error);
+    respond500(res, error, 'Failed to create review');
+  }
+});
+
+// POST create a new review (public — always pending moderation)
 router.post('/', async (req: Request, res: Response) => {
   try {
     const {
@@ -186,11 +242,21 @@ router.post('/', async (req: Request, res: Response) => {
       });
     }
 
+    const normalizedEmail = sanitizeString(customer_email).toLowerCase().slice(0, 255);
+    if (!normalizedEmail.includes('@')) {
+      return res.status(400).json({ success: false, error: 'Valid email is required' });
+    }
+
+    const productExists = await sql`SELECT id FROM products WHERE id = ${product_id} LIMIT 1`;
+    if (!productExists.length) {
+      return res.status(400).json({ success: false, error: 'Product not found' });
+    }
+
     // Check if customer already reviewed this product
     const existingReview = await sql`
       SELECT id FROM reviews 
       WHERE product_id = ${product_id} 
-        AND customer_email = ${customer_email.toLowerCase()}
+        AND customer_email = ${normalizedEmail}
       LIMIT 1
     `;
 
@@ -201,17 +267,17 @@ router.post('/', async (req: Request, res: Response) => {
       });
     }
 
-    // Check verified purchase
-    const isVerified = await checkVerifiedPurchase(customer_email.toLowerCase(), product_id);
+    const isVerified = order_id
+      ? await checkVerifiedPurchase(normalizedEmail, product_id, order_id)
+      : false;
 
-    // Sanitize inputs
     const sanitizedTitle = title ? sanitizeString(title) : null;
     const sanitizedContent = content ? sanitizeString(content) : null;
     const sanitizedName = sanitizeString(customer_name);
-    const sanitizedPros = pros?.map(p => sanitizeString(p)).filter(Boolean) || [];
-    const sanitizedCons = cons?.map(c => sanitizeString(c)).filter(Boolean) || [];
+    const sanitizedPros = pros?.map((p) => sanitizeString(p)).filter(Boolean) || [];
+    const sanitizedCons = cons?.map((c) => sanitizeString(c)).filter(Boolean) || [];
+    const sanitizedImages = sanitizeReviewImages(images);
 
-    // Create review (pending approval for non-verified purchases)
     const result = await sql`
       INSERT INTO reviews (
         product_id,
@@ -229,7 +295,7 @@ router.post('/', async (req: Request, res: Response) => {
         status
       ) VALUES (
         ${product_id},
-        ${customer_email.toLowerCase()},
+        ${normalizedEmail},
         ${sanitizedName},
         ${order_id || null},
         ${rating},
@@ -239,25 +305,20 @@ router.post('/', async (req: Request, res: Response) => {
         ${sanitizedCons},
         ${isVerified},
         ${is_recommended !== false},
-        ${images || []},
-        ${isVerified ? 'approved' : 'pending'}
+        ${sanitizedImages},
+        'pending'
       )
       RETURNING *
     `;
 
     res.status(201).json({
       success: true,
-      message: isVerified 
-        ? 'Thank you for your review!' 
-        : 'Thank you! Your review will be published after approval.',
-      data: result[0]
+      message: 'Thank you! Your review will be published after approval.',
+      data: toPublicReview(result[0] as Record<string, unknown>),
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Error creating review:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to create review'
-    });
+    respond500(res, error, 'Failed to create review');
   }
 });
 
@@ -265,7 +326,8 @@ router.post('/', async (req: Request, res: Response) => {
 router.post('/:id/vote', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { vote_type, voter_identifier } = req.body;
+    const { vote_type } = req.body;
+    const voter_identifier = deriveReviewVoterId(req);
 
     if (!vote_type || !['helpful', 'not_helpful'].includes(vote_type)) {
       return res.status(400).json({
@@ -274,10 +336,13 @@ router.post('/:id/vote', async (req: Request, res: Response) => {
       });
     }
 
-    if (!voter_identifier) {
-      return res.status(400).json({
+    const reviewRow = await sql`
+      SELECT id, status FROM reviews WHERE id = ${id} LIMIT 1
+    `;
+    if (!reviewRow.length || reviewRow[0].status !== 'approved') {
+      return res.status(404).json({
         success: false,
-        error: 'Voter identifier is required'
+        error: 'Review not found',
       });
     }
 
@@ -355,12 +420,9 @@ router.post('/:id/vote', async (req: Request, res: Response) => {
       message: 'Vote recorded',
       action: 'created'
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Error voting on review:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to record vote'
-    });
+    respond500(res, error, 'Failed to record vote');
   }
 });
 
@@ -451,62 +513,87 @@ router.get('/', verifyAdmin, async (req: Request, res: Response) => {
         parsed.params
       )
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Error fetching reviews:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to fetch reviews'
-    });
+    respond500(res, error, 'Failed to fetch reviews');
   }
 });
 
-// PATCH update review status (Admin only)
-router.patch('/:id/status', verifyAdmin, async (req: Request, res: Response) => {
+// PATCH update review (admin)
+router.patch('/:id', verifyAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { status, admin_response } = req.body;
+    const {
+      status,
+      admin_response,
+      product_id,
+      customer_name,
+      customer_email,
+      rating,
+      title,
+      content,
+      is_verified_purchase,
+    } = req.body;
 
-    if (!status || !['pending', 'approved', 'rejected', 'flagged'].includes(status)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Valid status is required'
-      });
+    if (status && !['pending', 'approved', 'rejected', 'flagged'].includes(status)) {
+      return res.status(400).json({ success: false, error: 'Invalid status' });
     }
 
-    const updateData: any = { status };
-    if (admin_response) {
-      updateData.admin_response = sanitizeString(admin_response);
-      updateData.admin_response_at = new Date().toISOString();
+    if (rating !== undefined && (rating < 1 || rating > 5)) {
+      return res.status(400).json({ success: false, error: 'Rating must be between 1 and 5' });
+    }
+
+    const existing = await sql`SELECT id FROM reviews WHERE id = ${id} LIMIT 1`;
+    if (!existing.length) {
+      return res.status(404).json({ success: false, error: 'Review not found' });
+    }
+
+    const sanitizedTitle = title !== undefined ? (title ? sanitizeString(title) : null) : undefined;
+    const sanitizedContent = content !== undefined ? (content ? sanitizeString(content) : null) : undefined;
+    const sanitizedName =
+      customer_name !== undefined ? sanitizeString(String(customer_name)) : undefined;
+    const sanitizedEmail =
+      customer_email !== undefined
+        ? sanitizeString(String(customer_email)).toLowerCase().slice(0, 255)
+        : undefined;
+
+    if (product_id !== undefined) {
+      const productExists = await sql`SELECT id FROM products WHERE id = ${product_id} LIMIT 1`;
+      if (!productExists.length) {
+        return res.status(400).json({ success: false, error: 'Product not found' });
+      }
     }
 
     const result = await sql`
-      UPDATE reviews 
-      SET 
-        status = ${status},
-        admin_response = ${admin_response ? sanitizeString(admin_response) : sql`admin_response`},
-        admin_response_at = ${admin_response ? sql`NOW()` : sql`admin_response_at`},
+      UPDATE reviews SET
+        product_id = COALESCE(${product_id ?? null}, product_id),
+        status = COALESCE(${status ?? null}, status),
+        admin_response = COALESCE(
+          ${admin_response !== undefined ? (admin_response ? sanitizeString(admin_response) : null) : null},
+          admin_response
+        ),
+        admin_response_at = CASE
+          WHEN ${admin_response !== undefined} THEN NOW()
+          ELSE admin_response_at
+        END,
+        customer_name = COALESCE(${sanitizedName ?? null}, customer_name),
+        customer_email = COALESCE(${sanitizedEmail ?? null}, customer_email),
+        rating = COALESCE(${rating ?? null}, rating),
+        title = COALESCE(${sanitizedTitle !== undefined ? sanitizedTitle : null}, title),
+        content = COALESCE(${sanitizedContent !== undefined ? sanitizedContent : null}, content),
+        is_verified_purchase = COALESCE(
+          ${is_verified_purchase !== undefined ? Boolean(is_verified_purchase) : null},
+          is_verified_purchase
+        ),
         updated_at = NOW()
       WHERE id = ${id}
       RETURNING *
     `;
 
-    if (result.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: 'Review not found'
-      });
-    }
-
-    res.json({
-      success: true,
-      data: result[0]
-    });
-  } catch (error: any) {
+    res.json({ success: true, data: result[0] });
+  } catch (error: unknown) {
     logger.error('Error updating review:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to update review'
-    });
+    respond500(res, error, 'Failed to update review');
   }
 });
 
@@ -530,46 +617,70 @@ router.delete('/:id', verifyAdmin, async (req: Request, res: Response) => {
       success: true,
       message: 'Review deleted successfully'
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Error deleting review:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to delete review'
-    });
+    respond500(res, error, 'Failed to delete review');
   }
 });
 
-// GET review by customer email (check if can review)
+async function checkReviewEligibility(productId: number, email: string) {
+  const normalizedEmail = sanitizeString(email).toLowerCase().slice(0, 255);
+  if (!normalizedEmail.includes('@')) {
+    return { status: 400 as const, error: 'Invalid email' };
+  }
+
+  const existingReview = await sql`
+    SELECT 1 FROM reviews
+    WHERE product_id = ${productId}
+      AND customer_email = ${normalizedEmail}
+    LIMIT 1
+  `;
+
+  return {
+    status: 200 as const,
+    data: { can_review: existingReview.length === 0 },
+  };
+}
+
+// POST check review eligibility (email in body — avoids PII in URLs)
+router.post('/check', async (req: Request, res: Response) => {
+  try {
+    const { product_id, email } = req.body as { product_id?: number; email?: string };
+    const productId = parseInt(String(product_id), 10);
+
+    if (!productId || Number.isNaN(productId) || !email?.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: 'product_id and email are required',
+      });
+    }
+
+    const result = await checkReviewEligibility(productId, email);
+    if (result.status === 400) {
+      return res.status(400).json({ success: false, error: result.error });
+    }
+
+    res.json({ success: true, data: result.data });
+  } catch (error: unknown) {
+    logger.error('Error checking review eligibility:', error);
+    respond500(res, error, 'Failed to check review eligibility');
+  }
+});
+
+/** @deprecated Use POST /check — email in URL leaks to logs */
 router.get('/check/:productId/:email', async (req: Request, res: Response) => {
   try {
-    const { productId, email } = req.params;
-
-    // Check if already reviewed
-    const existingReview = await sql`
-      SELECT id, rating, created_at FROM reviews 
-      WHERE product_id = ${parseInt(productId)} 
-        AND customer_email = ${email.toLowerCase()}
-      LIMIT 1
-    `;
-
-    // Check if has purchased
-    const hasPurchased = await checkVerifiedPurchase(email.toLowerCase(), parseInt(productId));
-
-    res.json({
-      success: true,
-      data: {
-        has_reviewed: existingReview.length > 0,
-        existing_review: existingReview[0] || null,
-        has_purchased: hasPurchased,
-        can_review: existingReview.length === 0
-      }
-    });
-  } catch (error: any) {
+    const productId = parseInt(req.params.productId, 10);
+    const result = await checkReviewEligibility(productId, req.params.email);
+    res.setHeader('Deprecation', 'true');
+    res.setHeader('Link', '</api/reviews/check>; rel="successor-version"');
+    if (result.status === 400) {
+      return res.status(400).json({ success: false, error: result.error });
+    }
+    res.json({ success: true, data: result.data });
+  } catch (error: unknown) {
     logger.error('Error checking review eligibility:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to check review eligibility'
-    });
+    respond500(res, error, 'Failed to check review eligibility');
   }
 });
 

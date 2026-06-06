@@ -2,7 +2,24 @@
 
 How to test Lab Door Customs locally, in CI, and manually. This is the single reference for automated tests, manual QA flows, and verification commands.
 
-**Project reference:** [info.md](../info.md)
+**Project reference:** [info.md](info.md)
+
+---
+
+
+## Current system behavior
+
+Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API (`backend/`), Vitest + Playwright tests (`Tests/`). Production runs one Express process serving `/api/*` and the built SPA; PostgreSQL is Supabase with backend **service_role** access — RLS and revoked grants block `anon`/`authenticated` PostgREST on 13 tables.
+
+| Area | How it works |
+|------|----------------|
+| **Checkout** | Cart in localStorage; PayPal checkout exchange `?code=`; order tracking links use `GET /api/orders/access-exchange/:code` (no token in email URL); capture requires `serverOrderId` + `accessToken`. |
+| **Admin** | Bulk updates max **500** IDs; manual mark paid verifies PayPal capture via API; paid orders cannot cancel without refund; product cards on mobile. |
+| **Activity** | `POST /api/activity/batch` is CSRF-exempt and rate-limited; frontend sends only with analytics cookie consent; IPs anonymized with `IP_SALT`. |
+| **Reviews** | Public responses strip PII (`toPublicReview()`); admin shows email. Eligibility via `POST /api/reviews/check` (email in body). Votes on approved reviews only. |
+| **Mobile** | Sticky CTAs with keyboard lift on checkout; cookie banner top on purchase routes; cart stacked CTA at 320px; OOS hides product sticky bar; admin product cards on phones. |
+
+Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_ENCRYPTION_KEY`, `IP_SALT`, `ADMIN_PASSWORD_HASH`.
 
 ---
 
@@ -23,12 +40,12 @@ If the user did not mention testing, **skip** `npm test`, `npm run test:all`, Pl
 
 | Suite | Tool | Location | Count | Needs live DB? |
 |-------|------|----------|-------|----------------|
-| Backend unit | Vitest | `Tests/backend/` | 10 files | No (mocked) |
-| API integration | Vitest + Supertest | `Tests/api/` | 4 files | No (mocked) |
-| Frontend E2E smoke | Playwright | `Tests/frontend/` | 1 file, 4 tests | No (static preview) |
+| Backend unit | Vitest | `Tests/backend/` | 12 files, 60 tests | No (mocked) |
+| API integration | Vitest + Supertest | `Tests/api/` | 4 files, 16 tests | No (mocked) |
+| Frontend E2E / UI | Playwright | `Tests/frontend/` | 8 files, 22 tests | No (mocked `/api` + static preview) |
 | Link checker | Custom script | repo root | — | No |
 
-**Total:** 76 Vitest tests + 4 Playwright smoke tests.
+**Total:** 98 automated tests — 60 backend unit + 16 API + 22 Playwright UI (desktop + mobile projects).
 
 Backend unit tests include: payment idempotency, order tokens, checkout exchange hashing, order token encryption, webhook errors, product image validation, admin session hashing, PayPal webhook utils, refund idempotency, checkout pricing, client IP, keep-alive.
 
@@ -44,7 +61,9 @@ Tests/
 │   └── http.ts          # CSRF cookie/header helpers for API tests
 ├── backend/             # Backend unit tests (Vitest)
 ├── api/                 # HTTP API tests (Vitest + Supertest)
-├── frontend/            # Storefront E2E smoke tests (Playwright)
+├── frontend/            # Storefront E2E + UI tests (Playwright)
+│   ├── fixtures/        # Mock API data + extended test fixture
+│   └── helpers/         # API mocks, cookie/cart helpers
 ├── test-results/        # Timestamped reports (generated; gitignored)
 ├── scripts/
 │   └── run-with-report.mjs  # Runs tests and writes reports
@@ -79,31 +98,36 @@ npm run test:frontend:install   # first time only — downloads Chromium
 npm run test:frontend
 ```
 
-Playwright starts `vite preview` on `http://127.0.0.1:4173` automatically (see `playwright.config.ts`). The backend does **not** need to be running for smoke tests.
+Playwright starts `vite preview` on `http://127.0.0.1:4173` automatically (see `playwright.config.ts`). The backend does **not** need to be running — UI tests mock `/api/*` via `page.route()` in `Tests/frontend/helpers/mock-api.ts`.
+
+**UI coverage:** products list/detail, cart, checkout shell, contact form, navigation, cookie consent, mobile viewport (`mobile-ui.spec.ts` runs in the `mobile-chrome` project).
 
 ---
 
-## Test reports (`Tests/test-results/`)
+## Test reports (`documentation/test-results/`)
 
-Each report-enabled test run writes a **fresh report** when the run **completes**. Files use the completion timestamp:
+The unified runner (`Tests/scripts/run-with-report.mjs`) writes **one report per suite** plus a combined summary when you run the full suite.
 
-| File | Example |
-|------|---------|
-| Markdown report | `report-2026-05-30_23-45-12.md` |
-| JSON summary | `report-2026-05-30_23-45-12.json` |
+| Command | Reports written |
+|---------|-----------------|
+| `npm test` / `npm run test:all` | `backend-unit-{runId}.md`, `api-{runId}.md`, `frontend-ui-{runId}.md`, `summary-{runId}.md`, `latest-summary.json` |
+| `npm run test:backend` | `backend-unit-{runId}.md` + `.json` |
+| `npm run test:api` | `api-{runId}.md` + `.json` |
+| `npm run test:frontend` / `test:ui` | `frontend-ui-{runId}.md` + `.json` |
 
-Reports include:
+`{runId}` is a shared timestamp like `2026-06-06_13-01-59` so all reports from one full run group together.
+
+Each report includes:
 
 - Overall pass/fail and exit code
-- Per-suite summary (Vitest, Playwright)
 - Every test case with pass/fail status, file, and duration
 - **Failure logs** — full error messages and stack traces for failed cases
 - Command stderr/stdout snippets when useful for debugging
 - Git branch/commit and Node environment
 
-Generated reports are **gitignored**; only `Tests/test-results/README.md` is tracked.
+Generated reports are **gitignored**; only `documentation/TEST_RESULTS.md` is tracked.
 
-`npm test`, `test:unit`, `test:api`, `test:frontend`, and `test:all` all generate reports. Use `test:watch` (Vitest) or `test:raw` / `test:frontend:raw` to run **without** writing a report.
+`npm test` auto-builds the frontend (if needed) and installs Playwright in `Tests/` on first UI run. Use `test:watch` (Vitest) or `test:raw` / `test:frontend:raw` to run **without** writing a report.
 
 ---
 
@@ -111,15 +135,18 @@ Generated reports are **gitignored**; only `Tests/test-results/README.md` is tra
 
 Run these **only when you or the user explicitly want verification**.
 
-### From repo root
+### From repo root (one command runs everything)
 
 ```bash
-npm run test              # Backend unit + API (76 tests)
-npm run test:backend      # Backend unit only
-npm run test:api          # API tests only
-npm run test:frontend     # Playwright smoke (frontend must be built first)
-npm run test:all          # Vitest + Playwright
+npm test                  # All suites: backend unit + API + frontend UI (3 reports + summary)
+npm run test:all          # Same as npm test
+npm run test:backend      # Backend unit only → backend-unit-{runId}.md
+npm run test:api          # API tests only → api-{runId}.md
+npm run test:frontend     # Playwright UI → frontend-ui-{runId}.md
+npm run test:ui           # Alias for test:frontend
 ```
+
+Reports land in `documentation/test-results/`. The most recent full run is also summarized in `latest-summary.json`.
 
 ### Backend (Vitest)
 
@@ -259,8 +286,8 @@ Expect `success: true` with database and Redis status.
 
 | Checklist | Focus |
 |-----------|-------|
-| [RESPONSIVE_QA_CHECKLIST.md](../documentation/RESPONSIVE_QA_CHECKLIST.md) | Mobile/tablet/desktop layouts |
-| [FORMS_QA_CHECKLIST.md](../documentation/FORMS_QA_CHECKLIST.md) | Forms, CSRF, validation |
+| [RESPONSIVE_QA_CHECKLIST.md](RESPONSIVE_QA_CHECKLIST.md) | Mobile/tablet/desktop layouts |
+| [FORMS_QA_CHECKLIST.md](FORMS_QA_CHECKLIST.md) | Forms, CSRF, validation |
 
 ---
 
@@ -289,7 +316,7 @@ Expect `success: true` with database and Redis status.
 
 Use ngrok to expose local backend, configure PayPal sandbox webhook, trigger capture/refund events.
 
-See [PAYPAL_TESTING_GUIDE.md](../documentation/PAYPAL_TESTING_GUIDE.md).
+See [PAYPAL_TESTING_GUIDE.md](PAYPAL_TESTING_GUIDE.md).
 
 ---
 
@@ -319,8 +346,8 @@ Keep mocks in `Tests/setup.ts` when new tests need shared DB/Redis stubs. Run th
 
 | Document | Topic |
 |----------|--------|
-| [info.md](../info.md) | Full project reference |
-| [documentation/PAYPAL_TESTING_GUIDE.md](../documentation/PAYPAL_TESTING_GUIDE.md) | PayPal sandbox and webhooks |
-| [documentation/RESPONSIVE_QA_CHECKLIST.md](../documentation/RESPONSIVE_QA_CHECKLIST.md) | Manual responsive QA |
-| [documentation/FORMS_QA_CHECKLIST.md](../documentation/FORMS_QA_CHECKLIST.md) | Manual forms QA |
-| [documentation/DOCUMENTATION_INDEX.md](../documentation/DOCUMENTATION_INDEX.md) | Full docs index |
+| [info.md](info.md) | Full project reference |
+| [PAYPAL_TESTING_GUIDE.md](PAYPAL_TESTING_GUIDE.md) | PayPal sandbox and webhooks |
+| [RESPONSIVE_QA_CHECKLIST.md](RESPONSIVE_QA_CHECKLIST.md) | Manual responsive QA |
+| [FORMS_QA_CHECKLIST.md](FORMS_QA_CHECKLIST.md) | Manual forms QA |
+| [DOCUMENTATION_INDEX.md](DOCUMENTATION_INDEX.md) | Full docs index |

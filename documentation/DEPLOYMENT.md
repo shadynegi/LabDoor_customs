@@ -1,8 +1,10 @@
 # Deployment Guide
 
-**Authoritative reference:** [`../info.md`](../info.md) — environment variables and CI/CD.
+**Authoritative reference:** [`info.md`](info.md) — environment variables and CI/CD.
 
 Deploy Lab Door Customs from the repository root on Railway. Express serves the API (`/api/*`) and the built React storefront (`frontend/dist`) on one host.
+
+**Before first production traffic:** complete [PRE_LAUNCH_CHECKLIST.md](./PRE_LAUNCH_CHECKLIST.md).
 
 ---
 
@@ -51,6 +53,8 @@ User → Cloudflare (DNS + proxy) → Railway (Express API + static SPA)
 | `SENTRY_DSN` | Sentry backend DSN |
 | `JWT_SECRET` | 32+ characters with mixed case, number, and special character |
 | `RESEND_API_KEY` | Resend API key (required at startup) |
+| `ORDER_TOKEN_ENCRYPTION_KEY` | AES-256-GCM key for checkout exchange token encryption |
+| `IP_SALT` | Salt for activity IP anonymization and review voter IDs |
 
 ### Required build-time variables (frontend Vite build)
 
@@ -68,7 +72,6 @@ The frontend build runs `validate-env.mjs` → `generate-sitemap.mjs` → TypeSc
 
 | Variable | Purpose |
 |----------|---------|
-| `ORDER_TOKEN_ENCRYPTION_KEY` | Dedicated key for checkout exchange encryption (falls back to `JWT_SECRET`) |
 | `SERVE_FRONTEND` | `false` to disable static hosting (API-only mode); auto-enabled in production when dist exists |
 | `FRONTEND_DIST_PATH` | Override path to built SPA (default: `frontend/dist`) |
 | `DB_SSL_CA_PATH` | Supabase CA certificate |

@@ -1,8 +1,25 @@
 # Project Status — Current Capabilities
 
-**Authoritative reference:** [`../info.md`](../info.md)
+**Authoritative reference:** [`info.md`](info.md)
 
 This document describes what the Lab Door Customs platform currently supports.
+
+---
+
+
+## Current system behavior
+
+Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API (`backend/`), Vitest + Playwright tests (`Tests/`). Production runs one Express process serving `/api/*` and the built SPA; PostgreSQL is Supabase with backend **service_role** access — RLS and revoked grants block `anon`/`authenticated` PostgREST on 13 tables.
+
+| Area | How it works |
+|------|----------------|
+| **Checkout** | Cart in localStorage; PayPal checkout exchange `?code=`; order tracking links use `GET /api/orders/access-exchange/:code` (no token in email URL); capture requires `serverOrderId` + `accessToken`. |
+| **Admin** | Bulk updates max **500** IDs; manual mark paid verifies PayPal capture via API; paid orders cannot cancel without refund; product cards on mobile. |
+| **Activity** | `POST /api/activity/batch` is CSRF-exempt and rate-limited; frontend sends only with analytics cookie consent; IPs anonymized with `IP_SALT`. |
+| **Reviews** | Public responses strip PII (`toPublicReview()`); admin shows email. Eligibility via `POST /api/reviews/check` (email in body). Votes on approved reviews only. |
+| **Mobile** | Sticky CTAs with keyboard lift on checkout; cookie banner top on purchase routes; cart stacked CTA at 320px; OOS hides product sticky bar; admin product cards on phones. |
+
+Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_ENCRYPTION_KEY`, `IP_SALT`, `ADMIN_PASSWORD_HASH`.
 
 ---
 
@@ -10,11 +27,12 @@ This document describes what the Lab Door Customs platform currently supports.
 
 - Product catalog with filters, pagination, and Fuse.js search
 - Product detail pages with 360° viewer (real video assets or spin placeholder), reviews, and structured data
-- Shopping cart (localStorage)
+- Shopping cart (localStorage) with server price validation on each change
 - PayPal checkout with server-side pricing and coupon validation
 - Payment success page: redeems checkout exchange `?code=`, captures payment, strips sensitive params from URL
 - Customer order lookup at `/orders` via `POST /api/orders/lookup`
-- Contact form, policy pages, cookie consent, GA4 (consent-gated)
+- Contact form, policy pages, cookie consent, GA4 and activity tracking (consent-gated)
+- Mobile sticky CTAs, checkout keyboard offset, responsive layouts — see [MOBILE_RESPONSIVE.md](./MOBILE_RESPONSIVE.md)
 
 ---
 
@@ -35,13 +53,13 @@ This document describes what the Lab Door Customs platform currently supports.
 ## Admin
 
 - Secure login with HttpOnly session cookie (SHA-256 hashed server-side)
-- Dashboard: analytics, products, orders, coupons, messages, customers
-- Orders: server-side search, pagination, fulfillment modal, manual mark paid (requires admin note + activity log)
+- Dashboard: analytics, products, orders, coupons, messages, customers, **reviews**
+- Orders: server-side search, pagination, fulfillment modal, bulk status (max 500 IDs, validated transitions), manual mark paid (`admin_note` + `payment_id`, logged to activity)
 - Coupons: presets, custom create, edit modal, activate/deactivate, delete
 - Product CRUD and bulk stock updates
 - Contact message inbox
 - Customer soft delete/restore and order history modal
-- Review moderation via API
+- **Reviews tab**: moderation UI with customer email (admin-only), quick approve/reject, pagination; public API strips email via `toPublicReview()`
 
 ---
 

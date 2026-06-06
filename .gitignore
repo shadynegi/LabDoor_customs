@@ -32,7 +32,8 @@ frontend/test-results/
 Tests/test-results/*
 !Tests/test-results/.gitignore
 !Tests/test-results/.gitkeep
-!Tests/test-results/README.md
+documentation/test-results/*
+!documentation/test-results/.gitkeep
 
 # Vite / tooling
 frontend/dist/

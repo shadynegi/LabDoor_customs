@@ -2,7 +2,7 @@
 
 Get Lab Door Customs running locally in about 10 minutes.
 
-**Full reference:** [`../info.md`](../info.md)
+**Full reference:** [`info.md`](info.md)
 
 ---
 
@@ -41,9 +41,13 @@ PAYPAL_MODE=sandbox
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=your_password
 JWT_SECRET=your_secure_jwt_secret_at_least_32_characters_long
+ORDER_TOKEN_ENCRYPTION_KEY=your_32_char_encryption_key_for_checkout_tokens
+IP_SALT=random_salt_for_ip_anonymization
 RESEND_API_KEY=re_xxx
 SENDER_EMAIL=noreply@yourdomain.com
 ```
+
+`ORDER_TOKEN_ENCRYPTION_KEY` and `IP_SALT` are required in production (`validate-env.mjs`).
 
 Apply the database schema:
 

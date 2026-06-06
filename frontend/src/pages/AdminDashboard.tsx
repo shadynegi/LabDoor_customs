@@ -26,6 +26,7 @@ import {
   CheckCircle,
   Ban,
   Send,
+  Star,
 } from 'lucide-react';
 import { apiFetch } from '../config';
 import { useResponsive } from '../hooks/useResponsive';
@@ -33,6 +34,8 @@ import { toast } from 'sonner';
 import LiquidModal from '../components/LiquidModal';
 import AdminProductFormModal, { type AdminProduct } from '../components/AdminProductFormModal';
 import AdminCouponsTab from '../components/AdminCouponsTab';
+import AdminReviewsTab from '../components/AdminReviewsTab';
+import { clearProductCatalogCache } from '../lib/productCatalogCache';
 import { DashboardSkeleton, SkeletonStyles } from '../components/Skeletons';
 import { logError } from '../lib/logger';
 
@@ -106,13 +109,27 @@ interface Analytics {
   };
 }
 
-type Tab = 'analytics' | 'products' | 'orders' | 'messages' | 'customers' | 'coupons';
+type Tab = 'analytics' | 'products' | 'orders' | 'messages' | 'customers' | 'coupons' | 'reviews';
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<Tab>('analytics');
   const { isMobile } = useResponsive();
-  
+  const adminHeaderRef = useRef<HTMLDivElement>(null);
+  const [adminHeaderHeight, setAdminHeaderHeight] = useState(isMobile ? 72 : 80);
+
+  useEffect(() => {
+    const el = adminHeaderRef.current;
+    if (!el) return;
+
+    const measure = () => setAdminHeaderHeight(el.offsetHeight);
+    measure();
+
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [isMobile]);
+
   // Data states
   const [orders, setOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -520,6 +537,7 @@ export default function AdminDashboard() {
       });
       const data = await response.json();
       if (data.success) {
+        clearProductCatalogCache();
         toast.success(`Updated ${data.updatedCount} products`);
         setSelectedProducts(new Set());
         fetchProducts();
@@ -585,6 +603,7 @@ export default function AdminDashboard() {
       });
       const data = await response.json();
       if (data.success) {
+        clearProductCatalogCache();
         toast.success(`Product marked as ${!currentStatus ? 'out of stock' : 'in stock'}`);
         fetchProducts();
       }
@@ -611,6 +630,7 @@ export default function AdminDashboard() {
       const response = await apiFetch(`/products/${product.id}`, { method: 'DELETE' });
       const data = await response.json();
       if (data.success) {
+        clearProductCatalogCache();
         toast.success('Product deleted');
         fetchProducts();
       } else {
@@ -833,9 +853,50 @@ export default function AdminDashboard() {
         </button>
       </div>
 
-      {/* Products Table */}
+      {/* Products — cards on mobile, table on desktop */}
+      {isMobile ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {filteredProducts.map((product) => (
+            <div key={product.id} style={{ background: 'white', borderRadius: 12, border: '1px solid #e5e7eb', padding: 16 }}>
+              <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                <input
+                  type="checkbox"
+                  checked={selectedProducts.has(product.id)}
+                  onChange={(e) => {
+                    const newSet = new Set(selectedProducts);
+                    e.target.checked ? newSet.add(product.id) : newSet.delete(product.id);
+                    setSelectedProducts(newSet);
+                  }}
+                  style={{ marginTop: 4, minWidth: 20, minHeight: 20 }}
+                />
+                {product.image && (
+                  <img src={product.image} alt="" style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 8 }} />
+                )}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, color: '#1f2937' }}>{product.name}</div>
+                  <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>
+                    ${product.price.toFixed(2)} · Stock {product.stock} · {product.size || '—'}
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+                    <button type="button" onClick={() => toggleProductStock(product.id, product.is_out_of_stock)}
+                      style={{ padding: '8px 12px', minHeight: 44, borderRadius: 8, border: 'none', cursor: 'pointer', background: product.is_out_of_stock ? '#fee2e2' : '#dcfce7', color: product.is_out_of_stock ? '#dc2626' : '#16a34a', fontWeight: 600, fontSize: 13 }}>
+                      {product.is_out_of_stock ? 'Out of Stock' : 'In Stock'}
+                    </button>
+                    <button type="button" onClick={() => openEditProduct(product)} style={{ padding: 8, minHeight: 44, minWidth: 44, background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
+                      <Pencil size={16} color="#374151" />
+                    </button>
+                    <button type="button" onClick={() => handleDeleteProduct(product)} style={{ padding: 8, minHeight: 44, minWidth: 44, background: '#fee2e2', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
+                      <Trash2 size={16} color="#dc2626" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
       <div className="responsive-table-wrap" style={{ background: 'white', borderRadius: 12, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: isMobile ? 560 : 720 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 720 }}>
           <thead>
             <tr style={{ background: '#f9fafb' }}>
               <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#374151', width: 40 }}>
@@ -924,6 +985,7 @@ export default function AdminDashboard() {
           </tbody>
         </table>
       </div>
+      )}
     </div>
   );
 
@@ -1143,6 +1205,7 @@ export default function AdminDashboard() {
     { id: 'products', label: 'Products', icon: ShoppingBag },
     { id: 'orders', label: 'Orders', icon: Package },
     { id: 'coupons', label: 'Coupons', icon: Tag },
+    { id: 'reviews', label: 'Reviews', icon: Star },
     { id: 'messages', label: 'Messages', icon: MessageSquare },
     { id: 'customers', label: 'Customers', icon: Users },
   ];
@@ -1150,7 +1213,7 @@ export default function AdminDashboard() {
   return (
     <div style={{ minHeight: '100vh', background: '#f9fafb' }}>
       {/* Header */}
-      <div style={{ background: 'linear-gradient(135deg, #361906 0%, #9c6649 100%)', padding: isMobile ? '16px' : '24px 40px', position: 'sticky', top: 0, zIndex: 100 }}>
+      <div ref={adminHeaderRef} style={{ background: 'linear-gradient(135deg, #361906 0%, #9c6649 100%)', padding: isMobile ? '16px' : '24px 40px', position: 'sticky', top: 0, zIndex: 100 }}>
         <div style={{ maxWidth: 1400, margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h1 style={{ margin: 0, fontSize: isMobile ? 24 : 32, fontWeight: 800, color: 'white' }}>Admin Dashboard</h1>
           <button onClick={handleLogout} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', background: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 8, cursor: 'pointer', fontSize: 14, fontWeight: 600 }}>
@@ -1160,7 +1223,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Tabs */}
-      <div style={{ background: 'white', borderBottom: '1px solid #e5e7eb', position: 'sticky', top: isMobile ? 60 : 80, zIndex: 99 }}>
+      <div style={{ background: 'white', borderBottom: '1px solid #e5e7eb', position: 'sticky', top: adminHeaderHeight, zIndex: 99 }}>
         <div style={{ maxWidth: 1400, margin: '0 auto', padding: '0 16px', display: 'flex', gap: 4, overflowX: 'auto' }}>
           {tabs.map(({ id, label, icon: Icon }) => (
             <button key={id} onClick={() => setActiveTab(id)}
@@ -1185,6 +1248,7 @@ export default function AdminDashboard() {
             {activeTab === 'products' && renderProducts()}
             {activeTab === 'orders' && renderOrders()}
             {activeTab === 'coupons' && <AdminCouponsTab />}
+            {activeTab === 'reviews' && <AdminReviewsTab />}
             {activeTab === 'messages' && renderMessages()}
             {activeTab === 'customers' && renderCustomers()}
           </>

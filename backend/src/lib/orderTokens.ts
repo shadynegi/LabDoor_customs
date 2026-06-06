@@ -10,12 +10,8 @@ export function hashOrderAccessToken(token: string): string {
   return crypto.createHash('sha256').update(token).digest('hex');
 }
 
+/** Read order access token from header only (query tokens deprecated — use access-exchange code in email links). */
 export function getOrderAccessTokenFromRequest(req: Request): string | null {
-  const queryToken = req.query.token;
-  if (typeof queryToken === 'string' && queryToken.trim()) {
-    return queryToken.trim();
-  }
-
   const headerToken = req.headers['x-order-access-token'];
   if (typeof headerToken === 'string' && headerToken.trim()) {
     return headerToken.trim();

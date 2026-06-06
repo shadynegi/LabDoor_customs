@@ -28,7 +28,7 @@ const backgroundMap: Record<string, string> = {
 };
 
 const CACHE_KEY = 'ldc_product_catalog_v1';
-const CACHE_TTL_MS = 15 * 60 * 1000;
+const CACHE_TTL_MS = 3 * 60 * 1000;
 
 interface CachedCatalog {
   fetchedAt: number;
@@ -78,20 +78,33 @@ function writeCache(products: Product[]) {
 }
 
 async function fetchCatalogFromApi(): Promise<Product[]> {
-  const response = await apiFetch('/products?limit=100&page=1', {
-    retry: { count: 2, on: [502, 503, 504] },
-  });
+  const limit = 100;
+  let page = 1;
+  const allProducts: Product[] = [];
 
-  if (!response.ok) {
-    throw new Error('Failed to fetch product catalog');
+  while (true) {
+    const response = await apiFetch(`/products?limit=${limit}&page=${page}`, {
+      retry: { count: 2, on: [502, 503, 504] },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch product catalog');
+    }
+
+    const data = await response.json();
+    if (!data.success || !Array.isArray(data.data)) {
+      throw new Error('Invalid product catalog response');
+    }
+
+    const batch = data.data.map((product: Product) => normalizeProduct(product));
+    allProducts.push(...batch);
+
+    const hasMore = data.pagination?.hasMore ?? batch.length === limit;
+    if (!hasMore || batch.length < limit) break;
+    page += 1;
   }
 
-  const data = await response.json();
-  if (!data.success || !Array.isArray(data.data)) {
-    throw new Error('Invalid product catalog response');
-  }
-
-  return data.data.map((product: Product) => normalizeProduct(product));
+  return allProducts;
 }
 
 /** Fetch all products once; reuse localStorage cache for 15 minutes. */
@@ -106,6 +119,11 @@ export async function getProductCatalog(forceRefresh = false): Promise<Product[]
   return products;
 }
 
+export const CATALOG_CLEARED_EVENT = 'ldc:catalog-cleared';
+
 export function clearProductCatalogCache() {
   localStorage.removeItem(CACHE_KEY);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(CATALOG_CLEARED_EVENT));
+  }
 }

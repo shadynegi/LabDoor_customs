@@ -319,10 +319,10 @@ export default function CartPage() {
             </div>
           </div>
 
-          {/* Action Buttons */}
+          {/* Action Buttons — hide primary CTA on mobile when sticky bar is shown */}
           <div style={{ 
             marginTop: isMobile ? 20 : 24, 
-            display: "flex", 
+            display: isMobile && hasItems ? "none" : "flex", 
             flexDirection: isMobile ? "column" : "row",
             gap: 12 
           }}>
@@ -384,6 +384,10 @@ export default function CartPage() {
           amount={`$${total.toFixed(2)}`}
           label="Checkout"
           onClick={() => navigate("/checkout")}
+          secondaryLabel="Continue Shopping"
+          onSecondaryClick={() => navigate("/products")}
+          stacked
+          ariaLabel="Cart checkout actions"
         />
       )}
     </div>

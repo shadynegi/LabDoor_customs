@@ -2,7 +2,7 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, ShoppingCart, Package, Shield, Truck, Check, RotateCcw, Image } from 'lucide-react';
+import { ArrowLeft, ShoppingCart, Package, Shield, Truck, Check, RotateCcw, Image, AlertTriangle } from 'lucide-react';
 import { apiFetch } from '../config';
 import type { Product } from '../hooks/useProducts';
 import { useCart, type SizeSystem } from './CartContext';
@@ -14,6 +14,8 @@ import MetaTags from '../components/MetaTags';
 import ProductJsonLd from '../components/ProductJsonLd';
 import { logError } from '../lib/logger';
 import { useResponsive } from '../hooks/useResponsive';
+import MobileStickyCta from '../components/MobileStickyCta';
+import { trackProductView } from '../utils/activityTracker';
 
 const Product360Viewer = lazy(() =>
   import('../components/Product360Viewer').then((m) => ({ default: m.Product360Viewer }))
@@ -96,6 +98,7 @@ const ProductDetailPage: React.FC = () => {
             background: data.data.background ? (backgroundMap[data.data.background] || data.data.background) : undefined,
           };
           setProduct(productData);
+          trackProductView(productData.id, productData.name);
         } else {
           throw new Error('Product not found');
         }
@@ -113,6 +116,8 @@ const ProductDetailPage: React.FC = () => {
     }
   }, [id]);
 
+  const isOutOfStock = Boolean(product?.is_out_of_stock || product?.stock === 0);
+
   const handleAddToCart = () => {
     if (!selectedSize) {
       setSizeError("Please select your size before adding to cart.");
@@ -120,6 +125,11 @@ const ProductDetailPage: React.FC = () => {
     }
 
     if (!product) return;
+
+    if (isOutOfStock) {
+      setSizeError('This product is currently out of stock.');
+      return;
+    }
 
     addToCart({
       id: product.id,
@@ -131,7 +141,6 @@ const ProductDetailPage: React.FC = () => {
         value: selectedSize,
       },
     });
-    
     setAddedToCart(true);
     setSizeError(null);
     setTimeout(() => setAddedToCart(false), 2000);
@@ -166,7 +175,9 @@ const ProductDetailPage: React.FC = () => {
     : undefined;
 
   return (
-    <div style={{
+    <div
+      className={isMobile && !isOutOfStock ? 'has-mobile-sticky-cta' : undefined}
+      style={{
       minHeight: '100vh',
       background: 'linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)',
     }}>
@@ -186,7 +197,7 @@ const ProductDetailPage: React.FC = () => {
         description={product.description}
         image={productImage}
         price={product.price}
-        inStock={!product.is_out_of_stock}
+        inStock={!isOutOfStock}
         rating={product.rating}
         reviewCount={product.review_count}
       />
@@ -267,7 +278,8 @@ const ProductDetailPage: React.FC = () => {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 style={{
-                  padding: '10px 16px',
+                  padding: '12px 16px',
+                  minHeight: 44,
                   borderRadius: 10,
                   border: 'none',
                   background: !show360View ? 'white' : 'rgba(255,255,255,0.3)',
@@ -290,7 +302,8 @@ const ProductDetailPage: React.FC = () => {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 style={{
-                  padding: '10px 16px',
+                  padding: '12px 16px',
+                  minHeight: 44,
                   borderRadius: 10,
                   border: 'none',
                   background: show360View ? 'white' : 'rgba(255,255,255,0.3)',
@@ -452,6 +465,8 @@ const ProductDetailPage: React.FC = () => {
                 {(["UK", "US", "EU"] as SizeSystem[]).map((system) => (
                   <button
                     key={system}
+                    type="button"
+                    aria-pressed={selectedSizeSystem === system}
                     onClick={() => {
                       setSelectedSizeSystem(system);
                       setSelectedSize(null);
@@ -460,6 +475,7 @@ const ProductDetailPage: React.FC = () => {
                     style={{
                       flex: 1,
                       padding: "10px 16px",
+                      minHeight: 44,
                       border: "none",
                       borderRadius: 8,
                       background: selectedSizeSystem === system
@@ -532,32 +548,42 @@ const ProductDetailPage: React.FC = () => {
               </motion.div>
             )}
 
-            {/* Add to Cart Button */}
+            {/* Add to Cart — hidden on mobile when sticky CTA is shown */}
+            {(!isMobile || isOutOfStock) && (
             <motion.button
-              onClick={handleAddToCart}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+              onClick={isOutOfStock ? undefined : handleAddToCart}
+              disabled={isOutOfStock || addedToCart}
+              whileHover={isOutOfStock ? undefined : { scale: 1.02 }}
+              whileTap={isOutOfStock ? undefined : { scale: 0.98 }}
               style={{
                 width: '100%',
                 padding: isMobile ? '16px' : '20px',
-                background: addedToCart 
-                  ? "linear-gradient(90deg, #10b981, #059669)" 
+                background: isOutOfStock
+                  ? '#fee2e2'
+                  : addedToCart
+                  ? "linear-gradient(90deg, #10b981, #059669)"
                   : "linear-gradient(135deg, #361906 0%, #9c6649 100%)",
-                color: "white",
-                border: "none",
+                color: isOutOfStock ? '#dc2626' : 'white',
+                border: isOutOfStock ? '2px solid #fca5a5' : 'none',
                 borderRadius: 12,
                 fontSize: isMobile ? 16 : 18,
                 fontWeight: 700,
-                cursor: "pointer",
+                cursor: isOutOfStock ? 'not-allowed' : 'pointer',
+                opacity: isOutOfStock ? 0.9 : 1,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: 12,
                 marginBottom: 32,
-                boxShadow: '0 4px 12px rgba(102,126,234,0.4)',
+                boxShadow: isOutOfStock ? 'none' : '0 4px 12px rgba(102,126,234,0.4)',
               }}
             >
-              {addedToCart ? (
+              {isOutOfStock ? (
+                <>
+                  <AlertTriangle size={20} />
+                  Out of Stock
+                </>
+              ) : addedToCart ? (
                 <>
                   <Check size={20} />
                   Added to Cart!
@@ -569,6 +595,7 @@ const ProductDetailPage: React.FC = () => {
                 </>
               )}
             </motion.button>
+            )}
 
             {/* Features */}
             <div style={{
@@ -605,6 +632,15 @@ const ProductDetailPage: React.FC = () => {
           />
         </Suspense>
       </div>
+      {isMobile && !isOutOfStock && (
+        <MobileStickyCta
+          amount={`$${Number(product.price).toFixed(2)}`}
+          label={addedToCart ? 'Added to Cart' : 'Add to Cart'}
+          onClick={handleAddToCart}
+          disabled={addedToCart}
+          ariaLabel="Product purchase actions"
+        />
+      )}
     </div>
   );
 };

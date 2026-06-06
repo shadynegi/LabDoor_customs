@@ -2,7 +2,7 @@
 
 Configure PayPal Checkout for Lab Door Customs.
 
-**Full reference:** [`../info.md`](../info.md)
+**Full reference:** [`info.md`](info.md)
 
 ---
 
@@ -42,6 +42,17 @@ PAYPAL_MODE=sandbox
 Copy the Webhook ID to `PAYPAL_WEBHOOK_ID` (required in production).
 
 The backend verifies signatures using the raw request body before JSON parsing.
+
+---
+
+## Checkout flow (how payments bind to server orders)
+
+1. **Create payment** — `POST /api/paypal/create-payment` validates the cart, inserts a pending order, decrements stock, creates a PayPal order with `reference_id` = server order UUID, and stores a one-time checkout exchange code (30-minute TTL).
+2. **PayPal return URL** — `{FRONTEND_URL}/payment/success?code={exchangeCode}`; PayPal appends `&token={paypalOrderId}`. The order access token is **not** in the URL.
+3. **Payment success page** — redeems `code` via `GET /api/paypal/checkout-exchange/:code` to obtain `accessToken` and `serverOrderId`.
+4. **Capture** — `POST /api/paypal/capture-payment/:paypalOrderId` requires `serverOrderId`, `accessToken`, and matching `paypal_order_id` binding.
+
+Set `ORDER_TOKEN_ENCRYPTION_KEY` in production for checkout exchange token encryption at rest.
 
 ---
 

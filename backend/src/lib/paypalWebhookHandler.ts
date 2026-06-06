@@ -70,7 +70,6 @@ export function createPayPalWebhookHandler(isProduction: boolean) {
           res.status(401).json({
             success: false,
             error: 'Webhook verification failed',
-            message: verification.error,
           });
           return;
         }

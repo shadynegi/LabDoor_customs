@@ -18,6 +18,7 @@ export interface ProductSearchBarProps {
   /** Called when user presses Enter or chooses "View all results". Default: /products?q= */
   onSubmitSearch?: (query: string) => void;
   onSelectProduct?: (product: Product) => void;
+  onCatalogNeeded?: () => void;
 }
 
 export default function ProductSearchBar({
@@ -31,6 +32,7 @@ export default function ProductSearchBar({
   placeholder = 'Search products...',
   onSubmitSearch,
   onSelectProduct,
+  onCatalogNeeded,
 }: ProductSearchBarProps) {
   const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -123,6 +125,7 @@ export default function ProductSearchBar({
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
         onFocus={() => {
+          onCatalogNeeded?.();
           setIsFocused(true);
           setShowSuggestions(true);
         }}
@@ -226,7 +229,9 @@ export default function ProductSearchBar({
               overflowY: 'auto',
             }}
           >
-            {suggestions.map((product) => (
+            {suggestions.map((product) => {
+              const outOfStock = Boolean(product.is_out_of_stock || product.stock === 0);
+              return (
               <li key={product.id} role="option">
                 <button
                   type="button"
@@ -243,6 +248,7 @@ export default function ProductSearchBar({
                     borderRadius: 8,
                     cursor: 'pointer',
                     textAlign: 'left',
+                    opacity: outOfStock ? 0.65 : 1,
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.background = '#f3f4f6';
@@ -276,11 +282,13 @@ export default function ProductSearchBar({
                     <div style={{ fontSize: 13, color: '#6b7280' }}>
                       ${Number(product.price).toFixed(2)}
                       {product.category ? ` · ${product.category}` : ''}
+                      {outOfStock ? ' · Out of Stock' : ''}
                     </div>
                   </div>
                 </button>
               </li>
-            ))}
+            );
+            })}
             <li>
               <button
                 type="button"

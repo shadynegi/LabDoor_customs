@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import LiquidModal from './LiquidModal';
 import { apiFetch } from '../config';
 import { logError } from '../lib/logger';
+import { clearProductCatalogCache } from '../lib/productCatalogCache';
 import { useResponsive } from '../hooks/useResponsive';
 
 export interface AdminProduct {
@@ -191,6 +192,7 @@ export default function AdminProductFormModal({
         );
       }
 
+      clearProductCatalogCache();
       onSaved();
       onClose();
     } catch (err) {

@@ -3,14 +3,14 @@ import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { motion, AnimatePresence, type Variants } from "framer-motion";
 import { ChevronLeft, ChevronRight, ShoppingCart, Check, X, HelpCircle, AlertTriangle, Search } from "lucide-react";
 import { useCart, type SizeSystem } from "./CartContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useProducts } from "../hooks/useProducts";
 import { useProductSearchSuggestions } from "../hooks/useProductSearchSuggestions";
 import ProductSearchBar from "../components/ProductSearchBar";
 import ErrorMessage from "../components/ErrorMessage";
 import LiquidButton from "../components/LiquidButton";
 import LiquidModal from "../components/LiquidModal";
-import { trackProductView, trackAddToCart } from "../utils/activityTracker";
+import { trackProductView } from "../utils/activityTracker";
 import { HomePageSkeleton } from "../components/Skeletons";
 import { optimizeImageUrl } from "../utils/imageUrl";
 import MetaTags from "../components/MetaTags";
@@ -64,7 +64,7 @@ export default function Home() {
   const { products: apiProducts, loading, error, refetch } = useProducts();
   const products = apiProducts;  
   const [[index, direction], setIndex] = useState<[number, number]>([0, 0]);
-  const { isMobile } = useResponsive();
+  const { isMobile, isSmallMobile } = useResponsive();
   const productsCount = products.length;
   const startX = useRef<number | null>(null);
   const startY = useRef<number | null>(null);
@@ -200,10 +200,7 @@ export default function Home() {
         value: selectedSize,
       },
     });
-    
-    // Track add to cart event
-    trackAddToCart(p.id, p.name, 1, selectedSize);
-    
+
     setAddedToCart(p.id);
     setShowSizeModal(false);
     setSizeError(null);
@@ -269,15 +266,16 @@ export default function Home() {
           letterSpacing: 1,
           position: "relative",
           zIndex: 10,
-          minHeight: isMobile ? 100 : 120,
+          minHeight: isSmallMobile ? 72 : (isMobile ? 100 : 120),
         }}
       >
         {/* Top Left Logo */}
-        <a href="/" style={{ 
+        <Link to="/" style={{ 
           display: "flex", 
           alignItems: "center",
           position: "absolute",
-          left: isMobile ? 16 : 24
+          left: isMobile ? 16 : 24,
+          textDecoration: "none",
         }}>
           <img 
             src={logoHomePage} 
@@ -287,7 +285,7 @@ export default function Home() {
             loading="lazy"
             decoding="async"
             style={{ 
-              height: isMobile ? 50.625 : 67.5,
+              height: isSmallMobile ? 36 : (isMobile ? 50.625 : 67.5),
               width: "auto",
               filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.3))",
               transition: "transform 0.2s ease"
@@ -299,10 +297,11 @@ export default function Home() {
               e.currentTarget.style.transform = "scale(1)";
             }}
           />
-        </a>
+        </Link>
 
-        {/* Centered Logo */}
-        <a href="/" style={{ display: "flex", alignItems: "center" }}>
+        {/* Centered Logo — hidden on very small screens to avoid overlap */}
+        {!isSmallMobile && (
+        <Link to="/" style={{ display: "flex", alignItems: "center", textDecoration: "none" }}>
           <img 
             src={logoHomePageText} 
             alt="Lab Door Customs"
@@ -323,7 +322,8 @@ export default function Home() {
               e.currentTarget.style.transform = "scale(1)";
             }}
           />
-        </a>
+        </Link>
+        )}
 
         {/* Desktop: Cart & About Us on Right */}
         {!isMobile && (
@@ -436,7 +436,7 @@ export default function Home() {
           alignItems: "center",
           justifyContent: "center",
           position: "relative",
-          padding: isMobile ? "20px 0 max(80px, calc(80px + env(safe-area-inset-bottom))) 0" : "40px 0",
+          padding: isMobile ? "20px 0 max(96px, calc(96px + env(safe-area-inset-bottom))) 0" : "40px 0",
           touchAction: "pan-y",
         }}
       >
@@ -975,14 +975,40 @@ export default function Home() {
             zIndex: 20,
           }}
         >
-          <a 
-            href="/contact" 
-            style={{ color: "#ffffff", fontSize: 14, textDecoration: "none" }}
+          <Link
+            to="/contact"
+            style={{
+              color: "#ffffff",
+              fontSize: 14,
+              textDecoration: "none",
+              minHeight: 44,
+              minWidth: 44,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "10px 12px",
+            }}
           >
             Contact Us
-          </a>
-          <a href="/about" style={{ color: "#ffffff", fontSize: 14, textDecoration: "none" }}>About Us</a>
+          </Link>
+          <Link
+            to="/about"
+            style={{
+              color: "#ffffff",
+              fontSize: 14,
+              textDecoration: "none",
+              minHeight: 44,
+              minWidth: 44,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "10px 12px",
+            }}
+          >
+            About Us
+          </Link>
           <button
+            type="button"
             onClick={() => navigate('/help')}
             style={{
               background: "transparent",
@@ -993,7 +1019,9 @@ export default function Home() {
               display: "flex",
               alignItems: "center",
               gap: 6,
-              padding: 0
+              minHeight: 44,
+              minWidth: 44,
+              padding: "10px 12px",
             }}
           >
             <HelpCircle size={16} />

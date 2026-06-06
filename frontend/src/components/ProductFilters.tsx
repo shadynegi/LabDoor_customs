@@ -10,6 +10,7 @@ interface ProductFiltersProps {
   onClearFilters: () => void;
   activeFilterCount: number;
   isMobile?: boolean;
+  onPanelOpen?: () => void;
 }
 
 const ProductFilters: React.FC<ProductFiltersProps> = ({
@@ -19,6 +20,7 @@ const ProductFilters: React.FC<ProductFiltersProps> = ({
   onClearFilters,
   activeFilterCount,
   isMobile = false,
+  onPanelOpen,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -51,7 +53,10 @@ const ProductFilters: React.FC<ProductFiltersProps> = ({
       }}>
         {/* Filter Toggle Button - Touch-friendly */}
         <button
-          onClick={() => setIsExpanded(!isExpanded)}
+          onClick={() => {
+            if (!isExpanded) onPanelOpen?.();
+            setIsExpanded(!isExpanded);
+          }}
           style={{
             display: 'flex',
             alignItems: 'center',

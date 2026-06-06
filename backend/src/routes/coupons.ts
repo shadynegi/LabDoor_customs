@@ -1,5 +1,6 @@
 // backend/src/routes/coupons.ts
 import { logger } from '../lib/logger';
+import { respond500 } from '../lib/safeError';
 import { Router, Request, Response } from 'express';
 import sql from '../lib/db';
 import { cached } from '../lib/cache';
@@ -202,92 +203,9 @@ router.post('/validate', async (req: Request, res: Response) => {
     });
 
     res.json(result);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Error validating coupon:', error);
-    res.status(500).json({
-      success: false,
-      valid: false,
-      message: 'Error validating coupon',
-      error: error.message,
-    });
-  }
-});
-
-// POST record coupon usage — removed from public API.
-// Coupon usage is recorded server-side during PayPal capture only.
-router.post('/use', (_req: Request, res: Response) => {
-  res.status(410).json({
-    success: false,
-    error: 'Endpoint deprecated',
-    message: 'Coupon usage is recorded automatically during payment capture.',
-  });
-});
-
-// ============================================
-// ADMIN ROUTES
-// ============================================
-
-// GET all coupons (Admin only)
-router.get('/', verifyAdmin, async (req: Request, res: Response) => {
-  try {
-    const parsed = parsePagination(req.query);
-    if (!parsed.ok) {
-      return res.status(parsed.status).json({ success: false, error: parsed.error });
-    }
-
-    const { limit, offset } = parsed.params;
-    const { active_only, include_expired } = req.query;
-
-    let coupons;
-    let countResult;
-
-    if (active_only === 'true') {
-      coupons = await sql`
-        SELECT * FROM coupons 
-        WHERE is_active = TRUE 
-          AND (valid_until IS NULL OR valid_until > NOW())
-        ORDER BY created_at DESC
-        LIMIT ${limit} OFFSET ${offset}
-      `;
-      countResult = await sql`
-        SELECT COUNT(*) as count FROM coupons
-        WHERE is_active = TRUE
-          AND (valid_until IS NULL OR valid_until > NOW())
-      `;
-    } else if (include_expired === 'false') {
-      coupons = await sql`
-        SELECT * FROM coupons 
-        WHERE valid_until IS NULL OR valid_until > NOW()
-        ORDER BY created_at DESC
-        LIMIT ${limit} OFFSET ${offset}
-      `;
-      countResult = await sql`
-        SELECT COUNT(*) as count FROM coupons
-        WHERE valid_until IS NULL OR valid_until > NOW()
-      `;
-    } else {
-      coupons = await sql`
-        SELECT * FROM coupons
-        ORDER BY created_at DESC
-        LIMIT ${limit} OFFSET ${offset}
-      `;
-      countResult = await sql`SELECT COUNT(*) as count FROM coupons`;
-    }
-
-    const total = Number(countResult[0]?.count || 0);
-
-    res.json({
-      success: true,
-      data: coupons,
-      count: total,
-      pagination: paginationMeta(total, parsed.params),
-    });
-  } catch (error: any) {
-    logger.error('Error fetching coupons:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    respond500(res, error, 'Request failed');
   }
 });
 
@@ -326,12 +244,9 @@ router.get('/:id', verifyAdmin, async (req: Request, res: Response) => {
         },
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Error fetching coupon:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    respond500(res, error, 'Request failed');
   }
 });
 
@@ -414,12 +329,9 @@ router.post('/', verifyAdmin, async (req: Request, res: Response) => {
       data: result[0],
       message: 'Coupon created successfully',
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Error creating coupon:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    respond500(res, error, 'Request failed');
   }
 });
 
@@ -477,12 +389,9 @@ router.put('/:id', verifyAdmin, async (req: Request, res: Response) => {
       data: result[0],
       message: 'Coupon updated successfully',
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Error updating coupon:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    respond500(res, error, 'Request failed');
   }
 });
 
@@ -513,12 +422,9 @@ router.patch('/:id/toggle', verifyAdmin, async (req: Request, res: Response) => 
       data: result[0],
       message: `Coupon ${result[0].is_active ? 'activated' : 'deactivated'} successfully`,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Error toggling coupon:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    respond500(res, error, 'Request failed');
   }
 });
 
@@ -545,12 +451,9 @@ router.delete('/:id', verifyAdmin, async (req: Request, res: Response) => {
       success: true,
       message: 'Coupon deleted successfully',
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Error deleting coupon:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    respond500(res, error, 'Request failed');
   }
 });
 
@@ -580,12 +483,9 @@ router.get('/:id/usage', verifyAdmin, async (req: Request, res: Response) => {
       data: usage,
       count: parseInt(countResult[0].count),
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Error fetching coupon usage:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    respond500(res, error, 'Request failed');
   }
 });
 

@@ -1,16 +1,27 @@
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { XCircle, ArrowLeft, ShoppingCart } from "lucide-react";
+import { useResponsive } from "../hooks/useResponsive";
 
 export default function Cancel() {
   const navigate = useNavigate();
+  const { isMobile } = useResponsive();
+
+  useEffect(() => {
+    sessionStorage.removeItem("pendingOrder");
+    sessionStorage.removeItem("checkoutRecovery");
+    localStorage.removeItem("pendingOrder");
+  }, []);
 
   return (
     <div
       style={{
-        minHeight: "100vh",
+        minHeight: "100dvh",
         background: "linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)",
-        padding: "40px 20px",
+        padding: isMobile
+          ? "max(20px, env(safe-area-inset-top)) 16px max(20px, env(safe-area-inset-bottom))"
+          : "40px 20px",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -23,7 +34,7 @@ export default function Cancel() {
           maxWidth: 600,
           background: "white",
           borderRadius: 16,
-          padding: 40,
+          padding: isMobile ? 24 : 40,
           boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1)",
           textAlign: "center",
         }}

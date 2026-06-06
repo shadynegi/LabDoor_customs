@@ -150,13 +150,14 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
     >
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <h3 style={{ fontSize: 20, fontWeight: 700, color: '#1f2937' }}>
+        <h3 id="review-form-title" style={{ fontSize: 20, fontWeight: 700, color: '#1f2937' }}>
           Review {productName}
         </h3>
         {onClose && (
           <button
             type="button"
             onClick={onClose}
+            aria-label="Close review form"
             style={{
               background: 'none',
               border: 'none',

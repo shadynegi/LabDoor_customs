@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Package, Shield, FileText, ChevronDown, ChevronUp } from "lucide-react";
 import { useResponsive } from "../hooks/useResponsive";
 

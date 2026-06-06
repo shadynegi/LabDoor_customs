@@ -11,6 +11,8 @@ import helmet from "helmet";
 import compression from "compression";
 import { emailService } from './lib/email';
 import sql, { withRetry, getPoolStats } from './lib/db';
+import { sanitizeCustomerInfo } from './utils/sanitizeCustomer';
+import { clientErrorMessage } from './lib/safeError';
 import {
   validateCartItems,
   resolveCouponDiscount,
@@ -69,6 +71,7 @@ import {
   createCheckoutExchangeCode,
   redeemCheckoutExchangeCode,
 } from './lib/orderCheckoutExchange';
+import { ensureOrderAccessExchangeTable } from './lib/orderAccessExchange';
 import { ensureRlsPolicies } from './lib/rlsMigration';
 import { assertJwtSecretForProduction } from './lib/jwtSecret';
 import { purgeLegacyAdminSessions } from './lib/adminSessionMigration';
@@ -102,6 +105,8 @@ const validateEnvVars = () => {
     'RESEND_API_KEY',
     'PAYPAL_CLIENT_ID',
     'PAYPAL_SECRET',
+    'ORDER_TOKEN_ENCRYPTION_KEY',
+    'IP_SALT',
   ];
 
   const missing = required.filter((v) => !process.env[v]?.trim());
@@ -536,10 +541,10 @@ app.get("/api/paypal/test", verifyAdmin, async (req: Request, res: Response) => 
       message: "PayPal connection successful",
       hasToken: !!accessToken,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     res.status(500).json({
       success: false,
-      error: error.message || "PayPal connection failed",
+      error: clientErrorMessage(error, 'PayPal connection failed'),
     });
   }
 });
@@ -551,7 +556,10 @@ app.post("/api/paypal/create-payment", async (req: Request, res: Response) => {
 
   try {
     const body = req.body as CreatePaymentRequest;
-    const { currency = 'USD', description, customerInfo, items, coupon_code } = body;
+    const { currency = 'USD', description, items, coupon_code } = body;
+    const customerInfo = body.customerInfo
+      ? sanitizeCustomerInfo(body.customerInfo)
+      : undefined;
 
     if (!items || items.length === 0) {
       return res.status(400).json({
@@ -835,7 +843,7 @@ app.post("/api/paypal/create-payment", async (req: Request, res: Response) => {
     }
     res.status(500).json({
       success: false,
-      error: error.message || "Failed to create payment",
+      error: clientErrorMessage(error, 'Failed to create payment'),
     });
   }
 });
@@ -1128,6 +1136,7 @@ app.post("/api/paypal/capture-payment/:orderId", async (req: Request, res: Respo
         total: parseFloat(String(orderRecord.total ?? '0')),
         shippingAddress,
         orderDate: new Date().toISOString(),
+        orderId: serverOrderId,
         accessToken,
       }).catch((err) => logger.error('Confirmation email error after capture:', err));
     }
@@ -1171,7 +1180,7 @@ app.post("/api/paypal/capture-payment/:orderId", async (req: Request, res: Respo
 
     res.status(500).json({
       success: false,
-      error: error.message || "Failed to capture payment",
+      error: clientErrorMessage(error, 'Failed to capture payment'),
     });
   }
 });
@@ -1209,7 +1218,7 @@ app.get("/api/paypal/checkout-exchange/:code", async (req: Request, res: Respons
     logger.error('Checkout exchange error:', error);
     res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to exchange checkout code',
+      error: clientErrorMessage(error, 'Failed to exchange checkout code'),
     });
   }
 });
@@ -1273,7 +1282,7 @@ app.get("/api/paypal/checkout-context/:paypalOrderId", async (req: Request, res:
     logger.error('Checkout context error:', error);
     res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to load checkout context',
+      error: clientErrorMessage(error, 'Failed to load checkout context'),
     });
   }
 });
@@ -1315,7 +1324,7 @@ app.get("/api/paypal/order/:orderId", verifyAdmin, async (req: Request, res: Res
     logger.error("Get order error:", error);
     res.status(500).json({
       success: false,
-      error: error.message || "Failed to get order details",
+      error: clientErrorMessage(error, 'Failed to get order details'),
     });
   }
 });
@@ -1397,7 +1406,7 @@ app.post("/api/paypal/refund/:captureId", verifyAdmin, async (req: Request, res:
     logger.error("Refund error:", error);
     res.status(500).json({
       success: false,
-      error: error.message || "Failed to process refund",
+      error: clientErrorMessage(error, 'Failed to process refund'),
     });
   }
 });
@@ -1447,11 +1456,11 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
     path: req.path,
   });
 
+  const isDev = process.env.NODE_ENV === 'development';
   res.status(500).json({
     success: false,
-    error: err.message || "Internal server error",
-    // Only in development
-    ...(process.env.NODE_ENV === "development" && { stack: err.stack }),
+    error: isDev ? (err.message || 'Internal server error') : 'Internal server error',
+    ...(isDev && { stack: err.stack }),
   });
 });
 
@@ -1488,6 +1497,7 @@ async function bootstrap(): Promise<void> {
   await ensureIdempotencyTable();
   await ensureOrderPaymentSchema();
   await ensureCheckoutExchangeTable();
+  await ensureOrderAccessExchangeTable();
   await ensureRlsPolicies();
   await purgeLegacyAdminSessions();
   await warmCaches();

@@ -7,6 +7,7 @@ import { apiFetch } from '../config';
 import { toast } from 'sonner';
 import LiquidButton from '../components/LiquidButton';
 import { useResponsive } from '../hooks/useResponsive';
+import { useAdminAuth } from '../contexts/AdminAuthContext';
 
 export default function AdminLogin() {
   const { isMobile } = useResponsive();
@@ -16,22 +17,13 @@ export default function AdminLogin() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+  const { isAuthenticated, setAuthenticated, verify } = useAdminAuth();
 
-  // Check if already logged in (HttpOnly session cookie)
   useEffect(() => {
-    const verifySession = async () => {
-      try {
-        const response = await apiFetch('/admin/verify');
-        if (response.ok) {
-          navigate('/adminshivamdashboard');
-        }
-      } catch {
-        // Not logged in
-      }
-    };
-
-    verifySession();
-  }, [navigate]);
+    if (isAuthenticated) {
+      navigate('/adminshivamdashboard');
+    }
+  }, [isAuthenticated, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,6 +39,8 @@ export default function AdminLogin() {
       const data = await response.json();
 
       if (data.success) {
+        setAuthenticated(true);
+        await verify();
         toast.success('Login successful!');
         navigate('/adminshivamdashboard');
       } else {

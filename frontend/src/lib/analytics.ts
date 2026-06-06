@@ -12,15 +12,23 @@ function isDoNotTrack(): boolean {
   return dnt === '1' || dnt === 'yes';
 }
 
-export function hasAnalyticsConsent(): boolean {
+function readCookiePreferences(): { analytics?: boolean; marketing?: boolean } | null {
   try {
     const raw = localStorage.getItem(COOKIE_PREFERENCES_KEY);
-    if (!raw) return false;
-    const prefs = JSON.parse(raw) as { analytics?: boolean };
-    return prefs.analytics === true;
+    if (!raw) return null;
+    return JSON.parse(raw) as { analytics?: boolean; marketing?: boolean };
   } catch {
-    return false;
+    return null;
   }
+}
+
+export function hasAnalyticsConsent(): boolean {
+  return readCookiePreferences()?.analytics === true;
+}
+
+/** Marketing consent is stored for future campaigns; no trackers load on this flag yet. */
+export function hasMarketingConsent(): boolean {
+  return readCookiePreferences()?.marketing === true;
 }
 
 function canUseAnalytics(): boolean {

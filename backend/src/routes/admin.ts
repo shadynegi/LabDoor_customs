@@ -14,6 +14,9 @@ import {
 } from '../lib/cookies';
 import { hashAdminSessionToken } from '../lib/adminSession';
 import { validateJwtSecretComplexity } from '../lib/jwtSecret';
+import { MAX_BULK_IDS, validateStatusTransition, type OrderStatus } from '../lib/orderStatus';
+import { stripOrderSecrets } from '../lib/orderTokens';
+import { respond500 } from '../lib/safeError';
 
 const router = Router();
 
@@ -39,32 +42,21 @@ const getJwtSecret = (): string => {
   return secret;
 };
 
-const getAdminCredentials = (): { username: string; passwordHash: string; plainPassword?: string } => {
+const getAdminCredentials = (): { username: string; passwordHash: string } => {
   const username = process.env.ADMIN_USERNAME;
   const passwordHash = process.env.ADMIN_PASSWORD_HASH;
-  const plainPassword = process.env.ADMIN_PASSWORD; // Fallback for migration
-  
+
   if (!username) {
     logger.error('ERROR: ADMIN_USERNAME must be set');
     throw new Error('Invalid admin credentials configuration');
   }
-  
-  if (process.env.NODE_ENV === 'production' && !passwordHash) {
-    logger.error('ERROR: ADMIN_PASSWORD_HASH must be set in production');
+
+  if (!passwordHash) {
+    logger.error('ERROR: ADMIN_PASSWORD_HASH must be set (plaintext ADMIN_PASSWORD is not allowed)');
     throw new Error('Invalid admin credentials configuration');
   }
 
-  if (!passwordHash && !plainPassword) {
-    logger.error('ERROR: Either ADMIN_PASSWORD_HASH or ADMIN_PASSWORD must be set');
-    throw new Error('Invalid admin credentials configuration');
-  }
-  
-  // Warn if using plaintext password (insecure, dev only)
-  if (!passwordHash && plainPassword) {
-    logger.warn('⚠️  WARNING: Using plaintext ADMIN_PASSWORD. Generate a hash using /api/admin/generate-hash for better security.');
-  }
-  
-  return { username, passwordHash: passwordHash || '', plainPassword };
+  return { username, passwordHash };
 };
 
 // Utility function to generate password hash (for setup)
@@ -74,17 +66,7 @@ const generatePasswordHash = async (password: string): Promise<string> => {
 
 // Verify password against hash or plaintext (for migration)
 const verifyPassword = async (password: string, credentials: ReturnType<typeof getAdminCredentials>): Promise<boolean> => {
-  // If hash is available, use bcrypt compare
-  if (credentials.passwordHash) {
-    return bcrypt.compare(password, credentials.passwordHash);
-  }
-  
-  // Fallback to plaintext comparison (insecure, for migration)
-  if (credentials.plainPassword) {
-    return password === credentials.plainPassword;
-  }
-  
-  return false;
+  return bcrypt.compare(password, credentials.passwordHash);
 };
 
 // Clean up expired admin sessions
@@ -300,12 +282,9 @@ router.post('/login', async (req: Request, res: Response) => {
       expiresAt: expiresAt.toISOString(),
       message: 'Login successful',
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Admin login error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Login failed',
-    });
+    respond500(res, error, 'Request failed');
   }
 });
 
@@ -343,11 +322,9 @@ router.post('/generate-hash', async (req: Request, res: Response) => {
         '4. Restart your server',
       ],
     });
-  } catch (error: any) {
-    res.status(500).json({
-      success: false,
-      error: 'Failed to generate hash',
-    });
+  } catch (error: unknown) {
+    logger.error("Error:", error);
+    respond500(res, error, 'Request failed');
   }
 });
 
@@ -372,11 +349,9 @@ router.post('/logout', verifyAdmin, async (req: Request, res: Response) => {
       success: true,
       message: 'Logged out successfully',
     });
-  } catch (error: any) {
-    res.status(500).json({
-      success: false,
-      error: 'Logout failed',
-    });
+  } catch (error: unknown) {
+    logger.error("Error:", error);
+    respond500(res, error, 'Request failed');
   }
 });
 
@@ -414,225 +389,9 @@ router.get('/sessions', verifyAdmin, async (req: Request, res: Response) => {
         stats: stats[0],
       },
     });
-  } catch (error: any) {
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to fetch sessions',
-    });
-  }
-});
-
-// POST /admin/sessions/cleanup - Manually trigger session cleanup
-router.post('/sessions/cleanup', verifyAdmin, async (req: Request, res: Response) => {
-  try {
-    const result = await cleanupExpiredSessions();
-    
-    res.json({
-      success: true,
-      message: `Cleaned up ${result.deleted} expired session(s)`,
-      deleted: result.deleted,
-    });
-  } catch (error: any) {
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Session cleanup failed',
-    });
-  }
-});
-
-// GET /admin/analytics - Get dashboard analytics
-router.get('/analytics', verifyAdmin, async (req: Request, res: Response) => {
-  try {
-    // Get order statistics
-    const orderStats = await sql`
-      SELECT 
-        COUNT(*) as total_orders,
-        COALESCE(SUM(total), 0) as total_revenue,
-        COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_orders,
-        COUNT(CASE WHEN status = 'processing' THEN 1 END) as processing_orders,
-        COUNT(CASE WHEN status = 'shipped' THEN 1 END) as shipped_orders,
-        COUNT(CASE WHEN status = 'delivered' THEN 1 END) as delivered_orders,
-        COUNT(CASE WHEN status = 'cancelled' THEN 1 END) as cancelled_orders,
-        COUNT(CASE WHEN payment_status = 'completed' THEN 1 END) as paid_orders,
-        COUNT(CASE WHEN payment_status = 'pending' THEN 1 END) as unpaid_orders,
-        COUNT(CASE WHEN created_at >= NOW() - INTERVAL '7 days' THEN 1 END) as orders_last_7_days,
-        COUNT(CASE WHEN created_at >= NOW() - INTERVAL '30 days' THEN 1 END) as orders_last_30_days,
-        COALESCE(SUM(CASE WHEN created_at >= NOW() - INTERVAL '7 days' THEN total END), 0) as revenue_last_7_days,
-        COALESCE(SUM(CASE WHEN created_at >= NOW() - INTERVAL '30 days' THEN total END), 0) as revenue_last_30_days
-      FROM orders
-    `;
-
-    // Get product statistics
-    const productStats = await sql`
-      SELECT 
-        COUNT(*) as total_products,
-        COUNT(CASE WHEN is_out_of_stock = true OR stock = 0 THEN 1 END) as out_of_stock_products,
-        COUNT(CASE WHEN stock > 0 AND stock <= 10 THEN 1 END) as low_stock_products,
-        COALESCE(SUM(view_count), 0) as total_views,
-        COALESCE(SUM(cart_count), 0) as total_cart_adds
-      FROM products
-    `;
-
-    // Get top viewed products
-    const topViewedProducts = await sql`
-      SELECT id, name, view_count, cart_count, stock, is_out_of_stock
-      FROM products
-      ORDER BY view_count DESC
-      LIMIT 5
-    `;
-
-    // Get top carted products
-    const topCartedProducts = await sql`
-      SELECT id, name, view_count, cart_count, stock, is_out_of_stock
-      FROM products
-      ORDER BY cart_count DESC
-      LIMIT 5
-    `;
-
-    // Get customer locations from orders
-    const customerLocations = await sql`
-      SELECT 
-        shipping_address->>'country' as country,
-        shipping_address->>'city' as city,
-        COUNT(*) as order_count,
-        COALESCE(SUM(total), 0) as total_revenue
-      FROM orders
-      WHERE shipping_address->>'country' IS NOT NULL
-      GROUP BY shipping_address->>'country', shipping_address->>'city'
-      ORDER BY order_count DESC
-      LIMIT 20
-    `;
-
-    // Get country summary
-    const countrySummary = await sql`
-      SELECT 
-        shipping_address->>'country' as country,
-        COUNT(*) as order_count,
-        COALESCE(SUM(total), 0) as total_revenue
-      FROM orders
-      WHERE shipping_address->>'country' IS NOT NULL
-      GROUP BY shipping_address->>'country'
-      ORDER BY order_count DESC
-      LIMIT 10
-    `;
-
-    // Get recent orders
-    const recentOrders = await sql`
-      SELECT id, order_number, customer_name, customer_email, total, status, payment_status, created_at
-      FROM orders
-      ORDER BY created_at DESC
-      LIMIT 10
-    `;
-
-    // Get daily order trend (last 30 days)
-    const dailyTrend = await sql`
-      SELECT 
-        DATE(created_at) as date,
-        COUNT(*) as orders,
-        COALESCE(SUM(total), 0) as revenue
-      FROM orders
-      WHERE created_at >= NOW() - INTERVAL '30 days'
-      GROUP BY DATE(created_at)
-      ORDER BY date DESC
-    `;
-
-    // Get contact message stats
-    const messageStats = await sql`
-      SELECT
-        COUNT(*) as total_messages,
-        COUNT(CASE WHEN status = 'new' THEN 1 END) as new_messages,
-        COUNT(CASE WHEN status = 'read' THEN 1 END) as read_messages,
-        COUNT(CASE WHEN status = 'replied' THEN 1 END) as replied_messages,
-        COUNT(CASE WHEN status = 'archived' THEN 1 END) as archived_messages
-      FROM contact_messages
-    `;
-
-    // Get customer stats
-    const customerStats = await sql`
-      SELECT 
-        COUNT(*) as total_customers,
-        COUNT(CASE WHEN first_order_date >= NOW() - INTERVAL '30 days' THEN 1 END) as new_customers_30_days
-      FROM customers
-      WHERE is_deleted = FALSE
-    `;
-
-    res.json({
-      success: true,
-      data: {
-        orders: {
-          ...orderStats[0],
-          total_revenue: parseFloat(orderStats[0].total_revenue),
-          revenue_last_7_days: parseFloat(orderStats[0].revenue_last_7_days),
-          revenue_last_30_days: parseFloat(orderStats[0].revenue_last_30_days),
-        },
-        products: productStats[0],
-        topViewedProducts,
-        topCartedProducts,
-        customerLocations,
-        countrySummary,
-        recentOrders: recentOrders.map((o: any) => ({
-          ...o,
-          total: parseFloat(o.total),
-        })),
-        dailyTrend: dailyTrend.map((d: any) => ({
-          ...d,
-          revenue: parseFloat(d.revenue),
-        })),
-        messages: messageStats[0],
-        customers: customerStats[0],
-        integrations: {
-          ga4: {
-            configured: Boolean(process.env.GA4_MEASUREMENT_ID),
-            measurementId: process.env.GA4_MEASUREMENT_ID || null,
-            consoleUrl: 'https://analytics.google.com/',
-          },
-          searchConsole: {
-            configured: Boolean(process.env.GSC_SITE_URL),
-            siteUrl: process.env.GSC_SITE_URL || null,
-            consoleUrl: 'https://search.google.com/search-console',
-          },
-        },
-      },
-    });
-  } catch (error: any) {
-    logger.error('Analytics error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to fetch analytics',
-    });
-  }
-});
-
-// POST /admin/customers/:id/restore — restore soft-deleted customer
-router.post('/customers/:id/restore', verifyAdmin, async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-
-    const result = await sql`
-      UPDATE customers
-      SET is_deleted = FALSE, deleted_at = NULL, updated_at = NOW()
-      WHERE id = ${id}::uuid
-      RETURNING id, email, name, is_deleted, deleted_at
-    `;
-
-    if (!result.length) {
-      return res.status(404).json({
-        success: false,
-        error: 'Customer not found',
-      });
-    }
-
-    res.json({
-      success: true,
-      message: 'Customer restored',
-      data: result[0],
-    });
   } catch (error: unknown) {
-    logger.error('Restore customer error:', error);
-    res.status(500).json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to restore customer',
-    });
+    logger.error('Analytics error:', error);
+    respond500(res, error, 'Failed to restore customer');
   }
 });
 
@@ -668,10 +427,7 @@ router.delete('/customers/:id', verifyAdmin, async (req: Request, res: Response)
     });
   } catch (error: unknown) {
     logger.error('Soft-delete customer error:', error);
-    res.status(500).json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to delete customer',
-    });
+    respond500(res, error, 'Failed to delete customer');
   }
 });
 
@@ -717,10 +473,7 @@ router.get('/customers', verifyAdmin, async (req: Request, res: Response) => {
     });
   } catch (error: unknown) {
     logger.error('Customers error:', error);
-    res.status(500).json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to fetch customers',
-    });
+    respond500(res, error, 'Failed to fetch customers');
   }
 });
 
@@ -762,23 +515,25 @@ router.get('/customers/:email', verifyAdmin, async (req: Request, res: Response)
           ...summary[0],
           total_spent: parseFloat(summary[0].total_spent),
         },
-        orders: orders.map((o: any) => ({
-          ...o,
-          total: parseFloat(o.total),
-          subtotal: parseFloat(o.subtotal),
-          shipping_cost: parseFloat(o.shipping_cost),
-          tax: parseFloat(o.tax),
-          items: typeof o.items === 'string' ? JSON.parse(o.items) : o.items,
-          shipping_address: typeof o.shipping_address === 'string' ? JSON.parse(o.shipping_address) : o.shipping_address,
-        })),
+        orders: orders.map((o: Record<string, unknown>) =>
+          stripOrderSecrets({
+            ...o,
+            total: parseFloat(String(o.total)),
+            subtotal: parseFloat(String(o.subtotal)),
+            shipping_cost: parseFloat(String(o.shipping_cost)),
+            tax: parseFloat(String(o.tax)),
+            items: typeof o.items === 'string' ? JSON.parse(o.items as string) : o.items,
+            shipping_address:
+              typeof o.shipping_address === 'string'
+                ? JSON.parse(o.shipping_address as string)
+                : o.shipping_address,
+          })
+        ),
       },
     });
   } catch (error: any) {
     logger.error('Customer history error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to fetch customer history',
-    });
+    respond500(res, error, "Request failed");
   }
 });
 
@@ -791,6 +546,13 @@ router.post('/products/bulk-update', verifyAdmin, async (req: Request, res: Resp
       return res.status(400).json({
         success: false,
         error: 'Product IDs array is required',
+      });
+    }
+
+    if (productIds.length > MAX_BULK_IDS) {
+      return res.status(400).json({
+        success: false,
+        error: `Bulk update limited to ${MAX_BULK_IDS} items per request`,
       });
     }
 
@@ -830,10 +592,7 @@ router.post('/products/bulk-update', verifyAdmin, async (req: Request, res: Resp
     });
   } catch (error: any) {
     logger.error('Bulk update error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Bulk update failed',
-    });
+    respond500(res, error, "Request failed");
   }
 });
 
@@ -846,6 +605,13 @@ router.post('/orders/bulk-update', verifyAdmin, async (req: Request, res: Respon
       return res.status(400).json({
         success: false,
         error: 'Order IDs array is required',
+      });
+    }
+
+    if (orderIds.length > MAX_BULK_IDS) {
+      return res.status(400).json({
+        success: false,
+        error: `Bulk update limited to ${MAX_BULK_IDS} items per request`,
       });
     }
 
@@ -866,13 +632,44 @@ router.post('/orders/bulk-update', verifyAdmin, async (req: Request, res: Respon
       });
     }
 
+    if (paymentStatus !== undefined && paymentStatus !== null) {
+      return res.status(400).json({
+        success: false,
+        error: 'Payment status cannot be changed via bulk update. Use PATCH /api/orders/:id/payment-status',
+      });
+    }
+
+    if (status !== null) {
+      const allowed: OrderStatus[] = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
+      if (!allowed.includes(status as OrderStatus)) {
+        return res.status(400).json({ success: false, error: 'Invalid order status' });
+      }
+
+      const currentOrders = await sql`
+        SELECT id, status FROM orders WHERE id = ANY(${orderIds}::uuid[])
+      `;
+
+      for (const order of currentOrders) {
+        const check = validateStatusTransition(
+          order.status as OrderStatus,
+          status as OrderStatus
+        );
+        if (!check.valid) {
+          return res.status(400).json({
+            success: false,
+            error: check.message,
+            orderId: order.id,
+          });
+        }
+      }
+    }
+
     const BULK_CHUNK = 10;
     const chunkResults = await runInChunks(orderIds, BULK_CHUNK, async (chunk) =>
       sql.begin(async (txn) => {
         const rows = await txn`
           UPDATE orders SET
             status = COALESCE(${status}, status),
-            payment_status = COALESCE(${paymentStatus}, payment_status),
             updated_at = NOW()
           WHERE id = ANY(${chunk}::uuid[])
           RETURNING id
@@ -890,10 +687,7 @@ router.post('/orders/bulk-update', verifyAdmin, async (req: Request, res: Respon
     });
   } catch (error: any) {
     logger.error('Bulk update error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Bulk update failed',
-    });
+    respond500(res, error, "Request failed");
   }
 });
 
@@ -906,6 +700,13 @@ router.post('/messages/bulk-update', verifyAdmin, async (req: Request, res: Resp
       return res.status(400).json({
         success: false,
         error: 'Message IDs array is required',
+      });
+    }
+
+    if (messageIds.length > MAX_BULK_IDS) {
+      return res.status(400).json({
+        success: false,
+        error: `Bulk update limited to ${MAX_BULK_IDS} items per request`,
       });
     }
 
@@ -934,10 +735,7 @@ router.post('/messages/bulk-update', verifyAdmin, async (req: Request, res: Resp
     });
   } catch (error: any) {
     logger.error('Bulk update error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Bulk update failed',
-    });
+    respond500(res, error, "Request failed");
   }
 });
 

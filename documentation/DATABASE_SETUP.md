@@ -2,7 +2,7 @@
 
 PostgreSQL schema and migrations for Lab Door Customs on Supabase.
 
-**Full reference:** [`../info.md`](../info.md)
+**Full reference:** [`info.md`](info.md)
 
 ---
 
@@ -88,7 +88,11 @@ Applied via `migration-reviews.sql`:
 
 ## Row-level security
 
-`ensureRlsPolicies()` runs at startup (see `migration-rls-tighten.sql` and `migration-rls-sensitive-tables.sql`). Products allow public read; orders, contact_messages, coupons, coupon_usage, payment_idempotency, and processed_refund_events are service-role only. The backend uses the **service role** (or `postgres`) connection for all API operations.
+`ensureRlsPolicies()` runs at startup (`backend/src/lib/rlsMigration.ts`; see also `migration-rls-tighten.sql`, `migration-rls-sensitive-tables.sql`, `migration-revoke-graphql-client-roles.sql`).
+
+- **13 tables** have RLS with service_role-only policies: `products`, `orders`, `contact_messages`, `coupons`, `coupon_usage`, `customers`, `activity_logs`, `admin_sessions`, `reviews`, `review_votes`, `payment_idempotency`, `processed_refund_events`, `order_checkout_exchanges`.
+- **`anon` and `authenticated` grants are revoked** on all 13 tables — no public product catalog via PostgREST/GraphQL.
+- The Express backend connects with **service_role** credentials for all API operations.
 
 See [RLS_OPTIMIZATION.md](./RLS_OPTIMIZATION.md).
 

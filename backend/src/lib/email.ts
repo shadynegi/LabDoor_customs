@@ -1,6 +1,7 @@
 import { Resend } from 'resend';
 import { withRetry } from './db';
 import { logger } from './logger';
+import { createOrderAccessExchangeCode } from './orderAccessExchange';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -45,6 +46,7 @@ interface OrderEmailData {
   estimatedDelivery?: string;
   orderDate?: string;
   accessToken?: string;
+  orderId?: string;
 }
 
 interface OrderCancellationEmailData extends OrderEmailData {
@@ -77,10 +79,18 @@ export class EmailService {
     this.supportEmail = process.env.COMPANY_SUPPORT_EMAIL || 'support@labdoorcustoms.com';
   }
 
-  private getOrderTrackingUrl(orderNumber: string, accessToken?: string): string {
+  private async resolveTrackingUrl(data: OrderEmailData): Promise<string> {
+    if (data.trackingUrl) return data.trackingUrl;
+
     const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
-    const base = `${frontendUrl}/orders?orderNumber=${encodeURIComponent(orderNumber)}`;
-    return accessToken ? `${base}&token=${encodeURIComponent(accessToken)}` : `${frontendUrl}/orders`;
+    if (data.orderId && data.accessToken) {
+      const code = await createOrderAccessExchangeCode(data.orderId, data.accessToken);
+      return `${frontendUrl}/orders?code=${encodeURIComponent(code)}`;
+    }
+    if (data.orderNumber) {
+      return `${frontendUrl}/orders?orderNumber=${encodeURIComponent(data.orderNumber)}`;
+    }
+    return `${frontendUrl}/orders`;
   }
 
   /**
@@ -88,7 +98,8 @@ export class EmailService {
    */
   async sendOrderConfirmation(data: OrderEmailData) {
     try {
-      const emailHtml = this.generateOrderConfirmationHTML(data);
+      const trackingUrl = await this.resolveTrackingUrl(data);
+      const emailHtml = this.generateOrderConfirmationHTML({ ...data, trackingUrl });
       
       const { data: emailData, error } = await sendResendEmail({
         from: `${this.companyName} <${this.senderEmail}>`,
@@ -353,15 +364,13 @@ export class EmailService {
 
       <!-- Track Order Link -->
       <div style="text-align: center; margin: 30px 0;">
-        <a href="${this.getOrderTrackingUrl(data.orderNumber, data.accessToken)}" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
+        <a href="${data.trackingUrl || '#'}" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
           View Order Status
         </a>
       </div>
-      ${data.accessToken ? `
       <p style="text-align: center; color: #6b7280; font-size: 13px; margin: 0 0 24px 0;">
-        Save your access token from this email — you will need it with your order number to track this order.
+        This secure link is valid for 30 days. You can also track your order anytime with your order number and access token at ${(process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '')}/orders
       </p>
-      ` : ''}
     </div>
 
     <!-- Footer -->

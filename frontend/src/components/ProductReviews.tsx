@@ -1,5 +1,5 @@
 // ProductReviews - Complete reviews section for product pages
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReviewForm from './ReviewForm';
 import ReviewList from './ReviewList';
@@ -17,6 +17,15 @@ const ProductReviews: React.FC<ProductReviewsProps> = ({ productId, productName 
     setShowReviewForm(false);
     setRefreshKey(prev => prev + 1); // Trigger refresh of review list
   };
+
+  useEffect(() => {
+    if (!showReviewForm) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowReviewForm(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [showReviewForm]);
 
   return (
     <div style={{ marginTop: 40 }}>
@@ -45,6 +54,9 @@ const ProductReviews: React.FC<ProductReviewsProps> = ({ productId, productName 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="review-form-title"
             style={{
               position: 'fixed',
               inset: 0,
@@ -53,7 +65,7 @@ const ProductReviews: React.FC<ProductReviewsProps> = ({ productId, productName 
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              padding: 20,
+              padding: 'max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left))',
               zIndex: 1000,
             }}
             onClick={(e) => {

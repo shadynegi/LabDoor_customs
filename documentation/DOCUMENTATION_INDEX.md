@@ -1,8 +1,25 @@
 # Documentation Index — Lab Door Customs
 
-**Authoritative reference:** [`../info.md`](../info.md) — full system description, security, payments, API summary, and environment variables.
+**Authoritative reference:** [`info.md`](info.md) — full system description, security, payments, API summary, and environment variables.
 
-**Maintenance:** Code changes should update `info.md` and the affected guides below. Agents follow [`.cursor/rules/documentation-sync.mdc`](../.cursor/rules/documentation-sync.mdc).
+**Maintenance:** Code changes should update `documentation/info.md` and the affected guides below. Agents follow [`.cursor/rules/documentation-sync.mdc`](../.cursor/rules/documentation-sync.mdc).
+
+**Layout:** All `.md` documentation files live in this `documentation/` folder (including `info.md`, `test_guidelines.md`, and generated test reports under `test-results/`).
+
+---
+
+## System at a glance
+
+| Area | Behavior |
+|------|----------|
+| Monorepo | `frontend/` (React/Vite), `backend/` (Express), `Tests/` (Vitest + Playwright) |
+| Production | One Express process: `/api/*` + built SPA; Supabase PostgreSQL via service_role |
+| Checkout | Server-bound PayPal orders; checkout exchange `code` on return; capture needs `serverOrderId` + `accessToken` |
+| Cart | `POST /api/products/validate-cart` on item changes; Fuse search catalog cache (3 min TTL) |
+| RLS | 13 tables service_role-only; no public PostgREST product read |
+| Activity | Consent-gated batch logging; CSRF-exempt `/activity/batch`; IP anonymized |
+| Admin | Bulk max 500 IDs; validated status transitions; manual paid needs `admin_note` + `payment_id` |
+| Mobile | Sticky CTAs, visualViewport keyboard offset, body scroll containment |
 
 ---
 
@@ -10,8 +27,9 @@
 
 | Document | Purpose |
 |----------|---------|
-| [../info.md](../info.md) | Complete project reference |
+| [info.md](info.md) | Complete project reference |
 | [QUICK_START.md](./QUICK_START.md) | Local setup in ~10 minutes |
+| [guide.md](./guide.md) | Sequential commands: setup → dev → test |
 | [SETUP_GUIDE.md](./SETUP_GUIDE.md) | Detailed local configuration |
 | [PROJECT_OVERVIEW.md](./PROJECT_OVERVIEW.md) | High-level architecture |
 
@@ -22,8 +40,9 @@
 | Document | Purpose |
 |----------|---------|
 | [API_DOCUMENTATION.md](./API_DOCUMENTATION.md) | REST API endpoints |
-| [../Tests/test_guidelines.md](../Tests/test_guidelines.md) | Manual and automated testing (primary) |
-| [TESTING_INSTRUCTIONS.md](./TESTING_INSTRUCTIONS.md) | Redirect → `Tests/test_guidelines.md` |
+| [test_guidelines.md](test_guidelines.md) | Manual and automated testing (primary) |
+| [TEST_RESULTS.md](TEST_RESULTS.md) | Generated test reports (`test-results/`) |
+| [TESTING_INSTRUCTIONS.md](./TESTING_INSTRUCTIONS.md) | Redirect → `test_guidelines.md` |
 | [DATABASE_SETUP.md](./DATABASE_SETUP.md) | Schema, migrations, Supabase |
 | [ADMIN_DASHBOARD_GUIDE.md](./ADMIN_DASHBOARD_GUIDE.md) | Admin UI workflows |
 
@@ -46,6 +65,7 @@
 |----------|---------|
 | [DEPLOYMENT.md](./DEPLOYMENT.md) | Railway production deploy |
 | [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) | Extended deployment notes |
+| [PRE_LAUNCH_CHECKLIST.md](./PRE_LAUNCH_CHECKLIST.md) | **Go-live checklist** (env, SQL, smoke tests) |
 | [CLOUDFLARE_RAILWAY.md](./CLOUDFLARE_RAILWAY.md) | Cloudflare + Railway setup |
 | [SSL_DNS_CHECKLIST.md](./SSL_DNS_CHECKLIST.md) | HTTPS and DNS |
 | [SEARCH_CONSOLE_SETUP.md](./SEARCH_CONSOLE_SETUP.md) | Google Search Console |
@@ -69,6 +89,7 @@
 
 | Document | Purpose |
 |----------|---------|
+| [PRE_LAUNCH_CHECKLIST.md](./PRE_LAUNCH_CHECKLIST.md) | Production go-live (env, DB, PayPal, smoke tests) |
 | [RESPONSIVE_QA_CHECKLIST.md](./RESPONSIVE_QA_CHECKLIST.md) | Responsive layout QA |
 | [FORMS_QA_CHECKLIST.md](./FORMS_QA_CHECKLIST.md) | Forms and CSRF QA |
 

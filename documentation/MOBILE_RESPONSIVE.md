@@ -2,7 +2,7 @@
 
 Mobile-specific layout, breakpoints, and shared responsive utilities.
 
-**Full reference:** [`../info.md`](../info.md) | **QA:** [RESPONSIVE_QA_CHECKLIST.md](./RESPONSIVE_QA_CHECKLIST.md)
+**Full reference:** [`info.md`](info.md) | **QA:** [RESPONSIVE_QA_CHECKLIST.md](./RESPONSIVE_QA_CHECKLIST.md)
 
 ## Breakpoints
 
@@ -39,10 +39,14 @@ Layouts are verified at these common viewport widths:
 ### Storefront
 
 - **Home:** Hero product image scales with `hero-product-img` (no fixed 350px overflow on 320px screens). Carousel controls use 44px touch targets.
-- **Products:** `responsive-product-grid` uses `minmax(160px, 1fr)` on phones; two columns on very narrow (≤359px) screens.
-- **Product detail:** `Product360Viewer` uses CSS-based sizing (not Tailwind). Review stats and pros/cons stack on narrow screens.
-- **Cart / checkout:** Sticky bottom bar (`MobileStickyCta`) shows total + primary action on phones. Checkout hides duplicate PayPal button in the summary when the sticky bar is visible.
-- **Modals:** `LiquidModal` uses fluid padding and safe-area insets.
+- **Products:** `responsive-product-grid` uses `minmax(160px, 1fr)` on phones; two columns on very narrow (≤359px) screens. Out-of-stock products show an **Out of Stock** badge on cards.
+- **Product detail:** `Product360Viewer` uses CSS-based sizing (not Tailwind). Review stats and pros/cons stack on narrow screens. When out of stock, add-to-cart is disabled (inline button hidden on mobile when sticky CTA is shown; sticky CTA also disabled).
+- **Cart / checkout / product detail:** Sticky bottom bar (`MobileStickyCta`) shows total + primary action on phones. Cart uses **stacked** layout at 320px. Product detail **omits** sticky bar when out of stock.
+- **Checkout keyboard:** `keyboardOffset` lifts the sticky PayPal CTA above the virtual keyboard (`translateY`).
+- **Cookie consent:** On cart, checkout, and product routes, the banner renders at the **top** on mobile so it does not cover purchase CTAs (`has-cookie-banner-top` body padding).
+- **Body scroll:** `html` and `body` use `overflow-y: auto`, `overscroll-behavior-y: contain`, and `-webkit-fill-available` min-height for stable mobile scrolling; horizontal overflow is clipped.
+- **Navigation logo:** On non-home pages, header logo scales to 36px height on very small phones (`isSmallMobile`), 40px on mobile, 50px on desktop.
+- **Modals:** `LiquidModal` uses fixed overlay, `maxHeight: 90vh`, fluid padding, and safe-area insets.
 
 ### Admin
 

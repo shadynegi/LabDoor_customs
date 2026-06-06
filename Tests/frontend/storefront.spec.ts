@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures/storefront';
 
 test.describe('Storefront smoke', () => {
   test('home page renders', async ({ page }) => {
@@ -7,9 +7,12 @@ test.describe('Storefront smoke', () => {
     await expect(page).toHaveTitle(/Lab Door/i);
   });
 
-  test('products page renders', async ({ page }) => {
+  test('products page renders with catalog', async ({ page }) => {
     await page.goto('/products');
     await expect(page.locator('#root')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'All Products' })).toBeVisible({
+      timeout: 15_000,
+    });
   });
 
   test('checkout route loads', async ({ page }) => {
@@ -21,5 +24,6 @@ test.describe('Storefront smoke', () => {
   test('contact page renders', async ({ page }) => {
     await page.goto('/contact');
     await expect(page.locator('#root')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Contact Us' })).toBeVisible();
   });
 });

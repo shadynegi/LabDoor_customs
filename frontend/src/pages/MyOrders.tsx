@@ -519,16 +519,43 @@ export default function MyOrders() {
 
   useEffect(() => {
     trackedOrdersRef.current = getTrackedOrders();
+    const urlCode = searchParams.get('code');
     const urlOrderNumber = searchParams.get('orderNumber');
     const urlToken = searchParams.get('token');
 
-    if (urlOrderNumber && urlToken) {
-      setOrderNumber(urlOrderNumber);
-      setAccessToken(urlToken);
-      void lookupOrder(urlOrderNumber, urlToken);
-    } else if (trackedOrdersRef.current.length > 0) {
-      void refreshTrackedOrders(false);
-    }
+    const redeemEmailLink = async () => {
+      if (!urlCode) return false;
+      try {
+        const response = await apiFetch(`/orders/access-exchange/${encodeURIComponent(urlCode)}`);
+        const data = await response.json();
+        if (data.success && data.data) {
+          const { orderNumber: num, accessToken: token } = data.data;
+          setOrderNumber(num);
+          setAccessToken(token);
+          await lookupOrder(num, token);
+          window.history.replaceState({}, '', '/orders');
+          return true;
+        }
+        toast.error('Invalid or expired tracking link');
+      } catch (err) {
+        logError('Order access exchange failed:', err);
+        toast.error('Could not open tracking link');
+      }
+      return true;
+    };
+
+    void (async () => {
+      if (await redeemEmailLink()) return;
+
+      if (urlOrderNumber && urlToken) {
+        setOrderNumber(urlOrderNumber);
+        setAccessToken(urlToken);
+        void lookupOrder(urlOrderNumber, urlToken);
+        window.history.replaceState({}, '', '/orders');
+      } else if (trackedOrdersRef.current.length > 0) {
+        void refreshTrackedOrders(false);
+      }
+    })();
   }, [searchParams, lookupOrder, refreshTrackedOrders]);
 
   // Auto-refresh effect

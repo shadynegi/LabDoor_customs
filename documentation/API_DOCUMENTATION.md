@@ -1,10 +1,10 @@
 # REST API Documentation
 
-**Authoritative reference:** [`../info.md`](../info.md)
+**Authoritative reference:** [`info.md`](info.md)
 
 Base URL: `{VITE_API_BASE_URL}` (default local: `http://localhost:5000/api`)
 
-All mutating requests require CSRF token (`X-CSRF-Token` header + cookie) except PayPal webhooks.
+Mutating requests require CSRF token (`X-CSRF-Token` header + cookie) except PayPal webhooks and `POST /activity/batch` (CSRF-exempt for `sendBeacon`; rate-limited).
 
 ---
 
@@ -97,6 +97,7 @@ Headers: `X-Idempotency-Key` (PayPal order ID or client key), `X-CSRF-Token`
 | GET | `/category/:category` | Public | Products by category name |
 | GET | `/:id` | Public | Single product (cached) |
 | POST | `/search` | Public | Search products |
+| POST | `/validate-cart` | Public + CSRF | Validate cart lines — `{ items: [{ product_id, quantity, size_system?, size_value? }] }`; returns refreshed prices and stock errors |
 | POST | `/` | Admin | Create product (image/background URL or ≤512KB data URL) |
 | PUT | `/:id` | Admin | Update product (same image rules) |
 | DELETE | `/:id` | Admin | Delete product |
@@ -108,16 +109,17 @@ Headers: `X-Idempotency-Key` (PayPal order ID or client key), `X-CSRF-Token`
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | POST | `/` | — | **410 Gone** — use PayPal checkout |
-| POST | `/lookup` | Public + CSRF | Lookup by `orderNumber` + `accessToken` in JSON body (preferred for customer lookup) |
+| POST | `/lookup` | Public + CSRF | Lookup by `orderNumber` + `accessToken` in JSON body |
+| GET | `/access-exchange/:code` | Public | Redeem one-time email tracking link → `{ orderNumber, accessToken, serverOrderId }` |
 | GET | `/` | Admin | List orders — `?status=&payment_status=&page=&search=` (`search` matches order number, email, or name) |
 | GET | `/stats/summary` | Admin | Order/revenue statistics |
-| GET | `/number/:orderNumber` | Token or admin | Lookup by order number (`?token=` or `X-Order-Access-Token` header) |
+| GET | `/number/:orderNumber` | Token or admin | Lookup by order number (`X-Order-Access-Token` header) |
 | GET | `/customer/:email` | Admin | Customer order history |
 | GET | `/:id` | Token or admin | Single order |
 | PUT | `/:id` | Admin | Update fulfillment fields (not payment_status) |
 | PATCH | `/:id/status` | Admin | Update order status |
-| PATCH | `/:id/payment-status` | Admin | Update payment status; marking `pending` → `completed` requires `admin_note` (≥3 chars) and logs `admin_mark_paid` |
-| POST | `/:id/cancel` | Admin | Cancel order (optional PayPal refund) |
+| PATCH | `/:id/payment-status` | Admin | Mark paid: `admin_note` + `payment_id`; **PayPal capture verified** via API before update |
+| POST | `/:id/cancel` | Admin | Cancel order; **paid orders require refund** (`process_refund: true`) |
 | DELETE | `/:id` | Admin | Delete order (blocked if paid) |
 | POST | `/:id/notify-shipped` | Admin | Send shipping email |
 
@@ -135,7 +137,8 @@ Headers: `X-Idempotency-Key` (PayPal order ID or client key), `X-CSRF-Token`
 ```json
 {
   "payment_status": "completed",
-  "admin_note": "Paid via bank transfer — ref #12345"
+  "admin_note": "Paid via bank transfer — ref #12345",
+  "payment_id": "CAPTURE_OR_EXTERNAL_REF_ID"
 }
 ```
 
@@ -168,14 +171,18 @@ Headers: `X-Idempotency-Key` (PayPal order ID or client key), `X-CSRF-Token`
 
 ## Reviews (`/reviews`)
 
+Public list/submit/vote responses use `toPublicReview()` — **`customer_email`, `order_id`, and `status` are never returned** to the storefront. Admin routes return full rows including `customer_email`.
+
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/product/:productId` | Public | Approved reviews for product |
-| POST | `/` | Public | Submit review (rate limited) |
-| POST | `/:id/vote` | Public | Vote helpful/not helpful |
-| GET | `/check/:productId/:email` | Public | Check if user reviewed |
-| GET | `/` | Admin | All reviews |
-| PATCH | `/:id/status` | Admin | Approve/reject |
+| GET | `/product/:productId` | Public | Approved reviews (PII stripped) |
+| POST | `/` | Public | Submit review — always `pending`; response PII stripped |
+| POST | `/:id/vote` | Public + CSRF | Vote on **approved** reviews only (rate-limited; voter ID derived server-side from IP) |
+| POST | `/check` | Public + CSRF | Body: `{ product_id, email }` → `{ can_review: boolean }` |
+| GET | `/check/:productId/:email` | Public | **Deprecated** — use POST `/check` |
+| GET | `/` | Admin | All reviews **including `customer_email`** |
+| POST | `/admin` | Admin + CSRF | Create review |
+| PATCH | `/:id` | Admin + CSRF | Edit fields or approve/reject |
 | DELETE | `/:id` | Admin | Delete review |
 
 ---
@@ -197,8 +204,8 @@ Headers: `X-Idempotency-Key` (PayPal order ID or client key), `X-CSRF-Token`
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/log` | Public | Log single event |
-| POST | `/batch` | Public | Log batch of events |
+| POST | `/log` | Public + CSRF | Log single event |
+| POST | `/batch` | Public (CSRF-exempt) | Log up to 20 events per request (rate-limited; frontend consent-gated) |
 | GET | `/logs` | Admin | Query logs |
 | GET | `/stats` | Admin | Activity statistics |
 | GET | `/export` | Admin | Export logs |
@@ -220,9 +227,9 @@ Headers: `X-Idempotency-Key` (PayPal order ID or client key), `X-CSRF-Token`
 | GET | `/customers/:email` | Admin | Customer detail |
 | POST | `/customers/:id/restore` | Admin | Restore soft-deleted customer |
 | DELETE | `/customers/:id` | Admin | Soft delete customer |
-| POST | `/products/bulk-update` | Admin | Bulk product updates |
-| POST | `/orders/bulk-update` | Admin | Bulk order status updates (`cancelled` rejected — use cancel endpoint) |
-| POST | `/messages/bulk-update` | Admin | Bulk message updates |
+| POST | `/products/bulk-update` | Admin | Bulk product updates (max **500** IDs) |
+| POST | `/orders/bulk-update` | Admin | Bulk order **status** only (max **500** IDs; validates transitions; `cancelled` and `payment_status` rejected) |
+| POST | `/messages/bulk-update` | Admin | Bulk message updates (max **500** IDs) |
 
 ---
 
@@ -247,8 +254,9 @@ Error:
 Applied per IP. Uses Redis when `REDIS_URL` is set; in production, rate limiting fails closed if Redis is required but unavailable. Notable limits:
 
 - Admin login: 5 attempts / 15 minutes
-- Contact, reviews, coupon validate: per-route limits
+- Contact, reviews (submit/vote/admin), coupon validate: per-route limits
 - Payment endpoints: dedicated limiter (webhooks excluded)
+- Order lookup (`POST /orders/lookup`), product search (`POST /products/search`), checkout exchange redeem (`GET /paypal/checkout-exchange/:code`), review eligibility check
 
 ---
 

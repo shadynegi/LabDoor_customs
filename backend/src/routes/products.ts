@@ -1,5 +1,6 @@
 // backend/src/routes/products.ts
 import { logger } from '../lib/logger';
+import { respond500 } from '../lib/safeError';
 import { Router, Request, Response } from 'express';
 import sql from '../lib/db';
 import { cached } from '../lib/cache';
@@ -11,6 +12,7 @@ import {
   validateProductImageUrl,
   validateOptionalProductImageUrl,
 } from '../lib/productImage';
+import { validateCartItems } from '../lib/paypalCheckout';
 
 const router = Router();
 
@@ -70,12 +72,47 @@ router.get('/', async (req: Request, res: Response) => {
       data: payload.data,
       pagination: payload.pagination,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Error fetching products:', error);
+    respond500(res, error, 'Request failed');
+  }
+});
+
+// POST validate cart line items against server prices/stock
+router.post('/validate-cart', async (req: Request, res: Response) => {
+  try {
+    const { items } = req.body;
+    const validation = await validateCartItems(items || []);
+
+    if (!validation.ok) {
+      return res.status(400).json({
+        success: false,
+        error: validation.error,
+        message: validation.message,
+      });
+    }
+
+    const refreshedItems = validation.lineItems.map((line) => ({
+      id: line.product_id,
+      name: line.product_name,
+      image: line.product_image,
+      price: line.price,
+      quantity: line.quantity,
+      size: line.size_system && line.size_value
+        ? { system: line.size_system, value: line.size_value }
+        : undefined,
+    }));
+
+    res.json({
+      success: true,
+      items: refreshedItems,
+      subtotal: validation.lineItems.reduce((sum, item) => sum + item.price * item.quantity, 0),
+    });
+  } catch (error: unknown) {
+    logger.error('Validate cart error:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to load products',
-      message: 'Unable to retrieve products from database. Please try again later.',
+      error: 'Failed to validate cart',
     });
   }
 });
@@ -128,41 +165,9 @@ router.get('/filters', async (_req: Request, res: Response) => {
         ]
       }
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Error fetching filter options:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to fetch filter options',
-    });
-  }
-});
-
-// GET product paths for sitemap (must be registered before /:id)
-router.get('/sitemap-urls', async (_req: Request, res: Response) => {
-  try {
-    res.setHeader('Cache-Control', 'public, max-age=300');
-
-    const payload = await cached('products:sitemap-urls', 300_000, async () => {
-      const rows = await sql`
-        SELECT id, updated_at
-        FROM products
-        ORDER BY id ASC
-      `;
-      return (rows as unknown as Array<{ id: number; updated_at?: string }>).map((p) => ({
-        id: p.id,
-        path: `/product/${p.id}`,
-        updated_at: p.updated_at,
-      }));
-    });
-
-    res.json({
-      success: true,
-      data: payload,
-      count: payload.length,
-    });
-  } catch (error: any) {
-    logger.error('Error fetching sitemap URLs:', error);
-    res.status(500).json({ success: false, error: 'Failed to load sitemap URLs' });
+    respond500(res, error, 'Request failed');
   }
 });
 
@@ -196,10 +201,7 @@ router.get('/category/:category', async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     logger.error('Error fetching products by category:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to fetch products',
-    });
+    respond500(res, error, "Request failed");
   }
 });
 
@@ -231,10 +233,7 @@ router.get('/:id', async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     logger.error('Error fetching product:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to fetch product',
-    });
+    respond500(res, error, "Request failed");
   }
 });
 
@@ -308,10 +307,7 @@ router.post('/', verifyAdmin, async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     logger.error('Error creating product:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to create product',
-    });
+    respond500(res, error, "Request failed");
   }
 });
 
@@ -353,8 +349,6 @@ router.put('/:id', verifyAdmin, async (req: Request, res: Response) => {
         size = COALESCE(${updates.size || null}, size),
         color = COALESCE(${updates.color || null}, color),
         stock = COALESCE(${updates.stock || null}, stock),
-        rating = COALESCE(${updates.rating || null}, rating),
-        review_count = COALESCE(${updates.review_count || null}, review_count),
         is_out_of_stock = COALESCE(${isOutOfStock}, is_out_of_stock),
         updated_at = NOW()
       WHERE id = ${id}
@@ -377,10 +371,7 @@ router.put('/:id', verifyAdmin, async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     logger.error('Error updating product:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to update product',
-    });
+    respond500(res, error, "Request failed");
   }
 });
 
@@ -410,10 +401,7 @@ router.delete('/:id', verifyAdmin, async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     logger.error('Error deleting product:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to delete product',
-    });
+    respond500(res, error, "Request failed");
   }
 });
 
@@ -531,10 +519,7 @@ router.post('/search', async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     logger.error('Error searching products:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to search products',
-    });
+    respond500(res, error, "Request failed");
   }
 });
 

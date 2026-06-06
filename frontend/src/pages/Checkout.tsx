@@ -18,6 +18,7 @@ import { getFriendlyError } from "../utils/errorMessages";
 import { logError } from "../lib/logger";
 import { useResponsive } from "../hooks/useResponsive";
 import MobileStickyCta from "../components/MobileStickyCta";
+import { setUserEmail, trackCheckoutStart } from "../utils/activityTracker";
 import {
   CreditCard,
   User,
@@ -167,6 +168,7 @@ export default function Checkout() {
   const navigate = useNavigate();
   const { isMobile } = useResponsive();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
   const paymentIdempotencyKey = useRef(crypto.randomUUID());
   const [errors, setErrors] = useState<FormErrors>({});
   
@@ -192,6 +194,34 @@ export default function Checkout() {
     discount_amount: number;
   } | null>(null);
   const [couponError, setCouponError] = useState("");
+
+  useEffect(() => {
+    if (state.items.length > 0) {
+      const itemCount = state.items.reduce((sum, item) => sum + item.quantity, 0);
+      trackCheckoutStart(state.total, itemCount);
+    }
+    if (formData.email?.trim()) {
+      setUserEmail(formData.email.trim());
+    }
+  }, []);
+
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv || !isMobile) return;
+
+    const updateOffset = () => {
+      const offset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      setKeyboardOffset(offset);
+    };
+
+    updateOffset();
+    vv.addEventListener('resize', updateOffset);
+    vv.addEventListener('scroll', updateOffset);
+    return () => {
+      vv.removeEventListener('resize', updateOffset);
+      vv.removeEventListener('scroll', updateOffset);
+    };
+  }, [isMobile]);
 
   // Apply coupon handler
   const handleApplyCoupon = async () => {
@@ -388,6 +418,9 @@ export default function Checkout() {
     }
 
     setIsProcessing(true);
+    if (formData.email?.trim()) {
+      setUserEmail(formData.email.trim());
+    }
 
     try {
       const response = await apiFetch('/paypal/create-payment', {
@@ -424,15 +457,12 @@ export default function Checkout() {
       )?.href;
 
       if (approvalUrl) {
-        localStorage.setItem('pendingOrder', JSON.stringify({
-          formData: formData,
-          items: state.items,
+        sessionStorage.setItem('pendingOrder', JSON.stringify({
           total: data.total ?? total,
           serverOrderId: data.serverOrderId,
           orderNumber: data.orderNumber,
           paypalOrderId: data.orderId,
           idempotencyKey: paymentIdempotencyKey.current,
-          discount: pricing.discount,
           coupon: appliedCoupon ? {
             id: data.couponId || appliedCoupon.id,
             code: appliedCoupon.code,
@@ -440,7 +470,12 @@ export default function Checkout() {
           } : null,
           timestamp: new Date().toISOString(),
         }));
-        
+        sessionStorage.setItem('checkoutRecovery', JSON.stringify({
+          formData,
+          items: state.items,
+        }));
+        localStorage.removeItem('pendingOrder');
+
         window.location.href = approvalUrl;
       } else {
         throw new Error('No approval URL received from PayPal');
@@ -469,7 +504,9 @@ export default function Checkout() {
         minHeight: "100vh",
         background: "linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)",
         padding: isMobile ? "20px" : "40px 20px",
-        paddingBottom: isMobile ? undefined : "20px",
+        paddingBottom: isMobile
+          ? `calc(var(--sticky-footer-height) + var(--safe-bottom) + 16px + ${keyboardOffset}px)`
+          : "20px",
       }}
     >
       <div
@@ -698,6 +735,8 @@ export default function Checkout() {
                       placeholder="Select a country..."
                       isSearchable
                       isClearable
+                      menuPortalTarget={typeof document !== 'undefined' ? document.body : undefined}
+                      menuPosition="fixed"
                       aria-invalid={countryHasError}
                       aria-describedby={countryErrorId}
                     />
@@ -755,9 +794,9 @@ export default function Checkout() {
               </h2>
 
               <div style={{ marginBottom: 20 }}>
-                {state.items.map((item) => (
+                {state.items.map((item, index) => (
                   <div
-                    key={item.id}
+                    key={`${item.id}-${item.size?.system}-${item.size?.value}-${index}`}
                     style={{
                       display: "flex",
                       gap: 12,
@@ -848,13 +887,15 @@ export default function Checkout() {
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "space-between",
+                      flexWrap: "wrap",
+                      gap: 8,
                       padding: "12px 16px",
                       background: "linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)",
                       borderRadius: 8,
                       border: "1px solid #10b981",
                     }}
                   >
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", minWidth: 0, flex: 1 }}>
                       <Check size={18} color="#059669" />
                       <span style={{ fontWeight: 600, color: "#047857" }}>
                         {appliedCoupon.code}
@@ -866,15 +907,20 @@ export default function Checkout() {
                       </span>
                     </div>
                     <button
+                      type="button"
                       onClick={handleRemoveCoupon}
+                      aria-label="Remove coupon"
                       style={{
                         background: "none",
                         border: "none",
                         cursor: "pointer",
                         padding: 4,
+                        minWidth: 44,
+                        minHeight: 44,
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
+                        flexShrink: 0,
                       }}
                     >
                       <X size={18} color="#059669" />
@@ -1116,6 +1162,8 @@ export default function Checkout() {
           label={isProcessing ? "Processing…" : "Pay with PayPal"}
           onClick={handlePayPalPayment}
           disabled={isProcessing}
+          keyboardOffset={keyboardOffset}
+          ariaLabel="Complete payment"
         />
       )}
     </div>

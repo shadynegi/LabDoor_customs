@@ -1,5 +1,5 @@
 // ProductsPage - Main listing page with infinite scroll pagination, search, and filters
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePaginatedProducts } from '../hooks/usePaginatedProducts';
@@ -33,6 +33,9 @@ const ProductsPage = () => {
     clearFilters,
     filterOptions,
     activeFilterCount,
+    ensureCatalogLoaded,
+    ensureFilterOptionsLoaded,
+    error: searchError,
   } = useProductSearch(300);
   const { isMobile } = useResponsive();
   const observerRef = useRef<HTMLDivElement>(null);
@@ -43,9 +46,10 @@ const ProductsPage = () => {
     const q = searchParams.get('q')?.trim();
     if (q) {
       setSearchQuery(q);
+      void ensureCatalogLoaded();
       initialQueryApplied.current = true;
     }
-  }, [searchParams, setSearchQuery]);
+  }, [searchParams, setSearchQuery, ensureCatalogLoaded]);
 
   // Determine which products to display - search/filter results or all products
   const isUsingSearchOrFilters = isSearching || isFiltering;
@@ -55,7 +59,7 @@ const ProductsPage = () => {
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && hasMore && !loading) {
+        if (entries[0].isIntersecting && hasMore && !loading && !isUsingSearchOrFilters) {
           loadMore();
         }
       },
@@ -71,7 +75,7 @@ const ProductsPage = () => {
         observer.unobserve(observerRef.current);
       }
     };
-  }, [hasMore, loading, loadMore]);
+  }, [hasMore, loading, loadMore, isUsingSearchOrFilters]);
 
   // Initial loading state (only for paginated products, not search/filter)
   if (loading && products.length === 0 && !isUsingSearchOrFilters) {
@@ -219,7 +223,15 @@ const ProductsPage = () => {
           loading={searchLoading}
           clearSearch={clearSearch}
           onSubmitSearch={(q) => navigate(`/products?q=${encodeURIComponent(q)}`, { replace: true })}
+          onCatalogNeeded={() => { void ensureCatalogLoaded(); }}
         />
+
+        {searchError && (
+          <ErrorMessage
+            message={searchError}
+            onRetry={() => { void ensureCatalogLoaded(); }}
+          />
+        )}
 
         {isSearching && !searchLoading && !isFiltering && (
           <p
@@ -241,6 +253,7 @@ const ProductsPage = () => {
       <ProductFilters
         filters={filters}
         filterOptions={filterOptions}
+        onPanelOpen={() => { void ensureFilterOptionsLoaded(); void ensureCatalogLoaded(); }}
         onFilterChange={updateFilter}
         onClearFilters={clearFilters}
         activeFilterCount={activeFilterCount}
@@ -345,6 +358,24 @@ const ProductsPage = () => {
                 overflow: 'hidden',
                 background: 'linear-gradient(135deg, #361906 0%, #9c6649 100%)',
               }}>
+                {(product.is_out_of_stock || product.stock === 0) && (
+                  <span
+                    style={{
+                      position: 'absolute',
+                      top: 12,
+                      left: 12,
+                      zIndex: 2,
+                      padding: '4px 10px',
+                      borderRadius: 6,
+                      background: 'rgba(239, 68, 68, 0.95)',
+                      color: 'white',
+                      fontSize: 12,
+                      fontWeight: 700,
+                    }}
+                  >
+                    Out of Stock
+                  </span>
+                )}
                 <img
                   src={optimizeImageUrl(product.image, { width: 480 })}
                   alt={product.name}

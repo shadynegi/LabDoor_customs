@@ -78,10 +78,10 @@ export async function refundPayPalCapture(
       };
     }
 
-    return { success: false, error: refundData.message || 'Refund failed' };
+    logger.warn('PayPal refund failed:', refundData.message || refundResponse.status);
+    return { success: false, error: 'Refund could not be processed' };
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Refund processing error';
     logger.error('PayPal refund error:', error);
-    return { success: false, error: message };
+    return { success: false, error: 'Refund could not be processed' };
   }
 }

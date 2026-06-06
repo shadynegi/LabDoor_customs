@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import type { Product } from './useProducts';
-import { getProductCatalog } from '../lib/productCatalogCache';
+import { CATALOG_CLEARED_EVENT, getProductCatalog } from '../lib/productCatalogCache';
 import { createProductFuse, fuseSearchProducts, SUGGESTION_LIMIT } from '../lib/productFuseSearch';
 
 export interface UseProductSearchSuggestionsResult {
@@ -39,9 +39,15 @@ export function useProductSearchSuggestions(): UseProductSearchSuggestionsResult
       }
     };
 
+    const onCatalogCleared = () => {
+      void loadCatalog();
+    };
+
     loadCatalog();
+    window.addEventListener(CATALOG_CLEARED_EVENT, onCatalogCleared);
     return () => {
       cancelled = true;
+      window.removeEventListener(CATALOG_CLEARED_EVENT, onCatalogCleared);
     };
   }, []);
 

@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const docDir = path.join(__dirname, '..', 'documentation');
 
-const BANNER = `> **Documentation status (May 2026):** Authoritative reference: [\`../info.md\`](../info.md). Documentation index: [DOCUMENTATION_INDEX.md](./DOCUMENTATION_INDEX.md). Phases 1–6 are implemented (resilience, caching, HTTPS, customer soft-delete, frontend perf, GA4/SEO).\n\n`;
+const BANNER = `> **Documentation status (May 2026):** Authoritative reference: [\`info.md\`](info.md). Documentation index: [DOCUMENTATION_INDEX.md](./DOCUMENTATION_INDEX.md). Phases 1–6 are implemented (resilience, caching, HTTPS, customer soft-delete, frontend perf, GA4/SEO).\n\n`;
 
 const SKIP = new Set([
   'DOCUMENTATION_INDEX.md',

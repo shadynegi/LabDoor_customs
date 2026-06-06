@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS review_votes (
 );
 
 -- Indexes for better query performance
+CREATE INDEX IF NOT EXISTS idx_reviews_order_id ON reviews(order_id);
 CREATE INDEX IF NOT EXISTS idx_reviews_product_id ON reviews(product_id);
 CREATE INDEX IF NOT EXISTS idx_reviews_customer_email ON reviews(customer_email);
 CREATE INDEX IF NOT EXISTS idx_reviews_status ON reviews(status);
@@ -44,33 +45,34 @@ CREATE INDEX IF NOT EXISTS idx_reviews_created_at ON reviews(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_reviews_verified ON reviews(is_verified_purchase);
 CREATE INDEX IF NOT EXISTS idx_review_votes_review_id ON review_votes(review_id);
 
--- Function to update product rating when reviews change
-CREATE OR REPLACE FUNCTION update_product_rating()
-RETURNS TRIGGER AS $$
+-- Function to update product rating when reviews change (search_path fixed for Supabase linter 0011)
+CREATE OR REPLACE FUNCTION public.update_product_rating()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
 DECLARE
   avg_rating DECIMAL(3,2);
   total_reviews INTEGER;
 BEGIN
-  -- Calculate new average rating for the product (only approved reviews)
-  SELECT 
+  SELECT
     COALESCE(AVG(rating)::DECIMAL(3,2), 0),
     COUNT(*)
   INTO avg_rating, total_reviews
-  FROM reviews 
+  FROM public.reviews
   WHERE product_id = COALESCE(NEW.product_id, OLD.product_id)
     AND status = 'approved';
-  
-  -- Update the product
-  UPDATE products 
-  SET 
+
+  UPDATE public.products
+  SET
     rating = avg_rating,
     review_count = total_reviews,
     updated_at = NOW()
   WHERE id = COALESCE(NEW.product_id, OLD.product_id);
-  
+
   RETURN COALESCE(NEW, OLD);
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 -- Trigger to auto-update product rating
 DROP TRIGGER IF EXISTS trigger_update_product_rating ON reviews;
@@ -83,14 +85,14 @@ CREATE TRIGGER trigger_update_product_rating
 ALTER TABLE reviews ENABLE ROW LEVEL SECURITY;
 ALTER TABLE review_votes ENABLE ROW LEVEL SECURITY;
 
--- RLS Policies for reviews
+-- RLS Policies for reviews (single service_role policy — API serves approved reviews)
 DROP POLICY IF EXISTS "Anyone can view approved reviews" ON reviews;
-CREATE POLICY "Anyone can view approved reviews" ON reviews
-  FOR SELECT USING (status = 'approved');
-
 DROP POLICY IF EXISTS "Service role can manage all reviews" ON reviews;
-CREATE POLICY "Service role can manage all reviews" ON reviews
-  FOR ALL USING ((select auth.role()) = 'service_role');
+DROP POLICY IF EXISTS "Service role manages reviews" ON reviews;
+CREATE POLICY "Service role manages reviews" ON reviews
+  FOR ALL
+  USING ((select auth.role()) = 'service_role')
+  WITH CHECK ((select auth.role()) = 'service_role');
 
 -- RLS Policies for review_votes
 DROP POLICY IF EXISTS "Service role can manage review votes" ON review_votes;

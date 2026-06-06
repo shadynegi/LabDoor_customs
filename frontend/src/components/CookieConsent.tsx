@@ -2,8 +2,9 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Cookie, X, Settings, Check, Shield } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useResponsive } from '../hooks/useResponsive';
+import { clearUserEmail } from '../utils/activityTracker';
 
 interface CookiePreferences {
   essential: boolean;
@@ -18,6 +19,12 @@ export default function CookieConsent() {
   const [isVisible, setIsVisible] = useState(false);
   const [showPreferences, setShowPreferences] = useState(false);
   const { isMobile } = useResponsive();
+  const location = useLocation();
+  const stickyCtaRoute =
+    isMobile &&
+    (location.pathname === '/cart' ||
+      location.pathname === '/checkout' ||
+      location.pathname.startsWith('/product/'));
   const [preferences, setPreferences] = useState<CookiePreferences>({
     essential: true, // Always true, cannot be disabled
     analytics: false,
@@ -71,6 +78,7 @@ export default function CookieConsent() {
   };
 
   const handleRejectNonEssential = () => {
+    clearUserEmail();
     const essentialOnly: CookiePreferences = {
       essential: true,
       analytics: false,
@@ -78,6 +86,15 @@ export default function CookieConsent() {
     };
     saveConsent(essentialOnly);
   };
+
+  useEffect(() => {
+    if (isVisible && stickyCtaRoute) {
+      document.body.classList.add('has-cookie-banner-top');
+    } else {
+      document.body.classList.remove('has-cookie-banner-top');
+    }
+    return () => document.body.classList.remove('has-cookie-banner-top');
+  }, [isVisible, stickyCtaRoute]);
 
   const saveConsent = (prefs: CookiePreferences) => {
     localStorage.setItem(COOKIE_CONSENT_KEY, new Date().toISOString());
@@ -169,14 +186,16 @@ export default function CookieConsent() {
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
           style={{
             position: 'fixed',
-            bottom: isMobile ? 0 : 20,
+            top: stickyCtaRoute ? 0 : 'auto',
+            bottom: stickyCtaRoute ? 'auto' : isMobile ? 0 : 20,
             left: isMobile ? 0 : 20,
             right: isMobile ? 0 : 'auto',
             width: isMobile ? '100%' : showPreferences ? 480 : 420,
             maxHeight: '90vh',
             overflowY: 'auto',
             background: 'white',
-            borderRadius: isMobile ? '20px 20px 0 0' : 20,
+            borderRadius: stickyCtaRoute && isMobile ? '0 0 20px 20px' : isMobile ? '20px 20px 0 0' : 20,
+            paddingBottom: isMobile ? 'max(0px, env(safe-area-inset-bottom))' : undefined,
             boxShadow: '0 10px 50px rgba(0,0,0,0.2)',
             zIndex: 10000,
           }}

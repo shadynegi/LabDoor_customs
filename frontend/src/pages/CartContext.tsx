@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useReducer, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { logError, logDebug } from '../lib/logger';
+import { trackAddToCart, trackRemoveFromCart } from '../utils/activityTracker';
+import { apiFetch } from '../config';
 
 export type SizeSystem = "UK" | "US" | "EU";
 
@@ -30,7 +32,8 @@ type CartAction =
   | { type: 'DECREMENT'; payload: { id: number; size?: ShoeSize } }
   | { type: 'CLEAR_CART' }
   | { type: 'UPDATE_QUANTITY'; payload: { id: number; size?: ShoeSize; quantity: number } }
-  | { type: 'SYNC_FROM_STORAGE'; payload: CartState };
+  | { type: 'SYNC_FROM_STORAGE'; payload: CartState }
+  | { type: 'REFRESH_PRICES'; payload: CartItem[] };
 
 interface CartContextType {
   state: CartState;
@@ -189,6 +192,27 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
       // Sync cart from another tab/window
       return action.payload;
 
+    case 'REFRESH_PRICES': {
+      const priceMap = new Map(
+        action.payload.map((item) => [
+          `${item.id}-${item.size?.system}-${item.size?.value}`,
+          item,
+        ])
+      );
+      const updatedItems = state.items.map((item) => {
+        const key = `${item.id}-${item.size?.system}-${item.size?.value}`;
+        const refreshed = priceMap.get(key);
+        return refreshed
+          ? { ...item, price: refreshed.price, name: refreshed.name, image: refreshed.image }
+          : item;
+      });
+      newState = {
+        items: updatedItems,
+        total: calculateTotal(updatedItems),
+      };
+      break;
+    }
+
     default:
       return state;
   }
@@ -210,6 +234,8 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [state, dispatch] = useReducer(cartReducer, { items: [], total: 0 }, loadCartFromStorage);
   const channelRef = useRef<BroadcastChannel | null>(null);
   const isLocalUpdate = useRef(false);
+  const hydratedRef = useRef(false);
+  const userActionRef = useRef(false);
 
   // Set up BroadcastChannel for cross-tab sync
   useEffect(() => {
@@ -248,44 +274,107 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
   }, []);
 
-  // Broadcast cart changes to other tabs
   useEffect(() => {
-    if (channelRef.current && state.items !== undefined) {
-      isLocalUpdate.current = true;
-      channelRef.current.postMessage({
-        type: 'CART_UPDATE',
-        payload: state,
-      });
-      // Reset flag after a short delay to allow for message processing
-      setTimeout(() => {
-        isLocalUpdate.current = false;
-      }, 100);
-    }
+    hydratedRef.current = true;
+  }, []);
+
+  const itemsSignature = state.items
+    .map((item) => `${item.id}:${item.quantity}:${item.size?.system ?? ''}:${item.size?.value ?? ''}`)
+    .join('|');
+
+  // Revalidate cart prices from server when cart contents change
+  useEffect(() => {
+    if (state.items.length === 0) return;
+
+    const validatePrices = async () => {
+      try {
+        const response = await apiFetch('/products/validate-cart', {
+          method: 'POST',
+          body: JSON.stringify({
+            items: state.items.map((item) => ({
+              product_id: item.id,
+              quantity: item.quantity,
+              size_system: item.size?.system,
+              size_value: item.size?.value,
+            })),
+          }),
+        });
+
+        if (!response.ok) return;
+
+        const data = await response.json();
+        if (data.success && Array.isArray(data.items)) {
+          userActionRef.current = true;
+          dispatch({ type: 'REFRESH_PRICES', payload: data.items });
+        }
+      } catch (error) {
+        logError('Cart price validation failed:', error);
+      }
+    };
+
+    void validatePrices();
+  }, [itemsSignature]);
+
+  // Broadcast cart changes to other tabs (skip initial hydration)
+  useEffect(() => {
+    if (!hydratedRef.current || !channelRef.current) return;
+    if (!userActionRef.current) return;
+
+    isLocalUpdate.current = true;
+    channelRef.current.postMessage({
+      type: 'CART_UPDATE',
+      payload: state,
+    });
+    userActionRef.current = false;
+    setTimeout(() => {
+      isLocalUpdate.current = false;
+    }, 100);
   }, [state]);
 
   // Helper functions
   const addToCart = (item: Omit<CartItem, 'quantity'>) => {
-    // Ensure price is a number
+    userActionRef.current = true;
     const itemWithNumberPrice = {
       ...item,
       price: typeof item.price === 'string' ? parseFloat(item.price) : item.price,
     };
+    trackAddToCart(
+      itemWithNumberPrice.id,
+      itemWithNumberPrice.name,
+      1,
+      itemWithNumberPrice.size
+        ? `${itemWithNumberPrice.size.system} ${itemWithNumberPrice.size.value}`
+        : undefined
+    );
     dispatch({ type: 'ADD_ITEM', payload: itemWithNumberPrice });
   };
 
   const removeFromCart = (id: number, size?: ShoeSize) => {
+    userActionRef.current = true;
+    const item = state.items.find(
+      (i) =>
+        i.id === id &&
+        i.size?.system === size?.system &&
+        i.size?.value === size?.value
+    );
+    if (item) {
+      trackRemoveFromCart(item.id, item.name, item.quantity);
+    }
     dispatch({ type: 'REMOVE_ITEM', payload: { id, size } });
   };
 
   const incrementQuantity = (id: number, size?: ShoeSize) => {
+    userActionRef.current = true;
     dispatch({ type: 'INCREMENT', payload: { id, size } });
   };
 
   const decrementQuantity = (id: number, size?: ShoeSize) => {
+    userActionRef.current = true;
     dispatch({ type: 'DECREMENT', payload: { id, size } });
   };
 
   const clearCart = () => {
+    userActionRef.current = true;
     dispatch({ type: 'CLEAR_CART' });
   };
 

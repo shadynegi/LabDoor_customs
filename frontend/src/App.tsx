@@ -1,15 +1,14 @@
 import { BrowserRouter, Routes, Route, Link, useLocation, Navigate } from "react-router-dom";
 import { ShoppingCart, Package } from "lucide-react";
-import { useState, useEffect, lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { CartProvider, useCart } from "./pages/CartContext";
-import Loader from "./components/Loader";
-import RouteLoader from "./components/RouteLoader";
 import ErrorBoundary from "./components/ErrorBoundary";
+import RouteErrorBoundary from "./components/RouteErrorBoundary";
+import { AdminAuthProvider, useAdminAuth } from "./contexts/AdminAuthContext";
 import { Toaster } from "sonner";
 import { trackPageView } from "./utils/activityTracker";
 import CookieConsent, { openCookiePreferences } from "./components/CookieConsent";
 import { trackGaPageView } from "./lib/analytics";
-import { apiFetch } from "./config";
 import logoAllPagesText from "./assets/Logo/LogoAllPagesText.png";
 import logoAllPages from "./assets/Logo/LogoAllPages.png";
 import { useResponsive } from "./hooks/useResponsive";
@@ -58,22 +57,10 @@ const PageLoader = () => (
   </div>
 );
 
-// Protected Route Component for Admin
+const FOOTER_HIDDEN_ROUTES = ['/', '/cart', '/checkout'];
+
 function ProtectedAdminRoute({ children }: { children: React.ReactNode }) {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    const verifyAuth = async () => {
-      try {
-        const response = await apiFetch('/admin/verify');
-        setIsAuthenticated(response.ok);
-      } catch {
-        setIsAuthenticated(false);
-      }
-    };
-
-    verifyAuth();
-  }, []);
+  const { isAuthenticated } = useAdminAuth();
 
   if (isAuthenticated === null) {
     // Loading state
@@ -279,63 +266,48 @@ function Navigation() {
   );
 }
 
-export default function App() {
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    // Simulate initial page load
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 1500); // Show loader for 1.5 seconds
-
-    return () => clearTimeout(timer);
-  }, []);
+function AppShell() {
+  const location = useLocation();
+  const showFooter = !FOOTER_HIDDEN_ROUTES.includes(location.pathname);
 
   return (
-    <ErrorBoundary>
-      <CartProvider>
-        <BrowserRouter>
-          <Loader isLoading={isLoading} />
-          <RouteLoader>
-          <div style={{ 
-            minHeight: "100vh", 
-            display: "flex", 
-            flexDirection: "column",
-            position: "relative",
-            overflow: "hidden"
-          }}>
-            <Navigation />
-          
-            <div style={{ 
-              flex: 1,
-              overflow: "auto",
-              WebkitOverflowScrolling: "touch",
-              overscrollBehavior: "contain"
-            }}>
-              <PageViewTracker />
-              <Suspense fallback={<PageLoader />}>
-              <Routes>
-                <Route path="/" element={<Home />} />
-                <Route path="/products" element={<ProductsPage />} />
-                <Route path="/product/:id" element={<ProductDetailPage />} />
-                <Route path="/about" element={<AboutUs />} />
-                <Route path="/contact" element={<ContactUs />} />
-                <Route path="/help" element={<HelpCenter />} />
-                <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-                <Route path="/terms-of-service" element={<TermsOfService />} />
-                <Route path="/returns-policy" element={<ReturnsPolicy />} />
-                <Route path="/shipping-policy" element={<ShippingPolicy />} />
-                <Route path="/orders" element={<MyOrders />} />
-                <Route path="/admin/login" element={<AdminLogin />} />
-                <Route path="/adminshivamdashboard" element={
-                  <ProtectedAdminRoute>
-                    <AdminDashboard />
-                  </ProtectedAdminRoute>
-                } />
-                <Route path="/cart" element={<CartPage />} />
-                <Route path="/checkout" element={<Checkout />} />
-                <Route path="/payment/success" element={<PaymentSuccess />} />
-                <Route path="/payment/cancel" element={<Cancel />} />
+    <div style={{
+      minHeight: "100dvh",
+      display: "flex",
+      flexDirection: "column",
+      position: "relative",
+    }}>
+      <Navigation />
+
+      <main style={{
+        flex: 1,
+      }}>
+        <PageViewTracker />
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
+            <Route path="/" element={<RouteErrorBoundary title="Home page error"><Home /></RouteErrorBoundary>} />
+            <Route path="/products" element={<RouteErrorBoundary title="Products page error"><ProductsPage /></RouteErrorBoundary>} />
+            <Route path="/product/:id" element={<RouteErrorBoundary title="Product page error"><ProductDetailPage /></RouteErrorBoundary>} />
+            <Route path="/about" element={<AboutUs />} />
+            <Route path="/contact" element={<ContactUs />} />
+            <Route path="/help" element={<HelpCenter />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/terms-of-service" element={<TermsOfService />} />
+            <Route path="/returns-policy" element={<ReturnsPolicy />} />
+            <Route path="/shipping-policy" element={<ShippingPolicy />} />
+            <Route path="/orders" element={<RouteErrorBoundary title="Orders page error"><MyOrders /></RouteErrorBoundary>} />
+            <Route path="/admin/login" element={<AdminLogin />} />
+            <Route path="/adminshivamdashboard" element={
+              <ProtectedAdminRoute>
+                <RouteErrorBoundary title="Admin dashboard error">
+                  <AdminDashboard />
+                </RouteErrorBoundary>
+              </ProtectedAdminRoute>
+            } />
+            <Route path="/cart" element={<RouteErrorBoundary title="Cart error"><CartPage /></RouteErrorBoundary>} />
+            <Route path="/checkout" element={<RouteErrorBoundary title="Checkout error"><Checkout /></RouteErrorBoundary>} />
+            <Route path="/payment/success" element={<RouteErrorBoundary title="Payment error"><PaymentSuccess /></RouteErrorBoundary>} />
+            <Route path="/payment/cancel" element={<Cancel />} />
                 <Route path="*" element={
                 <div style={{ 
                   display: "flex", 
@@ -362,46 +334,59 @@ export default function App() {
                     Go Home
                   </Link>
                 </div>
-              } />
-              </Routes>
-              </Suspense>
-            </div>
+            } />
+          </Routes>
+        </Suspense>
+      </main>
 
-            <footer style={{ 
-              textAlign: "center", 
-              padding: "24px 16px", 
-              paddingBottom: "max(24px, env(safe-area-inset-bottom))",
-              borderTop: "1px solid #e5e7eb",
-              background: "#f9fafb",
-              fontSize: 14,
-              color: "#6b7280",
-              flexShrink: 0
-            }}>
-              <p style={{ margin: 0 }}>
-                © {new Date().getFullYear()} Lab Door Customs. All rights reserved.
-              </p>
-              <button
-                type="button"
-                onClick={openCookiePreferences}
-                style={{
-                  marginTop: 8,
-                  background: 'none',
-                  border: 'none',
-                  color: '#9c6649',
-                  fontSize: 13,
-                  cursor: 'pointer',
-                  textDecoration: 'underline',
-                }}
-              >
-                Cookie preferences
-              </button>
-            </footer>
-          </div>
-        </RouteLoader>
-        <Toaster position="top-center" richColors closeButton />
-        <CookieConsent />
-      </BrowserRouter>
-    </CartProvider>
-  </ErrorBoundary>
+      {showFooter && (
+        <footer style={{
+          textAlign: "center",
+          padding: "24px 16px",
+          paddingBottom: "max(24px, env(safe-area-inset-bottom))",
+          borderTop: "1px solid #e5e7eb",
+          background: "#f9fafb",
+          fontSize: 14,
+          color: "#6b7280",
+          flexShrink: 0,
+        }}>
+          <p style={{ margin: 0 }}>
+            © {new Date().getFullYear()} Lab Door Customs. All rights reserved.
+          </p>
+          <button
+            type="button"
+            onClick={openCookiePreferences}
+            style={{
+              marginTop: 8,
+              background: 'none',
+              border: 'none',
+              color: '#9c6649',
+              fontSize: 13,
+              cursor: 'pointer',
+              textDecoration: 'underline',
+              minHeight: 44,
+            }}
+          >
+            Cookie preferences
+          </button>
+        </footer>
+      )}
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <CartProvider>
+        <BrowserRouter>
+          <AdminAuthProvider>
+            <AppShell />
+          </AdminAuthProvider>
+          <Toaster position="top-center" richColors closeButton />
+          <CookieConsent />
+        </BrowserRouter>
+      </CartProvider>
+    </ErrorBoundary>
   );
 }

@@ -87,27 +87,12 @@ DROP POLICY IF EXISTS "Service role can update activity logs" ON activity_logs;
 DROP POLICY IF EXISTS "Service role can delete activity logs" ON activity_logs;
 DROP POLICY IF EXISTS "Admin can read activity logs" ON activity_logs;
 
--- SELECT: Only authenticated users (admin) can read activity logs for analytics
--- Service role bypasses RLS, so no need for a separate service_role SELECT policy
-CREATE POLICY "Admin can read activity logs" ON activity_logs
-  FOR SELECT 
-  USING ((select auth.role()) = 'authenticated');
-
--- INSERT: Only service_role (backend) can insert activity logs
-CREATE POLICY "Service role can insert activity logs" ON activity_logs
-  FOR INSERT
-  WITH CHECK ((select auth.role()) = 'service_role');
-
--- UPDATE: Only service_role (backend) can update activity logs
-CREATE POLICY "Service role can update activity logs" ON activity_logs
-  FOR UPDATE
+-- Single service_role policy (avoids duplicate permissive policies per action)
+DROP POLICY IF EXISTS "Service role manages activity_logs" ON activity_logs;
+CREATE POLICY "Service role manages activity_logs" ON activity_logs
+  FOR ALL
   USING ((select auth.role()) = 'service_role')
   WITH CHECK ((select auth.role()) = 'service_role');
-
--- DELETE: Only service_role (backend) can delete activity logs
-CREATE POLICY "Service role can delete activity logs" ON activity_logs
-  FOR DELETE
-  USING ((select auth.role()) = 'service_role');
 
 -- Admin sessions policies
 -- Drop any existing policies first
@@ -129,10 +114,10 @@ DROP POLICY IF EXISTS "Allow reading customers" ON customers;
 DROP POLICY IF EXISTS "Allow managing customers" ON customers;
 DROP POLICY IF EXISTS "Authenticated users can manage customers" ON customers;
 
-CREATE POLICY "Authenticated users can manage customers" ON customers
-  FOR ALL 
-  USING ((select auth.role()) = 'authenticated')
-  WITH CHECK ((select auth.role()) = 'authenticated');
+CREATE POLICY "Service role manages customers" ON customers
+  FOR ALL
+  USING ((select auth.role()) = 'service_role')
+  WITH CHECK ((select auth.role()) = 'service_role');
 
 -- Update products view and cart counts to 0 if null
 UPDATE products SET view_count = 0 WHERE view_count IS NULL;

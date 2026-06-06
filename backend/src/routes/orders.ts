@@ -1,5 +1,6 @@
 // backend/src/routes/orders.ts
 import { logger } from '../lib/logger';
+import { respond500 } from '../lib/safeError';
 import { Router, Request, Response } from 'express';
 import sql from '../lib/db';
 import { upsertCustomerFromOrder } from '../lib/customers';
@@ -17,6 +18,9 @@ import { refundPayPalCapture } from '../lib/paypalRefund';
 import { syncOrderAfterRefund, isOrderFullyRefunded } from '../lib/refundSync';
 import { buildPayPalRefundDedupeKey } from '../lib/refundIdempotency';
 import { getClientIp } from '../lib/clientIp';
+import { validateStatusTransition, type OrderStatus } from '../lib/orderStatus';
+import { verifyPayPalCaptureForOrder } from '../lib/paypalCaptureVerify';
+import { redeemOrderAccessExchangeCode } from '../lib/orderAccessExchange';
 
 const router = Router();
 
@@ -37,7 +41,7 @@ function unauthorizedOrderAccess(res: Response, message?: string) {
     error: 'Token required',
     message:
       message ||
-      'Provide the access token from your order confirmation email (?token=... or X-Order-Access-Token header).',
+      'Provide the access token via X-Order-Access-Token header or use the tracking link from your confirmation email.',
   });
 }
 
@@ -47,39 +51,6 @@ function forbiddenOrderAccess(res: Response) {
     error: 'Invalid access token',
     message: 'The access token does not match this order.',
   });
-}
-
-// ============================================
-// ORDER STATUS STATE MACHINE
-// ============================================
-type OrderStatus = 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
-
-const STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  pending: ['processing', 'cancelled'],
-  processing: ['shipped', 'cancelled'],
-  shipped: ['delivered', 'cancelled'],
-  delivered: [], // Final state - no transitions allowed
-  cancelled: [], // Final state - no transitions allowed
-};
-
-/**
- * Validate if a status transition is allowed
- */
-function validateStatusTransition(currentStatus: OrderStatus, newStatus: OrderStatus): { valid: boolean; message: string } {
-  if (currentStatus === newStatus) {
-    return { valid: true, message: 'Status unchanged' };
-  }
-  
-  const allowedTransitions = STATUS_TRANSITIONS[currentStatus] || [];
-  
-  if (allowedTransitions.includes(newStatus)) {
-    return { valid: true, message: 'Valid transition' };
-  }
-  
-  return {
-    valid: false,
-    message: `Cannot transition from '${currentStatus}' to '${newStatus}'. Allowed: ${allowedTransitions.length > 0 ? allowedTransitions.join(', ') : 'none (final state)'}`,
-  };
 }
 
 // ============================================
@@ -218,12 +189,9 @@ router.get('/', verifyAdmin, async (req: Request, res: Response) => {
       count: totalCount,
       pagination: paginationMeta(totalCount, parsed.params),
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Error fetching orders:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to fetch orders',
-    });
+    respond500(res, error, 'Failed to fetch orders');
   }
 });
 
@@ -256,12 +224,36 @@ router.get('/stats/summary', verifyAdmin, async (req: Request, res: Response) =>
         },
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Error fetching order stats:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to fetch order statistics',
+    respond500(res, error, 'Failed to fetch order statistics');
+  }
+});
+
+// GET redeem one-time order access code from confirmation email (no token in URL)
+router.get('/access-exchange/:code', async (req: Request, res: Response) => {
+  try {
+    const { code } = req.params;
+    const result = await redeemOrderAccessExchangeCode(code);
+
+    if (!result) {
+      return res.status(404).json({
+        success: false,
+        error: 'Invalid or expired tracking link',
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        orderNumber: result.orderNumber,
+        accessToken: result.accessToken,
+        serverOrderId: result.serverOrderId,
+      },
     });
+  } catch (error: unknown) {
+    logger.error('Order access exchange error:', error);
+    respond500(res, error, 'Failed to redeem tracking link');
   }
 });
 
@@ -300,10 +292,7 @@ router.post('/lookup', async (req: Request, res: Response) => {
     });
   } catch (error: unknown) {
     logger.error('Order lookup error:', error);
-    res.status(500).json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to lookup order',
-    });
+    respond500(res, error, 'Failed to lookup order');
   }
 });
 
@@ -341,12 +330,9 @@ router.get('/number/:orderNumber', async (req: Request, res: Response) => {
       success: true,
       data: parseOrderRow(order[0] as Record<string, unknown>),
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Error fetching order:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to fetch order',
-    });
+    respond500(res, error, 'Failed to fetch order');
   }
 });
 
@@ -390,12 +376,9 @@ router.get('/customer/:email', async (req: Request, res: Response) => {
       count: parsedOrders?.length || 0,
       pagination: paginationMeta(total, parsed.params),
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Error fetching customer orders:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to fetch orders',
-    });
+    respond500(res, error, 'Failed to fetch orders');
   }
 });
 
@@ -433,12 +416,9 @@ router.get('/:id', async (req: Request, res: Response) => {
       success: true,
       data: parseOrderRow(order[0] as Record<string, unknown>),
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Error fetching order:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to fetch order',
-    });
+    respond500(res, error, 'Failed to fetch order');
   }
 });
 
@@ -498,15 +478,7 @@ router.put('/:id', verifyAdmin, async (req: Request, res: Response) => {
     `;
 
 // Parse JSON fields if they are strings
-const dbOrder = result[0] as Order;
-
-const parsedResult: Order = {
-  ...dbOrder,
-  items: typeof dbOrder.items === 'string' ? JSON.parse(dbOrder.items) : dbOrder.items,
-  shipping_address: typeof dbOrder.shipping_address === 'string'
-    ? JSON.parse(dbOrder.shipping_address)
-    : dbOrder.shipping_address,
-};
+const parsedResult = parseOrderRow(result[0] as Record<string, unknown>) as Order;
 
     // Send shipping notification email automatically when status changes to shipped
     if (shouldSendShippingEmail && parsedResult.tracking_number) {
@@ -556,12 +528,9 @@ const parsedResult: Order = {
       data: parsedResult,
       message: 'Order updated successfully',
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Error updating order:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to update order',
-    });
+    respond500(res, error, 'Failed to update order');
   }
 });
 
@@ -630,15 +599,7 @@ router.patch('/:id/status', verifyAdmin, async (req: Request, res: Response) => 
     }
 
 // Parse JSON fields if they are strings
-const dbOrder = result[0] as Order;
-
-const parsedResult: Order = {
-  ...dbOrder,
-  items: typeof dbOrder.items === 'string' ? JSON.parse(dbOrder.items) : dbOrder.items,
-  shipping_address: typeof dbOrder.shipping_address === 'string'
-    ? JSON.parse(dbOrder.shipping_address)
-    : dbOrder.shipping_address,
-};
+const parsedResult = parseOrderRow(result[0] as Record<string, unknown>) as Order;
 
     // Send shipping notification email automatically when status changes to shipped
     if (shouldSendShippingEmail && parsedResult.tracking_number) {
@@ -688,12 +649,9 @@ const parsedResult: Order = {
       data: parsedResult,
       message: 'Order status updated successfully',
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Error updating order status:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to update order status',
-    });
+    respond500(res, error, 'Failed to update order status');
   }
 });
 
@@ -727,7 +685,8 @@ router.patch('/:id/payment-status', verifyAdmin, async (req: Request, res: Respo
     }
 
     const currentOrder = await sql`
-      SELECT payment_status, order_number FROM orders WHERE id = ${id}
+      SELECT payment_status, order_number, total, paypal_order_id, paypal_capture_id
+      FROM orders WHERE id = ${id}
     `;
     if (!currentOrder.length) {
       return res.status(404).json({
@@ -738,13 +697,34 @@ router.patch('/:id/payment-status', verifyAdmin, async (req: Request, res: Respo
 
     if (
       payment_status === 'completed' &&
-      currentOrder[0].payment_status === 'pending' &&
-      (!admin_note || String(admin_note).trim().length < 3)
+      currentOrder[0].payment_status === 'pending'
     ) {
-      return res.status(400).json({
-        success: false,
-        error: 'admin_note is required (min 3 characters) when manually marking an order paid',
-      });
+      if (!admin_note || String(admin_note).trim().length < 3) {
+        return res.status(400).json({
+          success: false,
+          error: 'admin_note is required (min 3 characters) when manually marking an order paid',
+        });
+      }
+      if (!payment_id || String(payment_id).trim().length < 5) {
+        return res.status(400).json({
+          success: false,
+          error: 'payment_id (PayPal capture ID) is required when marking an order paid',
+        });
+      }
+
+      const captureId = String(payment_id).trim();
+      const expectedTotal = parseFloat(String(currentOrder[0].total ?? '0'));
+      const verification = await verifyPayPalCaptureForOrder(
+        captureId,
+        expectedTotal,
+        currentOrder[0].paypal_order_id as string | null
+      );
+      if (!verification.ok) {
+        return res.status(400).json({
+          success: false,
+          error: verification.error,
+        });
+      }
     }
 
     if (
@@ -757,10 +737,16 @@ router.patch('/:id/payment-status', verifyAdmin, async (req: Request, res: Respo
       });
     }
 
+    const captureIdForUpdate =
+      payment_status === 'completed' && payment_id
+        ? String(payment_id).trim()
+        : null;
+
     const result = await sql`
       UPDATE orders SET
         payment_status = ${payment_status},
         payment_id = COALESCE(${payment_id || null}, payment_id),
+        paypal_capture_id = COALESCE(${captureIdForUpdate}, paypal_capture_id),
         updated_at = NOW()
       WHERE id = ${id}
       RETURNING *
@@ -774,15 +760,7 @@ router.patch('/:id/payment-status', verifyAdmin, async (req: Request, res: Respo
     }
 
     // Parse JSON fields if they are strings
-const dbOrder = result[0] as Order;
-
-const parsedResult: Order = {
-  ...dbOrder,
-  items: typeof dbOrder.items === 'string' ? JSON.parse(dbOrder.items) : dbOrder.items,
-  shipping_address: typeof dbOrder.shipping_address === 'string'
-    ? JSON.parse(dbOrder.shipping_address)
-    : dbOrder.shipping_address,
-};
+const parsedResult = parseOrderRow(result[0] as Record<string, unknown>) as Order;
 
     if (
       payment_status === 'completed' &&
@@ -809,12 +787,9 @@ const parsedResult: Order = {
       data: parsedResult,
       message: 'Payment status updated successfully',
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Error updating payment status:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to update payment status',
-    });
+    respond500(res, error, 'Failed to update payment status');
   }
 });
 
@@ -924,7 +899,6 @@ router.post('/:id/cancel', verifyAdmin, async (req: Request, res: Response) => {
           message: 'Order was not cancelled. Resolve the PayPal refund manually before retrying.',
           refund: {
             processed: false,
-            error: refundResult.error,
           },
         });
       }
@@ -958,28 +932,9 @@ router.post('/:id/cancel', verifyAdmin, async (req: Request, res: Response) => {
         });
       }
     } else if (order.payment_status === 'completed' && !process_refund) {
-      const updateResult = await sql`
-        UPDATE orders SET
-          status = 'cancelled',
-          updated_at = NOW()
-        WHERE id = ${id}
-        RETURNING *
-      `;
-
-      const parsedOnlyCancel = {
-        ...updateResult[0],
-        items,
-        shipping_address:
-          typeof updateResult[0].shipping_address === 'string'
-            ? JSON.parse(updateResult[0].shipping_address)
-            : updateResult[0].shipping_address,
-      };
-
-      return res.json({
-        success: true,
-        data: parsedOnlyCancel,
-        refund: { processed: false, message: 'Order cancelled without refund or inventory restore' },
-        message: 'Order cancelled without refund',
+      return res.status(400).json({
+        success: false,
+        error: 'Paid orders cannot be cancelled without processing a refund',
       });
     }
 
@@ -1047,12 +1002,9 @@ router.post('/:id/cancel', verifyAdmin, async (req: Request, res: Response) => {
       },
       message: `Order cancelled successfully${refundResult.success ? ' and refund processed' : ''}`,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Error cancelling order:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to cancel order',
-    });
+    respond500(res, error, 'Failed to cancel order');
   }
 });
 
@@ -1090,12 +1042,9 @@ router.delete('/:id', verifyAdmin, async (req: Request, res: Response) => {
       success: true,
       message: 'Order deleted successfully',
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Error deleting order:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to delete order',
-    });
+    respond500(res, error, 'Failed to delete order');
   }
 });
 
@@ -1156,12 +1105,9 @@ router.post('/:id/notify-shipped', verifyAdmin, async (req: Request, res: Respon
         error: 'Failed to send email',
       });
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Error sending shipping notification:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    respond500(res, error, 'Request failed');
   }
 });
 

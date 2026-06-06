@@ -94,6 +94,17 @@ export function mountRateLimits(app: Express): void {
   );
 
   app.post(
+    '/api/reviews/admin',
+    rateLimit({
+      ...common,
+      store: storeFor('rl:reviews-admin'),
+      windowMs: 15 * 60 * 1000,
+      max: 30,
+      handler: rateLimit429('Too many review requests. Please try again later.'),
+    })
+  );
+
+  app.post(
     '/api/reviews',
     rateLimit({
       ...common,
@@ -134,6 +145,83 @@ export function mountRateLimits(app: Express): void {
       windowMs: 15 * 60 * 1000,
       max: 120,
       handler: rateLimit429('Too many activity requests. Please try again later.'),
+    })
+  );
+
+  app.post(
+    '/api/reviews/:id/vote',
+    rateLimit({
+      ...common,
+      store: storeFor('rl:review-vote'),
+      windowMs: 15 * 60 * 1000,
+      max: 30,
+      handler: rateLimit429('Too many review votes. Please try again later.'),
+    })
+  );
+
+  app.post(
+    '/api/orders/lookup',
+    rateLimit({
+      ...common,
+      store: storeFor('rl:order-lookup'),
+      windowMs: 15 * 60 * 1000,
+      max: 20,
+      handler: rateLimit429('Too many order lookup attempts. Please try again later.'),
+    })
+  );
+
+  app.post(
+    '/api/products/search',
+    rateLimit({
+      ...common,
+      store: storeFor('rl:product-search'),
+      windowMs: 15 * 60 * 1000,
+      max: 60,
+      handler: rateLimit429('Too many search requests. Please try again later.'),
+    })
+  );
+
+  app.get(
+    '/api/paypal/checkout-exchange/:code',
+    rateLimit({
+      ...common,
+      store: storeFor('rl:checkout-exchange'),
+      windowMs: 15 * 60 * 1000,
+      max: 30,
+      handler: rateLimit429('Too many checkout exchange attempts. Please try again later.'),
+    })
+  );
+
+  app.post(
+    '/api/reviews/check',
+    rateLimit({
+      ...common,
+      store: storeFor('rl:review-check'),
+      windowMs: 15 * 60 * 1000,
+      max: 20,
+      handler: rateLimit429('Too many eligibility checks. Please try again later.'),
+    })
+  );
+
+  app.get(
+    '/api/orders/access-exchange/:code',
+    rateLimit({
+      ...common,
+      store: storeFor('rl:order-access-exchange'),
+      windowMs: 15 * 60 * 1000,
+      max: 30,
+      handler: rateLimit429('Too many tracking link attempts. Please try again later.'),
+    })
+  );
+
+  app.get(
+    '/api/reviews/check/:productId/:email',
+    rateLimit({
+      ...common,
+      store: storeFor('rl:review-check'),
+      windowMs: 15 * 60 * 1000,
+      max: 20,
+      handler: rateLimit429('Too many eligibility checks. Please try again later.'),
     })
   );
 }

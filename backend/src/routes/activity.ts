@@ -1,29 +1,59 @@
 // backend/src/routes/activity.ts - Activity logging for user tracking
 import { logger } from '../lib/logger';
+import { respond500 } from '../lib/safeError';
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import sql from '../lib/db';
 import { parsePagination, paginationMeta } from '../lib/pagination';
 import { verifyAdmin } from './admin';
 import { getClientIp } from '../lib/clientIp';
+import { sanitizeActivityPayload } from '../lib/activitySanitize';
+import { canBumpProductMetric } from '../lib/activityMetricLimiter';
+
+const MAX_BATCH_SIZE = 20;
+
+const ALLOWED_ACTION_TYPES = new Set([
+  'page_view',
+  'product_view',
+  'add_to_cart',
+  'remove_from_cart',
+  'checkout_start',
+  'search',
+  'filter_apply',
+  'contact_submit',
+]);
 
 // Anonymize IP address for GDPR compliance
-// Uses one-way hash so IPs can be compared but not reversed
 const anonymizeIp = (ip: string): string => {
   if (!ip || ip === 'unknown') return 'anonymous';
-  
-  // Use a daily salt so same IP produces same hash within a day (for session tracking)
-  // but different hash on different days (limits long-term tracking)
-  const dailySalt = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+
+  const dailySalt = new Date().toISOString().split('T')[0];
+  const salt = process.env.IP_SALT || 'default-salt';
   const hash = crypto.createHash('sha256')
-    .update(ip + dailySalt + (process.env.IP_SALT || 'default-salt'))
+    .update(ip + dailySalt + salt)
     .digest('hex')
-    .substring(0, 16); // Truncate for storage efficiency
-  
+    .substring(0, 16);
+
   return `anon_${hash}`;
 };
 
 const router = Router();
+
+async function bumpProductMetric(actionType: string, entityId: string | number | null | undefined): Promise<void> {
+  if (!entityId) return;
+
+  const id = typeof entityId === 'string' ? parseInt(entityId, 10) : entityId;
+  if (!Number.isFinite(id)) return;
+
+  const exists = await sql`SELECT id FROM products WHERE id = ${id} LIMIT 1`;
+  if (!exists.length) return;
+
+  if (actionType === 'product_view') {
+    await sql`UPDATE products SET view_count = view_count + 1 WHERE id = ${id}`.catch(() => {});
+  } else if (actionType === 'add_to_cart') {
+    await sql`UPDATE products SET cart_count = cart_count + 1 WHERE id = ${id}`.catch(() => {});
+  }
+}
 
 // POST /activity/log - Log a user activity (public endpoint for frontend tracking)
 router.post('/log', async (req: Request, res: Response) => {
@@ -40,57 +70,62 @@ router.post('/log', async (req: Request, res: Response) => {
       referrer,
     } = req.body;
 
-    if (!actionType) {
+    if (!actionType || !ALLOWED_ACTION_TYPES.has(actionType)) {
       return res.status(400).json({
         success: false,
-        error: 'Action type is required',
+        error: 'Invalid or missing action type',
       });
     }
 
-    // Get IP (anonymized for GDPR) and user agent
     const rawIp = getClientIp(req);
     const anonymizedIp = anonymizeIp(rawIp);
     const userAgent = req.get('user-agent') || '';
+    const clean = sanitizeActivityPayload({
+      sessionId,
+      userEmail,
+      entityType,
+      entityId,
+      entityName,
+      metadata,
+      pageUrl,
+      referrer,
+    });
 
     await sql`
       INSERT INTO activity_logs (
-        session_id, user_email, action_type, entity_type, entity_id, 
+        session_id, user_email, action_type, entity_type, entity_id,
         entity_name, metadata, ip_address, user_agent, page_url, referrer
       ) VALUES (
-        ${sessionId || null},
-        ${userEmail || null},
+        ${clean.sessionId},
+        ${clean.userEmail},
         ${actionType},
-        ${entityType || null},
-        ${entityId || null},
-        ${entityName || null},
-        ${JSON.stringify(metadata || {})},
+        ${clean.entityType},
+        ${clean.entityId},
+        ${clean.entityName},
+        ${clean.metadataJson},
         ${anonymizedIp},
         ${userAgent},
-        ${pageUrl || null},
-        ${referrer || null}
+        ${clean.pageUrl},
+        ${clean.referrer}
       )
     `;
 
-    // If it's a product view or cart add, update the product counts
-    if (actionType === 'product_view' && entityId) {
-      await sql`
-        UPDATE products SET view_count = view_count + 1 WHERE id = ${entityId}
-      `.catch(() => {});
-    } else if (actionType === 'add_to_cart' && entityId) {
-      await sql`
-        UPDATE products SET cart_count = cart_count + 1 WHERE id = ${entityId}
-      `.catch(() => {});
+    if (
+      (actionType === 'product_view' || actionType === 'add_to_cart') &&
+      clean.entityId &&
+      canBumpProductMetric(rawIp, parseInt(clean.entityId, 10))
+    ) {
+      await bumpProductMetric(actionType, clean.entityId);
     }
 
     res.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Activity log error:', error);
-    // Don't fail the request, just log the error
     res.json({ success: true });
   }
 });
 
-// POST /activity/batch - Log multiple activities at once
+// POST /activity/batch - Log multiple activities at once (CSRF-exempt; rate-limited)
 router.post('/batch', async (req: Request, res: Response) => {
   try {
     const { activities } = req.body;
@@ -102,50 +137,63 @@ router.post('/batch', async (req: Request, res: Response) => {
       });
     }
 
-    const ipAddress = getClientIp(req);
-    const userAgent = req.get('user-agent') || '';
-
-    // Process activities in parallel for better performance (1000+ users)
-    // Limit concurrency to prevent overwhelming the database
-    const BATCH_SIZE = 10;
-    const batches = [];
-    for (let i = 0; i < activities.length; i += BATCH_SIZE) {
-      batches.push(activities.slice(i, i + BATCH_SIZE));
+    if (activities.length > MAX_BATCH_SIZE) {
+      return res.status(413).json({
+        success: false,
+        error: `Batch size exceeds maximum of ${MAX_BATCH_SIZE}`,
+      });
     }
 
-    for (const batch of batches) {
-      await Promise.all(batch.map(async (activity: any) => {
-        // Insert activity log
-        await sql`
-          INSERT INTO activity_logs (
-            session_id, user_email, action_type, entity_type, entity_id, 
-            entity_name, metadata, ip_address, user_agent, page_url, referrer
-          ) VALUES (
-            ${activity.sessionId || null},
-            ${activity.userEmail || null},
-            ${activity.actionType},
-            ${activity.entityType || null},
-            ${activity.entityId || null},
-            ${activity.entityName || null},
-            ${JSON.stringify(activity.metadata || {})},
-            ${String(ipAddress)},
-            ${userAgent},
-            ${activity.pageUrl || null},
-            ${activity.referrer || null}
-          )
-        `.catch(() => {});
+    const rawIp = getClientIp(req);
+    const anonymizedIp = anonymizeIp(rawIp);
+    const userAgent = req.get('user-agent') || '';
 
-        // Update product counts
-        if (activity.actionType === 'product_view' && activity.entityId) {
-          await sql`UPDATE products SET view_count = view_count + 1 WHERE id = ${activity.entityId}`.catch(() => {});
-        } else if (activity.actionType === 'add_to_cart' && activity.entityId) {
-          await sql`UPDATE products SET cart_count = cart_count + 1 WHERE id = ${activity.entityId}`.catch(() => {});
-        }
-      }));
+    for (const activity of activities) {
+      if (!activity?.actionType || !ALLOWED_ACTION_TYPES.has(activity.actionType)) {
+        continue;
+      }
+
+      const clean = sanitizeActivityPayload({
+        sessionId: activity.sessionId,
+        userEmail: activity.userEmail,
+        entityType: activity.entityType,
+        entityId: activity.entityId,
+        entityName: activity.entityName,
+        metadata: activity.metadata,
+        pageUrl: activity.pageUrl,
+        referrer: activity.referrer,
+      });
+
+      await sql`
+        INSERT INTO activity_logs (
+          session_id, user_email, action_type, entity_type, entity_id,
+          entity_name, metadata, ip_address, user_agent, page_url, referrer
+        ) VALUES (
+          ${clean.sessionId},
+          ${clean.userEmail},
+          ${activity.actionType},
+          ${clean.entityType},
+          ${clean.entityId},
+          ${clean.entityName},
+          ${clean.metadataJson},
+          ${anonymizedIp},
+          ${userAgent},
+          ${clean.pageUrl},
+          ${clean.referrer}
+        )
+      `.catch(() => {});
+
+      if (
+        (activity.actionType === 'product_view' || activity.actionType === 'add_to_cart') &&
+        clean.entityId &&
+        canBumpProductMetric(rawIp, parseInt(clean.entityId, 10))
+      ) {
+        await bumpProductMetric(activity.actionType, clean.entityId);
+      }
     }
 
     res.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Batch activity log error:', error);
     res.json({ success: true });
   }
@@ -189,7 +237,7 @@ router.get('/export', verifyAdmin, async (req: Request, res: Response) => {
     if (!res.headersSent) {
       res.status(500).json({
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to export activity logs',
+        error: 'Failed to export activity logs',
       });
     } else {
       res.end();
@@ -248,7 +296,7 @@ router.get('/logs', verifyAdmin, async (req: Request, res: Response) => {
     logger.error('Get activity logs error:', error);
     res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to fetch activity logs',
+      error: 'Failed to fetch activity logs',
     });
   }
 });
@@ -256,7 +304,6 @@ router.get('/logs', verifyAdmin, async (req: Request, res: Response) => {
 // GET /activity/stats - Get activity statistics (admin only)
 router.get('/stats', verifyAdmin, async (req: Request, res: Response) => {
   try {
-    // Get action type breakdown
     const actionBreakdown = await sql`
       SELECT action_type, COUNT(*) as count
       FROM activity_logs
@@ -264,9 +311,8 @@ router.get('/stats', verifyAdmin, async (req: Request, res: Response) => {
       ORDER BY count DESC
     `;
 
-    // Get daily activity (last 30 days)
     const dailyActivity = await sql`
-      SELECT 
+      SELECT
         DATE(created_at) as date,
         COUNT(*) as total_actions,
         COUNT(CASE WHEN action_type = 'page_view' THEN 1 END) as page_views,
@@ -280,9 +326,8 @@ router.get('/stats', verifyAdmin, async (req: Request, res: Response) => {
       ORDER BY date DESC
     `;
 
-    // Get unique sessions/users
     const uniqueStats = await sql`
-      SELECT 
+      SELECT
         COUNT(DISTINCT session_id) as unique_sessions,
         COUNT(DISTINCT user_email) FILTER (WHERE user_email IS NOT NULL) as unique_users,
         COUNT(DISTINCT ip_address) as unique_ips
@@ -290,7 +335,6 @@ router.get('/stats', verifyAdmin, async (req: Request, res: Response) => {
       WHERE created_at >= NOW() - INTERVAL '30 days'
     `;
 
-    // Get top pages
     const topPages = await sql`
       SELECT page_url, COUNT(*) as views
       FROM activity_logs
@@ -300,7 +344,6 @@ router.get('/stats', verifyAdmin, async (req: Request, res: Response) => {
       LIMIT 10
     `;
 
-    // Get top products by views
     const topProductViews = await sql`
       SELECT entity_id, entity_name, COUNT(*) as views
       FROM activity_logs
@@ -310,7 +353,6 @@ router.get('/stats', verifyAdmin, async (req: Request, res: Response) => {
       LIMIT 10
     `;
 
-    // Get top products by cart adds
     const topProductCartAdds = await sql`
       SELECT entity_id, entity_name, COUNT(*) as cart_adds
       FROM activity_logs
@@ -331,11 +373,11 @@ router.get('/stats', verifyAdmin, async (req: Request, res: Response) => {
         topProductCartAdds,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Activity stats error:', error);
     res.status(500).json({
       success: false,
-      error: error.message || 'Failed to fetch activity stats',
+      error: 'Failed to fetch activity stats',
     });
   }
 });

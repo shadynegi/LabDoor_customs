@@ -1,5 +1,6 @@
 // backend/src/routes/contact.ts
 import { logger } from '../lib/logger';
+import { respond500 } from '../lib/safeError';
 import { Router, Request, Response } from 'express';
 import sql from '../lib/db';
 import { emailService } from '../lib/email';
@@ -129,13 +130,9 @@ router.post('/', async (req: Request, res: Response) => {
       data: result[0],
       message: 'Thank you for contacting us. We will get back to you soon.',
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Error submitting contact form:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to submit message',
-      message: 'Unable to send your message. Please try again or contact us directly via email.',
-    });
+    respond500(res, error, 'Request failed');
   }
 });
 
@@ -181,10 +178,7 @@ router.get('/', verifyAdmin, async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     logger.error('Error fetching contact messages:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to fetch contact messages',
-    });
+    respond500(res, error, "Request failed");
   }
 });
 
@@ -210,10 +204,7 @@ router.get('/stats/summary', verifyAdmin, async (req: Request, res: Response) =>
     });
   } catch (error: any) {
     logger.error('Error fetching contact stats:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to fetch contact statistics',
-    });
+    respond500(res, error, "Request failed");
   }
 });
 
@@ -253,10 +244,7 @@ router.get('/:id', verifyAdmin, async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     logger.error('Error fetching contact message:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to fetch contact message',
-    });
+    respond500(res, error, "Request failed");
   }
 });
 
@@ -302,10 +290,7 @@ router.patch('/:id/status', verifyAdmin, async (req: Request, res: Response) => 
     });
   } catch (error: any) {
     logger.error('Error updating contact message status:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to update status',
-    });
+    respond500(res, error, "Request failed");
   }
 });
 
@@ -333,10 +318,7 @@ router.delete('/:id', verifyAdmin, async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     logger.error('Error deleting contact message:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to delete contact message',
-    });
+    respond500(res, error, "Request failed");
   }
 });
 

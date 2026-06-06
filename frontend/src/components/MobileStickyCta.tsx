@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 
 interface MobileStickyCtaProps {
   label: ReactNode;
@@ -7,6 +7,10 @@ interface MobileStickyCtaProps {
   disabled?: boolean;
   secondaryLabel?: string;
   onSecondaryClick?: () => void;
+  keyboardOffset?: number;
+  ariaLabel?: string;
+  /** Stack buttons vertically on narrow screens (cart page) */
+  stacked?: boolean;
 }
 
 export function MobileStickyCta({
@@ -16,53 +20,50 @@ export function MobileStickyCta({
   disabled = false,
   secondaryLabel,
   onSecondaryClick,
+  keyboardOffset = 0,
+  ariaLabel = 'Checkout actions',
+  stacked = false,
 }: MobileStickyCtaProps) {
+  const wrapperStyle: CSSProperties = {
+    bottom: keyboardOffset > 0 ? keyboardOffset : undefined,
+    transform: keyboardOffset > 0 ? `translateY(-${keyboardOffset}px)` : undefined,
+  };
+
   return (
-    <div className="mobile-sticky-cta" role="region" aria-label="Checkout actions">
+    <div
+      className={`mobile-sticky-cta${stacked ? ' mobile-sticky-cta--stacked' : ''}`}
+      style={wrapperStyle}
+      role="region"
+      aria-label={ariaLabel}
+    >
       {amount && (
-        <div>
+        <div className="mobile-sticky-cta__total">
           <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 2 }}>Total</div>
           <div style={{ fontSize: 20, fontWeight: 800, color: '#1f2937' }}>{amount}</div>
         </div>
       )}
-      <div style={{ display: 'flex', gap: 8, flex: 1, justifyContent: amount ? 'flex-end' : 'stretch' }}>
+      <div className="mobile-sticky-cta__actions">
         {secondaryLabel && onSecondaryClick && (
           <button
             type="button"
             onClick={onSecondaryClick}
-            style={{
-              padding: '12px 16px',
-              background: 'white',
-              color: '#374151',
-              border: '2px solid #d1d5db',
-              borderRadius: 12,
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-            }}
+            aria-label={secondaryLabel === 'Continue Shopping' ? 'Continue shopping' : secondaryLabel}
+            className="mobile-sticky-cta__secondary"
           >
-            {secondaryLabel}
+            {secondaryLabel === 'Continue Shopping' && stacked ? 'Shop' : secondaryLabel}
           </button>
         )}
         <button
           type="button"
           onClick={onClick}
           disabled={disabled}
+          className="mobile-sticky-cta__primary"
           style={{
-            flex: amount ? 'none' : 1,
-            padding: '12px 20px',
-            minHeight: 44,
+            flex: amount && !stacked ? 'none' : 1,
             background: disabled
               ? '#9ca3af'
               : 'linear-gradient(135deg, #361906 0%, #9c6649 100%)',
-            color: 'white',
-            border: 'none',
-            borderRadius: 12,
-            fontSize: 15,
-            fontWeight: 700,
             cursor: disabled ? 'not-allowed' : 'pointer',
-            whiteSpace: 'nowrap',
           }}
         >
           {label}

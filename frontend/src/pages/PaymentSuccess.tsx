@@ -1,5 +1,5 @@
 // src/pages/PaymentSuccess.tsx
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { CheckCircle2, Package, Truck, Mail, Download, ArrowRight, CreditCard, ShieldCheck, Loader2 } from 'lucide-react';
@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { getFriendlyError } from '../utils/errorMessages';
 import { logError } from '../lib/logger';
 import { useResponsive } from '../hooks/useResponsive';
+import { trackPurchaseComplete } from '../utils/activityTracker';
 
 // Payment progress steps
 type PaymentStep = 'verifying' | 'capturing' | 'saving' | 'complete' | 'error';
@@ -180,9 +181,13 @@ export default function PaymentSuccess() {
 
   const token = searchParams.get('token');
   const payerId = searchParams.get('PayerID');
+  const capturedRef = useRef(false);
 
   useEffect(() => {
+    let cancelled = false;
+
     const capturePayment = async () => {
+      if (capturedRef.current) return;
       setCaptureError(null);
 
       const lastOrder = localStorage.getItem('lastCompletedOrder');
@@ -216,15 +221,34 @@ export default function PaymentSuccess() {
         setPaymentStep('verifying');
         await new Promise(resolve => setTimeout(resolve, 500)); // Brief UI pause
 
-        const pendingOrderRaw = localStorage.getItem('pendingOrder');
+        const pendingOrderRaw =
+          sessionStorage.getItem('pendingOrder') || localStorage.getItem('pendingOrder');
         let pendingOrder: PendingOrderContext | null = pendingOrderRaw
           ? JSON.parse(pendingOrderRaw)
           : null;
 
-        const checkoutCode = searchParams.get('code');
+        const recoveryRaw = sessionStorage.getItem('checkoutRecovery');
+        if (recoveryRaw) {
+          try {
+            const recovery = JSON.parse(recoveryRaw);
+            pendingOrder = {
+              ...(pendingOrder || {}),
+              formData: recovery.formData ?? pendingOrder?.formData,
+              items: recovery.items ?? pendingOrder?.items,
+            };
+          } catch {
+            sessionStorage.removeItem('checkoutRecovery');
+          }
+        }
+
+        const urlCode = searchParams.get('code');
+        if (urlCode) {
+          sessionStorage.setItem('paypalReturnCode', urlCode);
+        }
+        const checkoutCode = urlCode || sessionStorage.getItem('paypalReturnCode');
         const legacyAid = searchParams.get('aid');
 
-        if (!pendingOrder && checkoutCode) {
+        if (checkoutCode && (!pendingOrder || !pendingOrder.accessToken)) {
           const exchangeRes = await apiFetch(
             `/paypal/checkout-exchange/${encodeURIComponent(checkoutCode)}`
           );
@@ -232,17 +256,20 @@ export default function PaymentSuccess() {
 
           if (exchangeRes.ok && exchange.accessToken) {
             pendingOrder = {
-              serverOrderId: exchange.serverOrderId,
-              orderNumber: exchange.orderNumber,
+              ...(pendingOrder || {}),
+              formData: pendingOrder?.formData,
+              items: pendingOrder?.items,
+              serverOrderId: exchange.serverOrderId || pendingOrder?.serverOrderId,
+              orderNumber: exchange.orderNumber || pendingOrder?.orderNumber,
               accessToken: exchange.accessToken,
-              paypalOrderId: token || exchange.paypalOrderId || undefined,
-              total: exchange.total,
+              paypalOrderId: token || exchange.paypalOrderId || pendingOrder?.paypalOrderId,
+              total: exchange.total ?? pendingOrder?.total,
               coupon: exchange.couponId
                 ? {
                     id: exchange.couponId,
                     discount_amount: exchange.discount_amount,
                   }
-                : null,
+                : pendingOrder?.coupon ?? null,
             };
           }
         }
@@ -362,7 +389,22 @@ export default function PaymentSuccess() {
           );
         }
 
+        if (cancelled) return;
+
+        capturedRef.current = true;
+        const pendingItems = pendingOrder.items;
+        const itemCount = Array.isArray(completedDetails.items)
+          ? completedDetails.items.length
+          : (Array.isArray(pendingItems) ? pendingItems.length : 0);
+        trackPurchaseComplete(
+          pendingOrder.serverOrderId || completedDetails.orderNumber || '',
+          completedDetails.total ?? pendingOrder.total ?? 0,
+          itemCount
+        );
         clearCart();
+        sessionStorage.removeItem('pendingOrder');
+        sessionStorage.removeItem('checkoutRecovery');
+        sessionStorage.removeItem('paypalReturnCode');
         localStorage.removeItem('pendingOrder');
 
         const { accessToken: _omitToken, ...persistDetails } = completedDetails;
@@ -375,8 +417,9 @@ export default function PaymentSuccess() {
         setPaymentStep('complete');
         window.history.replaceState({}, '', '/payment/success');
         await new Promise(resolve => setTimeout(resolve, 500));
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       } catch (error) {
+        if (cancelled) return;
         setPaymentStep('error');
         logError('Payment capture error:', error);
         const friendlyError = getFriendlyError(error);
@@ -390,7 +433,10 @@ export default function PaymentSuccess() {
     };
 
     capturePayment();
-  }, [token, payerId, navigate, clearCart]);
+    return () => {
+      cancelled = true;
+    };
+  }, [token, payerId, navigate, clearCart, searchParams]);
 
   const displayEmail =
     orderDetails?.customer_email ||

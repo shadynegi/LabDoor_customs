@@ -1,6 +1,7 @@
 // Activity tracking utility for user behavior analytics
 import { config, apiFetch } from '../config';
 import { logDebug } from '../lib/logger';
+import { hasAnalyticsConsent } from '../lib/analytics';
 
 // Generate or get session ID
 const getSessionId = (): string => {
@@ -12,9 +13,9 @@ const getSessionId = (): string => {
   return sessionId;
 };
 
-// Get user email from localStorage if available
 const getUserEmail = (): string | null => {
-  return localStorage.getItem('userEmail');
+  if (!hasAnalyticsConsent()) return null;
+  return sessionStorage.getItem('userEmail');
 };
 
 // Action types
@@ -79,8 +80,10 @@ const scheduleFlush = () => {
   flushTimeout = setTimeout(flushQueue, 2000); // Flush after 2 seconds of inactivity
 };
 
-// Track a single activity
+// Track a single activity (requires analytics cookie consent)
 export const trackActivity = (data: ActivityData) => {
+  if (!hasAnalyticsConsent()) return;
+
   activityQueue.push({
     ...data,
     pageUrl: window.location.href,
@@ -167,28 +170,47 @@ export const trackFilterApply = (filters: Record<string, any>) => {
   });
 };
 
-// Set user email when they provide it (e.g., during checkout)
+/** Store email for analytics batches only when consent is granted (session-scoped). */
 export const setUserEmail = (email: string) => {
-  localStorage.setItem('userEmail', email);
+  if (!hasAnalyticsConsent()) return;
+  sessionStorage.setItem('userEmail', email.trim().toLowerCase());
 };
 
-// Flush on page unload
+export const clearUserEmail = () => {
+  sessionStorage.removeItem('userEmail');
+  localStorage.removeItem('userEmail');
+};
+
+// Flush on page unload (batch endpoint is CSRF-exempt; prefer keepalive fetch)
 if (typeof window !== 'undefined') {
   window.addEventListener('beforeunload', () => {
-    if (activityQueue.length > 0) {
-      // Use sendBeacon for reliable delivery on page unload
-      const activities = activityQueue.map((activity) => ({
-        ...activity,
-        sessionId: getSessionId(),
-        userEmail: getUserEmail(),
-        pageUrl: activity.pageUrl || window.location.href,
-        referrer: activity.referrer || document.referrer,
-      }));
-      
-      navigator.sendBeacon(
-        `${config.apiBaseUrl}/activity/batch`,
-        JSON.stringify({ activities })
-      );
+    if (!hasAnalyticsConsent() || activityQueue.length === 0) return;
+
+    const activities = activityQueue.map((activity) => ({
+      ...activity,
+      sessionId: getSessionId(),
+      userEmail: getUserEmail(),
+      pageUrl: activity.pageUrl || window.location.href,
+      referrer: activity.referrer || document.referrer,
+    }));
+
+    const body = JSON.stringify({ activities });
+    const url = `${config.apiBaseUrl}/activity/batch`;
+
+    if (typeof fetch !== 'undefined') {
+      fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+        keepalive: true,
+        credentials: 'include',
+      }).catch(() => {
+        if (navigator.sendBeacon) {
+          navigator.sendBeacon(url, new Blob([body], { type: 'application/json' }));
+        }
+      });
+    } else if (navigator.sendBeacon) {
+      navigator.sendBeacon(url, new Blob([body], { type: 'application/json' }));
     }
   });
 }

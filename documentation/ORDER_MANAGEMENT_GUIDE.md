@@ -2,7 +2,7 @@
 
 Admin workflows for order fulfillment.
 
-**Full reference:** [`../info.md`](../info.md) | **Dashboard:** [ADMIN_DASHBOARD_GUIDE.md](./ADMIN_DASHBOARD_GUIDE.md)
+**Full reference:** [`info.md`](info.md) | **Dashboard:** [ADMIN_DASHBOARD_GUIDE.md](./ADMIN_DASHBOARD_GUIDE.md)
 
 ---
 
@@ -35,14 +35,24 @@ Use **Cancel order** in the modal for cancellations (not bulk update).
 
 ## Manual mark paid
 
-For offline or non-PayPal payments, use **Mark paid** in the order modal. The dashboard prompts for a reason (minimum 3 characters). The API requires:
+For offline or non-PayPal payments, use **Mark paid** in the order modal. The API requires a reason and a payment reference:
 
 ```json
 PATCH /api/orders/:id/payment-status
-{ "payment_status": "completed", "admin_note": "your reason" }
+{
+  "payment_status": "completed",
+  "admin_note": "your reason (min 3 characters)",
+  "payment_id": "CAPTURE_OR_EXTERNAL_REF_ID (min 5 characters)"
+}
 ```
 
 Each manual mark is recorded in `activity_logs` as `admin_mark_paid`.
+
+---
+
+## Bulk status updates
+
+`POST /api/admin/orders/bulk-update` accepts up to **500** order IDs and a fulfillment `status` only. The server validates each order's status transition (`pending` → `processing` → `shipped` → `delivered`). Bulk update rejects `cancelled` status and any `payment_status` change — use the order modal cancel flow or `PATCH /api/orders/:id/payment-status` instead.
 
 ---
 
