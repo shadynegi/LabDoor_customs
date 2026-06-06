@@ -9,10 +9,15 @@ import { cleanupExpiredCheckoutExchanges } from './orderCheckoutExchange';
 import { cleanupExpiredOrderAccessExchanges } from './orderAccessExchange';
 
 async function runInitialMaintenance(): Promise<void> {
+  const started = Date.now();
   try {
+    logger.info('Maintenance: starting initial run');
     await pingDatabase();
+    logger.info('Maintenance: expiring stale pending orders');
     await expireStalePendingOrders();
+    logger.info('Maintenance: reaping stuck idempotency keys');
     await reapStuckIdempotencyKeys();
+    logger.info(`Maintenance: initial run complete (${Date.now() - started}ms)`);
   } catch (err) {
     logger.warn('Initial maintenance run skipped (DB not ready):', err);
   }

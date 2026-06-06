@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import sql, { withRetry } from './db';
+import sql from './db';
 import {
   logBootstrapDdlSkipped,
   publicTableExists,
@@ -68,7 +68,11 @@ export function buildCreatePaymentKey(
 }
 
 export async function ensureIdempotencyTable(): Promise<void> {
-  if (shouldSkipBootstrapDdl() || (await publicTableExists('payment_idempotency'))) {
+  const tableExists = await publicTableExists('payment_idempotency');
+  if (shouldSkipBootstrapDdl() || tableExists) {
+    if (tableExists) {
+      await ensureIdempotencyIndexes();
+    }
     logBootstrapDdlSkipped('payment_idempotency');
     return;
   }
@@ -86,8 +90,20 @@ export async function ensureIdempotencyTable(): Promise<void> {
       expires_at TIMESTAMPTZ NOT NULL
     )
   `;
+  await ensureIdempotencyIndexes();
+}
+
+/** Safe on every boot — CREATE INDEX IF NOT EXISTS only. */
+export async function ensureIdempotencyIndexes(): Promise<void> {
+  if (!(await publicTableExists('payment_idempotency'))) return;
+
   await sql`CREATE INDEX IF NOT EXISTS idx_payment_idempotency_expires ON payment_idempotency (expires_at)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_payment_idempotency_operation ON payment_idempotency (operation)`;
+  await sql`
+    CREATE INDEX IF NOT EXISTS idx_payment_idempotency_processing_created
+    ON payment_idempotency (created_at)
+    WHERE status = 'processing'
+  `;
 }
 
 export async function claimIdempotencyKey(
@@ -192,33 +208,62 @@ export async function failIdempotencyKey(key: string, operation: string): Promis
 export async function reapStuckIdempotencyKeys(
   staleMinutes = parseInt(process.env.IDEMPOTENCY_STALE_MINUTES || '5', 10)
 ): Promise<number> {
+  const batchSize = parseInt(process.env.IDEMPOTENCY_REAP_BATCH_SIZE || '200', 10);
+  let total = 0;
+
   try {
-    const updated = await withRetry(() => sql`
-      UPDATE payment_idempotency
-      SET status = 'failed'
-      WHERE status = 'processing'
-        AND created_at < NOW() - ${staleMinutes} * interval '1 minute'
-      RETURNING id
-    `);
-    if (updated.length > 0) {
-      logger.info(`Reaped ${updated.length} stuck payment idempotency record(s)`);
+    await ensureIdempotencyIndexes();
+
+    for (;;) {
+      const updated = await sql`
+        UPDATE payment_idempotency
+        SET status = 'failed'
+        WHERE id IN (
+          SELECT id
+          FROM payment_idempotency
+          WHERE status = 'processing'
+            AND created_at < NOW() - ${staleMinutes} * interval '1 minute'
+          ORDER BY created_at ASC
+          LIMIT ${batchSize}
+        )
+        RETURNING id
+      `;
+      total += updated.length;
+      if (updated.length < batchSize) break;
     }
-    return updated.length;
+
+    if (total > 0) {
+      logger.info(`Reaped ${total} stuck payment idempotency record(s)`);
+    }
+    return total;
   } catch (error) {
     logger.warn('Stuck idempotency reaper failed (non-fatal):', error);
-    return 0;
+    return total;
   }
 }
 
 export async function cleanupExpiredIdempotencyKeys(): Promise<void> {
+  const batchSize = parseInt(process.env.IDEMPOTENCY_REAP_BATCH_SIZE || '200', 10);
+  let total = 0;
+
   try {
-    const deleted = await withRetry(() => sql`
-      DELETE FROM payment_idempotency
-      WHERE expires_at < NOW() AND status != 'processing'
-      RETURNING id
-    `);
-    if (deleted.length > 0) {
-      logger.info(`Cleaned up ${deleted.length} expired payment idempotency records`);
+    for (;;) {
+      const deleted = await sql`
+        DELETE FROM payment_idempotency
+        WHERE id IN (
+          SELECT id
+          FROM payment_idempotency
+          WHERE expires_at < NOW() AND status != 'processing'
+          ORDER BY expires_at ASC
+          LIMIT ${batchSize}
+        )
+        RETURNING id
+      `;
+      total += deleted.length;
+      if (deleted.length < batchSize) break;
+    }
+    if (total > 0) {
+      logger.info(`Cleaned up ${total} expired payment idempotency records`);
     }
   } catch (error) {
     logger.warn('Idempotency cleanup failed (non-fatal):', error);

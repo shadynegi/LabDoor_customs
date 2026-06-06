@@ -13,3 +13,6 @@ CREATE TABLE IF NOT EXISTS payment_idempotency (
 
 CREATE INDEX IF NOT EXISTS idx_payment_idempotency_expires ON payment_idempotency (expires_at);
 CREATE INDEX IF NOT EXISTS idx_payment_idempotency_operation ON payment_idempotency (operation);
+CREATE INDEX IF NOT EXISTS idx_payment_idempotency_processing_created
+  ON payment_idempotency (created_at)
+  WHERE status = 'processing';
