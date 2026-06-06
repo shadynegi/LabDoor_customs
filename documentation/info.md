@@ -811,6 +811,7 @@ Templates: `backend/env.template`, `frontend/env.template`
 | `BOOTSTRAP_BLOCK_UNTIL_RLS` | — | Dev only: set `true` to block API ready until RLS migration finishes (production always waits) |
 | `BOOTSTRAP_BLOCK_API` | — | Dev only: set `true` to return 503 until full bootstrap completes (default: API ready immediately in dev) |
 | `BOOTSTRAP_SKIP_DDL` | — | Skip boot-time CREATE TABLE/INDEX when schema already exists in Supabase |
+| `BOOTSTRAP_FORCE_RLS` | — | Drop legacy RLS policies on boot (default off; run `migration-performance-linter-fixes.sql` once instead) |
 | `BOOTSTRAP_PING_TIMEOUT_MS` | 20000 | Fail fast if database is unreachable at bootstrap start |
 | `REQUEST_TIMEOUT_MS` | 60000 | HTTP request timeout |
 | `SLOW_REQUEST_TIMEOUT_MS` | 180000 | Catalog, admin analytics, activity routes |

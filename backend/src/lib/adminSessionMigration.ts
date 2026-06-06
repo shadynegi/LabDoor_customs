@@ -1,8 +1,18 @@
 import sql from './db';
+import {
+  hasLegacyAdminSessions,
+  logBootstrapStepSkipped,
+  shouldSkipBootstrapDdl,
+} from './bootstrapSchema';
 import { logger } from './logger';
 
 /** Remove legacy plaintext admin session tokens (pre-hashing deploy). */
 export async function purgeLegacyAdminSessions(): Promise<void> {
+  if (shouldSkipBootstrapDdl() || !(await hasLegacyAdminSessions())) {
+    logBootstrapStepSkipped('purge_legacy_admin_sessions', 'nothing to purge');
+    return;
+  }
+
   try {
     const result = await sql`
       DELETE FROM admin_sessions

@@ -1563,6 +1563,7 @@ if (require.main === module) {
 
 async function runDeferredBootstrap(): Promise<void> {
   try {
+    logger.info('Deferred bootstrap started (skips steps already applied)');
     await runBootstrapTask('rls_policies', ensureRlsPolicies);
     await runBootstrapTask('purge_legacy_admin_sessions', purgeLegacyAdminSessions);
     await runBootstrapTask('warm_caches', warmCaches);

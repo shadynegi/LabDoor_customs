@@ -1,4 +1,12 @@
 import sql from './db';
+import {
+  authenticatedHasTableGrants,
+  isRlsMigrationApplied,
+  logBootstrapStepSkipped,
+  serviceRolePolicyExists,
+  shouldSkipBootstrapDdl,
+  tableHasServiceRolePolicy,
+} from './bootstrapSchema';
 import { logger } from './logger';
 
 /** Tables that must not be readable via anon/authenticated (PostgREST / GraphQL). */
@@ -81,21 +89,27 @@ async function grantServiceRole(table: string): Promise<void> {
 
 async function revokeClientRoleGrants(table: string): Promise<void> {
   if (!(await tableExists(table))) return;
+  if (!(await authenticatedHasTableGrants(table))) return;
   await sql.unsafe(
     `REVOKE ALL ON TABLE public.${quoteIdent(table)} FROM anon, authenticated`
   );
   await sql.unsafe(`GRANT ALL ON TABLE public.${quoteIdent(table)} TO service_role`);
 }
 
+/**
+ * Create unified policy only when the table has none.
+ * Never DROP on boot — duplicate legacy policies are cleaned via migration SQL.
+ */
 async function ensureServiceRolePolicy(table: string, policyName: string): Promise<void> {
   assertAllowedTable(table);
   if (!(await tableExists(table))) return;
 
-  const existing = await sql`
-    SELECT 1 FROM pg_policies
-    WHERE schemaname = 'public' AND tablename = ${table} AND policyname = ${policyName}
-  `;
-  if (existing.length > 0) return;
+  if (await serviceRolePolicyExists(table, policyName)) return;
+
+  if (await tableHasServiceRolePolicy(table)) {
+    logger.info(`RLS: ${table} already has a service_role policy — skip create`);
+    return;
+  }
 
   await sql.unsafe(`
     CREATE POLICY ${quoteIdent(policyName)} ON public.${quoteIdent(table)}
@@ -105,40 +119,104 @@ async function ensureServiceRolePolicy(table: string, policyName: string): Promi
   `);
 }
 
+/** Destructive legacy cleanup — run only when BOOTSTRAP_FORCE_RLS=true (or via SQL migration). */
+async function dropLegacyPolicies(): Promise<void> {
+  logger.warn('RLS: BOOTSTRAP_FORCE_RLS — dropping legacy policies (may hold table locks)');
+  const drops: Array<readonly [string, string]> = [
+    ['products', 'Allow authenticated users to insert products'],
+    ['products', 'Allow authenticated users to update products'],
+    ['products', 'Allow authenticated users to delete products'],
+    ['products', 'Allow public read access to products'],
+    ['orders', 'Users can read their own orders'],
+    ['orders', 'Allow authenticated users to update orders'],
+    ['orders', 'Service role can create orders'],
+    ['orders', 'Allow authenticated users to create orders'],
+    ['contact_messages', 'Only authenticated users can read contact messages'],
+    ['contact_messages', 'Only authenticated users can update contact messages'],
+    ['contact_messages', 'Only authenticated users can delete contact messages'],
+    ['contact_messages', 'Service role can insert contact messages'],
+    ['contact_messages', 'Anyone can submit contact messages'],
+    ['customers', 'Authenticated users can manage customers'],
+    ['activity_logs', 'Admin can read activity logs'],
+    ['activity_logs', 'Service role can insert activity logs'],
+    ['activity_logs', 'Service role can update activity logs'],
+    ['activity_logs', 'Service role can delete activity logs'],
+    ['activity_logs', 'Service role can manage activity logs'],
+    ['reviews', 'Anyone can view approved reviews'],
+    ['reviews', 'Service role can manage all reviews'],
+    ['admin_sessions', 'Service role can manage admin sessions'],
+    ['admin_sessions', 'Allow inserting admin sessions'],
+    ['admin_sessions', 'Allow reading admin sessions'],
+    ['admin_sessions', 'Allow deleting admin sessions'],
+    ['review_votes', 'Service role can manage review votes'],
+  ];
+
+  for (const [table, policy] of drops) {
+    if (!(await tableExists(table))) continue;
+    await sql.unsafe(
+      `DROP POLICY IF EXISTS ${quoteIdent(policy)} ON public.${quoteIdent(table)}`
+    );
+  }
+}
+
+async function ensureRlsIndexes(): Promise<void> {
+  if (await tableExists('coupon_usage')) {
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_coupon_usage_order_id ON coupon_usage(order_id)
+    `;
+  }
+  if (await tableExists('reviews')) {
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_reviews_order_id ON reviews(order_id)
+    `;
+  }
+}
+
+async function ensureUpdateProductRatingFunction(): Promise<void> {
+  await sql`
+    CREATE OR REPLACE FUNCTION public.update_product_rating()
+    RETURNS TRIGGER
+    LANGUAGE plpgsql
+    SET search_path = public
+    AS $fn$
+    DECLARE
+      avg_rating DECIMAL(3,2);
+      total_reviews INTEGER;
+    BEGIN
+      SELECT
+        COALESCE(AVG(rating)::DECIMAL(3,2), 0),
+        COUNT(*)
+      INTO avg_rating, total_reviews
+      FROM public.reviews
+      WHERE product_id = COALESCE(NEW.product_id, OLD.product_id)
+        AND status = 'approved';
+
+      UPDATE public.products
+      SET
+        rating = avg_rating,
+        review_count = total_reviews,
+        updated_at = NOW()
+      WHERE id = COALESCE(NEW.product_id, OLD.product_id);
+
+      RETURN COALESCE(NEW, OLD);
+    END;
+    $fn$
+  `;
+}
+
 /** Idempotent Supabase RLS tighten — backend uses service_role; limits direct PostgREST abuse. */
 export async function ensureRlsPolicies(): Promise<void> {
   const isProduction = process.env.NODE_ENV === 'production';
 
+  if (shouldSkipBootstrapDdl() || (await isRlsMigrationApplied())) {
+    logBootstrapStepSkipped('rls_policies', 'service_role policies already present');
+    return;
+  }
+
   try {
-    await sql`DROP POLICY IF EXISTS "Allow authenticated users to insert products" ON products`;
-    await sql`DROP POLICY IF EXISTS "Allow authenticated users to update products" ON products`;
-    await sql`DROP POLICY IF EXISTS "Allow authenticated users to delete products" ON products`;
-    await sql`DROP POLICY IF EXISTS "Users can read their own orders" ON orders`;
-    await sql`DROP POLICY IF EXISTS "Allow authenticated users to update orders" ON orders`;
-    await sql`DROP POLICY IF EXISTS "Only authenticated users can read contact messages" ON contact_messages`;
-    await sql`DROP POLICY IF EXISTS "Only authenticated users can update contact messages" ON contact_messages`;
-    await sql`DROP POLICY IF EXISTS "Only authenticated users can delete contact messages" ON contact_messages`;
-    await sql`DROP POLICY IF EXISTS "Authenticated users can manage customers" ON customers`;
-    await sql`DROP POLICY IF EXISTS "Admin can read activity logs" ON activity_logs`;
-    await sql`DROP POLICY IF EXISTS "Service role can insert activity logs" ON activity_logs`;
-    await sql`DROP POLICY IF EXISTS "Service role can update activity logs" ON activity_logs`;
-    await sql`DROP POLICY IF EXISTS "Service role can delete activity logs" ON activity_logs`;
-    await sql`DROP POLICY IF EXISTS "Service role can manage activity logs" ON activity_logs`;
-    await sql`DROP POLICY IF EXISTS "Anyone can view approved reviews" ON reviews`;
-    await sql`DROP POLICY IF EXISTS "Service role can manage all reviews" ON reviews`;
-
-    // Lint 0006: drop legacy per-action policies superseded by "Service role manages {table}"
-    await sql`DROP POLICY IF EXISTS "Service role can manage admin sessions" ON admin_sessions`;
-    await sql`DROP POLICY IF EXISTS "Allow inserting admin sessions" ON admin_sessions`;
-    await sql`DROP POLICY IF EXISTS "Allow reading admin sessions" ON admin_sessions`;
-    await sql`DROP POLICY IF EXISTS "Allow deleting admin sessions" ON admin_sessions`;
-    await sql`DROP POLICY IF EXISTS "Service role can insert contact messages" ON contact_messages`;
-    await sql`DROP POLICY IF EXISTS "Anyone can submit contact messages" ON contact_messages`;
-    await sql`DROP POLICY IF EXISTS "Service role can create orders" ON orders`;
-    await sql`DROP POLICY IF EXISTS "Allow authenticated users to create orders" ON orders`;
-    await sql`DROP POLICY IF EXISTS "Service role can manage review votes" ON review_votes`;
-
-    await sql`DROP POLICY IF EXISTS "Allow public read access to products" ON products`;
+    if (process.env.BOOTSTRAP_FORCE_RLS === 'true') {
+      await dropLegacyPolicies();
+    }
 
     for (const table of SERVICE_ROLE_ONLY_TABLES) {
       await enableRowLevelSecurity(table);
@@ -150,64 +228,19 @@ export async function ensureRlsPolicies(): Promise<void> {
     await ensureServiceRolePolicy('contact_messages', 'Service role manages contact_messages');
 
     for (const table of SERVICE_ROLE_ONLY_TABLES) {
-      const policyName = `Service role manages ${table}`;
-      await ensureServiceRolePolicy(table, policyName);
+      await ensureServiceRolePolicy(table, `Service role manages ${table}`);
     }
 
-    await sql`ALTER TABLE IF EXISTS products ENABLE ROW LEVEL SECURITY`;
-    await sql`ALTER TABLE IF EXISTS orders ENABLE ROW LEVEL SECURITY`;
-    await sql`ALTER TABLE IF EXISTS contact_messages ENABLE ROW LEVEL SECURITY`;
+    for (const table of ['products', 'orders', 'contact_messages'] as const) {
+      await enableRowLevelSecurity(table);
+    }
 
     for (const table of CLIENT_REVOKED_TABLES) {
       await revokeClientRoleGrants(table);
     }
 
-    await sql`
-      CREATE INDEX IF NOT EXISTS idx_coupon_usage_order_id ON coupon_usage(order_id)
-    `;
-    await sql`
-      CREATE INDEX IF NOT EXISTS idx_reviews_order_id ON reviews(order_id)
-    `;
-
-    await sql`
-      DROP POLICY IF EXISTS "Service role manages reviews" ON reviews
-    `;
-    await sql`
-      CREATE POLICY "Service role manages reviews" ON reviews
-        FOR ALL
-        USING ((select auth.role()) = 'service_role')
-        WITH CHECK ((select auth.role()) = 'service_role')
-    `;
-
-    await sql`
-      CREATE OR REPLACE FUNCTION public.update_product_rating()
-      RETURNS TRIGGER
-      LANGUAGE plpgsql
-      SET search_path = public
-      AS $fn$
-      DECLARE
-        avg_rating DECIMAL(3,2);
-        total_reviews INTEGER;
-      BEGIN
-        SELECT
-          COALESCE(AVG(rating)::DECIMAL(3,2), 0),
-          COUNT(*)
-        INTO avg_rating, total_reviews
-        FROM public.reviews
-        WHERE product_id = COALESCE(NEW.product_id, OLD.product_id)
-          AND status = 'approved';
-
-        UPDATE public.products
-        SET
-          rating = avg_rating,
-          review_count = total_reviews,
-          updated_at = NOW()
-        WHERE id = COALESCE(NEW.product_id, OLD.product_id);
-
-        RETURN COALESCE(NEW, OLD);
-      END;
-      $fn$
-    `;
+    await ensureRlsIndexes();
+    await ensureUpdateProductRatingFunction();
 
     logger.info('RLS policy migration applied');
   } catch (error) {
