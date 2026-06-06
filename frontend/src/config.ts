@@ -155,7 +155,9 @@ export const apiFetch = async (
         continue;
       }
 
-      if (response.status === 401 && endpoint.includes('/admin')) {
+      const isAdminSessionProbe =
+        endpoint.includes('/admin/verify') || endpoint.includes('/admin/login');
+      if (response.status === 401 && endpoint.includes('/admin') && !isAdminSessionProbe) {
         unauthorizedHandler?.();
       }
 

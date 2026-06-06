@@ -2,6 +2,8 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { useNavigate } from 'react-router-dom';
 import { apiFetch, setUnauthorizedHandler } from '../config';
 
+const ADMIN_DASHBOARD_PATH = '/adminshivamdashboard';
+
 interface AdminAuthContextValue {
   isAuthenticated: boolean | null;
   verify: () => Promise<boolean>;
@@ -43,7 +45,10 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setUnauthorizedHandler(() => {
       setIsAuthenticated(false);
-      navigate('/admin/login', { replace: true });
+      // Only leave the admin dashboard on session expiry — never hijack the storefront.
+      if (window.location.pathname === ADMIN_DASHBOARD_PATH) {
+        navigate('/admin/login', { replace: true });
+      }
     });
     return () => setUnauthorizedHandler(null);
   }, [navigate]);
