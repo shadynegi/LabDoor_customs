@@ -93,17 +93,51 @@ export async function ensureIdempotencyTable(): Promise<void> {
   await ensureIdempotencyIndexes();
 }
 
-/** Safe on every boot — CREATE INDEX IF NOT EXISTS only. */
+async function processingReaperIndexExists(): Promise<boolean> {
+  const rows = await sql`
+    SELECT 1
+    FROM pg_indexes
+    WHERE schemaname = 'public'
+      AND tablename = 'payment_idempotency'
+      AND indexname = 'idx_payment_idempotency_processing_created'
+    LIMIT 1
+  `;
+  return rows.length > 0;
+}
+
+/** Safe on every boot — CREATE INDEX IF NOT EXISTS only (never during maintenance reaper). */
 export async function ensureIdempotencyIndexes(): Promise<void> {
   if (!(await publicTableExists('payment_idempotency'))) return;
 
   await sql`CREATE INDEX IF NOT EXISTS idx_payment_idempotency_expires ON payment_idempotency (expires_at)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_payment_idempotency_operation ON payment_idempotency (operation)`;
-  await sql`
-    CREATE INDEX IF NOT EXISTS idx_payment_idempotency_processing_created
-    ON payment_idempotency (created_at)
+
+  if (await processingReaperIndexExists()) return;
+
+  try {
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_payment_idempotency_processing_created
+      ON payment_idempotency (created_at)
+      WHERE status = 'processing'
+    `;
+    logger.info('Created idx_payment_idempotency_processing_created');
+  } catch (error) {
+    logger.warn(
+      'Could not create partial idempotency index — run migration-payment-idempotency.sql in Supabase:',
+      error
+    );
+  }
+}
+
+async function hasStuckIdempotencyKeys(staleMinutes: number): Promise<boolean> {
+  const rows = await sql`
+    SELECT 1 AS found
+    FROM payment_idempotency
     WHERE status = 'processing'
+      AND created_at < NOW() - ${staleMinutes} * interval '1 minute'
+    LIMIT 1
   `;
+  return rows.length > 0;
 }
 
 export async function claimIdempotencyKey(
@@ -208,25 +242,33 @@ export async function failIdempotencyKey(key: string, operation: string): Promis
 export async function reapStuckIdempotencyKeys(
   staleMinutes = parseInt(process.env.IDEMPOTENCY_STALE_MINUTES || '5', 10)
 ): Promise<number> {
-  const batchSize = parseInt(process.env.IDEMPOTENCY_REAP_BATCH_SIZE || '200', 10);
+  const batchSize = parseInt(process.env.IDEMPOTENCY_REAP_BATCH_SIZE || '50', 10);
+  const maxBatches = parseInt(process.env.IDEMPOTENCY_REAP_MAX_BATCHES || '10', 10);
   let total = 0;
 
   try {
-    await ensureIdempotencyIndexes();
+    if (!(await hasStuckIdempotencyKeys(staleMinutes))) {
+      logger.info('Maintenance: no stuck idempotency keys');
+      return 0;
+    }
 
-    for (;;) {
+    for (let batch = 0; batch < maxBatches; batch++) {
+      // SKIP LOCKED avoids waiting on rows held by in-flight checkouts (Supabase 120s timeout).
       const updated = await sql`
-        UPDATE payment_idempotency
-        SET status = 'failed'
-        WHERE id IN (
+        WITH batch AS (
           SELECT id
           FROM payment_idempotency
           WHERE status = 'processing'
             AND created_at < NOW() - ${staleMinutes} * interval '1 minute'
           ORDER BY created_at ASC
           LIMIT ${batchSize}
+          FOR UPDATE SKIP LOCKED
         )
-        RETURNING id
+        UPDATE payment_idempotency AS p
+        SET status = 'failed'
+        FROM batch
+        WHERE p.id = batch.id
+        RETURNING p.id
       `;
       total += updated.length;
       if (updated.length < batchSize) break;
@@ -243,7 +285,7 @@ export async function reapStuckIdempotencyKeys(
 }
 
 export async function cleanupExpiredIdempotencyKeys(): Promise<void> {
-  const batchSize = parseInt(process.env.IDEMPOTENCY_REAP_BATCH_SIZE || '200', 10);
+  const batchSize = parseInt(process.env.IDEMPOTENCY_REAP_BATCH_SIZE || '50', 10);
   let total = 0;
 
   try {
