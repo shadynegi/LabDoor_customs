@@ -34,7 +34,7 @@ There is **no** public read policy on `products` via PostgREST. Catalog data is 
 
 `migration-revoke-graphql-client-roles.sql` (also applied at boot) revokes `ALL` on all 13 tables from `anon` and `authenticated`, then grants `ALL` to `service_role`. This addresses Supabase linter warnings for unintended GraphQL exposure.
 
-Legacy permissive policies (authenticated product writes, public product read, customer order read, etc.) are dropped at startup.
+Legacy permissive policies (authenticated product writes, public product read, customer order read, etc.) are dropped at startup. Supabase lint **0006** (multiple permissive policies) is addressed by removing older per-action names such as `Service role can create orders` in favor of a single `Service role manages {table}` policy per table; `ensureRlsPolicies()` applies the same drops on boot.
 
 ---
 
@@ -44,7 +44,7 @@ Legacy permissive policies (authenticated product writes, public product read, c
 |------|------|
 | `migration-rls-sensitive-tables.sql` | RLS on runtime-sensitive tables (skips missing tables) |
 | `migration-revoke-graphql-client-roles.sql` | Revoke anon/authenticated; fix `update_product_rating` search_path |
-| `migration-performance-linter-fixes.sql` | FK indexes; consolidate duplicate RLS policies |
+| `migration-performance-linter-fixes.sql` | FK indexes; consolidate duplicate RLS policies (lint 0006) |
 | `migration-rls-tighten.sql` | Reference SQL mirroring boot migration |
 
 Re-run `migration-rls-sensitive-tables.sql` after first production boot if runtime tables (`payment_idempotency`, etc.) were created after the initial SQL run.

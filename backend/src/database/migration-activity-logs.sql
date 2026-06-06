@@ -94,16 +94,14 @@ CREATE POLICY "Service role manages activity_logs" ON activity_logs
   USING ((select auth.role()) = 'service_role')
   WITH CHECK ((select auth.role()) = 'service_role');
 
--- Admin sessions policies
--- Drop any existing policies first
+-- Admin sessions: single service_role policy (lint 0006)
 DROP POLICY IF EXISTS "Allow inserting admin sessions" ON admin_sessions;
 DROP POLICY IF EXISTS "Allow reading admin sessions" ON admin_sessions;
 DROP POLICY IF EXISTS "Allow deleting admin sessions" ON admin_sessions;
 DROP POLICY IF EXISTS "Service role can manage admin sessions" ON admin_sessions;
 
--- Only service_role (backend) can manage admin sessions
--- All session operations go through the backend API which uses service_role
-CREATE POLICY "Service role can manage admin sessions" ON admin_sessions
+DROP POLICY IF EXISTS "Service role manages admin_sessions" ON admin_sessions;
+CREATE POLICY "Service role manages admin_sessions" ON admin_sessions
   FOR ALL
   USING ((select auth.role()) = 'service_role')
   WITH CHECK ((select auth.role()) = 'service_role');
@@ -127,17 +125,22 @@ UPDATE products SET is_out_of_stock = FALSE WHERE is_out_of_stock IS NULL;
 -- Fix overly permissive policies on existing tables
 -- These policies allowed unrestricted INSERT which bypasses RLS security
 
--- Fix contact_messages INSERT policy
+-- contact_messages + orders: single service_role policy each (lint 0006)
 DROP POLICY IF EXISTS "Anyone can submit contact messages" ON contact_messages;
 DROP POLICY IF EXISTS "Service role can insert contact messages" ON contact_messages;
-CREATE POLICY "Service role can insert contact messages" ON contact_messages
-  FOR INSERT WITH CHECK ((select auth.role()) = 'service_role');
+DROP POLICY IF EXISTS "Service role manages contact_messages" ON contact_messages;
+CREATE POLICY "Service role manages contact_messages" ON contact_messages
+  FOR ALL
+  USING ((select auth.role()) = 'service_role')
+  WITH CHECK ((select auth.role()) = 'service_role');
 
--- Fix orders INSERT policy  
 DROP POLICY IF EXISTS "Allow authenticated users to create orders" ON orders;
 DROP POLICY IF EXISTS "Service role can create orders" ON orders;
-CREATE POLICY "Service role can create orders" ON orders
-  FOR INSERT WITH CHECK ((select auth.role()) = 'service_role');
+DROP POLICY IF EXISTS "Service role manages orders" ON orders;
+CREATE POLICY "Service role manages orders" ON orders
+  FOR ALL
+  USING ((select auth.role()) = 'service_role')
+  WITH CHECK ((select auth.role()) = 'service_role');
 
 -- Success message
 SELECT 'Migration completed successfully!' as status;

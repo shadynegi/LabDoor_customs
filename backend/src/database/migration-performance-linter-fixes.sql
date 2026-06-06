@@ -37,3 +37,52 @@ CREATE POLICY "Service role manages reviews" ON public.reviews
   FOR ALL
   USING ((select auth.role()) = 'service_role')
   WITH CHECK ((select auth.role()) = 'service_role');
+
+-- ---------------------------------------------------------------------------
+-- admin_sessions (lint 0006)
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "Service role can manage admin sessions" ON public.admin_sessions;
+DROP POLICY IF EXISTS "Allow inserting admin sessions" ON public.admin_sessions;
+DROP POLICY IF EXISTS "Allow reading admin sessions" ON public.admin_sessions;
+DROP POLICY IF EXISTS "Allow deleting admin sessions" ON public.admin_sessions;
+
+DROP POLICY IF EXISTS "Service role manages admin_sessions" ON public.admin_sessions;
+CREATE POLICY "Service role manages admin_sessions" ON public.admin_sessions
+  FOR ALL
+  USING ((select auth.role()) = 'service_role')
+  WITH CHECK ((select auth.role()) = 'service_role');
+
+-- ---------------------------------------------------------------------------
+-- contact_messages (lint 0006)
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "Service role can insert contact messages" ON public.contact_messages;
+DROP POLICY IF EXISTS "Anyone can submit contact messages" ON public.contact_messages;
+
+DROP POLICY IF EXISTS "Service role manages contact_messages" ON public.contact_messages;
+CREATE POLICY "Service role manages contact_messages" ON public.contact_messages
+  FOR ALL
+  USING ((select auth.role()) = 'service_role')
+  WITH CHECK ((select auth.role()) = 'service_role');
+
+-- ---------------------------------------------------------------------------
+-- orders (lint 0006)
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "Service role can create orders" ON public.orders;
+DROP POLICY IF EXISTS "Allow authenticated users to create orders" ON public.orders;
+
+DROP POLICY IF EXISTS "Service role manages orders" ON public.orders;
+CREATE POLICY "Service role manages orders" ON public.orders
+  FOR ALL
+  USING ((select auth.role()) = 'service_role')
+  WITH CHECK ((select auth.role()) = 'service_role');
+
+-- ---------------------------------------------------------------------------
+-- review_votes (lint 0006)
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "Service role can manage review votes" ON public.review_votes;
+
+DROP POLICY IF EXISTS "Service role manages review_votes" ON public.review_votes;
+CREATE POLICY "Service role manages review_votes" ON public.review_votes
+  FOR ALL
+  USING ((select auth.role()) = 'service_role')
+  WITH CHECK ((select auth.role()) = 'service_role');

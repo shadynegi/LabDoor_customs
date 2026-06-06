@@ -20,7 +20,7 @@ Located in `backend/src/database/`:
 - `migration-rls-sensitive-tables.sql` — RLS on coupons, coupon_usage, payment_idempotency, processed_refund_events (skips tables not created yet)
 - `migration-revoke-graphql-client-roles.sql` — revoke `anon`/`authenticated` grants (fixes GraphQL linter 0026/0027) + fix `update_product_rating` search_path (lint 0011)
 - `migration-order-access-exchange.sql` — one-time order tracking link codes (email; no token in URL)
-- `migration-performance-linter-fixes.sql` — FK indexes (lint 0001) + consolidate duplicate RLS policies on `activity_logs` / `reviews` (lint 0006)
+- `migration-performance-linter-fixes.sql` — FK indexes (lint 0001) + consolidate duplicate RLS policies (lint 0006) on `activity_logs`, `reviews`, `admin_sessions`, `contact_messages`, `orders`, `review_votes`
 
 Runtime tables created/patched at server boot:
 

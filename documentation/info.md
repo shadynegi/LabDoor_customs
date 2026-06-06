@@ -574,6 +574,7 @@ Started on server boot and run on intervals (`maintenanceJobs.ts`):
 - `backend/src/database/migration-*.sql` — incremental migrations
 - Startup applies: `ensureIdempotencyTable()`, `ensureOrderPaymentSchema()`, `ensureCheckoutExchangeTable()`, `ensureRlsPolicies()`
 - `backend/src/database/migration-rls-tighten.sql` — reference SQL for RLS (also applied idempotently at boot)
+- `backend/src/database/migration-performance-linter-fixes.sql` — FK indexes (lint 0001) and single `Service role manages {table}` policy per table (lint 0006) for `activity_logs`, `reviews`, `admin_sessions`, `contact_messages`, `orders`, `review_votes`; also applied at boot via `ensureRlsPolicies()`
 
 ---
 

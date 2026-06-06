@@ -118,6 +118,17 @@ export async function ensureRlsPolicies(): Promise<void> {
     await sql`DROP POLICY IF EXISTS "Anyone can view approved reviews" ON reviews`;
     await sql`DROP POLICY IF EXISTS "Service role can manage all reviews" ON reviews`;
 
+    // Lint 0006: drop legacy per-action policies superseded by "Service role manages {table}"
+    await sql`DROP POLICY IF EXISTS "Service role can manage admin sessions" ON admin_sessions`;
+    await sql`DROP POLICY IF EXISTS "Allow inserting admin sessions" ON admin_sessions`;
+    await sql`DROP POLICY IF EXISTS "Allow reading admin sessions" ON admin_sessions`;
+    await sql`DROP POLICY IF EXISTS "Allow deleting admin sessions" ON admin_sessions`;
+    await sql`DROP POLICY IF EXISTS "Service role can insert contact messages" ON contact_messages`;
+    await sql`DROP POLICY IF EXISTS "Anyone can submit contact messages" ON contact_messages`;
+    await sql`DROP POLICY IF EXISTS "Service role can create orders" ON orders`;
+    await sql`DROP POLICY IF EXISTS "Allow authenticated users to create orders" ON orders`;
+    await sql`DROP POLICY IF EXISTS "Service role can manage review votes" ON review_votes`;
+
     await sql`DROP POLICY IF EXISTS "Allow public read access to products" ON products`;
 
     for (const table of SERVICE_ROLE_ONLY_TABLES) {

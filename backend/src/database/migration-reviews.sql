@@ -94,10 +94,13 @@ CREATE POLICY "Service role manages reviews" ON reviews
   USING ((select auth.role()) = 'service_role')
   WITH CHECK ((select auth.role()) = 'service_role');
 
--- RLS Policies for review_votes
+-- RLS Policies for review_votes (single policy — lint 0006)
 DROP POLICY IF EXISTS "Service role can manage review votes" ON review_votes;
-CREATE POLICY "Service role can manage review votes" ON review_votes
-  FOR ALL USING ((select auth.role()) = 'service_role');
+DROP POLICY IF EXISTS "Service role manages review_votes" ON review_votes;
+CREATE POLICY "Service role manages review_votes" ON review_votes
+  FOR ALL
+  USING ((select auth.role()) = 'service_role')
+  WITH CHECK ((select auth.role()) = 'service_role');
 
 -- Comments
 COMMENT ON TABLE reviews IS 'Customer reviews for products';
