@@ -1541,7 +1541,19 @@ if (require.main === module) {
     });
 }
 
+async function runDeferredBootstrap(): Promise<void> {
+  try {
+    await runBootstrapTask('rls_policies', ensureRlsPolicies);
+    await runBootstrapTask('purge_legacy_admin_sessions', purgeLegacyAdminSessions);
+    await runBootstrapTask('warm_caches', warmCaches);
+    logger.info('Deferred bootstrap complete');
+  } catch (err) {
+    logger.error('Deferred bootstrap failed (dev only, non-fatal):', err);
+  }
+}
+
 async function bootstrap(): Promise<void> {
+  logger.info('Bootstrap started');
   if (process.env.REDIS_URL?.trim()) {
     try {
       await connectRedis();
@@ -1558,9 +1570,21 @@ async function bootstrap(): Promise<void> {
   await runBootstrapTask('order_payment_schema', ensureOrderPaymentSchema);
   await runBootstrapTask('checkout_exchange', ensureCheckoutExchangeTable);
   await runBootstrapTask('order_access_exchange', ensureOrderAccessExchangeTable);
-  await runBootstrapTask('rls_policies', ensureRlsPolicies);
-  await runBootstrapTask('purge_legacy_admin_sessions', purgeLegacyAdminSessions);
-  await runBootstrapTask('warm_caches', warmCaches);
+
+  const blockUntilRls =
+    isProduction || process.env.BOOTSTRAP_BLOCK_UNTIL_RLS === 'true';
+
+  if (blockUntilRls) {
+    await runBootstrapTask('rls_policies', ensureRlsPolicies);
+    await runBootstrapTask('purge_legacy_admin_sessions', purgeLegacyAdminSessions);
+    await runBootstrapTask('warm_caches', warmCaches);
+    return;
+  }
+
+  logger.info(
+    'Bootstrap: core schema ready — API will accept traffic; RLS/cache work continues in background'
+  );
+  void runDeferredBootstrap();
 }
 
 function startHttpServer() {

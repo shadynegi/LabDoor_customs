@@ -3,6 +3,10 @@
   "permissions": {
     "allow": [
       "Shell(**)",
+      "Shell(git)",
+      "Shell(git:*)",
+      "Shell(gh)",
+      "Shell(gh:*)",
       "Mcp(**)",
       "Fetch(**)",
       "Read(**)",

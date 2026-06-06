@@ -808,6 +808,7 @@ Templates: `backend/env.template`, `frontend/env.template`
 | `PENDING_ORDER_TTL_HOURS` | 24 | Abandoned checkout expiry |
 | `IDEMPOTENCY_STALE_MINUTES` | 5 | Stuck idempotency reaper |
 | `DB_STATEMENT_TIMEOUT_MS` | 300000 | Postgres `statement_timeout` per connection (bootstrap DDL on Supabase pooler) |
+| `BOOTSTRAP_BLOCK_UNTIL_RLS` | — | Dev only: set `true` to block API ready until RLS migration finishes (production always waits) |
 | `REQUEST_TIMEOUT_MS` | 60000 | HTTP request timeout |
 | `SLOW_REQUEST_TIMEOUT_MS` | 180000 | Catalog, admin analytics, activity routes |
 | `VITE_API_TIMEOUT_MS` | 60000 | Frontend default `apiFetch` timeout |

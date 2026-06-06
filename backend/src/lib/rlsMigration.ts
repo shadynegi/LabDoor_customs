@@ -50,12 +50,21 @@ function assertAllowedTable(table: string): void {
   }
 }
 
+let publicTablesCache: Set<string> | null = null;
+
+async function loadPublicTables(): Promise<Set<string>> {
+  if (!publicTablesCache) {
+    const rows = await sql`
+      SELECT tablename FROM pg_tables WHERE schemaname = 'public'
+    `;
+    publicTablesCache = new Set(rows.map((r) => String(r.tablename)));
+  }
+  return publicTablesCache;
+}
+
 async function tableExists(table: string): Promise<boolean> {
   assertAllowedTable(table);
-  const rows = await sql`
-    SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = ${table}
-  `;
-  return rows.length > 0;
+  return (await loadPublicTables()).has(table);
 }
 
 async function enableRowLevelSecurity(table: string): Promise<void> {

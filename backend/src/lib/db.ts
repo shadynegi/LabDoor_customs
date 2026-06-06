@@ -168,10 +168,15 @@ export async function runBootstrapTask<T>(
   label: string,
   fn: () => Promise<T>
 ): Promise<T> {
+  const started = Date.now();
+  logger.info(`Bootstrap: starting ${label}`);
   try {
-    return await withRetry(fn, { retries: 3, baseMs: 2000 });
+    const result = await withRetry(fn, { retries: 3, baseMs: 2000 });
+    logger.info(`Bootstrap: finished ${label} (${Date.now() - started}ms)`);
+    return result;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    logger.error(`Bootstrap: failed ${label} after ${Date.now() - started}ms`);
     throw new Error(`Bootstrap step failed (${label}): ${message}`);
   }
 }
