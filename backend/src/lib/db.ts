@@ -10,7 +10,7 @@ dotenv.config();
 const connectionString = process.env.DATABASE_URL;
 
 if (!connectionString) {
-  throw new Error('❌ Missing DATABASE_URL in .env file');
+  throw new Error('Missing DATABASE_URL in .env file');
 }
 
 /** Postgres connection errors worth retrying (transient pool/network). */
@@ -21,6 +21,7 @@ const RETRYABLE_PG_CODES = new Set([
   '57P03', // cannot_connect_now
   '08006', // connection_failure
   '08001', // sqlclient_unable_to_establish_sqlconnection
+  '57014', // query_canceled (statement timeout)
 ]);
 
 const isProduction = process.env.NODE_ENV === 'production';
@@ -71,6 +72,8 @@ function buildSslConfig(): false | { rejectUnauthorized: boolean; ca?: string } 
   return { rejectUnauthorized };
 }
 
+const statementTimeoutMs = parseInt(process.env.DB_STATEMENT_TIMEOUT_MS || '300000', 10);
+
 const sql: Sql = postgres(connectionString, {
   max: maxConnections,
   idle_timeout: 30,
@@ -89,6 +92,9 @@ const sql: Sql = postgres(connectionString, {
       : undefined,
   ssl: buildSslConfig(),
   prepare: !poolerMode,
+  connection: {
+    statement_timeout: statementTimeoutMs,
+  },
 });
 
 export interface WithRetryOptions {
@@ -115,6 +121,7 @@ function isRetryableError(error: unknown): boolean {
     msg.includes('504') ||
     msg.includes('Connection terminated') ||
     msg.includes('CONNECTION_ENDED') ||
+    msg.includes('statement timeout') ||
     msg.includes('timed out')
   );
 }
@@ -154,6 +161,19 @@ export async function withRetry<T>(
   }
 
   throw lastError ?? new Error('Operation failed after retries');
+}
+
+/** Run boot-time schema/RLS tasks with extra retries (slow Supabase pooler). */
+export async function runBootstrapTask<T>(
+  label: string,
+  fn: () => Promise<T>
+): Promise<T> {
+  try {
+    return await withRetry(fn, { retries: 3, baseMs: 2000 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Bootstrap step failed (${label}): ${message}`);
+  }
 }
 
 /** Run async tasks in fixed-size parallel chunks (e.g. bulk inserts). */

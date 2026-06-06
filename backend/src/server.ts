@@ -10,7 +10,8 @@ import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import compression from "compression";
 import { emailService } from './lib/email';
-import sql, { withRetry, getPoolStats } from './lib/db';
+import sql, { withRetry, getPoolStats, runBootstrapTask } from './lib/db';
+import { getLanIPv4Addresses, getPrimaryLanIPv4 } from './lib/lanAddress';
 import { sanitizeCustomerInfo } from './utils/sanitizeCustomer';
 import { clientErrorMessage } from './lib/safeError';
 import {
@@ -1552,14 +1553,14 @@ async function bootstrap(): Promise<void> {
       logger.warn('Redis connection failed (cache/rate limits use fallback):', err);
     }
   }
-  await ensureIdempotencyTable();
-  await ensureActivityLogsTable();
-  await ensureOrderPaymentSchema();
-  await ensureCheckoutExchangeTable();
-  await ensureOrderAccessExchangeTable();
-  await ensureRlsPolicies();
-  await purgeLegacyAdminSessions();
-  await warmCaches();
+  await runBootstrapTask('payment_idempotency', ensureIdempotencyTable);
+  await runBootstrapTask('activity_logs', ensureActivityLogsTable);
+  await runBootstrapTask('order_payment_schema', ensureOrderPaymentSchema);
+  await runBootstrapTask('checkout_exchange', ensureCheckoutExchangeTable);
+  await runBootstrapTask('order_access_exchange', ensureOrderAccessExchangeTable);
+  await runBootstrapTask('rls_policies', ensureRlsPolicies);
+  await runBootstrapTask('purge_legacy_admin_sessions', purgeLegacyAdminSessions);
+  await runBootstrapTask('warm_caches', warmCaches);
 }
 
 function startHttpServer() {
@@ -1575,11 +1576,11 @@ function startHttpServer() {
     });
     if (listenHost) {
       app.listen(PORT, listenHost, () => {
-        logger.info(`📍 HTTP Port: ${PORT} (redirecting to HTTPS)`);
+        logger.info(`HTTP port: ${PORT} (redirecting to HTTPS)`);
       });
     } else {
       app.listen(PORT, () => {
-        logger.info(`📍 HTTP Port: ${PORT} (redirecting to HTTPS)`);
+        logger.info(`HTTP port: ${PORT} (redirecting to HTTPS)`);
       });
     }
     return httpsServer;
@@ -1588,7 +1589,15 @@ function startHttpServer() {
   const onListen = () => {
     logServerBanner('HTTP', PORT, false);
     if (!isProduction && listenHost === '0.0.0.0') {
-      logger.info('📡 LAN: backend reachable at http://<your-ip>:' + PORT);
+      const lanIps = getLanIPv4Addresses();
+      if (lanIps.length > 0) {
+        for (const ip of lanIps) {
+          logger.info(`LAN: backend reachable at http://${ip}:${PORT}`);
+        }
+      } else {
+        const fallback = getPrimaryLanIPv4() ?? 'localhost';
+        logger.info(`LAN: backend reachable at http://${fallback}:${PORT}`);
+      }
     }
   };
 
@@ -1596,17 +1605,15 @@ function startHttpServer() {
 }
 
 function logServerBanner(mode: string, port: number | string, sslEnabled: boolean) {
-  const title = sslEnabled ? '🔒 HTTPS Server Running!' : '🚀 Server Running Successfully!';
-  logger.info('╔════════════════════════════════════════╗');
-  logger.info(`║   ${title.padEnd(36)}║`);
-  logger.info('╚════════════════════════════════════════╝');
-  logger.info(`📍 ${mode} Port: ${port}`);
+  const title = sslEnabled ? 'HTTPS server running' : 'Server running successfully';
+  logger.info(title);
+  logger.info(`${mode} port: ${port}`);
   if (isProduction && !sslEnabled && mode === 'HTTP') {
-    logger.info('⚠️  WARNING: Running in production without SSL!');
+    logger.info('WARNING: Running in production without SSL');
   }
-  logger.info(`🌍 Frontend: ${process.env.FRONTEND_URL || 'http://localhost:5173'}`);
-  logger.info(`💳 PayPal Mode: ${process.env.PAYPAL_MODE || 'sandbox'}`);
-  logger.info(`🔗 PayPal API: ${PAYPAL_API}`);
-  logger.info(`⏰ Started: ${new Date().toLocaleString()}`);
+  logger.info(`Frontend: ${process.env.FRONTEND_URL || 'http://localhost:5173'}`);
+  logger.info(`PayPal mode: ${process.env.PAYPAL_MODE || 'sandbox'}`);
+  logger.info(`PayPal API: ${PAYPAL_API}`);
+  logger.info(`Started: ${new Date().toLocaleString()}`);
 }
 
