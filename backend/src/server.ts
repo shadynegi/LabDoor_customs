@@ -351,18 +351,42 @@ app.use(compression({
   threshold: 1024, // Only compress responses larger than 1KB
 }));
 
-const REQUEST_TIMEOUT_MS = parseInt(process.env.REQUEST_TIMEOUT_MS || '15000', 10);
+const REQUEST_TIMEOUT_MS = parseInt(process.env.REQUEST_TIMEOUT_MS || '60000', 10);
+const SLOW_REQUEST_TIMEOUT_MS = parseInt(
+  process.env.SLOW_REQUEST_TIMEOUT_MS ||
+    process.env.CATALOG_REQUEST_TIMEOUT_MS ||
+    '180000',
+  10
+);
 
-const ACTIVITY_PATHS_NO_TIMEOUT = ['/api/activity/batch', '/api/activity/log'];
+function isCatalogReadRequest(req: Request): boolean {
+  if (req.method !== 'GET') return false;
+  const path = req.path;
+  if (
+    path === '/api/products' ||
+    path === '/api/products/filters' ||
+    path === '/api/products/sitemap-urls'
+  ) {
+    return true;
+  }
+  if (path.startsWith('/api/products/category/')) return true;
+  return /^\/api\/products\/[^/]+$/.test(path);
+}
+
+function isSlowApiRequest(req: Request): boolean {
+  const path = req.path;
+  if (isCatalogReadRequest(req)) return true;
+  if (path === '/api/admin/analytics') return true;
+  if (path === '/api/activity/batch' || path === '/api/activity/log') return true;
+  return false;
+}
 
 app.use((req: Request, res: Response, next: NextFunction) => {
-  if (ACTIVITY_PATHS_NO_TIMEOUT.some((p) => req.path === p || req.path.startsWith(p))) {
-    return next();
-  }
+  const timeoutMs = isSlowApiRequest(req) ? SLOW_REQUEST_TIMEOUT_MS : REQUEST_TIMEOUT_MS;
 
   const sendTimeout = () => {
     if (!res.headersSent) {
-      req.log?.warn({ method: req.method, path: req.path }, 'Request timeout');
+      req.log?.warn({ method: req.method, path: req.path, timeoutMs }, 'Request timeout');
       res.status(504).json({
         success: false,
         error: 'Gateway Timeout',
@@ -371,8 +395,8 @@ app.use((req: Request, res: Response, next: NextFunction) => {
     }
   };
 
-  req.setTimeout(REQUEST_TIMEOUT_MS, sendTimeout);
-  res.setTimeout(REQUEST_TIMEOUT_MS, sendTimeout);
+  req.setTimeout(timeoutMs, sendTimeout);
+  res.setTimeout(timeoutMs, sendTimeout);
   next();
 });
 

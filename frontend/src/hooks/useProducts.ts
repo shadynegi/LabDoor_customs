@@ -1,6 +1,6 @@
 // Custom hook for fetching and managing products
 import { useState, useEffect } from 'react';
-import { apiFetch } from '../config';
+import { catalogFetch } from '../config';
 import { toast } from 'sonner';
 import { logError } from '../lib/logger';
 
@@ -73,7 +73,7 @@ export const useProducts = (): UseProductsResult => {
       setLoading(true);
       setError(null);
 
-      const response = await apiFetch('/products', {
+      const response = await catalogFetch('/products', {
         retry: { count: 2, on: [502, 503, 504] },
       });
       

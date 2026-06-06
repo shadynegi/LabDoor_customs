@@ -405,7 +405,7 @@ At create-payment, a row in `coupon_usage` reserves the coupon for the pending o
 | **CORS** | Whitelist `FRONTEND_URL` + localhost dev origins; no-origin allowed in prod only for `/api/health` and webhook |
 | **Helmet** | CSP (PayPal domains allowed), HSTS in production, frameguard deny, noSniff, XSS filter |
 | **HTTPS** | Production redirect via `x-forwarded-proto`; optional direct SSL via cert env paths |
-| **Request timeout** | 15s default (`REQUEST_TIMEOUT_MS`) |
+| **Request timeout** | 60s default (`REQUEST_TIMEOUT_MS`); slow routes use 180s (`SLOW_REQUEST_TIMEOUT_MS`): `/api/products*`, `/api/admin/analytics`, `/api/activity/*` |
 | **Trust proxy** | Enabled for Railway/load balancers |
 
 ### Input and data protection
@@ -807,7 +807,10 @@ Templates: `backend/env.template`, `frontend/env.template`
 |----------|---------|---------|
 | `PENDING_ORDER_TTL_HOURS` | 24 | Abandoned checkout expiry |
 | `IDEMPOTENCY_STALE_MINUTES` | 5 | Stuck idempotency reaper |
-| `REQUEST_TIMEOUT_MS` | 15000 | HTTP request timeout |
+| `REQUEST_TIMEOUT_MS` | 60000 | HTTP request timeout |
+| `SLOW_REQUEST_TIMEOUT_MS` | 180000 | Catalog, admin analytics, activity routes |
+| `VITE_API_TIMEOUT_MS` | 60000 | Frontend default `apiFetch` timeout |
+| `VITE_EXTENDED_API_TIMEOUT_MS` | 180000 | Frontend `slowApiFetch` (catalog, analytics, activity) |
 | `LOG_LEVEL` | info/debug | Pino log level |
 | `RESEND_API_KEY` | — | Email sender (required in production) |
 | `ORDER_TOKEN_ENCRYPTION_KEY` | — | AES-256-GCM key for checkout exchange token encryption (required in production) |

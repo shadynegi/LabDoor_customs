@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { CheckCircle, Pencil, Plus, RefreshCw, Star, Trash2, X, XCircle } from 'lucide-react';
-import { apiFetch } from '../config';
+import { apiFetch, catalogFetch } from '../config';
 import { toast } from 'sonner';
 import { logError } from '../lib/logger';
 import { useResponsive } from '../hooks/useResponsive';
@@ -97,7 +97,7 @@ export default function AdminReviewsTab() {
 
   const fetchProducts = useCallback(async () => {
     try {
-      const response = await apiFetch('/products?limit=100');
+      const response = await catalogFetch('/products?limit=100');
       const data = await response.json();
       if (data.success) {
         setProducts(

@@ -1,6 +1,6 @@
 // Custom hook for fetching paginated products
 import { useState, useEffect, useCallback } from 'react';
-import { apiFetch } from '../config';
+import { catalogFetch } from '../config';
 import type { Product } from './useProducts';
 import { toast } from 'sonner';
 import { logError } from '../lib/logger';
@@ -68,7 +68,7 @@ export const usePaginatedProducts = (limit: number = 10): UsePaginatedProductsRe
       setLoading(true);
       setError(null);
 
-      const response = await apiFetch(`/products?page=${page}&limit=${limit}`);
+      const response = await catalogFetch(`/products?page=${page}&limit=${limit}`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch products');

@@ -20,10 +20,22 @@ function resolveApiBaseUrl(): string {
   return envUrl;
 }
 
+function parseExtendedApiTimeoutMs(): number {
+  const raw =
+    import.meta.env.VITE_EXTENDED_API_TIMEOUT_MS ||
+    import.meta.env.VITE_CATALOG_TIMEOUT_MS ||
+    '180000';
+  return parseInt(raw, 10);
+}
+
 export const config = {
   apiBaseUrl: resolveApiBaseUrl(),
   backendUrl: import.meta.env.VITE_BACKEND_URL?.trim() || '',
-  apiTimeoutMs: parseInt(import.meta.env.VITE_API_TIMEOUT_MS || '15000', 10),
+  apiTimeoutMs: parseInt(import.meta.env.VITE_API_TIMEOUT_MS || '60000', 10),
+  /** Catalog, analytics, activity — slow on cold Supabase pooler links. */
+  extendedApiTimeoutMs: parseExtendedApiTimeoutMs(),
+  /** @deprecated Use extendedApiTimeoutMs */
+  catalogTimeoutMs: parseExtendedApiTimeoutMs(),
 } as const;
 
 export interface ApiFetchRetryOptions {
@@ -112,7 +124,7 @@ async function refreshCsrfToken(): Promise<void> {
 }
 
 /**
- * API fetch with CSRF, 15s default timeout, optional gateway retry, and CSRF 403 refresh.
+ * API fetch with CSRF, 60s default timeout, optional gateway retry, and CSRF 403 refresh.
  */
 export const apiFetch = async (
   endpoint: string,
@@ -172,3 +184,17 @@ export const apiFetch = async (
 
   throw lastError ?? new Error('API request failed');
 };
+
+/** DB-heavy reads/writes (catalog, analytics, activity) — 180s timeout + one gateway retry. */
+export const slowApiFetch = (
+  endpoint: string,
+  options: ApiFetchOptions = {}
+): Promise<Response> =>
+  apiFetch(endpoint, {
+    timeoutMs: config.extendedApiTimeoutMs,
+    retry: { count: 1, on: [502, 503, 504] },
+    ...options,
+  });
+
+/** @deprecated Use slowApiFetch */
+export const catalogFetch = slowApiFetch;

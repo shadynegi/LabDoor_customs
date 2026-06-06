@@ -52,12 +52,13 @@ Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_
 
 ## Network / timeout errors
 
-**Symptom:** "Request timed out after 15000ms"
+**Symptom:** "Request timed out after 60000ms" (or 180000ms on slow routes)
 
 **Checks:**
 
 1. Backend running and reachable.
-2. `REQUEST_TIMEOUT_MS` on backend (default 15s).
+2. `REQUEST_TIMEOUT_MS` on backend (default 60s). Slow routes use `SLOW_REQUEST_TIMEOUT_MS` (default 180s): `/api/products*`, `/api/admin/analytics`, `/api/activity/*`.
+3. `VITE_EXTENDED_API_TIMEOUT_MS` on frontend for `slowApiFetch` / catalog reads (default 180s). General `apiFetch` default is 60s (`VITE_API_TIMEOUT_MS`).
 3. Database healthy (`GET /api/health`).
 
 ---

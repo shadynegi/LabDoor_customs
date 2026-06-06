@@ -1,5 +1,5 @@
 // Activity tracking utility for user behavior analytics
-import { config, apiFetch } from '../config';
+import { config, slowApiFetch } from '../config';
 import { logDebug } from '../lib/logger';
 import { hasAnalyticsConsent } from '../lib/analytics';
 
@@ -62,7 +62,7 @@ const flushQueue = async () => {
   activityQueue = [];
 
   try {
-    await apiFetch('/activity/batch', {
+    await slowApiFetch('/activity/batch', {
       method: 'POST',
       body: JSON.stringify({ activities }),
     });

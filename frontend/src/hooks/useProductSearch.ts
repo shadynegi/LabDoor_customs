@@ -1,6 +1,6 @@
 // Custom hook for client-side product search (Fuse.js) and filters
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { apiFetch } from '../config';
+import { catalogFetch } from '../config';
 import type { Product } from './useProducts';
 import { CATALOG_CLEARED_EVENT, getProductCatalog } from '../lib/productCatalogCache';
 import {
@@ -97,7 +97,7 @@ export const useProductSearch = (debounceMs: number = 300): UseProductSearchResu
 
     try {
       setLoadingFilterOptions(true);
-      const response = await apiFetch('/products/filters');
+      const response = await catalogFetch('/products/filters');
 
       if (!response.ok) {
         throw new Error('Failed to fetch filter options');

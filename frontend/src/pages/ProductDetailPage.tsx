@@ -3,7 +3,7 @@ import { useState, useEffect, lazy, Suspense } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, ShoppingCart, Package, Shield, Truck, Check, RotateCcw, Image, AlertTriangle } from 'lucide-react';
-import { apiFetch } from '../config';
+import { catalogFetch } from '../config';
 import type { Product } from '../hooks/useProducts';
 import { useCart, type SizeSystem } from './CartContext';
 import StarRating from '../components/StarRating';
@@ -80,7 +80,7 @@ const ProductDetailPage: React.FC = () => {
         setLoading(true);
         setError(null);
 
-        const response = await apiFetch(`/products/${id}`);
+        const response = await catalogFetch(`/products/${id}`);
         
         if (!response.ok) {
           throw new Error('Failed to fetch product');

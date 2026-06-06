@@ -28,7 +28,7 @@ import {
   Send,
   Star,
 } from 'lucide-react';
-import { apiFetch } from '../config';
+import { apiFetch, catalogFetch, slowApiFetch } from '../config';
 import { useResponsive } from '../hooks/useResponsive';
 import { toast } from 'sonner';
 import LiquidModal from '../components/LiquidModal';
@@ -211,9 +211,7 @@ export default function AdminDashboard() {
   const fetchAnalytics = async () => {
     setAnalyticsError(null);
     try {
-      const response = await apiFetch('/admin/analytics', {
-        // Analytics runs many DB queries; allow extra time on slow Supabase pooler links.
-        timeoutMs: 45_000,
+      const response = await slowApiFetch('/admin/analytics', {
         retry: { count: 1, on: [502, 503, 504] },
       });
       const data = await response.json();
@@ -260,7 +258,7 @@ export default function AdminDashboard() {
 
   const fetchProducts = async () => {
     try {
-      const response = await apiFetch('/products?limit=100');
+      const response = await catalogFetch('/products?limit=100');
       const data = await response.json();
       if (data.success) {
         const parsed = (data.data || []).map((p: any) => ({

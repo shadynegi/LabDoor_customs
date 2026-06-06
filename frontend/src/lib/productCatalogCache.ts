@@ -1,4 +1,4 @@
-import { apiFetch } from '../config';
+import { catalogFetch } from '../config';
 import type { Product } from '../hooks/useProducts';
 import blueNikeImg from '../assets/Shoe_Design/blue nike.png';
 import goldBlackNikeImg from '../assets/Shoe_Design/gold black nike.png';
@@ -83,7 +83,7 @@ async function fetchCatalogFromApi(): Promise<Product[]> {
   const allProducts: Product[] = [];
 
   while (true) {
-    const response = await apiFetch(`/products?limit=${limit}&page=${page}`, {
+    const response = await catalogFetch(`/products?limit=${limit}&page=${page}`, {
       retry: { count: 2, on: [502, 503, 504] },
     });
 

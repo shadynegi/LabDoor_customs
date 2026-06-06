@@ -52,7 +52,7 @@ const STATIC_ROUTES = [
 async function fetchProductPaths() {
   try {
     const sitemapRes = await fetch(`${API_BASE}/products/sitemap-urls`, {
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(60000),
     });
 
     if (sitemapRes.ok) {
@@ -72,7 +72,7 @@ async function fetchProductPaths() {
 
     while (page <= totalPages) {
       const res = await fetch(`${API_BASE}/products?limit=100&page=${page}`, {
-        signal: AbortSignal.timeout(15000),
+        signal: AbortSignal.timeout(60000),
       });
       if (!res.ok) break;
 
