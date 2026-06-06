@@ -16,6 +16,7 @@ if (!connectionString) {
 /** Postgres connection errors worth retrying (transient pool/network). */
 const RETRYABLE_PG_CODES = new Set([
   'ECONNRESET',
+  'CONNECTION_ENDED',
   '57P01', // admin_shutdown
   '57P03', // cannot_connect_now
   '08006', // connection_failure
@@ -113,8 +114,14 @@ function isRetryableError(error: unknown): boolean {
     msg.includes('503') ||
     msg.includes('504') ||
     msg.includes('Connection terminated') ||
+    msg.includes('CONNECTION_ENDED') ||
     msg.includes('timed out')
   );
+}
+
+/** Verify pool connectivity after long idle periods (e.g. post-bootstrap). */
+export async function pingDatabase(): Promise<void> {
+  await withRetry(() => sql`SELECT 1`, { retries: 3, baseMs: 500 });
 }
 
 /**

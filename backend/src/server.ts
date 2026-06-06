@@ -411,6 +411,22 @@ app.get('/api/csrf-token', getCsrfTokenHandler);
 
 mountRateLimits(app);
 
+/** False until bootstrap() finishes — tests skip bootstrap and stay ready. */
+let serverReady = process.env.NODE_ENV === 'test';
+
+const STARTUP_ALLOWED_PATHS = new Set(['/api/health', '/health', '/api/csrf-token']);
+
+app.use((req: Request, res: Response, next: NextFunction) => {
+  if (serverReady || STARTUP_ALLOWED_PATHS.has(req.path)) {
+    return next();
+  }
+  res.status(503).json({
+    success: false,
+    error: 'Server starting',
+    message: 'Database migrations are still running. Please retry in a few seconds.',
+  });
+});
+
 // Request logging middleware
 app.use((req: Request, res: Response, next: NextFunction) => {
   req.log?.info({ method: req.method, path: req.path }, 'Incoming request');
@@ -520,6 +536,15 @@ app.get("/health", (req: Request, res: Response) => {
 // Health check - enhanced for production monitoring
 app.get("/api/health", async (req: Request, res: Response) => {
   const startTime = Date.now();
+
+  if (!serverReady) {
+    return res.status(503).json({
+      status: 'STARTING',
+      timestamp: new Date().toISOString(),
+      responseTime_ms: Date.now() - startTime,
+    });
+  }
+
   let dbStatus = "unknown";
   let dbLatency = 0;
   
@@ -1500,11 +1525,14 @@ export { app };
 let server: ReturnType<typeof app.listen> | undefined;
 
 if (require.main === module) {
+  server = startHttpServer();
+  registerGracefulShutdown(server);
+
   bootstrap()
     .then(() => {
+      serverReady = true;
+      logger.info('Bootstrap complete — API ready');
       startMaintenanceJobs();
-      server = startHttpServer();
-      registerGracefulShutdown(server);
     })
     .catch((err) => {
       logger.error('Startup failed:', err);

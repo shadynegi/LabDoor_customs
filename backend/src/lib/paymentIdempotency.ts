@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import sql from './db';
+import sql, { withRetry } from './db';
 import { logger } from './logger';
 
 export type IdempotencyStatus = 'processing' | 'completed' | 'failed';
@@ -183,13 +183,13 @@ export async function reapStuckIdempotencyKeys(
   staleMinutes = parseInt(process.env.IDEMPOTENCY_STALE_MINUTES || '5', 10)
 ): Promise<number> {
   try {
-    const updated = await sql`
+    const updated = await withRetry(() => sql`
       UPDATE payment_idempotency
       SET status = 'failed'
       WHERE status = 'processing'
         AND created_at < NOW() - ${staleMinutes} * interval '1 minute'
       RETURNING id
-    `;
+    `);
     if (updated.length > 0) {
       logger.info(`Reaped ${updated.length} stuck payment idempotency record(s)`);
     }
@@ -202,11 +202,11 @@ export async function reapStuckIdempotencyKeys(
 
 export async function cleanupExpiredIdempotencyKeys(): Promise<void> {
   try {
-    const deleted = await sql`
+    const deleted = await withRetry(() => sql`
       DELETE FROM payment_idempotency
       WHERE expires_at < NOW() AND status != 'processing'
       RETURNING id
-    `;
+    `);
     if (deleted.length > 0) {
       logger.info(`Cleaned up ${deleted.length} expired payment idempotency records`);
     }

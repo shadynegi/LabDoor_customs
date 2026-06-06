@@ -1,4 +1,5 @@
 import { logger } from './logger';
+import { pingDatabase } from './db';
 import { expireStalePendingOrders } from './orderLifecycle';
 import {
   cleanupExpiredIdempotencyKeys,
@@ -6,6 +7,16 @@ import {
 } from './paymentIdempotency';
 import { cleanupExpiredCheckoutExchanges } from './orderCheckoutExchange';
 import { cleanupExpiredOrderAccessExchanges } from './orderAccessExchange';
+
+async function runInitialMaintenance(): Promise<void> {
+  try {
+    await pingDatabase();
+    await expireStalePendingOrders();
+    await reapStuckIdempotencyKeys();
+  } catch (err) {
+    logger.warn('Initial maintenance run skipped (DB not ready):', err);
+  }
+}
 
 export function startMaintenanceJobs(): void {
   const hourMs = 60 * 60 * 1000;
@@ -32,16 +43,13 @@ export function startMaintenanceJobs(): void {
     );
   }, fifteenMinMs);
 
-  // Defer first run so Supabase pooler connections are warm (avoids CONNECTION_ENDED on boot).
-  const deferMs = parseInt(process.env.MAINTENANCE_DEFER_MS || '60000', 10);
+  // Defer first run and ping DB so pooler connections are fresh after bootstrap.
+  const deferMs = parseInt(process.env.MAINTENANCE_DEFER_MS || '120000', 10);
   setTimeout(() => {
-    expireStalePendingOrders().catch((err) =>
-      logger.warn('Stale pending order cleanup failed:', err)
-    );
-    reapStuckIdempotencyKeys().catch((err) =>
-      logger.warn('Stuck idempotency reaper failed:', err)
+    runInitialMaintenance().catch((err) =>
+      logger.warn('Initial maintenance run failed:', err)
     );
   }, deferMs);
 
-  logger.info('Maintenance jobs scheduled (pending orders, idempotency)');
+  logger.info(`Maintenance jobs scheduled (first run in ${deferMs}ms)`);
 }
