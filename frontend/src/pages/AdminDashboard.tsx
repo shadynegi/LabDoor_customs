@@ -212,6 +212,9 @@ export default function AdminDashboard() {
     setAnalyticsError(null);
     try {
       const response = await apiFetch('/admin/analytics', {
+        // Analytics runs many DB queries; allow extra time on slow Supabase pooler links.
+        timeoutMs: 45_000,
+        retry: { count: 1, on: [502, 503, 504] },
       });
       const data = await response.json();
       if (data.success) {
