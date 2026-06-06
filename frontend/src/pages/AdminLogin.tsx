@@ -1,5 +1,5 @@
 // AdminLogin.tsx - Admin login page
-import { useState, useEffect, useId } from 'react';
+import { useState, useEffect, useId, type CSSProperties, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Lock, User, Eye, EyeOff, AlertCircle, Shield } from 'lucide-react';
@@ -8,6 +8,19 @@ import { toast } from 'sonner';
 import LiquidButton from '../components/LiquidButton';
 import { useResponsive } from '../hooks/useResponsive';
 import { useAdminAuth } from '../contexts/AdminAuthContext';
+
+const adminInputStyle: CSSProperties = {
+  width: '100%',
+  background: 'rgba(255, 255, 255, 0.05)',
+  border: '1px solid rgba(255, 255, 255, 0.1)',
+  borderRadius: 12,
+  color: '#ffffff',
+  WebkitTextFillColor: '#ffffff',
+  caretColor: '#ffffff',
+  fontSize: 15,
+  outline: 'none',
+  transition: 'border-color 0.2s, background 0.2s',
+};
 
 export default function AdminLogin() {
   const { isMobile } = useResponsive();
@@ -27,7 +40,7 @@ export default function AdminLogin() {
     }
   }, [isAuthenticated, navigate]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
@@ -166,21 +179,17 @@ export default function AdminLogin() {
               />
               <input
                 id={usernameId}
+                className="admin-login-input"
                 type="text"
+                name="username"
+                autoComplete="username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="Enter username"
                 required
                 style={{
-                  width: '100%',
+                  ...adminInputStyle,
                   padding: '14px 14px 14px 44px',
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  borderRadius: 12,
-                  color: '#ffffff',
-                  fontSize: 15,
-                  outline: 'none',
-                  transition: 'border-color 0.2s, background 0.2s',
                 }}
                 onFocus={(e) => {
                   e.target.style.borderColor = 'rgba(156, 102, 73, 0.5)';
@@ -217,21 +226,17 @@ export default function AdminLogin() {
               />
               <input
                 id={passwordId}
+                className="admin-login-input"
                 type={showPassword ? 'text' : 'password'}
+                name="password"
+                autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter password"
                 required
                 style={{
-                  width: '100%',
+                  ...adminInputStyle,
                   padding: '14px 44px 14px 44px',
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  borderRadius: 12,
-                  color: '#ffffff',
-                  fontSize: 15,
-                  outline: 'none',
-                  transition: 'border-color 0.2s, background 0.2s',
                 }}
                 onFocus={(e) => {
                   e.target.style.borderColor = 'rgba(156, 102, 73, 0.5)';
@@ -340,6 +345,25 @@ export default function AdminLogin() {
           Authorized personnel only
         </p>
       </motion.div>
+      <style>{`
+        .admin-login-input::placeholder,
+        .admin-login-input::-webkit-input-placeholder {
+          color: #c9c9c9;
+          opacity: 1;
+        }
+        .admin-login-input::-moz-placeholder {
+          color: #c9c9c9;
+          opacity: 1;
+        }
+        .admin-login-input:-webkit-autofill,
+        .admin-login-input:-webkit-autofill:hover,
+        .admin-login-input:-webkit-autofill:focus {
+          -webkit-text-fill-color: #ffffff !important;
+          caret-color: #ffffff;
+          box-shadow: 0 0 0 1000px rgba(255, 255, 255, 0.08) inset;
+          transition: background-color 9999s ease-out 0s;
+        }
+      `}</style>
     </div>
   );
 }
