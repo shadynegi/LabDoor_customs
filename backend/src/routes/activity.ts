@@ -154,49 +154,57 @@ router.post('/batch', async (req: Request, res: Response) => {
         continue;
       }
 
-      const clean = sanitizeActivityPayload({
-        sessionId: activity.sessionId,
-        userEmail: activity.userEmail,
-        entityType: activity.entityType,
-        entityId: activity.entityId,
-        entityName: activity.entityName,
-        metadata: activity.metadata,
-        pageUrl: activity.pageUrl,
-        referrer: activity.referrer,
-      });
+      try {
+        const clean = sanitizeActivityPayload({
+          sessionId: activity.sessionId,
+          userEmail: activity.userEmail,
+          entityType: activity.entityType,
+          entityId: activity.entityId,
+          entityName: activity.entityName,
+          metadata: activity.metadata,
+          pageUrl: activity.pageUrl,
+          referrer: activity.referrer,
+        });
 
-      await sql`
-        INSERT INTO activity_logs (
-          session_id, user_email, action_type, entity_type, entity_id,
-          entity_name, metadata, ip_address, user_agent, page_url, referrer
-        ) VALUES (
-          ${clean.sessionId},
-          ${clean.userEmail},
-          ${activity.actionType},
-          ${clean.entityType},
-          ${clean.entityId},
-          ${clean.entityName},
-          ${clean.metadataJson},
-          ${anonymizedIp},
-          ${userAgent},
-          ${clean.pageUrl},
-          ${clean.referrer}
-        )
-      `.catch(() => {});
+        await sql`
+          INSERT INTO activity_logs (
+            session_id, user_email, action_type, entity_type, entity_id,
+            entity_name, metadata, ip_address, user_agent, page_url, referrer
+          ) VALUES (
+            ${clean.sessionId},
+            ${clean.userEmail},
+            ${activity.actionType},
+            ${clean.entityType},
+            ${clean.entityId},
+            ${clean.entityName},
+            ${clean.metadataJson},
+            ${anonymizedIp},
+            ${userAgent},
+            ${clean.pageUrl},
+            ${clean.referrer}
+          )
+        `.catch(() => {});
 
-      if (
-        (activity.actionType === 'product_view' || activity.actionType === 'add_to_cart') &&
-        clean.entityId &&
-        canBumpProductMetric(rawIp, parseInt(clean.entityId, 10))
-      ) {
-        await bumpProductMetric(activity.actionType, clean.entityId);
+        if (
+          (activity.actionType === 'product_view' || activity.actionType === 'add_to_cart') &&
+          clean.entityId &&
+          canBumpProductMetric(rawIp, parseInt(clean.entityId, 10))
+        ) {
+          await bumpProductMetric(activity.actionType, clean.entityId).catch(() => {});
+        }
+      } catch (itemError) {
+        logger.warn('Skipped one activity in batch:', itemError);
       }
     }
 
-    res.json({ success: true });
+    if (!res.headersSent) {
+      res.json({ success: true });
+    }
   } catch (error: unknown) {
     logger.error('Batch activity log error:', error);
-    res.json({ success: true });
+    if (!res.headersSent) {
+      res.json({ success: true });
+    }
   }
 });
 

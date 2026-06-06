@@ -43,6 +43,7 @@ import { warmCaches } from './lib/cacheWarm';
 import { connectRedis, isRedisEnabled, getRedisClient } from './lib/redis';
 import { mountRateLimits } from './middleware/rateLimits';
 import { startMaintenanceJobs } from './lib/maintenanceJobs';
+import { ensureActivityLogsTable } from './lib/activitySchema';
 import { registerGracefulShutdown } from './lib/gracefulShutdown';
 import { syncOrderAfterRefund, isFullRefundAmount, validateAdminRefundAmount } from './lib/refundSync';
 import { buildPayPalRefundDedupeKey } from './lib/refundIdempotency';
@@ -352,7 +353,13 @@ app.use(compression({
 
 const REQUEST_TIMEOUT_MS = parseInt(process.env.REQUEST_TIMEOUT_MS || '15000', 10);
 
+const ACTIVITY_PATHS_NO_TIMEOUT = ['/api/activity/batch', '/api/activity/log'];
+
 app.use((req: Request, res: Response, next: NextFunction) => {
+  if (ACTIVITY_PATHS_NO_TIMEOUT.some((p) => req.path === p || req.path.startsWith(p))) {
+    return next();
+  }
+
   const sendTimeout = () => {
     if (!res.headersSent) {
       req.log?.warn({ method: req.method, path: req.path }, 'Request timeout');
@@ -1494,6 +1501,7 @@ async function bootstrap(): Promise<void> {
     }
   }
   await ensureIdempotencyTable();
+  await ensureActivityLogsTable();
   await ensureOrderPaymentSchema();
   await ensureCheckoutExchangeTable();
   await ensureOrderAccessExchangeTable();
