@@ -38,7 +38,9 @@ If the analytics API fails, the tab shows an error message with a **Retry** butt
 
 ## Products tab
 
-- View all products with stock and status
+- View products with stock and status — **50 per page** with **Load more** and total count (`GET /api/products?limit=50&page=`)
+- Client-side search/filter applies to loaded products; load more to include additional catalog pages
+- Error banner with **Retry** if the product list fails to load
 - Create new products (name, price, images, category, size, color, stock)
 - Edit existing products
 - Delete products
@@ -62,7 +64,7 @@ Data source: `GET /api/orders?page=&limit=50&status=&search=`.
 
 Click an order card to open fulfillment actions:
 
-- **Tracking** — save tracking number, carrier, optional tracking URL
+- **Tracking** — save tracking number, carrier, optional tracking URL, and **estimated delivery** date (`PUT /api/orders/:id`)
 - **Notify shipped** — `POST /api/orders/:id/notify-shipped` (requires tracking number)
 - **Status** — Mark processing, shipped, or delivered (valid transitions enforced)
 - **Mark paid** — prompts for a reason, then `PATCH /api/orders/:id/payment-status` with `completed`, `admin_note` (≥3 chars), and `payment_id` (external reference or capture ID, ≥5 chars); logged to `activity_logs` as `admin_mark_paid`
@@ -94,8 +96,8 @@ If PayPal refund succeeds but DB sync fails, the API returns 502 — reconcile m
 
 Manage discount codes used at checkout (server-side billing via `resolveCouponDiscount`).
 
-- **Quick presets** — create `SAVE5`, `SAVE10`, `SAVE20`, `SAVE25`, `SAVE50` (percentage off)
-- **Custom coupon** — any code + 5–50% discount
+- **Quick presets** — create `SAVE5`, `SAVE10`, `SAVE20`, `SAVE25`, `SAVE50` (percentage off, entire order)
+- **Custom coupon** — any code + 5–50% discount + **scope**: entire order, specific product IDs, or category IDs (`applies_to` / `applies_to_ids` on `POST /api/coupons`)
 - **Edit** — pencil icon opens a modal to update description, max uses, valid-until date, and active status (`PUT /api/coupons/:id`)
 - **Activate / deactivate** — toggle `is_active` without deleting
 - **Delete** — remove unused coupons
@@ -110,8 +112,9 @@ API: `GET/POST/PUT/DELETE /api/coupons`
 
 Contact form submissions from `contact_messages` table.
 
-- View message details
-- Update status: new → read → replied → archived
+- Error banner with **Retry** if the inbox fails to load
+- Click a message to open the detail modal — **new** messages are automatically marked **read** via `PATCH /api/contact/:id/status`
+- Modal actions: **Reply via Email** (mailto), **Mark replied**, **Archive**
 - Bulk status updates via `POST /api/admin/messages/bulk-update`
 
 ---
@@ -138,7 +141,7 @@ Manage customer reviews from the **Reviews** tab.
 - **Quick Approve / Reject** for pending reviews
 - Pagination — 50 reviews per page
 - **Create Review** — modal to add a review with customer name, optional email, product, rating, title, body, status, and verified-purchase badge
-- **Edit** — update any review field or status
+- **Edit** — update any review field, status, or **admin response** (customer-visible reply on the storefront)
 - **Delete** — remove a review permanently
 
 API: `GET /api/reviews`, `POST /api/reviews/admin`, `PATCH /api/reviews/:id`, `DELETE /api/reviews/:id`

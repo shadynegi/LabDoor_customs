@@ -23,7 +23,7 @@ Admin workflows for order fulfillment.
 
 1. Order appears as **processing** after PayPal capture (or after admin **Mark paid** for offline payments).
 2. Open the order in the admin dashboard **Orders** tab → click order card.
-3. Enter tracking number, carrier, and optional tracking URL → **Save tracking**.
+3. Enter tracking number, carrier, optional tracking URL, and optional **estimated delivery** date → **Save tracking** (`PUT /api/orders/:id` includes `estimated_delivery`).
 4. Click **Notify shipped** (`POST /api/orders/:id/notify-shipped`) — requires tracking number.
 5. Use **Mark shipped** / **Mark delivered** for status transitions.
 

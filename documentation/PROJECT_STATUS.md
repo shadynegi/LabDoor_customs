@@ -13,10 +13,11 @@ Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API
 
 | Area | How it works |
 |------|----------------|
-| **Checkout** | Cart in localStorage; PayPal checkout exchange `?code=`; order tracking links use `GET /api/orders/access-exchange/:code` (no token in email URL); capture requires `serverOrderId` + `accessToken`. |
-| **Admin** | Bulk updates max **500** IDs; manual mark paid verifies PayPal capture via API; paid orders cannot cancel without refund; product cards on mobile. |
-| **Activity** | `POST /api/activity/batch` is CSRF-exempt and rate-limited; frontend sends only with analytics cookie consent; IPs anonymized with `IP_SALT`. |
-| **Reviews** | Public responses strip PII (`toPublicReview()`); admin shows email. Eligibility via `POST /api/reviews/check` (email in body). Votes on approved reviews only. |
+| **Checkout** | Cart validation with retry; PayPal `?code=` exchange; capture **409** shows processing UI (polls checkout-context; cart held); checkout email synced to activity on change/blur. |
+| **Orders** | Email links `GET /api/orders/access-exchange/:code`; legacy `?orderNumber=&token=` stripped; partial refresh keeps stale data + warning. |
+| **Admin** | Products paginated (load more); messages mark read on open; coupons support scope; reviews admin response; estimated delivery on orders; tab error/retry states. |
+| **Activity** | Consent-gated batch; `contact_form_submit` on contact success; IPs anonymized with `IP_SALT`. |
+| **Reviews** | `POST /api/reviews/check` on email blur; pending-moderation success copy; vote error toasts; admin `admin_response` editable. |
 | **Mobile** | Sticky CTAs with keyboard lift on checkout; cookie banner top on purchase routes; cart stacked CTA at 320px; OOS hides product sticky bar; admin product cards on phones. |
 
 Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_ENCRYPTION_KEY`, `IP_SALT`, `ADMIN_PASSWORD_HASH`.
@@ -27,9 +28,9 @@ Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_
 
 - Product catalog with filters, pagination, and Fuse.js search
 - Product detail pages with 360° viewer (real video assets or spin placeholder), reviews, and structured data
-- Shopping cart (localStorage) with server price validation on each change
+- Shopping cart (localStorage) with server price validation on each change and **retry** on validation failure
 - PayPal checkout with server-side pricing and coupon validation
-- Payment success page: redeems checkout exchange `?code=`, captures payment, strips sensitive params from URL
+- Payment success page: redeems checkout exchange `?code=`, captures payment; handles **409** reconciliation UI; surfaces expired exchange errors; strips sensitive params from URL on success
 - Customer order lookup at `/orders` via `POST /api/orders/lookup`
 - Contact form, policy pages, cookie consent, GA4 and activity tracking (consent-gated)
 - Mobile sticky CTAs, checkout keyboard offset, responsive layouts — see [MOBILE_RESPONSIVE.md](./MOBILE_RESPONSIVE.md)
@@ -55,11 +56,12 @@ Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_
 - Secure login with HttpOnly session cookie (SHA-256 hashed server-side)
 - Dashboard: analytics, products, orders, coupons, messages, customers, **reviews**
 - Orders: server-side search, pagination, fulfillment modal, bulk status (max 500 IDs, validated transitions), manual mark paid (`admin_note` + `payment_id`, logged to activity)
-- Coupons: presets, custom create, edit modal, activate/deactivate, delete
+- Coupons: presets, custom create with **applies_to** scope, edit modal, activate/deactivate, delete
+- Products: paginated admin list (50/page, load more), error/retry UI
 - Product CRUD and bulk stock updates
-- Contact message inbox
+- Contact message inbox (mark read on open, modal reply/archive actions)
 - Customer soft delete/restore and order history modal
-- **Reviews tab**: moderation UI with customer email (admin-only), quick approve/reject, pagination; public API strips email via `toPublicReview()`
+- **Reviews tab**: moderation UI with customer email (admin-only), admin response field, quick approve/reject, pagination; storefront eligibility check + pending copy; public API strips email via `toPublicReview()`
 
 ---
 
@@ -100,6 +102,6 @@ Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_
 
 ## Testing
 
-- 76 backend Vitest tests (unit + API)
+- 99 automated tests (61 backend unit + 16 API + 22 Playwright UI)
 - Playwright storefront smoke tests (home, products, checkout, contact)
 - Documentation link checker in CI

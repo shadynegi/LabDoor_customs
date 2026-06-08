@@ -13,10 +13,11 @@ Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API
 
 | Area | How it works |
 |------|----------------|
-| **Checkout** | Cart in localStorage; PayPal checkout exchange `?code=`; order tracking links use `GET /api/orders/access-exchange/:code` (no token in email URL); capture requires `serverOrderId` + `accessToken`. |
-| **Admin** | Bulk updates max **500** IDs; manual mark paid verifies PayPal capture via API; paid orders cannot cancel without refund; product cards on mobile. |
-| **Activity** | `POST /api/activity/batch` is CSRF-exempt and rate-limited; frontend sends only with analytics cookie consent; IPs anonymized with `IP_SALT`. |
-| **Reviews** | Public responses strip PII (`toPublicReview()`); admin shows email. Eligibility via `POST /api/reviews/check` (email in body). Votes on approved reviews only. |
+| **Checkout** | Cart validation with retry; PayPal `?code=` exchange; capture **409** → processing UI; checkout email synced to activity on change/blur. |
+| **Orders** | Email links `GET /api/orders/access-exchange/:code`; legacy `?orderNumber=&token=` stripped; partial refresh keeps stale data + warning. 
+| **Admin** | Products paginated (load more); messages mark read on open; coupons scope UI; reviews admin response; estimated delivery; error/retry states. |
+| **Activity** | Consent-gated batch; `contact_form_submit` on contact success. |
+| **Reviews** | `POST /api/reviews/check` on email blur; pending-moderation copy; vote error toasts. |
 | **Mobile** | Sticky CTAs with keyboard lift on checkout; cookie banner top on purchase routes; cart stacked CTA at 320px; OOS hides product sticky bar; admin product cards on phones. |
 
 Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_ENCRYPTION_KEY`, `IP_SALT`, `ADMIN_PASSWORD_HASH`.
@@ -47,8 +48,9 @@ On CSRF 403, `apiFetch` refreshes the token and retries once.
 - [ ] Required fields validated (name, email, subject, message)
 - [ ] Invalid email rejected
 - [ ] Success toast shown on submit
+- [ ] `contact_form_submit` activity event sent when analytics consent granted
 - [ ] Auto-reply email received (if Resend configured)
-- [ ] Message appears in admin inbox
+- [ ] Message appears in admin inbox; opening marks **new** messages as read
 
 ---
 
@@ -59,7 +61,11 @@ On CSRF 403, `apiFetch` refreshes the token and retries once.
 - [ ] Empty cart redirects or shows error
 - [ ] Coupon validation shows correct discount/error
 - [ ] PayPal redirect occurs on valid submission
+- [ ] Checkout email updates activity batch identity on change/blur (with consent)
+- [ ] Cart validation failure shows **Retry validation** on cart page
 - [ ] Server rejects tampered totals (amount mismatch)
+- [ ] Payment success **409** shows processing UI (cart not cleared)
+- [ ] Expired checkout `code` shows explicit error on success page
 
 ---
 
@@ -78,7 +84,10 @@ On CSRF 403, `apiFetch` refreshes the token and retries once.
 - [ ] Product create/edit validates required fields
 - [ ] Order status update succeeds
 - [ ] Cancel order with refund shows confirmation
-- [ ] Contact message status update works
+- [ ] Opening a new contact message marks it read; Mark replied / Archive work in modal
+- [ ] Custom coupon create supports applies_to scope (all / product / category)
+- [ ] Review edit saves admin response visible on storefront
+- [ ] Review form shows eligibility message after email blur; success copy mentions pending moderation
 
 ---
 

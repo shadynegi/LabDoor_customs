@@ -13,7 +13,7 @@ Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API
 
 | Area | How it works |
 |------|----------------|
-| **Checkout** | Cart in localStorage; PayPal checkout exchange `?code=`; order tracking links use `GET /api/orders/access-exchange/:code` (no token in email URL); capture requires `serverOrderId` + `accessToken`. |
+| **Checkout** | `?code=` exchange on success page; **409** → processing UI (polls checkout-context); expired code → explicit error; alternate `?aid=` recovery. |
 | **Admin** | Bulk updates max **500** IDs; manual mark paid verifies PayPal capture via API; paid orders cannot cancel without refund; product cards on mobile. |
 | **Activity** | `POST /api/activity/batch` is CSRF-exempt and rate-limited; frontend sends only with analytics cookie consent; IPs anonymized with `IP_SALT`. |
 | **Reviews** | Public responses strip PII (`toPublicReview()`); admin shows email. Eligibility via `POST /api/reviews/check` (email in body). Votes on approved reviews only. |
@@ -41,6 +41,8 @@ Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_
 
 - Verify `serverOrderId` and `accessToken` sent from frontend.
 - After PayPal redirect, URL should have `?code=...&token=...` (PayPal order ID in `token`, not the order access token). Frontend calls `GET /api/paypal/checkout-exchange/:code` to obtain the access token. Alternate recovery uses `?aid=` with `GET /api/paypal/checkout-context/:paypalOrderId`.
+- **Expired or used `code`:** success page shows an explicit error — customer should use `/orders` lookup or contact support; do not expect capture without a valid exchange or recovery token.
+- **409 after capture:** PayPal may have charged the customer but DB order is not `payment_status=completed` — success page shows “payment received — processing”, polls checkout-context, and does **not** clear the cart until confirmed.
 - Amount mismatch: server auto-refunds and cancels if PayPal captured wrong amount.
 
 ### Webhook not processing

@@ -13,10 +13,10 @@ Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API
 
 | Area | How it works |
 |------|----------------|
-| **Checkout** | Cart in localStorage; PayPal checkout exchange `?code=`; order tracking links use `GET /api/orders/access-exchange/:code` (no token in email URL); capture requires `serverOrderId` + `accessToken`. |
-| **Admin** | Bulk updates max **500** IDs; manual mark paid verifies PayPal capture via API; paid orders cannot cancel without refund; product cards on mobile. |
-| **Activity** | `POST /api/activity/batch` is CSRF-exempt and rate-limited; frontend sends only with analytics cookie consent; IPs anonymized with `IP_SALT`. |
-| **Reviews** | Public responses strip PII (`toPublicReview()`); admin shows email. Eligibility via `POST /api/reviews/check` (email in body). Votes on approved reviews only. |
+| **Checkout** | PayPal checkout exchange `?code=`; capture requires `serverOrderId` + `accessToken`. |
+| **Orders** | Email links: `GET /api/orders/access-exchange/:code`; legacy `?orderNumber=&token=` URLs stripped with warning. |
+| **Activity** | Consent-gated `POST /api/activity/batch`. |
+| **Reviews** | `POST /api/reviews/check` on email blur (storefront). |
 | **Mobile** | Sticky CTAs with keyboard lift on checkout; cookie banner top on purchase routes; cart stacked CTA at 320px; OOS hides product sticky bar; admin product cards on phones. |
 
 Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_ENCRYPTION_KEY`, `IP_SALT`, `ADMIN_PASSWORD_HASH`.
@@ -25,10 +25,11 @@ Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_
 
 ## Customer flow
 
-1. After payment, the customer receives a confirmation email with a tracking link.
-2. Deep link format: `{FRONTEND_URL}/orders?orderNumber={orderNumber}&token={accessToken}`
-3. The customer can also visit `/orders` and enter the order number and access token manually.
-4. Multiple tracked orders are stored in browser `sessionStorage` and refreshed automatically.
+1. After payment, the customer receives a confirmation email with a **one-time tracking link**.
+2. Preferred deep link: `{FRONTEND_URL}/orders?code={exchangeCode}` — redeemed via `GET /api/orders/access-exchange/:code` (returns `orderNumber` + `accessToken`).
+3. The customer can also visit `/orders` and enter the order number and access token manually (`POST /api/orders/lookup`).
+4. Multiple tracked orders are stored in browser `sessionStorage` and refreshed automatically; failed refreshes keep last-known status and show a warning.
+5. **Deprecated:** `{FRONTEND_URL}/orders?orderNumber=...&token=...` — URL is stripped on load; use email link or manual lookup instead.
 
 ---
 

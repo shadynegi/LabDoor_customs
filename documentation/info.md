@@ -106,9 +106,9 @@
 | `/product/:id` | Product detail — 360° viewer (real multi-angle or static placeholder), reviews, JSON-LD, meta tags |
 | `/cart` | Shopping cart (localStorage via `CartContext`) |
 | `/checkout` | Customer/shipping form, coupon validation, PayPal redirect |
-| `/payment/success` | Post-PayPal capture, order confirmation, cart clear |
-| `/payment/cancel` | Abandoned checkout |
-| `/orders` | Customer order lookup (order number + access token via `POST /api/orders/lookup`) |
+| `/payment/success` | Redeems `?code=` via checkout exchange, captures payment; **409** shows “payment received — processing” (polls checkout-context; cart not cleared until confirmed); expired exchange shows explicit error |
+| `/payment/cancel` | Abandoned checkout; clears `pendingOrder`, `paypalReturnCode`, and `checkoutRecovery` from sessionStorage |
+| `/orders` | Customer order lookup (`POST /api/orders/lookup`); email links redeem `?code=` via `GET /api/orders/access-exchange/:code`; legacy `?orderNumber=&token=` URLs are stripped with a deprecation warning |
 | `/contact` | Contact form with CSRF-protected POST |
 | `/about`, `/help` | Static content |
 | `/privacy-policy`, `/terms-of-service`, `/returns-policy`, `/shipping-policy` | Legal pages |
@@ -124,7 +124,9 @@
 
 - Cart state persists in browser localStorage (synced across tabs via `BroadcastChannel`).
 - On every cart change, `POST /api/products/validate-cart` re-validates each line against the database (product exists, current price, stock) and refreshes displayed prices via `REFRESH_PRICES`.
+- Cart page shows validation errors and a **Retry validation** button when network validation fails.
 - Server recalculates all totals at checkout; client totals are validated against server pricing before PayPal order creation.
+- Checkout syncs customer email to activity batches on field change/blur (when analytics consent is granted), not only on initial page load.
 
 ---
 
@@ -139,12 +141,12 @@
 | Tab | Functions |
 |-----|-----------|
 | Analytics | Order/revenue stats, product metrics, customer counts, geo breakdown, GA4/GSC config status; error state with retry |
-| Products | List, create, edit, delete; bulk stock updates; image validation (URL or ≤512KB data URL) |
-| Orders | Paginated list (50/page), **server-side search**, filter by status, bulk status updates (not cancellation); order modal: tracking, notify shipped, status transitions, **mark paid** (PayPal capture verified via API + `admin_note` + `payment_id`), cancel with refund (paid orders cannot cancel without refund) |
-| Coupons | Preset percentage coupons (5/10/20/25/50%), custom codes, **edit** (description, max uses, expiry, active), activate/deactivate, delete |
-| Messages | Contact inbox — read, reply status, archive, bulk updates |
+| Products | Paginated list (50/page, load more, total count); error state with retry; list, create, edit, delete; bulk stock updates; image validation (URL or ≤512KB data URL) |
+| Orders | Paginated list (50/page), **server-side search**, filter by status, bulk status updates (not cancellation); order modal: tracking, carrier, tracking URL, **estimated delivery**, notify shipped, status transitions, **mark paid** (PayPal capture verified via API + `admin_note` + `payment_id`), cancel with refund (paid orders cannot cancel without refund) |
+| Coupons | Preset percentage coupons (5/10/20/25/50%), custom codes with **scope** (`applies_to`: all / product / category + IDs), **edit** (description, max uses, expiry, active), activate/deactivate, delete |
+| Messages | Contact inbox — auto **mark read** on open; modal **Mark replied** / **Archive**; bulk updates; error state with retry |
 | Customers | Aggregated customer list, detail view, soft delete / restore, show deleted toggle |
-| Reviews | List/create/edit/delete; **customer email visible only here**; filter by status; quick approve/reject; pagination (50/page) |
+| Reviews | List/create/edit/delete; **customer email visible only here**; edit modal includes **admin response** (shown on storefront); filter by status; quick approve/reject; pagination (50/page); self-loads (no parent tab skeleton flash) |
 
 **API-only admin features** (no dedicated UI tab): activity log export, PayPal refund/test endpoints.
 
@@ -208,7 +210,7 @@ Payment success page redeems ?code= via GET /api/paypal/checkout-exchange/:code
 7. `completeOrderPaymentCapture` sets `payment_status=completed`, `status=processing`, stores `paypal_capture_id`.
 8. Upserts customer aggregate stats (only after successful capture).
 9. Sends order confirmation email; caches idempotency response for safe retries.
-10. Returns **409** if PayPal capture succeeds but the order is not `payment_status=completed` in the database (prevents false-success UI).
+10. Returns **409** if PayPal capture succeeds but the order is not `payment_status=completed` in the database (prevents false-success UI). The payment success page shows a processing state, polls `GET /api/paypal/checkout-context/:paypalOrderId`, and does **not** clear the cart until reconciliation completes.
 
 ### Checkout exchange (PayPal return)
 
@@ -284,7 +286,9 @@ Statuses: `processing`, `completed`, `failed`. Stuck `processing` rows are reape
 
 - Each order receives a 64-character hex **access token** at creation; only a SHA-256 hash is stored.
 - Confirmation emails use a **one-time tracking link** (`/orders?code=...`) redeemed via `GET /api/orders/access-exchange/:code` — no long-lived token in the URL.
+- Legacy deep links with `?orderNumber=&token=` in the URL are deprecated: the storefront strips them and shows a warning; customers enter credentials manually or use a fresh email link.
 - Customer lookup: `POST /api/orders/lookup` with `{ orderNumber, accessToken }` in the JSON body.
+- Tracked orders in `sessionStorage` auto-refresh; partial refresh failures keep last-known order data and show a non-blocking warning.
 - Alternate lookup: `GET /api/orders/number/:orderNumber` with `X-Order-Access-Token` header only.
 - Access token is also required for payment capture and checkout context recovery.
 - Public listing of orders by email is blocked (`GET /api/orders/customer/:email` is admin-only).
@@ -339,9 +343,11 @@ At create-payment, a row in `coupon_usage` reserves the coupon for the pending o
 
 - **Public API** (`GET /api/reviews/product/:productId`, `POST /api/reviews`, `POST /api/reviews/:id/vote`): responses pass through `toPublicReview()` in `backend/src/lib/reviewHelpers.ts`, which **omits `customer_email`**, `order_id`, `status`, and other internal fields. Storefront shows reviewer **name** only.
 - **Admin API** (`GET /api/reviews`, `POST /api/reviews/admin`, `PATCH /api/reviews/:id`) returns full rows including **`customer_email`** for moderation and the admin **Reviews** tab.
-- Public submit: rate-limited; new reviews always start as `pending`; email format and product existence validated server-side.
-- Votes: rate-limited; **only `approved` reviews** accept helpful/not-helpful votes.
-- `POST /api/reviews/check` (email in JSON body) returns only `{ can_review: boolean }`. Legacy `GET .../:email` is deprecated (PII in URL).
+- Public submit: rate-limited; new reviews always start as `pending`; success copy tells customers the review is **pending moderation**; email format and product existence validated server-side.
+- Storefront **ReviewForm** calls `POST /api/reviews/check` on email blur before submit (generic eligibility message; avoids email enumeration in URLs).
+- Votes: rate-limited; **only `approved` reviews** accept helpful/not-helpful votes; vote failures show a toast; buttons disable after a successful vote.
+- `POST /api/reviews/check` (email in JSON body) returns `{ can_review, message }`. Legacy `GET .../:email` is deprecated (PII in URL).
+- Admin can set **`admin_response`** on edit (`PATCH /api/reviews/:id`); displayed on the public product page for approved reviews.
 - Voter identity for helpful votes is a server-derived daily hash from client IP + `IP_SALT` (not client-supplied).
 - Verified purchase flag when reviewer email matches a completed order for that product.
 - Admin dashboard: list, create, edit, delete, quick approve/reject, status filter, pagination.
@@ -351,7 +357,8 @@ At create-payment, a row in `coupon_usage` reserves the coupon for the pending o
 
 - `POST /api/contact` — rate-limited, CSRF-protected.
 - Stores message in `contact_messages`; sends auto-reply via Resend.
-- Admin inbox in dashboard with status workflow: new → read → replied → archived.
+- Successful submit emits `contact_form_submit` activity event (consent-gated).
+- Admin inbox in dashboard with status workflow: new → read → replied → archived; opening a **new** message marks it read via `PATCH /api/contact/:id/status`.
 
 ---
 
@@ -359,7 +366,8 @@ At create-payment, a row in `coupon_usage` reserves the coupon for the pending o
 
 ### Client activity tracking
 
-- Frontend batches page views, cart actions, and checkout events to `POST /api/activity/batch` only when analytics cookie consent is granted (`hasAnalyticsConsent()`). Checkout email is stored in `sessionStorage` only when consent is granted (`setUserEmail`); cleared on cookie reject.
+- Frontend batches page views, cart actions, checkout events, and **contact form submit** to `POST /api/activity/batch` only when analytics cookie consent is granted (`hasAnalyticsConsent()`). Checkout email is stored in `sessionStorage` only when consent is granted (`setUserEmail` on checkout email change/blur); cleared on cookie reject.
+- Declared but optional (not yet wired on all UI surfaces): `size_select`, `quantity_change`, `checkout_complete` as separate events beyond existing purchase tracking.
 - `POST /api/activity/batch` is **CSRF-exempt** (supports `sendBeacon`) and rate-limited separately; max **20** events per batch.
 - IP addresses anonymized with daily-salted SHA-256 (`IP_SALT`); stored as `anon_{hash}`.
 - `product_view` and `add_to_cart` events can bump product metrics when `canBumpProductMetric()` allows (per-IP per-product rate limit).
@@ -987,6 +995,7 @@ npm run links:check
 | Frontend E2E / UI | Playwright | Storefront smoke, products/cart/checkout/contact UI, navigation, cookie consent, mobile viewport (22 tests; mocked API) |
 
 **Total automated tests:** 99 (61 backend unit + 16 API + 22 Playwright UI).
+
 | Link check | Custom script | Documentation internal links |
 
 API tests mock the database layer (`Tests/setup.ts`) for fast isolated runs.

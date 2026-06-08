@@ -14,11 +14,13 @@
 |------|----------|
 | Monorepo | `frontend/` (React/Vite), `backend/` (Express), `Tests/` (Vitest + Playwright) |
 | Production | One Express process: `/api/*` + built SPA; Supabase PostgreSQL via service_role |
-| Checkout | Server-bound PayPal orders; checkout exchange `code` on return; capture needs `serverOrderId` + `accessToken` |
-| Cart | `POST /api/products/validate-cart` on item changes; Fuse search catalog cache (3 min TTL) |
-| RLS | 13 tables service_role-only; no public PostgREST product read |
-| Activity | Consent-gated batch logging; CSRF-exempt `/activity/batch`; IP anonymized |
-| Admin | Bulk max 500 IDs; validated status transitions; manual paid needs `admin_note` + `payment_id` |
+| Checkout | Server-bound PayPal orders; `?code=` exchange; capture **409** processing UI; email synced to activity on change/blur |
+| Cart | `POST /api/products/validate-cart` on item changes with retry; Fuse search catalog cache (15 min TTL) |
+| Orders | Email `?code=` access exchange; legacy URL tokens deprecated; partial refresh keeps stale data |
+| RLS | 14 tables service_role-only; no public PostgREST product read |
+| Activity | Consent-gated batch; `contact_form_submit`; CSRF-exempt `/activity/batch`; IP anonymized |
+| Admin | Products paginated; messages read-on-open; coupon scope; review admin response; estimated delivery |
+| Reviews | `POST /api/reviews/check` on email blur; pending-moderation copy; vote error toasts |
 | Mobile | Sticky CTAs, visualViewport keyboard offset, body scroll containment |
 
 ---

@@ -34,7 +34,7 @@ Mutating requests require CSRF token (`X-CSRF-Token` header + cookie) except Pay
 |--------|------|------|-------------|
 | POST | `/paypal/webhook` | PayPal signature | Webhook handler (raw JSON body) |
 | POST | `/paypal/create-payment` | Public + CSRF | Create pending order + PayPal checkout |
-| POST | `/paypal/capture-payment/:orderId` | Order token + CSRF | Capture approved payment; **409** if PayPal succeeds but order is not `payment_status=completed` |
+| POST | `/paypal/capture-payment/:orderId` | Order token + CSRF | Capture approved payment; **409** if PayPal succeeds but order is not `payment_status=completed` (storefront shows processing UI, polls checkout-context, does not clear cart) |
 | GET | `/paypal/checkout-exchange/:code` | Public | Atomically redeem one-time checkout code → `accessToken` |
 | GET | `/paypal/checkout-context/:paypalOrderId` | Order token | Checkout recovery when exchange code is unavailable |
 | POST | `/paypal/refund/:captureId` | Admin | Refund capture (partial or full) |
@@ -116,7 +116,7 @@ Headers: `X-Idempotency-Key` (PayPal order ID or client key), `X-CSRF-Token`
 | GET | `/number/:orderNumber` | Token or admin | Lookup by order number (`X-Order-Access-Token` header) |
 | GET | `/customer/:email` | Admin | Customer order history |
 | GET | `/:id` | Token or admin | Single order |
-| PUT | `/:id` | Admin | Update fulfillment fields (not payment_status) |
+| PUT | `/:id` | Admin | Update fulfillment fields including `estimated_delivery` (not payment_status) |
 | PATCH | `/:id/status` | Admin | Update order status |
 | PATCH | `/:id/payment-status` | Admin | Mark paid: `admin_note` + `payment_id`; **PayPal capture verified** via API before update |
 | POST | `/:id/cancel` | Admin | Cancel order; **paid orders require refund** (`process_refund: true`) |
@@ -161,7 +161,7 @@ Headers: `X-Idempotency-Key` (PayPal order ID or client key), `X-CSRF-Token`
 | POST | `/use` | — | **410 Gone** |
 | GET | `/` | Admin | List coupons |
 | GET | `/:id` | Admin | Single coupon |
-| POST | `/` | Admin | Create coupon |
+| POST | `/` | Admin | Create coupon (`applies_to`: `all` \| `product` \| `category`, optional `applies_to_ids`) |
 | PUT | `/:id` | Admin | Update coupon (code, description, discount, `max_uses`, `valid_until`, `is_active`, etc.) |
 | PATCH | `/:id/toggle` | Admin | Toggle active |
 | DELETE | `/:id` | Admin | Delete coupon |
@@ -178,7 +178,7 @@ Public list/submit/vote responses use `toPublicReview()` — **`customer_email`,
 | GET | `/product/:productId` | Public | Approved reviews (PII stripped) |
 | POST | `/` | Public | Submit review — always `pending`; response PII stripped |
 | POST | `/:id/vote` | Public + CSRF | Vote on **approved** reviews only (rate-limited; voter ID derived server-side from IP) |
-| POST | `/check` | Public + CSRF | Body: `{ product_id, email }` → `{ can_review: boolean }` |
+| POST | `/check` | Public + CSRF | Body: `{ product_id, email }` → `{ can_review, message }` — called from storefront ReviewForm on email blur |
 | GET | `/` | Admin | All reviews **including `customer_email`** |
 | POST | `/admin` | Admin + CSRF | Create review |
 | PATCH | `/:id` | Admin + CSRF | Edit fields or approve/reject |
@@ -245,6 +245,22 @@ Error:
 ```json
 { "success": false, "error": "message", "message": "details" }
 ```
+
+---
+
+## Storefront integration notes
+
+How the React SPA uses these APIs (see also [`info.md`](info.md)):
+
+| Flow | Frontend behavior |
+|------|-------------------|
+| Cart | `POST /products/validate-cart` on cart changes; **Retry validation** on network failure |
+| Checkout | `setUserEmail` on email change/blur (consent-gated); `POST /paypal/create-payment` with idempotency key |
+| Payment success | Redeem `GET /paypal/checkout-exchange/:code`; capture with `serverOrderId` + `accessToken`; **409** → processing UI + poll `GET /paypal/checkout-context/:paypalOrderId` (cart not cleared) |
+| Orders | `GET /orders/access-exchange/:code` for email links; `POST /orders/lookup` for manual entry; legacy `?orderNumber=&token=` stripped |
+| Reviews | `POST /reviews/check` on email blur; submit shows pending-moderation copy; vote errors via toast |
+| Contact | `POST /contact` + `contact_form_submit` activity when consented |
+| Admin | Products 50/page load-more; messages mark read on open (`PATCH /contact/:id/status`); coupons `applies_to` on create; `admin_response` on review edit; `estimated_delivery` on order PUT |
 
 ---
 

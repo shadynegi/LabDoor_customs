@@ -13,10 +13,11 @@ Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API
 
 | Area | How it works |
 |------|----------------|
-| **Checkout** | Cart in localStorage; PayPal checkout exchange `?code=`; order tracking links use `GET /api/orders/access-exchange/:code` (no token in email URL); capture requires `serverOrderId` + `accessToken`. |
-| **Admin** | Bulk updates max **500** IDs; manual mark paid verifies PayPal capture via API; paid orders cannot cancel without refund; product cards on mobile. |
-| **Activity** | `POST /api/activity/batch` is CSRF-exempt and rate-limited; frontend sends only with analytics cookie consent; IPs anonymized with `IP_SALT`. |
-| **Reviews** | Public responses strip PII (`toPublicReview()`); admin shows email. Eligibility via `POST /api/reviews/check` (email in body). Votes on approved reviews only. |
+| **Checkout** | Cart validation with retry; `?code=` exchange on success page; **409** → processing UI + checkout-context poll (cart not cleared); expired code → explicit error. |
+| **Orders** | `GET /api/orders/access-exchange/:code` for email links; legacy URL tokens deprecated. |
+| **Admin** | Bulk updates max **500** IDs; manual mark paid verifies PayPal capture via API; paid orders cannot cancel without refund. |
+| **Activity** | Consent-gated batch including `contact_form_submit`. |
+| **Reviews** | `POST /api/reviews/check` on email blur; pending-moderation success copy. |
 | **Mobile** | Sticky CTAs with keyboard lift on checkout; cookie banner top on purchase routes; cart stacked CTA at 320px; OOS hides product sticky bar; admin product cards on phones. |
 
 Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_ENCRYPTION_KEY`, `IP_SALT`, `ADMIN_PASSWORD_HASH`.
@@ -38,7 +39,10 @@ Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_
 3. Click PayPal — redirected to sandbox PayPal.
 4. Log in with sandbox buyer credentials and approve.
 5. Redirected to `/payment/success?code=...&token=...` — frontend redeems `code` via `GET /api/paypal/checkout-exchange/:code` to obtain the access token, then capture runs automatically.
-6. Verify order in admin dashboard (`payment_status: completed`).
+6. On success: cart clears, confirmation UI, URL stripped to `/payment/success`.
+7. If capture returns **409**: processing UI appears (cart unchanged); page polls checkout-context until order completes or user visits `/orders`.
+8. If exchange `code` is expired/used: explicit error with order lookup / support guidance (alternate recovery: `?aid=` + checkout-context when available).
+9. Verify order in admin dashboard (`payment_status: completed`).
 
 ---
 
