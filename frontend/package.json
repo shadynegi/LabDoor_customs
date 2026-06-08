@@ -19,7 +19,7 @@
     "@sentry/react": "^10.55.0",
     "country-list": "^2.4.1",
     "framer-motion": "^12.23.24",
-    "fuse.js": "^7.3.0",
+    "fuse.js": "^7.4.2",
     "liquid-web": "^1.1.1",
     "lucide-react": "^0.553.0",
     "react": "^19.2.0",
