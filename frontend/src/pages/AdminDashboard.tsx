@@ -1092,7 +1092,7 @@ export default function AdminDashboard() {
           <input type="text" placeholder="Search orders..." value={orderSearch} onChange={(e) => setOrderSearch(e.target.value)}
             style={{ width: '100%', padding: '10px 12px 10px 40px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14 }} />
         </div>
-        <select value={orderStatusFilter} onChange={(e) => { setOrderStatusFilter(e.target.value); setOrdersPage(1); fetchOrders(1); }}
+        <select value={orderStatusFilter} onChange={(e) => { setOrderStatusFilter(e.target.value); setOrdersPage(1); fetchOrders(1, orderSearch); }}
           style={{ padding: '10px 16px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14 }}>
           <option value="all">All Status</option>
           <option value="pending">Pending</option>

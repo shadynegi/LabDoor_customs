@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   generateOrderAccessToken,
+  getOrderAccessTokenFromRequest,
   hashOrderAccessToken,
   orderAccessMatches,
   stripOrderSecrets,
@@ -23,6 +24,20 @@ describe('orderTokens', () => {
   it('hashes tokens deterministically', () => {
     const token = 'abc123';
     expect(hashOrderAccessToken(token)).toBe(hashOrderAccessToken(token));
+  });
+
+  it('reads access token from header or legacy aid query', () => {
+    const headerReq = {
+      headers: { 'x-order-access-token': 'header-token' },
+      query: {},
+    } as Parameters<typeof getOrderAccessTokenFromRequest>[0];
+    expect(getOrderAccessTokenFromRequest(headerReq)).toBe('header-token');
+
+    const queryReq = {
+      headers: {},
+      query: { aid: 'query-token' },
+    } as Parameters<typeof getOrderAccessTokenFromRequest>[0];
+    expect(getOrderAccessTokenFromRequest(queryReq)).toBe('query-token');
   });
 
   it('strips access_token_hash from API payloads', () => {

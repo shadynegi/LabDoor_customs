@@ -28,7 +28,7 @@ const backgroundMap: Record<string, string> = {
 };
 
 const CACHE_KEY = 'ldc_product_catalog_v1';
-const CACHE_TTL_MS = 3 * 60 * 1000;
+const CACHE_TTL_MS = 15 * 60 * 1000;
 
 interface CachedCatalog {
   fetchedAt: number;

@@ -511,7 +511,8 @@ const ReviewList: React.FC<ReviewListProps> = ({ productId, onWriteReview }) => 
                       borderRadius: 6,
                       fontSize: 12,
                       color: '#6b7280',
-                      cursor: 'pointer',
+                      cursor: votedReviewIds.has(review.id) ? 'not-allowed' : 'pointer',
+                      opacity: votedReviewIds.has(review.id) ? 0.6 : 1,
                     }}
                   >
                     <ThumbsDown size={12} />

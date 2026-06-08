@@ -113,7 +113,7 @@ Headers: `X-Idempotency-Key` (PayPal order ID or client key), `X-CSRF-Token`
 | GET | `/access-exchange/:code` | Public | Redeem one-time email tracking link → `{ orderNumber, accessToken, serverOrderId }` |
 | GET | `/` | Admin | List orders — `?status=&payment_status=&page=&search=` (`search` matches order number, email, or name) |
 | GET | `/stats/summary` | Admin | Order/revenue statistics |
-| GET | `/number/:orderNumber` | Token or admin | Lookup by order number (`X-Order-Access-Token` header) |
+| GET | `/number/:orderNumber` | Token or admin | Lookup by order number (`X-Order-Access-Token` header or legacy `?aid=` query) |
 | GET | `/customer/:email` | Admin | Customer order history |
 | GET | `/:id` | Token or admin | Single order |
 | PUT | `/:id` | Admin | Update fulfillment fields including `estimated_delivery` (not payment_status) |
@@ -131,6 +131,8 @@ Headers: `X-Idempotency-Key` (PayPal order ID or client key), `X-CSRF-Token`
   "accessToken": "64-char-hex"
 }
 ```
+
+Wrong order number, missing token, or invalid token all return **404** `{ "error": "Order not found or invalid credentials" }` (anti-enumeration).
 
 ### Payment status body (manual mark paid)
 
@@ -204,7 +206,7 @@ Public list/submit/vote responses use `toPublicReview()` — **`customer_email`,
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | POST | `/log` | Public + CSRF | Log single event |
-| POST | `/batch` | Public (CSRF-exempt) | Log up to 20 events per request (rate-limited; frontend consent-gated) |
+| POST | `/batch` | Public (CSRF-exempt) | Log up to 20 events per request (rate-limited; frontend consent-gated). Allowed types: `page_view`, `product_view`, `add_to_cart`, `remove_from_cart`, `checkout_start`, `checkout_complete`, `purchase_complete`, `search`, `filter_apply`, `contact_submit`, `size_select`, `quantity_change` |
 | GET | `/logs` | Admin | Query logs |
 | GET | `/stats` | Admin | Activity statistics |
 | GET | `/export` | Admin | Export logs |
@@ -259,8 +261,8 @@ How the React SPA uses these APIs (see also [`info.md`](info.md)):
 | Payment success | Redeem `GET /paypal/checkout-exchange/:code`; capture with `serverOrderId` + `accessToken`; **409** → processing UI + poll `GET /paypal/checkout-context/:paypalOrderId` (cart not cleared) |
 | Orders | `GET /orders/access-exchange/:code` for email links; `POST /orders/lookup` for manual entry; legacy `?orderNumber=&token=` stripped |
 | Reviews | `POST /reviews/check` on email blur; submit shows pending-moderation copy; vote errors via toast |
-| Contact | `POST /contact` + `contact_form_submit` activity when consented |
-| Admin | Products 50/page load-more; messages mark read on open (`PATCH /contact/:id/status`); coupons `applies_to` on create; `admin_response` on review edit; `estimated_delivery` on order PUT |
+| Contact | `POST /contact` + `contact_submit` activity when consented |
+| Admin | Products 50/page load-more; messages mark read on open (`PATCH /contact/:id/status`); coupons `applies_to` on create **and edit**; product image upload max **512 KB**; `admin_response` on review edit; `estimated_delivery` on order PUT |
 
 ---
 

@@ -2,7 +2,7 @@ import React, { createContext, useContext, useReducer, useEffect, useRef, useSta
 import type { ReactNode } from 'react';
 import { toast } from 'sonner';
 import { logError, logDebug } from '../lib/logger';
-import { trackAddToCart, trackRemoveFromCart } from '../utils/activityTracker';
+import { trackAddToCart, trackRemoveFromCart, trackQuantityChange } from '../utils/activityTracker';
 import { apiFetch } from '../config';
 
 export type SizeSystem = "UK" | "US" | "EU";
@@ -391,14 +391,30 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     dispatch({ type: 'REMOVE_ITEM', payload: { id, size } });
   };
 
+  const findCartLine = (id: number, size?: ShoeSize) =>
+    state.items.find(
+      (item) =>
+        item.id === id &&
+        item.size?.system === size?.system &&
+        item.size?.value === size?.value
+    );
+
   const incrementQuantity = (id: number, size?: ShoeSize) => {
     userActionRef.current = true;
+    const item = findCartLine(id, size);
     dispatch({ type: 'INCREMENT', payload: { id, size } });
+    if (item) {
+      trackQuantityChange(item.id, item.name, item.quantity + 1);
+    }
   };
 
   const decrementQuantity = (id: number, size?: ShoeSize) => {
     userActionRef.current = true;
+    const item = findCartLine(id, size);
     dispatch({ type: 'DECREMENT', payload: { id, size } });
+    if (item && item.quantity > 1) {
+      trackQuantityChange(item.id, item.name, item.quantity - 1);
+    }
   };
 
   const clearCart = () => {

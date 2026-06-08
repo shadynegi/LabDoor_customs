@@ -37,21 +37,10 @@ function parseOrderRow(order: Record<string, unknown>) {
   });
 }
 
-function unauthorizedOrderAccess(res: Response, message?: string) {
-  return res.status(401).json({
+function orderAccessDenied(res: Response) {
+  return res.status(404).json({
     success: false,
-    error: 'Token required',
-    message:
-      message ||
-      'Provide the access token via X-Order-Access-Token header or use the tracking link from your confirmation email.',
-  });
-}
-
-function forbiddenOrderAccess(res: Response) {
-  return res.status(401).json({
-    success: false,
-    error: 'Invalid access token',
-    message: 'The access token does not match this order.',
+    error: 'Order not found or invalid credentials',
   });
 }
 
@@ -280,12 +269,8 @@ router.post('/lookup', async (req: Request, res: Response) => {
       LIMIT 1
     `;
 
-    if (!order?.length) {
-      return res.status(404).json({ success: false, error: 'Order not found' });
-    }
-
-    if (!orderAccessMatches(order[0].access_token_hash, accessToken.trim())) {
-      return forbiddenOrderAccess(res);
+    if (!order?.length || !orderAccessMatches(order[0].access_token_hash, accessToken.trim())) {
+      return orderAccessDenied(res);
     }
 
     res.json({
@@ -306,7 +291,7 @@ router.get('/number/:orderNumber', async (req: Request, res: Response) => {
     const accessToken = getOrderAccessTokenFromRequest(req);
 
     if (!isAdmin && !accessToken) {
-      return unauthorizedOrderAccess(res);
+      return orderAccessDenied(res);
     }
 
     const order = await sql`
@@ -315,17 +300,11 @@ router.get('/number/:orderNumber', async (req: Request, res: Response) => {
       LIMIT 1
     `;
 
-    if (!order || order.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: 'Order not found',
-      });
-    }
-
-    if (!isAdmin) {
-      if (!orderAccessMatches(order[0].access_token_hash, accessToken!)) {
-        return forbiddenOrderAccess(res);
-      }
+    if (
+      !order?.length ||
+      (!isAdmin && !orderAccessMatches(order[0].access_token_hash, accessToken!))
+    ) {
+      return orderAccessDenied(res);
     }
 
     res.json({
@@ -392,7 +371,7 @@ router.get('/:id', async (req: Request, res: Response) => {
     const accessToken = getOrderAccessTokenFromRequest(req);
 
     if (!isAdmin && !accessToken) {
-      return unauthorizedOrderAccess(res);
+      return orderAccessDenied(res);
     }
 
     const order = await sql`
@@ -401,17 +380,11 @@ router.get('/:id', async (req: Request, res: Response) => {
       LIMIT 1
     `;
 
-    if (!order || order.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: 'Order not found',
-      });
-    }
-
-    if (!isAdmin) {
-      if (!orderAccessMatches(order[0].access_token_hash, accessToken!)) {
-        return forbiddenOrderAccess(res);
-      }
+    if (
+      !order?.length ||
+      (!isAdmin && !orderAccessMatches(order[0].access_token_hash, accessToken!))
+    ) {
+      return orderAccessDenied(res);
     }
 
     res.json({
@@ -489,6 +462,7 @@ const parsedResult = parseOrderRow(result[0] as Record<string, unknown>) as Orde
           customerName: parsedResult.customer_name,
           customerEmail: parsedResult.customer_email,
           orderNumber: parsedResult.order_number!,
+          orderId: parsedResult.id as string,
           items: parsedResult.items.map((item: any) => ({
             product_name: item.product_name,
             product_image: item.product_image || item.image,
@@ -610,6 +584,7 @@ const parsedResult = parseOrderRow(result[0] as Record<string, unknown>) as Orde
           customerName: parsedResult.customer_name,
           customerEmail: parsedResult.customer_email,
           orderNumber: parsedResult.order_number!,
+          orderId: parsedResult.id as string,
           items: parsedResult.items.map((item: any) => ({
             product_name: item.product_name,
             product_image: item.product_image || item.image,
@@ -1127,6 +1102,7 @@ router.post('/:id/notify-shipped', verifyAdmin, async (req: Request, res: Respon
       customerName: orderData.customer_name,
       customerEmail: orderData.customer_email,
       orderNumber: orderData.order_number,
+      orderId: orderData.id as string,
       items: items,
       subtotal: parseFloat(orderData.subtotal),
       shipping_cost: parseFloat(orderData.shipping_cost),

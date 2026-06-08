@@ -264,6 +264,14 @@ export default function PaymentSuccess() {
             );
           }
           capturedRef.current = true;
+          const itemCount = Array.isArray(context.items)
+            ? context.items.length
+            : 0;
+          trackPurchaseComplete(
+            completedDetails.serverOrderId || reconciliationContext.serverOrderId || '',
+            completedDetails.total ?? context.total ?? 0,
+            itemCount
+          );
           clearCart();
           sessionStorage.removeItem('pendingOrder');
           sessionStorage.removeItem('checkoutRecovery');
@@ -433,7 +441,11 @@ export default function PaymentSuccess() {
 
         if (!pendingOrder) {
           setPaymentStep('error');
-          throw new Error('Missing pending order context');
+          setCaptureError(
+            'We could not restore your checkout session. Use the tracking link from your confirmation email or look up your order at /orders.'
+          );
+          setIsLoading(false);
+          return;
         }
 
         if (!pendingOrder.serverOrderId) {

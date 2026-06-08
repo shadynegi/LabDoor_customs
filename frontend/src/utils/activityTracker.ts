@@ -29,7 +29,7 @@ export type ActionType =
   | 'purchase_complete'
   | 'search'
   | 'filter_apply'
-  | 'contact_form_submit'
+  | 'contact_submit'
   | 'size_select'
   | 'quantity_change';
 
@@ -174,7 +174,7 @@ export const trackFilterApply = (filters: Record<string, any>) => {
 
 export const trackContactSubmit = (subject?: string) => {
   trackActivity({
-    actionType: 'contact_form_submit',
+    actionType: 'contact_submit',
     entityType: 'page',
     metadata: { subject: subject?.slice(0, 120) },
   });

@@ -1,7 +1,7 @@
 import sql from './db';
 import { InsufficientStockError } from './inventory';
 
-export const FREE_SHIPPING_THRESHOLD = 300;
+export const FREE_SHIPPING_THRESHOLD = 200;
 export const SHIPPING_COST = 25;
 export const PROMO_COUPON_CODE = 'LDCOFF10';
 

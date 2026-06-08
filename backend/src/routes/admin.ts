@@ -718,7 +718,7 @@ router.post('/orders/bulk-update', verifyAdmin, async (req: Request, res: Respon
     }
 
     if (status !== null) {
-      const allowed: OrderStatus[] = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
+      const allowed: OrderStatus[] = ['pending', 'processing', 'shipped', 'delivered'];
       if (!allowed.includes(status as OrderStatus)) {
         return res.status(400).json({ success: false, error: 'Invalid order status' });
       }

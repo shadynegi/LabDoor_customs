@@ -44,6 +44,8 @@ export default function AdminCouponsTab() {
   const [editMaxUses, setEditMaxUses] = useState('');
   const [editValidUntil, setEditValidUntil] = useState('');
   const [editIsActive, setEditIsActive] = useState(true);
+  const [editAppliesTo, setEditAppliesTo] = useState<'all' | 'category' | 'product'>('all');
+  const [editAppliesToIds, setEditAppliesToIds] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
 
   const fetchCoupons = useCallback(async () => {
@@ -99,17 +101,26 @@ export default function AdminCouponsTab() {
     return ids.length > 0 ? ids : null;
   };
 
-  const createCoupon = async (code: string, percent: number) => {
+  const createCoupon = async (
+    code: string,
+    percent: number,
+    appliesTo: 'all' | 'category' | 'product' = customAppliesTo
+  ) => {
     const normalized = code.trim().toUpperCase();
     if (!normalized) {
       toast.error('Coupon code is required');
       return;
     }
 
-    const appliesToIds = parseAppliesToIds();
-    if (customAppliesTo !== 'all' && !appliesToIds) {
+    const appliesToIds =
+      appliesTo === 'all'
+        ? null
+        : appliesTo === customAppliesTo
+          ? parseAppliesToIds()
+          : null;
+    if (appliesTo !== 'all' && !appliesToIds) {
       toast.error(
-        customAppliesTo === 'product'
+        appliesTo === 'product'
           ? 'Select at least one product ID for product-scoped coupons'
           : 'Enter at least one category ID for category-scoped coupons'
       );
@@ -126,7 +137,7 @@ export default function AdminCouponsTab() {
           discount_value: percent,
           minimum_order: 0,
           is_active: true,
-          applies_to: customAppliesTo,
+          applies_to: appliesTo,
           applies_to_ids: appliesToIds,
         }),
       });
@@ -167,6 +178,8 @@ export default function AdminCouponsTab() {
     setEditMaxUses(coupon.max_uses != null ? String(coupon.max_uses) : '');
     setEditValidUntil(coupon.valid_until ? coupon.valid_until.slice(0, 10) : '');
     setEditIsActive(coupon.is_active !== false);
+    setEditAppliesTo(coupon.applies_to || 'all');
+    setEditAppliesToIds((coupon.applies_to_ids || []).join(', '));
   };
 
   const saveCouponEdit = async () => {
@@ -178,6 +191,21 @@ export default function AdminCouponsTab() {
         toast.error('Max uses must be a non-negative number');
         return;
       }
+      let appliesToIds: number[] | null = null;
+      if (editAppliesTo !== 'all') {
+        appliesToIds = editAppliesToIds
+          .split(',')
+          .map((s) => parseInt(s.trim(), 10))
+          .filter((n) => !Number.isNaN(n) && n > 0);
+        if (!appliesToIds.length) {
+          toast.error(
+            editAppliesTo === 'product'
+              ? 'Enter at least one product ID'
+              : 'Enter at least one category ID'
+          );
+          return;
+        }
+      }
       const response = await apiFetch(`/coupons/${editingCoupon.id}`, {
         method: 'PUT',
         body: JSON.stringify({
@@ -185,6 +213,8 @@ export default function AdminCouponsTab() {
           max_uses: maxUses,
           valid_until: editValidUntil.trim() || null,
           is_active: editIsActive,
+          applies_to: editAppliesTo,
+          applies_to_ids: appliesToIds,
         }),
       });
       const data = await response.json();
@@ -229,7 +259,7 @@ export default function AdminCouponsTab() {
             <button
               key={pct}
               type="button"
-              onClick={() => createCoupon(`SAVE${pct}`, pct)}
+              onClick={() => createCoupon(`SAVE${pct}`, pct, 'all')}
               style={{
                 padding: '10px 18px',
                 background: '#f5e0d5',
@@ -494,6 +524,29 @@ export default function AdminCouponsTab() {
                 style={{ padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8 }}
               />
             </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, marginBottom: 12 }}>
+              Applies to
+              <select
+                value={editAppliesTo}
+                onChange={(e) => setEditAppliesTo(e.target.value as 'all' | 'category' | 'product')}
+                style={{ padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8 }}
+              >
+                <option value="all">All products</option>
+                <option value="product">Specific products</option>
+                <option value="category">Category</option>
+              </select>
+            </label>
+            {editAppliesTo !== 'all' && (
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, marginBottom: 12 }}>
+                {editAppliesTo === 'product' ? 'Product IDs (comma-separated)' : 'Category IDs (comma-separated)'}
+                <input
+                  value={editAppliesToIds}
+                  onChange={(e) => setEditAppliesToIds(e.target.value)}
+                  placeholder="e.g. 1, 2, 3"
+                  style={{ padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8 }}
+                />
+              </label>
+            )}
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, marginBottom: 20 }}>
               <input
                 type="checkbox"

@@ -204,12 +204,20 @@ async function ensureUpdateProductRatingFunction(): Promise<void> {
   `;
 }
 
+/** Revoke anon/authenticated grants even when full RLS DDL is skipped. */
+export async function ensureClientGrantsRevoked(): Promise<void> {
+  for (const table of CLIENT_REVOKED_TABLES) {
+    await revokeClientRoleGrants(table);
+  }
+}
+
 /** Idempotent Supabase RLS tighten — backend uses service_role; limits direct PostgREST abuse. */
 export async function ensureRlsPolicies(): Promise<void> {
   const isProduction = process.env.NODE_ENV === 'production';
 
   if (shouldSkipBootstrapDdl() || (await isRlsMigrationApplied())) {
     logBootstrapStepSkipped('rls_policies', 'service_role policies already present');
+    await ensureClientGrantsRevoked();
     return;
   }
 

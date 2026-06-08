@@ -16,7 +16,7 @@ Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API
 | **Checkout** | Cart validation with retry; PayPal `?code=` exchange; capture **409** → processing UI; checkout email synced to activity on change/blur. |
 | **Orders** | Email links `GET /api/orders/access-exchange/:code`; legacy `?orderNumber=&token=` stripped; partial refresh keeps stale data + warning. |
 | **Admin** | Products paginated (load more); messages mark read on open; coupons scope UI; reviews admin response; estimated delivery; error/retry states. |
-| **Activity** | Consent-gated batch; `contact_form_submit` on contact success. |
+| **Activity** | Consent-gated batch; `contact_submit` on contact success. |
 | **Reviews** | `POST /api/reviews/check` on email blur; pending-moderation copy; vote error toasts. |
 | **Mobile** | Sticky CTAs with keyboard lift on checkout; cookie banner top on purchase routes; cart stacked CTA at 320px; OOS hides product sticky bar; admin product cards on phones. |
 
@@ -46,7 +46,7 @@ If the user did not mention testing, **skip** `npm test`, `npm run test:all`, Pl
 | Frontend E2E / UI | Playwright | `Tests/frontend/` | 8 files, 22 tests | No (mocked `/api` + static preview) |
 | Link checker | Custom script | repo root | — | No |
 
-**Total:** 99 automated tests — 61 backend unit + 16 API + 22 Playwright UI (desktop + mobile projects).
+**Total:** 105 automated tests — 67 backend unit + 16 API + 22 Playwright UI (desktop + mobile projects).
 
 Backend unit tests include: payment idempotency, order tokens, checkout exchange hashing, order token encryption, webhook errors, product image validation, admin session hashing, PayPal webhook utils, refund idempotency, checkout pricing, client IP, keep-alive.
 

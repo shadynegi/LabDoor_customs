@@ -16,7 +16,7 @@ Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API
 | **Checkout** | Cart validation with retry; PayPal `?code=` exchange; capture **409** → processing UI; checkout email synced to activity on change/blur. |
 | **Orders** | Email links `GET /api/orders/access-exchange/:code`; legacy `?orderNumber=&token=` stripped; partial refresh keeps stale data + warning. 
 | **Admin** | Products paginated (load more); messages mark read on open; coupons scope UI; reviews admin response; estimated delivery; error/retry states. |
-| **Activity** | Consent-gated batch; `contact_form_submit` on contact success. |
+| **Activity** | Consent-gated batch; `contact_submit` on contact success. |
 | **Reviews** | `POST /api/reviews/check` on email blur; pending-moderation copy; vote error toasts. |
 | **Mobile** | Sticky CTAs with keyboard lift on checkout; cookie banner top on purchase routes; cart stacked CTA at 320px; OOS hides product sticky bar; admin product cards on phones. |
 
@@ -48,7 +48,7 @@ On CSRF 403, `apiFetch` refreshes the token and retries once.
 - [ ] Required fields validated (name, email, subject, message)
 - [ ] Invalid email rejected
 - [ ] Success toast shown on submit
-- [ ] `contact_form_submit` activity event sent when analytics consent granted
+- [ ] `contact_submit` activity event sent when analytics consent granted
 - [ ] Auto-reply email received (if Resend configured)
 - [ ] Message appears in admin inbox; opening marks **new** messages as read
 

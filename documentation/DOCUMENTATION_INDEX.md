@@ -18,7 +18,7 @@
 | Cart | `POST /api/products/validate-cart` on item changes with retry; Fuse search catalog cache (15 min TTL) |
 | Orders | Email `?code=` access exchange; legacy URL tokens deprecated; partial refresh keeps stale data |
 | RLS | 14 tables service_role-only; no public PostgREST product read |
-| Activity | Consent-gated batch; `contact_form_submit`; CSRF-exempt `/activity/batch`; IP anonymized |
+| Activity | Consent-gated batch; `contact_submit`, `purchase_complete`, `size_select`, `quantity_change`; CSRF-exempt `/activity/batch`; IP anonymized |
 | Admin | Products paginated; messages read-on-open; coupon scope; review admin response; estimated delivery |
 | Reviews | `POST /api/reviews/check` on email blur; pending-moderation copy; vote error toasts |
 | Mobile | Sticky CTAs, visualViewport keyboard offset, body scroll containment |
@@ -34,6 +34,15 @@
 | [guide.md](./guide.md) | Sequential commands: setup → dev → test |
 | [SETUP_GUIDE.md](./SETUP_GUIDE.md) | Detailed local configuration |
 | [PROJECT_OVERVIEW.md](./PROJECT_OVERVIEW.md) | High-level architecture |
+
+---
+
+## Quality & audit (living)
+
+| Document | Purpose |
+|----------|---------|
+| [PROJECT_AUDIT.md](PROJECT_AUDIT.md) | One-time full audit snapshot (2026-06-08) — remediation backlog |
+| [COVERAGE_MATRIX.md](COVERAGE_MATRIX.md) | Doc → code → test map — **update per PR** (avoids repeat audits) |
 
 ---
 

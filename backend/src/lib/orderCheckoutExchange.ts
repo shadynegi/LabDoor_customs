@@ -44,22 +44,28 @@ export async function createCheckoutExchangeCode(
   orderId: string,
   accessToken: string
 ): Promise<string> {
-  const code = crypto.randomBytes(24).toString('base64url');
-  const codeHash = hashCheckoutExchangeCode(code);
   const encryptedToken = encryptOrderAccessToken(accessToken);
 
-  await sql`
-    INSERT INTO order_checkout_exchanges (code_hash, order_id, access_token, expires_at)
-    VALUES (
-      ${codeHash},
-      ${orderId},
-      ${encryptedToken},
-      NOW() + ${TTL_MINUTES} * interval '1 minute'
-    )
-    ON CONFLICT (code_hash) DO NOTHING
-  `;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const code = crypto.randomBytes(24).toString('base64url');
+    const codeHash = hashCheckoutExchangeCode(code);
 
-  return code;
+    const inserted = await sql`
+      INSERT INTO order_checkout_exchanges (code_hash, order_id, access_token, expires_at)
+      VALUES (
+        ${codeHash},
+        ${orderId},
+        ${encryptedToken},
+        NOW() + ${TTL_MINUTES} * interval '1 minute'
+      )
+      ON CONFLICT (code_hash) DO NOTHING
+      RETURNING code_hash
+    `;
+
+    if (inserted.length > 0) return code;
+  }
+
+  throw new Error('Failed to generate unique checkout exchange code');
 }
 
 export type CheckoutExchangeResult = {

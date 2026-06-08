@@ -4,8 +4,8 @@ import { invalidateCache, invalidateCachePrefix } from './cache';
 export const CACHE = {
   productsList: (page: number, limit: number) => `products:list:${page}:${limit}`,
   productSingle: (id: string | number) => `products:single:${id}`,
-  couponValidate: (code: string, subtotal: number, email: string) =>
-    `coupon:validate:${code.toUpperCase()}:${subtotal}:${email.toLowerCase()}`,
+  couponValidate: (code: string, subtotal: number, email: string, itemCount = 0) =>
+    `coupon:validate:${code.toUpperCase()}:${subtotal}:${email.toLowerCase()}:${itemCount}`,
   productsPrefix: 'products:',
   couponsValidatePrefix: 'coupon:validate:',
 } as const;

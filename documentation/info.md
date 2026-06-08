@@ -357,7 +357,7 @@ At create-payment, a row in `coupon_usage` reserves the coupon for the pending o
 
 - `POST /api/contact` — rate-limited, CSRF-protected.
 - Stores message in `contact_messages`; sends auto-reply via Resend.
-- Successful submit emits `contact_form_submit` activity event (consent-gated).
+- Successful submit emits `contact_submit` activity event (consent-gated).
 - Admin inbox in dashboard with status workflow: new → read → replied → archived; opening a **new** message marks it read via `PATCH /api/contact/:id/status`.
 
 ---
@@ -366,7 +366,8 @@ At create-payment, a row in `coupon_usage` reserves the coupon for the pending o
 
 ### Client activity tracking
 
-- Frontend batches page views, cart actions, checkout events, and **contact form submit** to `POST /api/activity/batch` only when analytics cookie consent is granted (`hasAnalyticsConsent()`). Checkout email is stored in `sessionStorage` only when consent is granted (`setUserEmail` on checkout email change/blur); cleared on cookie reject.
+- Frontend batches page views, cart actions, checkout events (`checkout_start`, `checkout_complete`, `purchase_complete`), size/quantity changes, and **contact submit** to `POST /api/activity/batch` only when analytics cookie consent is granted (`hasAnalyticsConsent()`). Checkout email is stored in `sessionStorage` only when consent is granted (`setUserEmail` on checkout email change/blur); cleared on cookie reject.
+- Allowed batch action types: `page_view`, `product_view`, `add_to_cart`, `remove_from_cart`, `checkout_start`, `checkout_complete`, `purchase_complete`, `search`, `filter_apply`, `contact_submit`, `size_select`, `quantity_change`.
 - Declared but optional (not yet wired on all UI surfaces): `size_select`, `quantity_change`, `checkout_complete` as separate events beyond existing purchase tracking.
 - `POST /api/activity/batch` is **CSRF-exempt** (supports `sendBeacon`) and rate-limited separately; max **20** events per batch.
 - IP addresses anonymized with daily-salted SHA-256 (`IP_SALT`); stored as `anon_{hash}`.
@@ -994,7 +995,7 @@ npm run links:check
 | Backend unit/API | Vitest | Checkout validation, payment idempotency, order tokens, checkout exchange, order token encryption, webhook errors, product images, admin session hashing, PayPal utils, refund idempotency |
 | Frontend E2E / UI | Playwright | Storefront smoke, products/cart/checkout/contact UI, navigation, cookie consent, mobile viewport (22 tests; mocked API) |
 
-**Total automated tests:** 99 (61 backend unit + 16 API + 22 Playwright UI).
+**Total automated tests:** 105 (67 backend unit + 16 API + 22 Playwright UI).
 
 | Link check | Custom script | Documentation internal links |
 
@@ -1009,6 +1010,8 @@ API tests mock the database layer (`Tests/setup.ts`) for fast isolated runs.
 | Document | Topic |
 |----------|-------|
 | [test_guidelines.md](test_guidelines.md) | Testing — automated, manual QA, CI, when to run |
+| [PROJECT_AUDIT.md](PROJECT_AUDIT.md) | Full audit snapshot and remediation backlog |
+| [COVERAGE_MATRIX.md](COVERAGE_MATRIX.md) | Critical path coverage — update with behavior changes |
 | [QUICK_START.md](QUICK_START.md) | 10-minute local setup |
 | [API_DOCUMENTATION.md](API_DOCUMENTATION.md) | Full REST API |
 | [PRE_LAUNCH_CHECKLIST.md](PRE_LAUNCH_CHECKLIST.md) | Go-live checklist |

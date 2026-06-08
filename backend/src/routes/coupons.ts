@@ -7,7 +7,7 @@ import { cached } from '../lib/cache';
 import { CACHE, TTL, invalidateCouponCaches } from '../lib/cacheKeys';
 import { verifyAdmin } from './admin';
 import { parsePagination, paginationMeta } from '../lib/pagination';
-import { resolveCouponDiscount } from '../lib/paypalCheckout';
+import { calculateVolumeDiscount, resolveCouponDiscount } from '../lib/paypalCheckout';
 
 const router = Router();
 
@@ -74,8 +74,12 @@ router.post('/validate', async (req: Request, res: Response) => {
       });
     }
 
+    const totalItemCount = (items || []).reduce((sum, item) => sum + (item.quantity || 0), 0);
+    const volumePreview = calculateVolumeDiscount(subtotal, totalItemCount);
+    const couponSubtotal = Math.max(0, subtotal - volumePreview.amount);
+
     const emailKey = (customer_email || '').toLowerCase();
-    const cacheKey = CACHE.couponValidate(code.trim(), subtotal, emailKey);
+    const cacheKey = CACHE.couponValidate(code.trim(), subtotal, emailKey, totalItemCount);
 
     const result = await cached(cacheKey, TTL.couponValidate, async () => {
       const coupons = await sql`
@@ -132,7 +136,7 @@ router.post('/validate', async (req: Request, res: Response) => {
         };
       }
 
-      if (coupon.minimum_order && subtotal < coupon.minimum_order) {
+      if (coupon.minimum_order && couponSubtotal < coupon.minimum_order) {
         return {
           success: true,
           valid: false,
@@ -167,7 +171,7 @@ router.post('/validate', async (req: Request, res: Response) => {
         }));
         const resolved = await resolveCouponDiscount(
           code.trim(),
-          subtotal,
+          couponSubtotal,
           customer_email || '',
           couponLineItems
         );
@@ -417,6 +421,8 @@ router.put('/:id', verifyAdmin, async (req: Request, res: Response) => {
         valid_from = COALESCE(${updates.valid_from || null}, valid_from),
         valid_until = COALESCE(${updates.valid_until || null}, valid_until),
         is_active = COALESCE(${updates.is_active ?? null}, is_active),
+        applies_to = COALESCE(${updates.applies_to || null}, applies_to),
+        applies_to_ids = COALESCE(${updates.applies_to_ids ?? null}, applies_to_ids),
         updated_at = NOW()
       WHERE id = ${id}
       RETURNING *

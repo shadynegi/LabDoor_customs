@@ -41,22 +41,50 @@ export async function createOrderAccessExchangeCode(
   orderId: string,
   accessToken: string
 ): Promise<string> {
-  const code = crypto.randomBytes(24).toString('base64url');
-  const codeHash = hashOrderAccessExchangeCode(code);
   const encryptedToken = encryptOrderAccessToken(accessToken);
 
-  await sql`
-    INSERT INTO order_access_exchanges (code_hash, order_id, access_token, expires_at)
-    VALUES (
-      ${codeHash},
-      ${orderId},
-      ${encryptedToken},
-      NOW() + ${TTL_DAYS} * interval '1 day'
-    )
-    ON CONFLICT (code_hash) DO NOTHING
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const code = crypto.randomBytes(24).toString('base64url');
+    const codeHash = hashOrderAccessExchangeCode(code);
+
+    const inserted = await sql`
+      INSERT INTO order_access_exchanges (code_hash, order_id, access_token, expires_at)
+      VALUES (
+        ${codeHash},
+        ${orderId},
+        ${encryptedToken},
+        NOW() + ${TTL_DAYS} * interval '1 day'
+      )
+      ON CONFLICT (code_hash) DO NOTHING
+      RETURNING code_hash
+    `;
+
+    if (inserted.length > 0) return code;
+  }
+
+  throw new Error('Failed to generate unique order access exchange code');
+}
+
+/** Mint a tracking link from stored checkout exchange token (webhook/admin capture paths). */
+export async function issueOrderTrackingExchangeFromOrder(
+  orderId: string
+): Promise<string | null> {
+  const rows = await sql`
+    SELECT access_token FROM order_checkout_exchanges
+    WHERE order_id = ${orderId}
+    ORDER BY created_at DESC
+    LIMIT 1
   `;
 
-  return code;
+  if (!rows.length) return null;
+
+  const accessToken = decryptOrderAccessToken(rows[0].access_token as string);
+  if (!accessToken) {
+    logger.warn('Could not decrypt checkout exchange token for tracking link', { orderId });
+    return null;
+  }
+
+  return createOrderAccessExchangeCode(orderId, accessToken);
 }
 
 export type OrderAccessExchangeResult = {

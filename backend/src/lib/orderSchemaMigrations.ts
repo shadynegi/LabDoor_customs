@@ -10,44 +10,50 @@ import { ensureProcessedRefundEventsTable } from './refundIdempotency';
 
 /** Apply idempotent order/payment schema patches at startup. */
 export async function ensureOrderPaymentSchema(): Promise<void> {
-  if (
-    shouldSkipBootstrapDdl() ||
-    ((await publicColumnExists('orders', 'refunded_amount')) &&
-      (await publicTableExists('processed_refund_events')))
-  ) {
+  const hasRefundColumn = await publicColumnExists('orders', 'refunded_amount');
+  const hasRefundEventsTable = await publicTableExists('processed_refund_events');
+
+  if (shouldSkipBootstrapDdl() && hasRefundColumn && hasRefundEventsTable) {
     logBootstrapDdlSkipped('order_payment_schema');
     return;
   }
-  await sql`
-    ALTER TABLE orders
-    ADD COLUMN IF NOT EXISTS refunded_amount DECIMAL(10, 2) NOT NULL DEFAULT 0
-  `;
 
-  await sql`
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_paypal_order_id_unique
-    ON orders (paypal_order_id)
-    WHERE paypal_order_id IS NOT NULL
-  `;
+  if (!hasRefundColumn) {
+    await sql`
+      ALTER TABLE orders
+      ADD COLUMN IF NOT EXISTS refunded_amount DECIMAL(10, 2) NOT NULL DEFAULT 0
+    `;
+  }
 
-  await sql`
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_paypal_capture_id_unique
-    ON orders (paypal_capture_id)
-    WHERE paypal_capture_id IS NOT NULL
-  `;
+  if (!shouldSkipBootstrapDdl()) {
+    await sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_paypal_order_id_unique
+      ON orders (paypal_order_id)
+      WHERE paypal_order_id IS NOT NULL
+    `;
 
-  await ensureProcessedRefundEventsTable();
+    await sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_paypal_capture_id_unique
+      ON orders (paypal_capture_id)
+      WHERE paypal_capture_id IS NOT NULL
+    `;
 
-  await sql`
-    ALTER TABLE customers
-    ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE
-  `;
-  await sql`
-    ALTER TABLE customers
-    ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ NULL
-  `;
-  await sql`
-    CREATE INDEX IF NOT EXISTS idx_customers_is_deleted ON customers(is_deleted)
-  `;
+    await sql`
+      ALTER TABLE customers
+      ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE
+    `;
+    await sql`
+      ALTER TABLE customers
+      ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ NULL
+    `;
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_customers_is_deleted ON customers(is_deleted)
+    `;
+  }
+
+  if (!hasRefundEventsTable) {
+    await ensureProcessedRefundEventsTable();
+  }
 
   logger.info('Order payment schema patches applied');
 }

@@ -1,7 +1,10 @@
 import { Resend } from 'resend';
 import { withRetry } from './db';
 import { logger } from './logger';
-import { createOrderAccessExchangeCode } from './orderAccessExchange';
+import {
+  createOrderAccessExchangeCode,
+  issueOrderTrackingExchangeFromOrder,
+} from './orderAccessExchange';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -47,6 +50,7 @@ interface OrderEmailData {
   orderDate?: string;
   accessToken?: string;
   orderId?: string;
+  orderPortalUrl?: string;
 }
 
 interface OrderCancellationEmailData extends OrderEmailData {
@@ -79,17 +83,20 @@ export class EmailService {
     this.supportEmail = process.env.COMPANY_SUPPORT_EMAIL || 'support@labdoorcustoms.com';
   }
 
-  private async resolveTrackingUrl(data: OrderEmailData): Promise<string> {
-    if (data.trackingUrl) return data.trackingUrl;
-
+  private async resolveOrderPortalUrl(data: OrderEmailData): Promise<string> {
     const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
-    if (data.orderId && data.accessToken) {
-      const code = await createOrderAccessExchangeCode(data.orderId, data.accessToken);
-      return `${frontendUrl}/orders?code=${encodeURIComponent(code)}`;
+
+    if (data.orderId) {
+      if (data.accessToken) {
+        const code = await createOrderAccessExchangeCode(data.orderId, data.accessToken);
+        return `${frontendUrl}/orders?code=${encodeURIComponent(code)}`;
+      }
+      const code = await issueOrderTrackingExchangeFromOrder(data.orderId);
+      if (code) {
+        return `${frontendUrl}/orders?code=${encodeURIComponent(code)}`;
+      }
     }
-    if (data.orderNumber) {
-      return `${frontendUrl}/orders?orderNumber=${encodeURIComponent(data.orderNumber)}`;
-    }
+
     return `${frontendUrl}/orders`;
   }
 
@@ -98,8 +105,8 @@ export class EmailService {
    */
   async sendOrderConfirmation(data: OrderEmailData) {
     try {
-      const trackingUrl = await this.resolveTrackingUrl(data);
-      const emailHtml = this.generateOrderConfirmationHTML({ ...data, trackingUrl });
+      const orderPortalUrl = await this.resolveOrderPortalUrl(data);
+      const emailHtml = this.generateOrderConfirmationHTML({ ...data, orderPortalUrl });
       
       const { data: emailData, error } = await sendResendEmail({
         from: `${this.companyName} <${this.senderEmail}>`,
@@ -126,7 +133,8 @@ export class EmailService {
    */
   async sendShippingNotification(data: OrderEmailData) {
     try {
-      const emailHtml = this.generateShippingNotificationHTML(data);
+      const orderPortalUrl = await this.resolveOrderPortalUrl(data);
+      const emailHtml = this.generateShippingNotificationHTML({ ...data, orderPortalUrl });
       
       const { data: emailData, error } = await sendResendEmail({
         from: `${this.companyName} <${this.senderEmail}>`,
@@ -364,7 +372,7 @@ export class EmailService {
 
       <!-- Track Order Link -->
       <div style="text-align: center; margin: 30px 0;">
-        <a href="${data.trackingUrl || '#'}" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
+        <a href="${data.orderPortalUrl || '#'}" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
           View Order Status
         </a>
       </div>
@@ -444,6 +452,14 @@ export class EmailService {
         </a>
         ` : ''}
       </div>
+
+      ${data.orderPortalUrl ? `
+      <div style="text-align: center; margin: 0 0 30px 0;">
+        <a href="${data.orderPortalUrl}" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
+          View Order in Your Account
+        </a>
+      </div>
+      ` : ''}
 
       <!-- Order Items Summary with Images -->
       <h3 style="margin: 0 0 15px 0; color: #1f2937; font-size: 18px; font-weight: 700;">

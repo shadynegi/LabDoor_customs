@@ -22,11 +22,11 @@ describe('security hardening', () => {
     expect(res.body.error).toBe('Access denied');
   });
 
-  it('requires access token for order lookup by number', async () => {
+  it('returns generic 404 for order lookup without credentials', async () => {
     const res = await request(app).get('/api/orders/number/GSS-TEST-123');
 
-    expect(res.status).toBe(401);
-    expect(res.body.error).toBe('Token required');
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe('Order not found or invalid credentials');
   });
 
   it('rate limits failed admin login attempts (5 per 15 minutes)', async () => {

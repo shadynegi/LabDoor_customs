@@ -631,6 +631,13 @@ async function checkReviewEligibility(productId: number, email: string) {
     return { status: 400 as const, error: 'Invalid email' };
   }
 
+  const product = await sql`
+    SELECT id FROM products WHERE id = ${productId} LIMIT 1
+  `;
+  if (!product.length) {
+    return { status: 404 as const, error: 'Product not found' };
+  }
+
   const existingReview = await sql`
     SELECT 1 FROM reviews
     WHERE product_id = ${productId}
@@ -666,6 +673,9 @@ router.post('/check', async (req: Request, res: Response) => {
     const result = await checkReviewEligibility(productId, email);
     if (result.status === 400) {
       return res.status(400).json({ success: false, error: result.error });
+    }
+    if (result.status === 404) {
+      return res.status(404).json({ success: false, error: result.error });
     }
 
     res.json({ success: true, data: result.data });

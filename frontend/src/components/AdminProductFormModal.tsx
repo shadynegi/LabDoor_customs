@@ -41,7 +41,7 @@ const US_SIZES = [
   'US 10', 'US 10.5', 'US 11', 'US 11.5', 'US 12', 'US 12.5', 'US 13',
 ];
 
-const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 512 * 1024;
 
 const emptyForm = (): ProductFormPayload => ({
   name: '',
@@ -124,7 +124,7 @@ export default function AdminProductFormModal({
       return;
     }
     if (file.size > MAX_IMAGE_BYTES) {
-      toast.error('Image must be under 2 MB. Paste a hosted URL instead.');
+      toast.error('Image must be under 512 KB. Paste a hosted URL instead.');
       return;
     }
     const reader = new FileReader();
@@ -327,7 +327,7 @@ export default function AdminProductFormModal({
             />
             <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#9c6649', cursor: 'pointer', fontWeight: 600 }}>
               <Upload size={14} />
-              Upload image (max 2 MB)
+              Upload image (max 512 KB)
               <input
                 type="file"
                 accept="image/*"

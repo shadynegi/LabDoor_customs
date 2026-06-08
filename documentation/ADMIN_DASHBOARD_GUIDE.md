@@ -98,7 +98,7 @@ Manage discount codes used at checkout (server-side billing via `resolveCouponDi
 
 - **Quick presets** — create `SAVE5`, `SAVE10`, `SAVE20`, `SAVE25`, `SAVE50` (percentage off, entire order)
 - **Custom coupon** — any code + 5–50% discount + **scope**: entire order, specific product IDs, or category IDs (`applies_to` / `applies_to_ids` on `POST /api/coupons`)
-- **Edit** — pencil icon opens a modal to update description, max uses, valid-until date, and active status (`PUT /api/coupons/:id`)
+- **Edit** — pencil icon opens a modal to update description, max uses, valid-until date, **applies_to scope** (all / product / category IDs), and active status (`PUT /api/coupons/:id`)
 - **Activate / deactivate** — toggle `is_active` without deleting
 - **Delete** — remove unused coupons
 

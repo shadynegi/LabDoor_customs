@@ -19,9 +19,13 @@ const ALLOWED_ACTION_TYPES = new Set([
   'add_to_cart',
   'remove_from_cart',
   'checkout_start',
+  'checkout_complete',
+  'purchase_complete',
   'search',
   'filter_apply',
   'contact_submit',
+  'size_select',
+  'quantity_change',
 ]);
 
 // Anonymize IP address for GDPR compliance

@@ -12,7 +12,20 @@ import {
 import { sqlMock } from '../setup';
 
 describe('checkoutPricing', () => {
-  it('charges fixed shipping below free-shipping threshold', () => {
+  it('charges shipping one cent below free-shipping threshold', () => {
+    expect(calculateCheckoutPricing(FREE_SHIPPING_THRESHOLD - 0.01, 1)).toEqual({
+      subtotal: FREE_SHIPPING_THRESHOLD - 0.01,
+      shipping: SHIPPING_COST,
+      tax: 0,
+      volumeDiscount: 0,
+      volumeDiscountPercent: 0,
+      couponDiscount: 0,
+      discount: 0,
+      total: FREE_SHIPPING_THRESHOLD - 0.01 + SHIPPING_COST,
+    });
+  });
+
+  it('charges fixed shipping well below free-shipping threshold', () => {
     expect(calculateCheckoutPricing(100, 1)).toEqual({
       subtotal: 100,
       shipping: SHIPPING_COST,
@@ -39,28 +52,28 @@ describe('checkoutPricing', () => {
   });
 
   it('applies 10% volume discount for 2+ items', () => {
-    expect(calculateCheckoutPricing(200, 2)).toEqual({
-      subtotal: 200,
+    expect(calculateCheckoutPricing(150, 2)).toEqual({
+      subtotal: 150,
       shipping: SHIPPING_COST,
       tax: 0,
-      volumeDiscount: 20,
+      volumeDiscount: 15,
       volumeDiscountPercent: 10,
       couponDiscount: 0,
-      discount: 20,
-      total: 180 + SHIPPING_COST,
+      discount: 15,
+      total: 135 + SHIPPING_COST,
     });
   });
 
   it('applies 20% volume discount for 5+ items', () => {
-    expect(calculateCheckoutPricing(200, 5)).toEqual({
-      subtotal: 200,
+    expect(calculateCheckoutPricing(150, 5)).toEqual({
+      subtotal: 150,
       shipping: SHIPPING_COST,
       tax: 0,
-      volumeDiscount: 40,
+      volumeDiscount: 30,
       volumeDiscountPercent: 20,
       couponDiscount: 0,
-      discount: 40,
-      total: 160 + SHIPPING_COST,
+      discount: 30,
+      total: 120 + SHIPPING_COST,
     });
   });
 

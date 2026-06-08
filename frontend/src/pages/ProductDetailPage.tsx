@@ -15,7 +15,7 @@ import ProductJsonLd from '../components/ProductJsonLd';
 import { logError } from '../lib/logger';
 import { useResponsive } from '../hooks/useResponsive';
 import MobileStickyCta from '../components/MobileStickyCta';
-import { trackProductView } from '../utils/activityTracker';
+import { trackProductView, trackSizeSelect } from '../utils/activityTracker';
 
 const Product360Viewer = lazy(() =>
   import('../components/Product360Viewer').then((m) => ({ default: m.Product360Viewer }))
@@ -507,6 +507,9 @@ const ProductDetailPage: React.FC = () => {
                     onClick={() => {
                       setSelectedSize(size);
                       setSizeError(null);
+                      if (product) {
+                        trackSizeSelect(product.id, `${selectedSizeSystem} ${size}`);
+                      }
                     }}
                     style={{
                       padding: isMobile ? "14px 8px" : "12px 8px",
