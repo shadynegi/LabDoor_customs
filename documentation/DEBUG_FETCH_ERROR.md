@@ -86,12 +86,39 @@ Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_
 
 ---
 
+## 504 Gateway Timeout
+
+**Symptom:** API returns 504; backend log shows `Request timeout` with `elapsedMs` near `timeoutMs`.
+
+**Checks:**
+
+1. Supabase project awake (free tier pauses after inactivity — run keep-alive or wake via dashboard).
+2. `DATABASE_URL` uses pooler port **6543** with `pgbouncer=true`.
+3. Log `pool` stats on timeout — high `activeConnections` may indicate pool exhaustion.
+4. Catalog/admin routes use 180s timeout (`SLOW_REQUEST_TIMEOUT_MS`); others use 60s (`REQUEST_TIMEOUT_MS`).
+5. After laptop sleep, restart dev server — stale pooler connections may show `ECONNRESET` in `[withRetry]` logs.
+
+---
+
+## ECONNRESET / admin dashboard errors
+
+**Symptom:** `read ECONNRESET` on admin analytics or session validation.
+
+**Checks:**
+
+1. Restart backend after idle period.
+2. Confirm Supabase reachable: `GET /api/health`.
+3. Backend retries transient DB errors automatically; check `[withRetry]` logs for `label` (e.g. `adminAnalytics:order_stats`).
+
+---
+
 ## Debugging steps
 
 1. Browser DevTools → Network tab.
-2. Inspect failing request: headers, cookies, response body.
-3. Backend Pino logs filtered by `X-Request-Id`.
-4. Env vars consistent between frontend build and server runtime.
+2. Inspect failing request: headers, cookies, response body, `X-Request-Id`.
+3. Backend logs: match `requestId` from `Request started` → `Request finished` or `Request timeout`.
+4. Set `LOG_LEVEL=debug` in `backend/.env` for full request lifecycle.
+5. Env vars consistent between frontend build and server runtime.
 
 ---
 

@@ -21,17 +21,18 @@
 9. [Activity and analytics](#activity-and-analytics)
 10. [Security](#security)
 11. [Logging and monitoring](#logging-and-monitoring)
-12. [Caching and Redis](#caching-and-redis)
-13. [Email](#email)
-14. [Maintenance jobs](#maintenance-jobs)
-15. [SEO and sitemap](#seo-and-sitemap)
-16. [Database](#database)
-17. [Complete API endpoints](#complete-api-endpoints)
-18. [Webpage URLs](#webpage-urls)
-19. [Environment variables](#environment-variables)
-20. [CI/CD and deployment](#cicd-and-deployment)
-21. [Local development](#local-development)
-22. [Testing](#testing)
+12. [Server startup and bootstrap](#server-startup-and-bootstrap)
+13. [Caching and Redis](#caching-and-redis)
+14. [Email](#email)
+15. [Maintenance jobs](#maintenance-jobs)
+16. [SEO and sitemap](#seo-and-sitemap)
+17. [Database](#database)
+18. [Complete API endpoints](#complete-api-endpoints)
+19. [Webpage URLs](#webpage-urls)
+20. [Environment variables](#environment-variables)
+21. [CI/CD and deployment](#cicd-and-deployment)
+22. [Local development](#local-development)
+23. [Testing](#testing)
 
 ---
 
@@ -417,7 +418,7 @@ At create-payment, a row in `coupon_usage` reserves the coupon for the pending o
 - DB TLS verification in production (`DB_SSL_CA_PATH`; `rejectUnauthorized` defaults true).
 - PayPal order/capture IDs have partial unique indexes to prevent duplicate binding.
 - Product images validated on admin create/update: HTTPS/relative URLs or data URLs ≤512KB (`lib/productImage.ts`).
-- Supabase RLS at startup (`ensureRlsPolicies()`): all **14** application tables (including `order_access_exchanges`) use **service_role-only** policies; `anon` and `authenticated` grants are revoked — no public product read via PostgREST/GraphQL; all data access goes through Express.
+- Supabase RLS at startup (`ensureRlsPolicies()`): all **14** application tables (including `order_access_exchanges`) use **service_role-only** policies; `anon` and `authenticated` grants are revoked — no public product read via PostgREST/GraphQL; all data access goes through Express. Boot is **non-destructive** when policies already exist (skips DROP/CREATE that caused pooler lock hangs); run `migration-performance-linter-fixes.sql` once in Supabase for lint 0006 cleanup.
 
 ### Production environment gates
 
@@ -455,7 +456,7 @@ Redis connection failure in production prevents server startup.
 | Backend | `@sentry/node` | `SENTRY_DSN` required in production; optional `SENTRY_RELEASE`; 10% trace sample rate |
 | Frontend | `@sentry/react` | `VITE_SENTRY_DSN` required in CI/production builds; loads after cookie consent (`onMonitoringConsentReady`); browser tracing; optional `VITE_SENTRY_RELEASE` |
 
-- Global Express error handler calls `captureException` with request ID, method, path.
+- Global Express error handler calls `captureException` with request ID, method, path; structured error logs include duration, pool stats, and guard against double responses when a timeout already sent 504.
 - React `ErrorBoundary` captures render errors.
 - Frontend `logError`/`logWarn`: console in dev; Sentry only in production.
 
@@ -464,6 +465,55 @@ Redis connection failure in production prevents server startup.
 `GET /api/health` (public) returns a minimal payload (`status`, `timestamp`, `responseTime_ms`) for load balancers. Returns **503** if the database is unreachable or Redis is required but disconnected.
 
 `GET /api/health/detail` (admin) returns database latency, pool stats, PayPal mode, Redis status, and uptime.
+
+---
+
+## Server startup and bootstrap
+
+Every backend process run (`npm run dev`, `npm start`, Railway) executes `bootstrap()` in `backend/src/server.ts` unless the app is imported by tests.
+
+### Boot sequence
+
+| Phase | When | What runs |
+|-------|------|-----------|
+| **Listen** | Immediate | HTTP server on `PORT` (5000 dev) |
+| **API ready (dev default)** | Immediate | `serverReady=true` — storefront can call `/api/*` while bootstrap continues |
+| **Core bootstrap** | Background (dev) or blocking (prod with `BOOTSTRAP_BLOCK_API`) | DB ping → optional Redis → schema tasks (skip-if-exists) |
+| **Deferred bootstrap (dev default)** | After core schema | RLS check, legacy admin session purge, cache warm |
+| **Maintenance timers** | After bootstrap `.then()` | Initial run deferred; hourly + 15‑min intervals |
+
+### Schema tasks (idempotent)
+
+Each task runs on every start but **skips DDL** when `BOOTSTRAP_SKIP_DDL=true` or the table/index already exists:
+
+- `ensureIdempotencyTable()` — also ensures indexes including `idx_payment_idempotency_processing_created`
+- `ensureActivityLogsTable()`, `ensureOrderPaymentSchema()`, `ensureCheckoutExchangeTable()`, `ensureOrderAccessExchangeTable()`
+- `ensureRlsPolicies()` — skips when marker tables already have `Service role%` policies; never DROP legacy policies unless `BOOTSTRAP_FORCE_RLS=true`
+- `purgeLegacyAdminSessions()` — skips when no legacy plaintext tokens
+- `warmCaches()` — always runs (~500ms); preloads product list pages
+
+### Dev vs production
+
+| Behavior | Development (default) | Production |
+|----------|----------------------|------------|
+| API before bootstrap | Yes (immediate) | No — waits for bootstrap |
+| RLS before API | No (deferred) | Yes (sync path) |
+| Bootstrap failure | API stays up; log error | Process exits |
+
+**Recommended local `.env` after Supabase SQL is applied:** `BOOTSTRAP_SKIP_DDL=true`
+
+### Typical dev log lines
+
+```
+API ready — bootstrap continues in background (dev only)
+Bootstrap: skipping payment_idempotency DDL (already applied or BOOTSTRAP_SKIP_DDL)
+Bootstrap: skipping rls_policies (service_role policies already present)
+Deferred bootstrap complete
+Maintenance jobs scheduled (first run in 120000ms)
+Maintenance: step finished  step=reap_idempotency durationMs=…
+```
+
+See [RESTART_BACKEND.md](RESTART_BACKEND.md) and [DATABASE_SETUP.md](DATABASE_SETUP.md).
 
 ---
 
@@ -507,14 +557,18 @@ Powered by **Resend** (`RESEND_API_KEY`, `SENDER_EMAIL`, `COMPANY_NAME`, `COMPAN
 
 ## Maintenance jobs
 
-Started on server boot and run on intervals (`maintenanceJobs.ts`):
+Started after bootstrap completes (`maintenanceJobs.ts`). Each run logs `Maintenance: step started` / `step finished` with `durationMs`.
 
 | Job | Interval | Action |
 |-----|----------|--------|
-| Idempotency cleanup | 1 hour | Delete expired non-processing idempotency rows |
+| **Initial run** | `MAINTENANCE_DEFER_MS` after boot (default 120s) | DB ping → expire stale orders → reap stuck idempotency keys |
+| Idempotency cleanup | 1 hour | Delete expired non-processing rows (batched) |
 | Stale pending orders | 1 hour | Cancel pending orders older than `PENDING_ORDER_TTL_HOURS` (default 24), restore stock, release coupons |
-| Stuck idempotency reaper | 15 min | Mark long-running `processing` idempotency rows as `failed` |
+| Stuck idempotency reaper | 15 min | Mark long-running `processing` rows as `failed` (batched, `FOR UPDATE SKIP LOCKED`) |
 | Checkout exchange cleanup | 1 hour | Delete expired or used `order_checkout_exchanges` rows |
+| Order access exchange cleanup | 1 hour | Delete expired `order_access_exchanges` rows |
+
+**Idempotency reaper:** uses partial index `idx_payment_idempotency_processing_created`; batch size `IDEMPOTENCY_REAP_BATCH_SIZE` (default 50); max batches per run `IDEMPOTENCY_REAP_MAX_BATCHES` (default 10). On Supabase pooler, statements are capped at ~120s — batched reaper avoids statement timeouts.
 
 ---
 
@@ -574,10 +628,11 @@ Started on server boot and run on intervals (`maintenanceJobs.ts`):
 ### Schema files
 
 - `backend/src/database/schema.sql` — base schema
-- `backend/src/database/migration-*.sql` — incremental migrations
-- Startup applies: `ensureIdempotencyTable()`, `ensureOrderPaymentSchema()`, `ensureCheckoutExchangeTable()`, `ensureRlsPolicies()`
-- `backend/src/database/migration-rls-tighten.sql` — reference SQL for RLS (also applied idempotently at boot)
-- `backend/src/database/migration-performance-linter-fixes.sql` — FK indexes (lint 0001) and single `Service role manages {table}` policy per table (lint 0006) for `activity_logs`, `reviews`, `admin_sessions`, `contact_messages`, `orders`, `review_votes`; also applied at boot via `ensureRlsPolicies()`
+- `backend/src/database/migration-*.sql` — incremental migrations (run in Supabase SQL editor)
+- **Boot applies (skip-if-exists):** `ensureIdempotencyTable()`, `ensureOrderPaymentSchema()`, `ensureCheckoutExchangeTable()`, `ensureOrderAccessExchangeTable()`, `ensureRlsPolicies()`
+- `backend/src/database/migration-rls-tighten.sql` — reference SQL for RLS (mirrors boot logic)
+- `backend/src/database/migration-performance-linter-fixes.sql` — **run once manually** in Supabase: FK indexes (lint 0001) and consolidate duplicate RLS policies (lint 0006). Not applied destructively at boot (use `BOOTSTRAP_FORCE_RLS=true` only if you intentionally want legacy DROP on restart).
+- `backend/src/database/migration-payment-idempotency.sql` — includes partial index for reaper (`idx_payment_idempotency_processing_created`); boot also creates this index via `ensureIdempotencyIndexes()` when missing
 
 ---
 
@@ -810,7 +865,10 @@ Templates: `backend/env.template`, `frontend/env.template`
 |----------|---------|---------|
 | `PENDING_ORDER_TTL_HOURS` | 24 | Abandoned checkout expiry |
 | `IDEMPOTENCY_STALE_MINUTES` | 5 | Stuck idempotency reaper |
-| `DB_STATEMENT_TIMEOUT_MS` | 300000 | Postgres `statement_timeout` per connection (bootstrap DDL on Supabase pooler) |
+| `IDEMPOTENCY_REAP_BATCH_SIZE` | 50 | Rows per reaper/cleanup batch |
+| `IDEMPOTENCY_REAP_MAX_BATCHES` | 10 | Max reaper batches per maintenance run |
+| `MAINTENANCE_DEFER_MS` | 120000 | Delay first maintenance run after bootstrap |
+| `DB_STATEMENT_TIMEOUT_MS` | 300000 | Postgres `statement_timeout` per connection (client-side; Supabase pooler may still cap ~120s) |
 | `BOOTSTRAP_BLOCK_UNTIL_RLS` | — | Dev only: set `true` to block API ready until RLS migration finishes (production always waits) |
 | `BOOTSTRAP_BLOCK_API` | — | Dev only: set `true` to return 503 until full bootstrap completes (default: API ready immediately in dev) |
 | `BOOTSTRAP_SKIP_DDL` | — | Skip boot-time CREATE TABLE/INDEX when schema already exists in Supabase |
@@ -899,6 +957,15 @@ cd backend && SERVE_FRONTEND=true npm start   # http://localhost:5000
 ```
 
 **Strict env validation** is skipped locally unless `CI=true` or `NODE_ENV=production`.
+
+**After Supabase schema is applied**, add to `backend/.env`:
+
+```env
+BOOTSTRAP_SKIP_DDL=true
+LOG_LEVEL=debug
+```
+
+This skips CREATE TABLE/INDEX on every restart and enables detailed request/DB logs. See [Logging and monitoring](#logging-and-monitoring).
 
 ```bash
 npm test                         # All tests: backend unit + API + frontend UI (reports per suite)

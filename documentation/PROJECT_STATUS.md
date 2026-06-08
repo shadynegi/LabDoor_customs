@@ -68,10 +68,10 @@ Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_
 - **Monorepo** — npm workspaces (`frontend`, `backend`); root `npm run dev|build|start|test`
 - **Single-server** — Express serves `/api/*` and `frontend/dist` on one Railway service
 - Redis required in production (cache + rate limits; fail closed when unavailable)
-- Pino structured logging with request IDs
+- Pino structured logging with request IDs — `Request started` / `Request finished`, slow-request warnings, DB retry labels, maintenance step timing
 - Sentry required in production (backend + frontend build)
 - Health endpoint (`/api/health`) with DB, Redis (503 if required but down), and PayPal status
-- Maintenance jobs: idempotency cleanup, stale order expiry, stuck key reaper, checkout exchange cleanup
+- Maintenance jobs: idempotency cleanup (batched), stale order expiry, stuck key reaper (`SKIP LOCKED`), checkout/access exchange cleanup; deferred initial run
 - CI: backend validate-env + tests, frontend build with env validation, E2E smoke, sitemap gate
 
 ---

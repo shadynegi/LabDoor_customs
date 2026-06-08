@@ -24,7 +24,7 @@ Run in the **Supabase SQL Editor** (or psql on port 5432). Scripts live in `back
 **After SQL:**
 
 - [ ] `DATABASE_URL` uses **PgBouncer pooler** (port **6543**) on Railway, not direct 5432
-- [ ] Backend deployed/restarted once so `ensureRlsPolicies()` runs successfully (check deploy logs for `RLS policy migration applied`)
+- [ ] Backend deployed/restarted once — check deploy logs for `Bootstrap: skipping rls_policies` or successful RLS apply (not `BOOTSTRAP_FORCE_RLS` on routine restarts)
 - [ ] No startup error about RLS (set `ALLOW_INSECURE_RLS=true` only for local non-Supabase dev)
 
 ---

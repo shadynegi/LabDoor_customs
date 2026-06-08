@@ -49,6 +49,13 @@ SENDER_EMAIL=noreply@yourdomain.com
 
 `ORDER_TOKEN_ENCRYPTION_KEY` and `IP_SALT` are required in production (`validate-env.mjs`).
 
+**Recommended after running SQL in Supabase:**
+
+```env
+BOOTSTRAP_SKIP_DDL=true
+LOG_LEVEL=debug
+```
+
 Apply the database schema:
 
 ```bash

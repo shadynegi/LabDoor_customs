@@ -72,6 +72,10 @@ The frontend build runs `validate-env.mjs` → `generate-sitemap.mjs` → TypeSc
 
 | Variable | Purpose |
 |----------|---------|
+| `BOOTSTRAP_SKIP_DDL` | Skip CREATE TABLE/INDEX on boot when schema already in Supabase |
+| `MAINTENANCE_DEFER_MS` | Delay first maintenance run (default 120000) |
+| `LOG_LEVEL` | `debug` / `info` / `warn` / `error` |
+| `REQUEST_LOG_SLOW_MS` | Warn on slow HTTP requests (default 3000) |
 | `SERVE_FRONTEND` | `false` to disable static hosting (API-only mode); auto-enabled in production when dist exists |
 | `FRONTEND_DIST_PATH` | Override path to built SPA (default: `frontend/dist`) |
 | `DB_SSL_CA_PATH` | Supabase CA certificate |

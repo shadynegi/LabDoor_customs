@@ -59,16 +59,29 @@ cd backend && SERVE_FRONTEND=true npm start
 
 ## After restart
 
-The server automatically:
+The server automatically on **every start**:
 
-- Connects to Redis (required in production)
-- Applies schema patches (idempotency, refund events, checkout exchange tables)
-- Warms product cache
-- Starts maintenance jobs (order expiry, idempotency cleanup, checkout exchange cleanup)
-- Serves `frontend/dist` when present in production
+1. **Bootstrap** — DB ping, schema checks (skip-if-exists with `BOOTSTRAP_SKIP_DDL`), RLS verification, cache warm
+2. **Maintenance timers** — first run after `MAINTENANCE_DEFER_MS` (default 2 min), then hourly / 15‑min intervals
+3. **Redis** — connect in production (required)
+4. **Static SPA** — serves `frontend/dist` when present in production
+
+In **development**, the API is ready immediately; bootstrap and maintenance continue in the background. After Supabase schema is applied, set `BOOTSTRAP_SKIP_DDL=true` in `backend/.env` for fast restarts.
 
 ---
 
 ## Logs
 
-Check Railway logs or stdout for Pino JSON output. Filter by `X-Request-Id` for specific requests.
+Check Railway logs or stdout for Pino output (pretty-printed in dev, JSON in production).
+
+| Log message | Meaning |
+|-------------|---------|
+| `Request started` / `Request finished` | HTTP lifecycle with `requestId`, path, duration, status |
+| `Request timeout` | Route exceeded `REQUEST_TIMEOUT_MS` or `SLOW_REQUEST_TIMEOUT_MS`; includes `elapsedMs` and pool stats |
+| `[withRetry] transient failure` | DB connection blip (e.g. `ECONNRESET`); includes operation `label` |
+| `Bootstrap: skipping …` | Schema/RLS already applied — normal with `BOOTSTRAP_SKIP_DDL` |
+| `Maintenance: step finished` | Background cleanup step with `durationMs` |
+
+Filter by `X-Request-Id` header or `requestId` field in logs. Set `LOG_LEVEL=debug` locally for health-check noise at debug level only.
+
+**Full reference:** [`info.md`](info.md) — [Logging and monitoring](info.md#logging-and-monitoring), [Server startup and bootstrap](info.md#server-startup-and-bootstrap).

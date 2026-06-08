@@ -57,9 +57,11 @@ Created at server startup via `ensureIdempotencyTable()`, `ensureOrderPaymentSch
 
 Migration files:
 
-- `migration-payment-idempotency.sql`
+- `migration-payment-idempotency.sql` — table + indexes (including partial index for reaper)
 - `migration-paypal-unique-refunds.sql`
 - `migration-processed-refund-events.sql`
+
+Boot creates missing indexes via `ensureIdempotencyIndexes()` even when `BOOTSTRAP_SKIP_DDL=true`.
 
 ---
 
@@ -90,8 +92,9 @@ Applied via `migration-reviews.sql`:
 
 `ensureRlsPolicies()` runs at startup (`backend/src/lib/rlsMigration.ts`; see also `migration-rls-tighten.sql`, `migration-rls-sensitive-tables.sql`, `migration-revoke-graphql-client-roles.sql`).
 
-- **13 tables** have RLS with service_role-only policies: `products`, `orders`, `contact_messages`, `coupons`, `coupon_usage`, `customers`, `activity_logs`, `admin_sessions`, `reviews`, `review_votes`, `payment_idempotency`, `processed_refund_events`, `order_checkout_exchanges`.
-- **`anon` and `authenticated` grants are revoked** on all 13 tables — no public product catalog via PostgREST/GraphQL.
+- **14 tables** have RLS with service_role-only policies (including `order_access_exchanges`).
+- **`anon` and `authenticated` grants are revoked** — no public product catalog via PostgREST/GraphQL.
+- Boot is **non-destructive** when policies exist; run `migration-performance-linter-fixes.sql` once for lint 0006.
 - The Express backend connects with **service_role** credentials for all API operations.
 
 See [RLS_OPTIMIZATION.md](./RLS_OPTIMIZATION.md).
@@ -100,14 +103,14 @@ See [RLS_OPTIMIZATION.md](./RLS_OPTIMIZATION.md).
 
 ## Maintenance
 
-The backend runs scheduled jobs:
+Scheduled after bootstrap (`maintenanceJobs.ts`); initial run deferred by `MAINTENANCE_DEFER_MS` (default 120s):
 
 - Expire abandoned pending orders (restore stock)
-- Clean expired idempotency rows
-- Reap stuck processing idempotency keys
-- Clean expired or used checkout exchange codes
+- Clean expired idempotency rows (batched)
+- Reap stuck processing idempotency keys (batched, `SKIP LOCKED`, partial index)
+- Clean expired or used checkout / order-access exchange codes
 
----
+Logs: `Maintenance: step started` / `step finished` with `durationMs`.
 
 ## Keep-alive
 
