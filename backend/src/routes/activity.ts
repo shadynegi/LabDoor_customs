@@ -153,8 +153,12 @@ router.post('/batch', async (req: Request, res: Response) => {
     const anonymizedIp = anonymizeIp(rawIp);
     const userAgent = req.get('user-agent') || '';
 
+    let inserted = 0;
+    let skipped = 0;
+
     for (const activity of activities) {
       if (!activity?.actionType || !ALLOWED_ACTION_TYPES.has(activity.actionType)) {
+        skipped += 1;
         continue;
       }
 
@@ -170,7 +174,7 @@ router.post('/batch', async (req: Request, res: Response) => {
           referrer: activity.referrer,
         });
 
-        await sql`
+        const rows = await sql`
           INSERT INTO activity_logs (
             session_id, user_email, action_type, entity_type, entity_id,
             entity_name, metadata, ip_address, user_agent, page_url, referrer
@@ -187,7 +191,9 @@ router.post('/batch', async (req: Request, res: Response) => {
             ${clean.pageUrl},
             ${clean.referrer}
           )
-        `.catch(() => {});
+          RETURNING id
+        `;
+        if (rows.length) inserted += 1;
 
         if (
           (activity.actionType === 'product_view' || activity.actionType === 'add_to_cart') &&
@@ -202,12 +208,12 @@ router.post('/batch', async (req: Request, res: Response) => {
     }
 
     if (!res.headersSent) {
-      res.json({ success: true });
+      res.json({ success: true, inserted, skipped });
     }
   } catch (error: unknown) {
     logger.error('Batch activity log error:', error);
     if (!res.headersSent) {
-      res.json({ success: true });
+      respond500(res, error, 'Failed to log activity batch');
     }
   }
 });

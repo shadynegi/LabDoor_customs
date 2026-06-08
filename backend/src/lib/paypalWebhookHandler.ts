@@ -123,6 +123,9 @@ export function createPayPalWebhookHandler(isProduction: boolean) {
               processingFailed = true;
               logger.error('Database update error:', dbError);
             }
+          } else {
+            processingFailed = true;
+            logger.error('PAYMENT.CAPTURE.DENIED without resolvable order binding');
           }
           break;
         }

@@ -83,6 +83,63 @@ export function calculatePricing(subtotal: number, discount = 0): PricingBreakdo
   return calculateCheckoutPricing(subtotal, 0, discount);
 }
 
+export type ComputedCheckoutPricing = {
+  pricing: PricingBreakdown;
+  lineItems: ValidatedLineItem[];
+  couponId?: string;
+  couponDiscount: number;
+};
+
+/** Shared pricing path for create-payment and coupon validate (DB-backed cart). */
+export async function computeCheckoutPricingForCart(
+  items: CheckoutCartItemInput[],
+  couponCode?: string,
+  customerEmail?: string
+): Promise<
+  | { ok: true; result: ComputedCheckoutPricing }
+  | { ok: false; error: string; message: string }
+> {
+  const cartValidation = await validateCartItems(items);
+  if (!cartValidation.ok) {
+    return { ok: false, error: cartValidation.error, message: cartValidation.message };
+  }
+
+  const lineItems = cartValidation.lineItems;
+  const rawSubtotal = lineItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const totalItemCount = lineItems.reduce((sum, item) => sum + item.quantity, 0);
+  const volumePreview = calculateVolumeDiscount(rawSubtotal, totalItemCount);
+  const couponSubtotal = Math.max(0, rawSubtotal - volumePreview.amount);
+
+  let couponDiscount = 0;
+  let couponId: string | undefined;
+  if (couponCode?.trim()) {
+    try {
+      const couponResult = await resolveCouponDiscount(
+        couponCode,
+        couponSubtotal,
+        customerEmail || '',
+        lineItems.map((item) => ({
+          product_id: item.product_id,
+          price: item.price,
+          quantity: item.quantity,
+        }))
+      );
+      couponDiscount = couponResult.discount;
+      couponId = couponResult.couponId;
+    } catch (couponError: unknown) {
+      const message =
+        couponError instanceof Error ? couponError.message : 'Invalid coupon';
+      return { ok: false, error: 'Invalid coupon', message };
+    }
+  }
+
+  const pricing = calculateCheckoutPricing(rawSubtotal, totalItemCount, couponDiscount);
+  return {
+    ok: true,
+    result: { pricing, lineItems, couponId, couponDiscount },
+  };
+}
+
 export async function validateCartItems(
   items: CheckoutCartItemInput[]
 ): Promise<{ ok: true; lineItems: ValidatedLineItem[] } | { ok: false; error: string; message: string }> {

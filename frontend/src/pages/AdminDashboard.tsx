@@ -173,6 +173,8 @@ export default function AdminDashboard() {
   const [orderSearch, setOrderSearch] = useState('');
   const [orderStatusFilter, setOrderStatusFilter] = useState('all');
   const [productSearch, setProductSearch] = useState('');
+  const [productSearchResults, setProductSearchResults] = useState<typeof products | null>(null);
+  const [ordersError, setOrdersError] = useState<string | null>(null);
   const [messageStatusFilter, setMessageStatusFilter] = useState('all');
   const [customerSearch, setCustomerSearch] = useState('');
   
@@ -188,8 +190,41 @@ export default function AdminDashboard() {
     loadData();
   }, [activeTab]);
 
+  useEffect(() => {
+    if (!productSearch.trim()) {
+      setProductSearchResults(null);
+      return;
+    }
+    const handle = window.setTimeout(async () => {
+      try {
+        const response = await catalogFetch('/products/search', {
+          method: 'POST',
+          body: JSON.stringify({
+            query: productSearch.trim(),
+            limit: 50,
+            page: 1,
+          }),
+        });
+        const data = await response.json();
+        if (data.success) {
+          setProductSearchResults(
+            (data.data || []).map((p: { id: number; name: string; price: string | number; stock?: number; is_out_of_stock?: boolean }) => ({
+              ...p,
+              price: parseFloat(String(p.price)),
+              is_out_of_stock: p.is_out_of_stock || false,
+            }))
+          );
+        }
+      } catch (error) {
+        logError('Admin product search failed:', error);
+      }
+    }, 300);
+    return () => window.clearTimeout(handle);
+  }, [productSearch]);
+
   const loadData = async () => {
     if (activeTab === 'coupons' || activeTab === 'reviews') {
+      setLoading(false);
       return;
     }
     setLoading(true);
@@ -239,6 +274,7 @@ export default function AdminDashboard() {
   };
 
   const fetchOrders = async (page = ordersPage, search = orderSearch) => {
+    setOrdersError(null);
     try {
       const statusQuery = orderStatusFilter !== 'all' ? `&status=${orderStatusFilter}` : '';
       const searchQuery = search.trim() ? `&search=${encodeURIComponent(search.trim())}` : '';
@@ -257,9 +293,12 @@ export default function AdminDashboard() {
         setOrdersTotal(data.count ?? parsed.length);
         setOrdersTotalPages(data.pagination?.totalPages ?? 1);
         setOrdersPage(data.pagination?.page ?? page);
+      } else {
+        setOrdersError(data.error || 'Failed to load orders');
       }
     } catch (error) {
       logError('Error fetching orders:', error);
+      setOrdersError('Unable to load orders. Check your connection and try again.');
       toast.error('Failed to load orders');
     }
   };
@@ -715,7 +754,7 @@ export default function AdminDashboard() {
   // Filter functions
   const filteredOrders = orders;
 
-  const filteredProducts = products.filter(p => {
+  const filteredProducts = productSearchResults ?? products.filter((p) => {
     return !productSearch || p.name.toLowerCase().includes(productSearch.toLowerCase());
   });
 
@@ -1085,6 +1124,15 @@ export default function AdminDashboard() {
 
   const renderOrders = () => (
     <div>
+      {ordersError && (
+        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 12, padding: 16, marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+          <span style={{ color: '#b91c1c', fontSize: 14 }}>{ordersError}</span>
+          <button type="button" onClick={() => fetchOrders(ordersPage, orderSearch)}
+            style={{ padding: '8px 14px', background: 'white', border: '1px solid #fecaca', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
+            Retry
+          </button>
+        </div>
+      )}
       {/* Toolbar */}
       <div style={{ background: 'white', borderRadius: 12, padding: 16, marginBottom: 16, border: '1px solid #e5e7eb', display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
         <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>

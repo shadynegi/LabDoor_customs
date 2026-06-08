@@ -39,7 +39,8 @@ If the analytics API fails, the tab shows an error message with a **Retry** butt
 ## Products tab
 
 - View products with stock and status — **50 per page** with **Load more** and total count (`GET /api/products?limit=50&page=`)
-- Client-side search/filter applies to loaded products; load more to include additional catalog pages
+- **Search** — debounced server-side query via `POST /api/products/search` (searches full catalog, not only loaded pages)
+- **Load more** — paginated list via `GET /api/products?limit=50&page=` when not searching
 - Error banner with **Retry** if the product list fails to load
 - Create new products (name, price, images, category, size, color, stock)
 - Edit existing products

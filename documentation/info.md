@@ -190,7 +190,7 @@ Payment success page redeems ?code= via GET /api/paypal/checkout-exchange/:code
 2. Resolves coupon discount with scope rules (`applies_to`: all, product, or category).
 3. Calculates pricing: subtotal, shipping ($25 or free over $200), tax ($0), discount, total.
 4. Claims a **create_payment** idempotency key (header `X-Idempotency-Key` or fingerprint hash).
-5. Atomically inserts a pending order and decrements product stock.
+5. Atomically inserts a pending order and decrements product stock; stores `access_token_hash` and **AES-256-GCM** `access_token_encrypted` on the order row for durable post-capture email link minting.
 6. Reserves coupon usage in `coupon_usage`.
 7. Creates a PayPal order with `reference_id` / `custom_id` set to the server order UUID.
 8. Creates a one-time **checkout exchange code** (stored hashed in `order_checkout_exchanges`, 30-minute TTL, single use).
@@ -229,7 +229,7 @@ Payment success page redeems ?code= via GET /api/paypal/checkout-exchange/:code
 | Event | Behavior |
 |-------|----------|
 | `PAYMENT.CAPTURE.COMPLETED` | Resolve capture amount from webhook or PayPal API if missing; complete order with amount validation; auto-refund on mismatch; returns **500** (PayPal retry) when order binding or capture application fails |
-| `PAYMENT.CAPTURE.DENIED` | Cancel pending order, restore stock |
+| `PAYMENT.CAPTURE.DENIED` | Cancel pending order, restore stock; returns **500** when order binding cannot be resolved (PayPal retry) |
 | `PAYMENT.CAPTURE.REFUNDED` | Sync refund to DB with deduplication |
 | `PAYMENT.CAPTURE.REVERSED` | Sync reversal with deduplication |
 | `CHECKOUT.ORDER.APPROVED` / `COMPLETED` | Logged; capture handled by frontend or CAPTURE.COMPLETED |
@@ -284,8 +284,8 @@ Statuses: `processing`, `completed`, `failed`. Stuck `processing` rows are reape
 
 ### Customer order access
 
-- Each order receives a 64-character hex **access token** at creation; only a SHA-256 hash is stored.
-- Confirmation emails use a **one-time tracking link** (`/orders?code=...`) redeemed via `GET /api/orders/access-exchange/:code` — no long-lived token in the URL.
+- Each order receives a 64-character hex **access token** at creation; a SHA-256 hash and **AES-256-GCM encrypted** copy (`access_token_encrypted`) are stored on the order row.
+- Confirmation and shipping emails mint a **one-time tracking link** (`/orders?code=...`) via `order_access_exchanges`, using the encrypted token on the order (fallback: ephemeral `order_checkout_exchanges` row for legacy orders). Redeemed via `GET /api/orders/access-exchange/:code` — no long-lived token in the URL.
 - Legacy deep links with `?orderNumber=&token=` in the URL are deprecated: the storefront strips them and shows a warning; customers enter credentials manually or use a fresh email link.
 - Customer lookup: `POST /api/orders/lookup` with `{ orderNumber, accessToken }` in the JSON body.
 - Tracked orders in `sessionStorage` auto-refresh; partial refresh failures keep last-known order data and show a non-blocking warning.
@@ -320,10 +320,11 @@ Statuses: `processing`, `completed`, `failed`. Stuck `processing` rows are reape
 | Free shipping threshold | $200 subtotal |
 | Standard shipping | $25 |
 | Tax | $0 |
+| Volume discount | 10% off at 2+ items (quantity sum); 20% off at 5+ items — applied before coupon discount |
 
 ### Coupon validation
 
-- `POST /api/coupons/validate` — public, rate-limited, cached 30s.
+- `POST /api/coupons/validate` — public, rate-limited, cached 30s. Requires cart **`items`** (`product_id`, `quantity`); prices are loaded from the database via the same `computeCheckoutPricingForCart` helper as create-payment (volume discount, shipping, coupon scope). Response includes a **`pricing`** breakdown when valid. Checkout compares server `total` to the client total before PayPal redirect (blocks on mismatch > $0.01).
 - Scope enforcement at checkout:
   - `all` — applies to full eligible cart subtotal
   - `product` — only matching `applies_to_ids` product IDs
@@ -346,7 +347,7 @@ At create-payment, a row in `coupon_usage` reserves the coupon for the pending o
 - Public submit: rate-limited; new reviews always start as `pending`; success copy tells customers the review is **pending moderation**; email format and product existence validated server-side.
 - Storefront **ReviewForm** calls `POST /api/reviews/check` on email blur before submit (generic eligibility message; avoids email enumeration in URLs).
 - Votes: rate-limited; **only `approved` reviews** accept helpful/not-helpful votes; vote failures show a toast; buttons disable after a successful vote.
-- `POST /api/reviews/check` (email in JSON body) returns `{ can_review, message }`. Legacy `GET .../:email` is deprecated (PII in URL).
+- `POST /api/reviews/check` (email in JSON body) returns `{ can_review, message }` with the same generic message when the product is missing or ineligible (no product enumeration). Legacy `GET .../:email` is deprecated (PII in URL).
 - Admin can set **`admin_response`** on edit (`PATCH /api/reviews/:id`); displayed on the public product page for approved reviews.
 - Voter identity for helpful votes is a server-derived daily hash from client IP + `IP_SALT` (not client-supplied).
 - Verified purchase flag when reviewer email matches a completed order for that product.
@@ -368,8 +369,8 @@ At create-payment, a row in `coupon_usage` reserves the coupon for the pending o
 
 - Frontend batches page views, cart actions, checkout events (`checkout_start`, `checkout_complete`, `purchase_complete`), size/quantity changes, and **contact submit** to `POST /api/activity/batch` only when analytics cookie consent is granted (`hasAnalyticsConsent()`). Checkout email is stored in `sessionStorage` only when consent is granted (`setUserEmail` on checkout email change/blur); cleared on cookie reject.
 - Allowed batch action types: `page_view`, `product_view`, `add_to_cart`, `remove_from_cart`, `checkout_start`, `checkout_complete`, `purchase_complete`, `search`, `filter_apply`, `contact_submit`, `size_select`, `quantity_change`.
-- Declared but optional (not yet wired on all UI surfaces): `size_select`, `quantity_change`, `checkout_complete` as separate events beyond existing purchase tracking.
-- `POST /api/activity/batch` is **CSRF-exempt** (supports `sendBeacon`) and rate-limited separately; max **20** events per batch.
+- Wired on storefront: `size_select` (product detail), `quantity_change` (cart +/-), `checkout_complete` (before PayPal redirect), `purchase_complete` (payment success).
+- `POST /api/activity/batch` is **CSRF-exempt** (supports `sendBeacon`) and rate-limited separately; max **20** events per batch. Response includes `inserted` and `skipped` counts; unknown action types are skipped (not persisted).
 - IP addresses anonymized with daily-salted SHA-256 (`IP_SALT`); stored as `anon_{hash}`.
 - `product_view` and `add_to_cart` events can bump product metrics when `canBumpProductMetric()` allows (per-IP per-product rate limit).
 - Admin can query logs and export.
@@ -498,6 +499,7 @@ Each task runs on every start but **skips DDL** when `BOOTSTRAP_SKIP_DDL=true` o
 - `ensureIdempotencyTable()` — also ensures indexes including `idx_payment_idempotency_processing_created`
 - `ensureActivityLogsTable()`, `ensureOrderPaymentSchema()`, `ensureCheckoutExchangeTable()`, `ensureOrderAccessExchangeTable()`
 - `ensureRlsPolicies()` — skips when marker tables already have `Service role%` policies; never DROP legacy policies unless `BOOTSTRAP_FORCE_RLS=true`
+- `ensureClientGrantsRevoked()` — always runs (even when DDL is skipped); in production, startup **fails** if `anon`/`authenticated` still hold table grants after revoke
 - `purgeLegacyAdminSessions()` — skips when no legacy plaintext tokens
 - `warmCaches()` — always runs (~500ms); preloads product list pages
 
@@ -617,7 +619,7 @@ Started after bootstrap completes (`maintenanceJobs.ts`). Each run logs `Mainten
 | Table | Purpose |
 |-------|---------|
 | `products` | Catalog — price, stock, category, size, color, ratings |
-| `orders` | Orders — JSONB items/shipping, PayPal IDs, `refunded_amount`, access token hash |
+| `orders` | Orders — JSONB items/shipping, PayPal IDs, `refunded_amount`, `access_token_hash`, `access_token_encrypted` |
 | `customers` | Aggregated customer stats, soft delete |
 | `coupons` | Discount rules, scope, validity, usage limits |
 | `coupon_usage` | Per-order coupon reservations |
@@ -637,7 +639,7 @@ Started after bootstrap completes (`maintenanceJobs.ts`). Each run logs `Mainten
 ### Schema files
 
 - `backend/src/database/schema.sql` — base schema
-- `backend/src/database/migration-*.sql` — incremental migrations (run in Supabase SQL editor)
+- `backend/src/database/migration-*.sql` — incremental migrations (run in Supabase SQL editor), including `migration-order-checkout-exchange.sql` and `migration-order-access-token-encrypted.sql`
 - **Boot applies (skip-if-exists):** `ensureIdempotencyTable()`, `ensureOrderPaymentSchema()`, `ensureCheckoutExchangeTable()`, `ensureOrderAccessExchangeTable()`, `ensureRlsPolicies()`
 - `backend/src/database/migration-rls-tighten.sql` — reference SQL for RLS (mirrors boot logic)
 - `backend/src/database/migration-performance-linter-fixes.sql` — **run once manually** in Supabase: FK indexes (lint 0001) and consolidate duplicate RLS policies (lint 0006). Not applied destructively at boot (use `BOOTSTRAP_FORCE_RLS=true` only if you intentionally want legacy DROP on restart).
@@ -992,10 +994,10 @@ npm run links:check
 
 | Suite | Tool | Coverage |
 |-------|------|----------|
-| Backend unit/API | Vitest | Checkout validation, payment idempotency, order tokens, checkout exchange, order token encryption, webhook errors, product images, admin session hashing, PayPal utils, refund idempotency |
+| Backend unit/API | Vitest | Checkout validation, `computeCheckoutPricingForCart`, payment idempotency, order tokens, checkout exchange, order token encryption, webhook errors, product images, admin session hashing, PayPal utils, refund idempotency, activity batch, order lookup |
 | Frontend E2E / UI | Playwright | Storefront smoke, products/cart/checkout/contact UI, navigation, cookie consent, mobile viewport (22 tests; mocked API) |
 
-**Total automated tests:** 105 (67 backend unit + 16 API + 22 Playwright UI).
+**Total automated tests:** 111 (68 backend unit + 21 API + 22 Playwright UI).
 
 | Link check | Custom script | Documentation internal links |
 

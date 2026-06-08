@@ -18,7 +18,7 @@ import { getFriendlyError } from "../utils/errorMessages";
 import { logError } from "../lib/logger";
 import { useResponsive } from "../hooks/useResponsive";
 import MobileStickyCta from "../components/MobileStickyCta";
-import { setUserEmail, trackCheckoutStart } from "../utils/activityTracker";
+import { setUserEmail, trackCheckoutStart, trackCheckoutComplete } from "../utils/activityTracker";
 import {
   CreditCard,
   User,
@@ -290,6 +290,18 @@ export default function Checkout() {
     }
   }, [state.items.length, navigate]);
 
+  const cartSignature = state.items
+    .map((item) => `${item.id}:${item.quantity}:${item.price}`)
+    .join('|');
+  const prevCartSignature = useRef(cartSignature);
+
+  useEffect(() => {
+    if (prevCartSignature.current === cartSignature) return;
+    prevCartSignature.current = cartSignature;
+    setAppliedCoupon(null);
+    setCouponError('Cart changed — please re-apply your coupon.');
+  }, [cartSignature]);
+
   const countryOptions = useMemo(() => {
     const countries = getNames();
     return countries.map((name: string) => ({ value: name, label: name }));
@@ -470,14 +482,26 @@ export default function Checkout() {
         });
         throw new Error('Payment creation failed');
       }
+
+      const serverTotal =
+        data.total != null ? parseFloat(String(data.total)) : null;
+      if (serverTotal != null && Math.abs(serverTotal - total) > 0.01) {
+        toast.error('Pricing was updated', {
+          description: `Your total is now $${serverTotal.toFixed(2)}. Please review and try again.`,
+          duration: 8000,
+        });
+        setIsProcessing(false);
+        return;
+      }
       
       const approvalUrl = data.links?.find((link: any) => 
         link.rel === 'approval_url' || link.rel === 'approve'
       )?.href;
 
       if (approvalUrl) {
+        trackCheckoutComplete(serverTotal ?? total, totalItemCount);
         sessionStorage.setItem('pendingOrder', JSON.stringify({
-          total: data.total ?? total,
+          total: serverTotal ?? total,
           serverOrderId: data.serverOrderId,
           orderNumber: data.orderNumber,
           paypalOrderId: data.orderId,

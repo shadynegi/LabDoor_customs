@@ -20,6 +20,8 @@ Located in `backend/src/database/`:
 - `migration-rls-sensitive-tables.sql` — RLS on coupons, coupon_usage, payment_idempotency, processed_refund_events (skips tables not created yet)
 - `migration-revoke-graphql-client-roles.sql` — revoke `anon`/`authenticated` grants (fixes GraphQL linter 0026/0027) + fix `update_product_rating` search_path (lint 0011)
 - `migration-order-access-exchange.sql` — one-time order tracking link codes (email; no token in URL)
+- `migration-order-checkout-exchange.sql` — PayPal return checkout exchange codes (`order_checkout_exchanges`)
+- `migration-order-access-token-encrypted.sql` — `orders.access_token_encrypted` for durable post-capture email link minting
 - `migration-performance-linter-fixes.sql` — **run once manually:** FK indexes (lint 0001) + consolidate duplicate RLS policies (lint 0006) on `activity_logs`, `reviews`, `admin_sessions`, `contact_messages`, `orders`, `review_votes`
 - `migration-payment-idempotency.sql` — idempotency table + indexes including partial index `idx_payment_idempotency_processing_created` for maintenance reaper
 
@@ -35,7 +37,7 @@ Located in `backend/src/database/`:
 Runtime tables also patched at boot when not skipped:
 
 - `payment_idempotency`, `processed_refund_events`, `order_checkout_exchanges`, `order_access_exchanges`
-- `orders.refunded_amount`, customer soft-delete columns, PayPal unique indexes
+- `orders.refunded_amount`, `orders.access_token_encrypted`, customer soft-delete columns, PayPal unique indexes
 
 ## Running SQL
 

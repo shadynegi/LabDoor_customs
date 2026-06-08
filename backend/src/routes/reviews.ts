@@ -635,7 +635,14 @@ async function checkReviewEligibility(productId: number, email: string) {
     SELECT id FROM products WHERE id = ${productId} LIMIT 1
   `;
   if (!product.length) {
-    return { status: 404 as const, error: 'Product not found' };
+    return {
+      status: 200 as const,
+      data: {
+        can_review: false,
+        message:
+          'A review may already exist for this product and email, or eligibility could not be confirmed.',
+      },
+    };
   }
 
   const existingReview = await sql`
@@ -674,10 +681,6 @@ router.post('/check', async (req: Request, res: Response) => {
     if (result.status === 400) {
       return res.status(400).json({ success: false, error: result.error });
     }
-    if (result.status === 404) {
-      return res.status(404).json({ success: false, error: result.error });
-    }
-
     res.json({ success: true, data: result.data });
   } catch (error: unknown) {
     logger.error('Error checking review eligibility:', error);

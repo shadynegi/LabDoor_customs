@@ -12,8 +12,9 @@ import { ensureProcessedRefundEventsTable } from './refundIdempotency';
 export async function ensureOrderPaymentSchema(): Promise<void> {
   const hasRefundColumn = await publicColumnExists('orders', 'refunded_amount');
   const hasRefundEventsTable = await publicTableExists('processed_refund_events');
+  const hasTokenEncrypted = await publicColumnExists('orders', 'access_token_encrypted');
 
-  if (shouldSkipBootstrapDdl() && hasRefundColumn && hasRefundEventsTable) {
+  if (shouldSkipBootstrapDdl() && hasRefundColumn && hasRefundEventsTable && hasTokenEncrypted) {
     logBootstrapDdlSkipped('order_payment_schema');
     return;
   }
@@ -53,6 +54,13 @@ export async function ensureOrderPaymentSchema(): Promise<void> {
 
   if (!hasRefundEventsTable) {
     await ensureProcessedRefundEventsTable();
+  }
+
+  if (!hasTokenEncrypted) {
+    await sql`
+      ALTER TABLE orders
+      ADD COLUMN IF NOT EXISTS access_token_encrypted TEXT
+    `;
   }
 
   logger.info('Order payment schema patches applied');

@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS orders (
   paypal_capture_id VARCHAR(255),
   refunded_amount DECIMAL(10, 2) NOT NULL DEFAULT 0,
   access_token_hash VARCHAR(64),
+  access_token_encrypted TEXT,
   status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'shipped', 'delivered', 'cancelled')),
   tracking_number VARCHAR(100),
   tracking_url TEXT,

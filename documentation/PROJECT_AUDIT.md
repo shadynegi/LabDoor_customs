@@ -5,7 +5,7 @@
 
 **Review method:** Read `info.md` + operational guides; parallel audit of `backend/src`, `frontend/src`, `Tests/`, CI, env templates; spot-verify critical findings in source.
 
-**Automated tests at audit time:** 99 passing (61 unit + 16 API + 22 Playwright). **After remediation:** 105 passing (67 unit + 16 API + 22 Playwright).
+**Automated tests at audit time:** 99 passing (61 unit + 16 API + 22 Playwright). **After remediation (`3dbdef9`):** 105 passing. **After follow-up fixes:** 111 passing (68 unit + 21 API + 22 Playwright).
 
 ---
 
@@ -13,7 +13,7 @@
 
 The platform is **production-viable** for core storefront checkout, admin fulfillment, and PayPal capture/webhooks. Recent frontend work closed major gaps (409 payment UI, checkout exchange errors, admin messages, review eligibility, cart retry).
 
-**Remediation (2026-06-08):** Critical and high audit items **C1–C4, C6, H1–H8** were implemented in code; see [Remediation log](#remediation-log) below. Remaining gaps are mostly **integration tests** (C5) and medium-priority UX items — track via [`COVERAGE_MATRIX.md`](COVERAGE_MATRIX.md).
+**Remediation (2026-06-08):** Critical and high audit items **C1–C4, C6, H1–H8** were implemented in `3dbdef9`. **Follow-up (same day):** **F-01, F-02, F-04, F-06, F-07, DB-01, FE-01–FE-06** closed in code; partial **C5** coverage via activity batch, order lookup, and `computeCheckoutPricingForCart` tests. Remaining gaps: webhook/capture/mark-paid API tests, Playwright payment-edge specs — track via [`COVERAGE_MATRIX.md`](COVERAGE_MATRIX.md).
 
 **Original top risks (snapshot at audit time — most now closed):**
 
@@ -221,6 +221,51 @@ Sprint 4 — Admin/storefront polish
 
 ---
 
+## Follow-up audit (2026-06-08, post `3dbdef9`)
+
+**Method:** Re-read `info.md`, `COVERAGE_MATRIX.md`, `PROJECT_STATUS.md`; parallel code audit of backend, frontend, Tests, schema; spot-verify remediation claims.
+
+**Verdict:** Core storefront checkout is **production-viable**. Remediation closed most original C/H items in code. **Remaining work** clusters into: (1) durable order access for emails, (2) coupon validate price parity, (3) automated tests for payment paths, (4) frontend payment-edge UX, (5) DB migration completeness.
+
+### Closed in follow-up remediation (2026-06-08)
+
+| ID | Status | Summary |
+|----|--------|---------|
+| **F-01** | Closed | `orders.access_token_encrypted` at create-payment; `getOrderAccessTokenForEmail()` reads durable store with checkout-exchange fallback |
+| **F-02** | Closed | `/coupons/validate` uses `computeCheckoutPricingForCart` (DB prices + volume + shipping) |
+| **FE-01** | Closed | Checkout blocks PayPal redirect when server `total` ≠ client total (> $0.01) |
+| **FE-02** | Closed | `PaymentSuccess` error UI when PayPal `token` missing |
+| **FE-03** | Closed | 409 poll timeout shows terminal error + retry |
+| **FE-04** | Closed | Coupon cleared when cart signature changes |
+| **FE-05** | Closed | Admin product search via `POST /products/search` |
+| **FE-06** | Closed | Coupons/reviews tabs `setLoading(false)`; orders tab error + Retry |
+| **F-06** | Closed | `/reviews/check` returns 200 + generic message for missing product |
+| **F-07** | Closed | Webhook DENIED sets `processingFailed` when order binding fails |
+| **F-04** | Closed | `assertNoClientGrantsRemaining()` fails production startup if grants remain |
+| **DB-01** | Closed | `migration-order-checkout-exchange.sql` + `schema.sql`; `migration-order-access-token-encrypted.sql` |
+| **F-03** | Closed | `API_DOCUMENTATION.md` validate request/response synced |
+
+### Still open (next sprint)
+
+| ID | Severity | Issue | Next step |
+|----|----------|-------|-----------|
+| **C5** | Critical | Payment paths mostly untested (409, webhook, mark-paid, exchange redeem API) | `captureReconciliation.test.ts`, `paypalWebhook.test.ts`, Playwright payment specs |
+| **UI-PAY-409** | High | No Playwright for 409 poll / missing token | `payment-success-ui.spec.ts` |
+| **ORD-MARK-PAID** | High | Admin mark-paid untested | `adminMarkPaid.test.ts` |
+| **SEC-RLS** | Medium | No automated RLS/grant tests | `rlsMigration.test.ts` |
+
+### Test sprint order (closes C5 without re-auditing)
+
+1. `Tests/api/captureReconciliation.test.ts` — PAY-409, PAY-CONTEXT  
+2. `Tests/api/paypalWebhook.test.ts` — PAY-WEBHOOK, PAY-WEBHOOK-DENIED  
+3. `Tests/api/checkoutExchange.test.ts` + `orderAccessExchange.test.ts` — PAY-EXCHANGE, ORD-ACCESS-EX  
+4. `Tests/api/adminMarkPaid.test.ts` — ORD-MARK-PAID  
+5. `Tests/api/activityBatch.test.ts` — ACT-BATCH, ACT-CONTACT  
+6. `Tests/backend/rlsMigration.test.ts` — SEC-RLS, SEC-BOOTSTRAP  
+7. `Tests/frontend/payment-success-ui.spec.ts` + `orders-ui.spec.ts` — UI-PAY-409, UI-ORDERS  
+
+---
+
 ## Preventing repeat full reviews
 
 | Artifact | Role |
@@ -248,6 +293,18 @@ Sprint 4 — Admin/storefront polish
 | 2026-06-08 | H6 | Admin image upload limit 512 KB (matches server) |
 | 2026-06-08 | H7 | Shipping emails include order portal link |
 | 2026-06-08 | H8 | `processed_refund_events` created even under `BOOTSTRAP_SKIP_DDL` |
+| 2026-06-08 | — | Follow-up audit post `3dbdef9`; `COVERAGE_MATRIX.md` refreshed; `info.md` volume discount + activity wiring |
+| 2026-06-08 | F-01 | `orders.access_token_encrypted` + `getOrderAccessTokenForEmail()` durable email minting |
+| 2026-06-08 | F-02 | Coupon validate uses `computeCheckoutPricingForCart`; returns `pricing` breakdown |
+| 2026-06-08 | FE-01 | Checkout compares server vs client total before PayPal redirect |
+| 2026-06-08 | FE-02/FE-03 | PaymentSuccess missing-token and 409-timeout error UX |
+| 2026-06-08 | FE-04 | Coupon cleared on cart signature change |
+| 2026-06-08 | FE-05/FE-06 | Admin server product search; coupons/reviews/orders loading fixes |
+| 2026-06-08 | F-06 | Reviews check — no product enumeration (200 generic) |
+| 2026-06-08 | F-07 | Webhook DENIED → 500 when order binding fails |
+| 2026-06-08 | F-04 | Production startup fails if client grants remain |
+| 2026-06-08 | DB-01 | Checkout exchange + access_token_encrypted migration SQL files |
+| 2026-06-08 | C5 | Partial — `activityBatch.test.ts`, `orderLookup.test.ts`, `computeCheckoutPricingForCart.test.ts` (111 tests total) |
 
 *Append a line when closing each Critical/High item.*
 

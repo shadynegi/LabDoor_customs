@@ -389,6 +389,7 @@ export default function AdminCouponsTab() {
             <thead>
               <tr style={{ background: '#f9fafb' }}>
                 <th style={{ padding: 16, textAlign: 'left', fontSize: 13 }}>Code</th>
+                <th style={{ padding: 16, textAlign: 'left', fontSize: 13 }}>Scope</th>
                 <th style={{ padding: 16, textAlign: 'left', fontSize: 13 }}>Discount</th>
                 <th style={{ padding: 16, textAlign: 'left', fontSize: 13 }}>Uses</th>
                 <th style={{ padding: 16, textAlign: 'left', fontSize: 13 }}>Status</th>
@@ -403,6 +404,13 @@ export default function AdminCouponsTab() {
                       <Tag size={16} color="#9c6649" />
                       {coupon.code}
                     </span>
+                  </td>
+                  <td style={{ padding: 16, fontSize: 13, color: '#6b7280' }}>
+                    {coupon.applies_to === 'product'
+                      ? `Products (${(coupon.applies_to_ids || []).length})`
+                      : coupon.applies_to === 'category'
+                        ? `Categories (${(coupon.applies_to_ids || []).length})`
+                        : 'All'}
                   </td>
                   <td style={{ padding: 16 }}>
                     {coupon.discount_type === 'percentage'

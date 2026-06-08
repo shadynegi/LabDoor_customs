@@ -41,14 +41,16 @@ If the user did not mention testing, **skip** `npm test`, `npm run test:all`, Pl
 
 | Suite | Tool | Location | Count | Needs live DB? |
 |-------|------|----------|-------|----------------|
-| Backend unit | Vitest | `Tests/backend/` | 13 files, 61 tests | No (mocked) |
-| API integration | Vitest + Supertest | `Tests/api/` | 4 files, 16 tests | No (mocked) |
+| Backend unit | Vitest | `Tests/backend/` | 14 files, 68 tests | No (mocked) |
+| API integration | Vitest + Supertest | `Tests/api/` | 6 files, 21 tests | No (mocked) |
 | Frontend E2E / UI | Playwright | `Tests/frontend/` | 8 files, 22 tests | No (mocked `/api` + static preview) |
 | Link checker | Custom script | repo root | — | No |
 
-**Total:** 105 automated tests — 67 backend unit + 16 API + 22 Playwright UI (desktop + mobile projects).
+**Total:** 111 automated tests — 68 backend unit + 21 API + 22 Playwright UI (desktop + mobile projects).
 
-Backend unit tests include: payment idempotency, order tokens, checkout exchange hashing, order token encryption, webhook errors, product image validation, admin session hashing, PayPal webhook utils, refund idempotency, checkout pricing, client IP, keep-alive.
+Backend unit tests include: payment idempotency, order tokens, checkout exchange hashing, order token encryption, webhook errors, product image validation, admin session hashing, PayPal webhook utils, refund idempotency, checkout pricing, `computeCheckoutPricingForCart`, client IP, keep-alive.
+
+API tests include: checkout, health, orders, security, activity batch (`contact_submit`, unknown types, batch limit), order lookup (uniform 404).
 
 ---
 

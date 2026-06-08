@@ -204,11 +204,33 @@ async function ensureUpdateProductRatingFunction(): Promise<void> {
   `;
 }
 
+async function assertNoClientGrantsRemaining(): Promise<void> {
+  const isProduction = process.env.NODE_ENV === 'production';
+  const forceAudit = process.env.REQUIRE_RLS_GRANT_AUDIT === 'true';
+  if (!isProduction && !forceAudit) return;
+
+  const remaining: string[] = [];
+  for (const table of CLIENT_REVOKED_TABLES) {
+    if ((await tableExists(table)) && (await authenticatedHasTableGrants(table))) {
+      remaining.push(table);
+    }
+  }
+
+  if (remaining.length) {
+    const message = `PostgREST client grants remain on: ${remaining.join(', ')}`;
+    logger.error(message);
+    if (isProduction && process.env.ALLOW_INSECURE_RLS !== 'true') {
+      throw new Error(message);
+    }
+  }
+}
+
 /** Revoke anon/authenticated grants even when full RLS DDL is skipped. */
 export async function ensureClientGrantsRevoked(): Promise<void> {
   for (const table of CLIENT_REVOKED_TABLES) {
     await revokeClientRoleGrants(table);
   }
+  await assertNoClientGrantsRemaining();
 }
 
 /** Idempotent Supabase RLS tighten — backend uses service_role; limits direct PostgREST abuse. */
@@ -246,6 +268,8 @@ export async function ensureRlsPolicies(): Promise<void> {
     for (const table of CLIENT_REVOKED_TABLES) {
       await revokeClientRoleGrants(table);
     }
+
+    await assertNoClientGrantsRemaining();
 
     await ensureRlsIndexes();
     await ensureUpdateProductRatingFunction();

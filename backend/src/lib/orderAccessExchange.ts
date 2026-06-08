@@ -65,25 +65,37 @@ export async function createOrderAccessExchangeCode(
   throw new Error('Failed to generate unique order access exchange code');
 }
 
-/** Mint a tracking link from stored checkout exchange token (webhook/admin capture paths). */
-export async function issueOrderTrackingExchangeFromOrder(
-  orderId: string
-): Promise<string | null> {
-  const rows = await sql`
+/** Recover plaintext access token for email link minting (durable store first). */
+export async function getOrderAccessTokenForEmail(orderId: string): Promise<string | null> {
+  const orderRows = await sql`
+    SELECT access_token_encrypted FROM orders WHERE id = ${orderId} LIMIT 1
+  `;
+  if (orderRows[0]?.access_token_encrypted) {
+    const token = decryptOrderAccessToken(orderRows[0].access_token_encrypted as string);
+    if (token) return token;
+  }
+
+  const checkoutRows = await sql`
     SELECT access_token FROM order_checkout_exchanges
     WHERE order_id = ${orderId}
     ORDER BY created_at DESC
     LIMIT 1
   `;
+  if (!checkoutRows.length) return null;
 
-  if (!rows.length) return null;
-
-  const accessToken = decryptOrderAccessToken(rows[0].access_token as string);
-  if (!accessToken) {
-    logger.warn('Could not decrypt checkout exchange token for tracking link', { orderId });
-    return null;
+  const fallback = decryptOrderAccessToken(checkoutRows[0].access_token as string);
+  if (!fallback) {
+    logger.warn('Could not decrypt order access token for tracking link', { orderId });
   }
+  return fallback;
+}
 
+/** Mint a tracking link from stored order access token (webhook/admin capture paths). */
+export async function issueOrderTrackingExchangeFromOrder(
+  orderId: string
+): Promise<string | null> {
+  const accessToken = await getOrderAccessTokenForEmail(orderId);
+  if (!accessToken) return null;
   return createOrderAccessExchangeCode(orderId, accessToken);
 }
 

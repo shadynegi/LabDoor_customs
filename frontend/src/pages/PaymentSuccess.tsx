@@ -225,7 +225,16 @@ export default function PaymentSuccess() {
     const maxAttempts = 15;
 
     const pollOrderStatus = async () => {
-      if (cancelled || attempts >= maxAttempts) return;
+      if (cancelled) return;
+      if (attempts >= maxAttempts) {
+        setPaymentStep('error');
+        setCaptureError(
+          'Your payment was received but order confirmation is taking longer than expected. Check /orders or contact support — your cart was not cleared.'
+        );
+        setProcessingMessage(null);
+        setReconciliationContext(null);
+        return;
+      }
       attempts += 1;
 
       try {
@@ -324,7 +333,11 @@ export default function PaymentSuccess() {
       }
 
       if (!token) {
-        navigate('/');
+        setPaymentStep('error');
+        setCaptureError(
+          'PayPal did not return a payment reference. Use the tracking link from your confirmation email or look up your order at /orders.'
+        );
+        setIsLoading(false);
         return;
       }
 

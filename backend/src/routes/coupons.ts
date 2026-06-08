@@ -7,7 +7,7 @@ import { cached } from '../lib/cache';
 import { CACHE, TTL, invalidateCouponCaches } from '../lib/cacheKeys';
 import { verifyAdmin } from './admin';
 import { parsePagination, paginationMeta } from '../lib/pagination';
-import { calculateVolumeDiscount, resolveCouponDiscount } from '../lib/paypalCheckout';
+import { computeCheckoutPricingForCart } from '../lib/paypalCheckout';
 
 const router = Router();
 
@@ -65,144 +65,85 @@ router.post('/validate', async (req: Request, res: Response) => {
       });
     }
 
-    if (!subtotal || subtotal <= 0) {
+    const cartInputs = (items || [])
+      .filter((item) => item?.product_id && item.quantity > 0)
+      .map((item) => ({ product_id: item.product_id, quantity: item.quantity }));
+
+    if (!cartInputs.length && (!subtotal || subtotal <= 0)) {
       return res.status(400).json({
         success: false,
         valid: false,
-        message: 'Invalid order subtotal',
+        message: 'Cart items or a valid subtotal are required',
         error_code: 'INVALID_SUBTOTAL',
       });
     }
 
-    const totalItemCount = (items || []).reduce((sum, item) => sum + (item.quantity || 0), 0);
-    const volumePreview = calculateVolumeDiscount(subtotal, totalItemCount);
-    const couponSubtotal = Math.max(0, subtotal - volumePreview.amount);
-
     const emailKey = (customer_email || '').toLowerCase();
-    const cacheKey = CACHE.couponValidate(code.trim(), subtotal, emailKey, totalItemCount);
+    const cacheSubtotal = subtotal || 0;
+    const cacheKey = CACHE.couponValidate(
+      code.trim(),
+      cacheSubtotal,
+      emailKey,
+      cartInputs.reduce((sum, item) => sum + item.quantity, 0)
+    );
 
     const result = await cached(cacheKey, TTL.couponValidate, async () => {
-      const coupons = await sql`
-        SELECT * FROM coupons 
-        WHERE UPPER(code) = UPPER(${code.trim()})
-        LIMIT 1
-      `;
-
-      if (!coupons || coupons.length === 0) {
-        return {
-          success: true,
-          valid: false,
-          message: 'Invalid coupon code',
-          error_code: 'INVALID_CODE',
-        };
-      }
-
-      const coupon = coupons[0] as Coupon;
-
-      if (!coupon.is_active) {
-        return {
-          success: true,
-          valid: false,
-          message: 'This coupon is no longer active',
-          error_code: 'INACTIVE',
-        };
-      }
-
-      const now = new Date();
-      if (coupon.valid_from && new Date(coupon.valid_from) > now) {
-        return {
-          success: true,
-          valid: false,
-          message: 'This coupon is not yet valid',
-          error_code: 'NOT_YET_VALID',
-        };
-      }
-
-      if (coupon.valid_until && new Date(coupon.valid_until) < now) {
-        return {
-          success: true,
-          valid: false,
-          message: 'This coupon has expired',
-          error_code: 'EXPIRED',
-        };
-      }
-
-      if (coupon.max_uses != null && coupon.used_count != null && coupon.used_count >= coupon.max_uses) {
-        return {
-          success: true,
-          valid: false,
-          message: 'This coupon has reached its usage limit',
-          error_code: 'MAX_USES_REACHED',
-        };
-      }
-
-      if (coupon.minimum_order && couponSubtotal < coupon.minimum_order) {
-        return {
-          success: true,
-          valid: false,
-          message: `Minimum order of $${coupon.minimum_order.toFixed(2)} required for this coupon`,
-          error_code: 'MINIMUM_NOT_MET',
-          minimum_order: coupon.minimum_order,
-        };
-      }
-
-      if (customer_email && coupon.id && coupon.max_uses_per_customer != null) {
-        const usageCount = await sql`
-          SELECT COUNT(*) as count FROM coupon_usage 
-          WHERE coupon_id = ${coupon.id} AND customer_email = ${customer_email}
-        `;
-
-        if (parseInt(usageCount[0].count) >= coupon.max_uses_per_customer) {
+      if (cartInputs.length > 0) {
+        const computed = await computeCheckoutPricingForCart(
+          cartInputs,
+          code.trim(),
+          customer_email
+        );
+        if (!computed.ok) {
           return {
             success: true,
             valid: false,
-            message: 'You have already used this coupon the maximum number of times',
-            error_code: 'CUSTOMER_LIMIT_REACHED',
+            message: computed.message,
+            error_code: computed.error === 'Invalid coupon' ? 'NOT_APPLICABLE' : 'INVALID_CART',
           };
         }
-      }
 
-      let discount_amount = 0;
-      try {
-        const couponLineItems = (items || []).map((item) => ({
-          product_id: item.product_id,
-          price: item.price,
-          quantity: item.quantity,
-        }));
-        const resolved = await resolveCouponDiscount(
-          code.trim(),
-          couponSubtotal,
-          customer_email || '',
-          couponLineItems
-        );
-        discount_amount = resolved.discount;
-      } catch (couponError: unknown) {
-        const message =
-          couponError instanceof Error ? couponError.message : 'This coupon cannot be applied';
+        const { pricing, couponDiscount, couponId } = computed.result;
+        if (!couponId || couponDiscount <= 0) {
+          return {
+            success: true,
+            valid: false,
+            message: 'This coupon cannot be applied to your cart',
+            error_code: 'NOT_APPLICABLE',
+          };
+        }
+
+        const coupons = await sql`
+          SELECT * FROM coupons WHERE id = ${couponId} LIMIT 1
+        `;
+        const coupon = coupons[0] as Coupon;
+
         return {
           success: true,
-          valid: false,
-          message,
-          error_code: 'NOT_APPLICABLE',
+          valid: true,
+          coupon: {
+            id: coupon.id,
+            code: coupon.code,
+            description: coupon.description,
+            discount_type: coupon.discount_type,
+            discount_value: coupon.discount_value,
+            minimum_order: coupon.minimum_order,
+            maximum_discount: coupon.maximum_discount,
+          },
+          discount_amount: couponDiscount,
+          pricing,
+          message:
+            coupon.discount_type === 'percentage'
+              ? `${coupon.discount_value}% discount applied!`
+              : `$${coupon.discount_value.toFixed(2)} discount applied!`,
         };
       }
 
       return {
         success: true,
-        valid: true,
-        coupon: {
-          id: coupon.id,
-          code: coupon.code,
-          description: coupon.description,
-          discount_type: coupon.discount_type,
-          discount_value: coupon.discount_value,
-          minimum_order: coupon.minimum_order,
-          maximum_discount: coupon.maximum_discount,
-        },
-        discount_amount,
-        message: coupon.discount_type === 'percentage'
-          ? `${coupon.discount_value}% discount applied!`
-          : `$${coupon.discount_value.toFixed(2)} discount applied!`,
+        valid: false,
+        message: 'Cart items are required for coupon validation',
+        error_code: 'INVALID_CART',
       };
     });
 

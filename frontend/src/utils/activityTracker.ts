@@ -149,6 +149,14 @@ export const trackCheckoutStart = (cartTotal: number, itemCount: number) => {
   });
 };
 
+export const trackCheckoutComplete = (cartTotal: number, itemCount: number) => {
+  trackActivity({
+    actionType: 'checkout_complete',
+    entityType: 'cart',
+    metadata: { cartTotal, itemCount },
+  });
+};
+
 export const trackPurchaseComplete = (orderId: string, orderTotal: number, itemCount: number) => {
   trackActivity({
     actionType: 'purchase_complete',
@@ -255,6 +263,7 @@ export default {
   trackAddToCart,
   trackRemoveFromCart,
   trackCheckoutStart,
+  trackCheckoutComplete,
   trackPurchaseComplete,
   trackSearch,
   trackFilterApply,

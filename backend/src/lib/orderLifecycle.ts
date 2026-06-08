@@ -2,6 +2,7 @@ import sql from './db';
 import { logger } from './logger';
 import { InsufficientStockError } from './inventory';
 import { generateOrderAccessToken } from './orderTokens';
+import { encryptOrderAccessToken } from './orderTokenEncryption';
 import { releaseCouponForOrder } from './couponReservation';
 import { sanitizeCustomerInfo } from '../utils/sanitizeCustomer';
 
@@ -51,6 +52,7 @@ export async function createPendingPayPalOrderAtomic(input: PendingPayPalOrderIn
   const customerInfo = sanitizeCustomerInfo(input.customerInfo);
   const orderNumber = `GSS-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
   const { token: accessToken, hash: accessTokenHash } = generateOrderAccessToken();
+  const accessTokenEncrypted = encryptOrderAccessToken(accessToken);
 
   const shippingAddress = {
     full_name: customerInfo.fullName,
@@ -108,7 +110,7 @@ export async function createPendingPayPalOrderAtomic(input: PendingPayPalOrderIn
       INSERT INTO orders (
         order_number, customer_email, customer_name, shipping_address,
         items, subtotal, shipping_cost, tax, total,
-        payment_status, payment_method, access_token_hash, status
+        payment_status, payment_method, access_token_hash, access_token_encrypted, status
       ) VALUES (
         ${orderNumber},
         ${customerInfo.email},
@@ -122,6 +124,7 @@ export async function createPendingPayPalOrderAtomic(input: PendingPayPalOrderIn
         'pending',
         'PayPal',
         ${accessTokenHash},
+        ${accessTokenEncrypted},
         'pending'
       )
       RETURNING *

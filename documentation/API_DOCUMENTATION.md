@@ -159,7 +159,7 @@ Wrong order number, missing token, or invalid token all return **404** `{ "error
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/validate` | Public | Validate coupon — `{ code, subtotal, customer_email, items }` |
+| POST | `/validate` | Public | Validate coupon — `{ code, customer_email, items: [{ product_id, quantity }] }`; DB-backed pricing via `computeCheckoutPricingForCart`; returns `{ valid, coupon?, discount_amount?, pricing? }` (same rules as create-payment) |
 | POST | `/use` | — | **410 Gone** |
 | GET | `/` | Admin | List coupons |
 | GET | `/:id` | Admin | Single coupon |
