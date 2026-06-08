@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import MetaTags from "../components/MetaTags";
 import { logError } from "../lib/logger";
 import { apiFetch } from "../config";
+import { trackContactSubmit } from "../utils/activityTracker";
 import { useResponsive } from "../hooks/useResponsive";
 
 export default function ContactUs() {
@@ -31,6 +32,7 @@ export default function ContactUs() {
       const data = await response.json();
 
       if (response.ok) {
+        trackContactSubmit(formData.subject);
         setSubmitted(true);
         toast.success(data.message || 'Message sent successfully!', {
           description: "We'll get back to you as soon as possible.",

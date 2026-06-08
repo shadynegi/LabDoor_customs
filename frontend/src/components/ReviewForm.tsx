@@ -47,7 +47,41 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
+  const [eligibilityMessage, setEligibilityMessage] = useState<string | null>(null);
+  const [eligibilityOk, setEligibilityOk] = useState<boolean | null>(null);
+  const [checkingEligibility, setCheckingEligibility] = useState(false);
   const { isMobile } = useResponsive();
+
+  const checkEligibility = async (email: string) => {
+    const trimmed = email.trim();
+    if (!trimmed || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      setEligibilityMessage(null);
+      setEligibilityOk(null);
+      return;
+    }
+
+    setCheckingEligibility(true);
+    try {
+      const response = await apiFetch('/reviews/check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ product_id: productId, email: trimmed }),
+      });
+      const data = await response.json();
+      if (data.success && data.data) {
+        setEligibilityOk(Boolean(data.data.can_review));
+        setEligibilityMessage(data.data.message);
+      } else {
+        setEligibilityOk(null);
+        setEligibilityMessage(data.error || 'Could not verify review eligibility.');
+      }
+    } catch {
+      setEligibilityOk(null);
+      setEligibilityMessage(null);
+    } finally {
+      setCheckingEligibility(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -130,7 +164,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
       >
         <CheckCircle size={64} color="#10b981" style={{ margin: '0 auto 16px' }} />
         <h3 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>Thank You!</h3>
-        <p style={{ color: '#6b7280' }}>Your review has been submitted successfully.</p>
+        <p style={{ color: '#6b7280' }}>Thanks — your review is pending moderation and will appear after approval.</p>
       </motion.div>
     );
   }
@@ -213,7 +247,12 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
           <input
             type="email"
             value={formData.customer_email}
-            onChange={(e) => setFormData(prev => ({ ...prev, customer_email: e.target.value }))}
+            onChange={(e) => {
+              setFormData(prev => ({ ...prev, customer_email: e.target.value }));
+              setEligibilityMessage(null);
+              setEligibilityOk(null);
+            }}
+            onBlur={(e) => void checkEligibility(e.target.value)}
             placeholder="john@example.com"
             style={{
               width: '100%',
@@ -225,6 +264,24 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
             }}
             required
           />
+          {checkingEligibility && (
+            <p style={{ margin: '8px 0 0', fontSize: 13, color: '#6b7280' }}>Checking eligibility…</p>
+          )}
+          {eligibilityMessage && !checkingEligibility && (
+            <p
+              style={{
+                margin: '8px 0 0',
+                fontSize: 13,
+                color: eligibilityOk ? '#059669' : '#b45309',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+              }}
+            >
+              {eligibilityOk ? <CheckCircle size={14} /> : <AlertCircle size={14} />}
+              {eligibilityMessage}
+            </p>
+          )}
         </div>
       </div>
 

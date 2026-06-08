@@ -18,6 +18,7 @@ interface Review {
   content?: string;
   status: string;
   is_verified_purchase?: boolean;
+  admin_response?: string;
   created_at: string;
 }
 
@@ -35,6 +36,7 @@ const emptyForm = () => ({
   content: '',
   status: 'approved' as const,
   is_verified_purchase: false,
+  admin_response: '',
 });
 
 export default function AdminReviewsTab() {
@@ -134,6 +136,7 @@ export default function AdminReviewsTab() {
       content: review.content || '',
       status: (review.status as 'approved') || 'approved',
       is_verified_purchase: Boolean(review.is_verified_purchase),
+      admin_response: review.admin_response || '',
     });
     setModalOpen(true);
   };
@@ -165,6 +168,7 @@ export default function AdminReviewsTab() {
             content: form.content.trim() || null,
             status: form.status,
             is_verified_purchase: form.is_verified_purchase,
+            admin_response: form.admin_response.trim() || null,
           }),
         });
         const data = await response.json();
@@ -611,6 +615,19 @@ export default function AdminReviewsTab() {
               />
               Verified purchase badge
             </label>
+
+            {editingReview && (
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 14, fontWeight: 600 }}>
+                Admin response (shown on storefront)
+                <textarea
+                  rows={3}
+                  value={form.admin_response}
+                  onChange={(e) => setForm((f) => ({ ...f, admin_response: e.target.value }))}
+                  placeholder="Optional reply visible to customers"
+                  style={{ padding: 12, borderRadius: 8, border: '1px solid #d1d5db', resize: 'vertical' }}
+                />
+              </label>
+            )}
 
             <button
               type="submit"

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, useEffect, useRef, useState } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useRef, useState, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import { toast } from 'sonner';
 import { logError, logDebug } from '../lib/logger';
@@ -47,6 +47,7 @@ interface CartContextType {
   getItemQuantity: (id: number) => number;
   cartValidationError: string | null;
   isCartValidating: boolean;
+  retryCartValidation: () => void;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -287,54 +288,60 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     .map((item) => `${item.id}:${item.quantity}:${item.size?.system ?? ''}:${item.size?.value ?? ''}`)
     .join('|');
 
-  // Revalidate cart prices from server when cart contents change
-  useEffect(() => {
+  const [validationNonce, setValidationNonce] = useState(0);
+
+  const validateCartPrices = useCallback(async () => {
     if (state.items.length === 0) {
       setCartValidationError(null);
       setIsCartValidating(false);
       return;
     }
 
-    const validatePrices = async () => {
-      setIsCartValidating(true);
-      try {
-        const response = await apiFetch('/products/validate-cart', {
-          method: 'POST',
-          body: JSON.stringify({
-            items: state.items.map((item) => ({
-              product_id: item.id,
-              quantity: item.quantity,
-              size_system: item.size?.system,
-              size_value: item.size?.value,
-            })),
-          }),
-        });
+    setIsCartValidating(true);
+    try {
+      const response = await apiFetch('/products/validate-cart', {
+        method: 'POST',
+        body: JSON.stringify({
+          items: state.items.map((item) => ({
+            product_id: item.id,
+            quantity: item.quantity,
+            size_system: item.size?.system,
+            size_value: item.size?.value,
+          })),
+        }),
+      });
 
-        const data = await response.json().catch(() => ({}));
+      const data = await response.json().catch(() => ({}));
 
-        if (!response.ok || !data.success) {
-          const message =
-            data.message || data.error || 'Some items in your cart are unavailable. Please review your cart.';
-          setCartValidationError(message);
-          toast.error('Cart validation failed', { description: message, duration: 6000 });
-          return;
-        }
-
-        setCartValidationError(null);
-        if (Array.isArray(data.items)) {
-          userActionRef.current = true;
-          dispatch({ type: 'REFRESH_PRICES', payload: data.items });
-        }
-      } catch (error) {
-        logError('Cart price validation failed:', error);
-        setCartValidationError('Unable to validate cart. Check your connection and try again.');
-      } finally {
-        setIsCartValidating(false);
+      if (!response.ok || !data.success) {
+        const message =
+          data.message || data.error || 'Some items in your cart are unavailable. Please review your cart.';
+        setCartValidationError(message);
+        toast.error('Cart validation failed', { description: message, duration: 6000 });
+        return;
       }
-    };
 
-    void validatePrices();
-  }, [itemsSignature]);
+      setCartValidationError(null);
+      if (Array.isArray(data.items)) {
+        userActionRef.current = true;
+        dispatch({ type: 'REFRESH_PRICES', payload: data.items });
+      }
+    } catch (error) {
+      logError('Cart price validation failed:', error);
+      setCartValidationError('Unable to validate cart. Check your connection and try again.');
+    } finally {
+      setIsCartValidating(false);
+    }
+  }, [state.items]);
+
+  const retryCartValidation = useCallback(() => {
+    setValidationNonce((n) => n + 1);
+  }, []);
+
+  // Revalidate cart prices from server when cart contents change
+  useEffect(() => {
+    void validateCartPrices();
+  }, [itemsSignature, validationNonce, validateCartPrices]);
 
   // Broadcast cart changes to other tabs (skip initial hydration)
   useEffect(() => {
@@ -417,6 +424,7 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         getItemQuantity,
         cartValidationError,
         isCartValidating,
+        retryCartValidation,
       }}
     >
       {children}

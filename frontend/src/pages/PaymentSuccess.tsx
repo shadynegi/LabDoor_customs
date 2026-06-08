@@ -12,7 +12,7 @@ import { useResponsive } from '../hooks/useResponsive';
 import { trackPurchaseComplete } from '../utils/activityTracker';
 
 // Payment progress steps
-type PaymentStep = 'verifying' | 'capturing' | 'saving' | 'complete' | 'error';
+type PaymentStep = 'verifying' | 'capturing' | 'saving' | 'complete' | 'error' | 'processing';
 
 interface CheckoutFormData {
   email?: string;
@@ -193,6 +193,13 @@ export default function PaymentSuccess() {
   const [isLoading, setIsLoading] = useState(true);
   const [paymentStep, setPaymentStep] = useState<PaymentStep>('verifying');
   const [captureError, setCaptureError] = useState<string | null>(null);
+  const [processingMessage, setProcessingMessage] = useState<string | null>(null);
+  const [reconciliationContext, setReconciliationContext] = useState<{
+    paypalOrderId: string;
+    accessToken?: string;
+    serverOrderId?: string;
+    orderNumber?: string;
+  } | null>(null);
   const [retryAttempt, setRetryAttempt] = useState(0);
   const { isMobile } = useResponsive();
 
@@ -202,11 +209,83 @@ export default function PaymentSuccess() {
 
   const handleRetryCapture = () => {
     setCaptureError(null);
+    setProcessingMessage(null);
+    setReconciliationContext(null);
     setIsLoading(true);
     setPaymentStep('verifying');
     capturedRef.current = false;
     setRetryAttempt((n) => n + 1);
   };
+
+  useEffect(() => {
+    if (paymentStep !== 'processing' || !reconciliationContext?.paypalOrderId) return;
+
+    let cancelled = false;
+    let attempts = 0;
+    const maxAttempts = 15;
+
+    const pollOrderStatus = async () => {
+      if (cancelled || attempts >= maxAttempts) return;
+      attempts += 1;
+
+      try {
+        const headers: Record<string, string> = {};
+        if (reconciliationContext.accessToken) {
+          headers['X-Order-Access-Token'] = reconciliationContext.accessToken;
+        }
+        const contextRes = await apiFetch(
+          `/paypal/checkout-context/${encodeURIComponent(reconciliationContext.paypalOrderId)}`,
+          { headers }
+        );
+        const context = await contextRes.json();
+
+        if (cancelled) return;
+
+        if (contextRes.ok && context.alreadyCompleted) {
+          const completedDetails = {
+            orderNumber: context.orderNumber || reconciliationContext.orderNumber,
+            serverOrderId: context.serverOrderId || reconciliationContext.serverOrderId,
+            total: context.total,
+            completedAt: new Date().toISOString(),
+          };
+          setOrderDetails(completedDetails);
+          if (reconciliationContext.accessToken && completedDetails.orderNumber) {
+            sessionStorage.setItem(
+              'labdoor_tracked_orders',
+              JSON.stringify([
+                {
+                  orderNumber: completedDetails.orderNumber,
+                  token: reconciliationContext.accessToken,
+                },
+                ...JSON.parse(sessionStorage.getItem('labdoor_tracked_orders') || '[]').filter(
+                  (o: { orderNumber: string }) => o.orderNumber !== completedDetails.orderNumber
+                ),
+              ])
+            );
+          }
+          capturedRef.current = true;
+          clearCart();
+          sessionStorage.removeItem('pendingOrder');
+          sessionStorage.removeItem('checkoutRecovery');
+          sessionStorage.removeItem('paypalReturnCode');
+          localStorage.removeItem('pendingOrder');
+          setProcessingMessage(null);
+          setReconciliationContext(null);
+          setPaymentStep('complete');
+          window.history.replaceState({}, '', '/payment/success');
+        }
+      } catch (error) {
+        logError('Payment reconciliation poll failed:', error);
+      }
+    };
+
+    void pollOrderStatus();
+    const intervalId = window.setInterval(pollOrderStatus, 4000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [paymentStep, reconciliationContext, clearCart]);
 
   useEffect(() => {
     let cancelled = false;
@@ -297,6 +376,23 @@ export default function PaymentSuccess() {
                 : pendingOrder?.coupon ?? null,
             };
             persistPendingOrder(pendingOrder);
+          } else if (!legacyAid && !pendingOrder?.accessToken) {
+            setPaymentStep('error');
+            const exchangeError =
+              exchange.error ||
+              exchange.message ||
+              'This return link has expired or was already used.';
+            setCaptureError(
+              `${exchangeError} Try looking up your order at /orders or contact support.`
+            );
+            toast.error('Checkout session expired', {
+              description: legacyAid
+                ? undefined
+                : 'Your PayPal return link could not be restored. Use order lookup or contact support.',
+              duration: 10000,
+            });
+            setIsLoading(false);
+            return;
           }
         }
 
@@ -364,6 +460,24 @@ export default function PaymentSuccess() {
             discount_amount: pendingOrder.coupon?.discount_amount,
           }),
         });
+
+        if (response.status === 409) {
+          const errData = await response.json().catch(() => ({}));
+          setReconciliationContext({
+            paypalOrderId: token || pendingOrder.paypalOrderId || '',
+            accessToken: pendingOrder.accessToken,
+            serverOrderId: pendingOrder.serverOrderId,
+            orderNumber: pendingOrder.orderNumber,
+          });
+          setProcessingMessage(
+            errData.message ||
+              errData.error ||
+              'Payment received — your order is still being confirmed. This usually resolves within a minute.'
+          );
+          setPaymentStep('processing');
+          setIsLoading(false);
+          return;
+        }
 
         if (!response.ok) {
           setPaymentStep('error');
@@ -488,6 +602,53 @@ export default function PaymentSuccess() {
         }}
       >
         <PaymentProgress currentStep={paymentStep} isMobile={isMobile} />
+      </div>
+    );
+  }
+
+  if (paymentStep === 'processing' && processingMessage) {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)',
+          padding: 20,
+        }}
+      >
+        <div style={{ background: 'white', borderRadius: 16, padding: 32, maxWidth: 520, textAlign: 'center' }}>
+          <Loader2
+            size={48}
+            color="#9c6649"
+            style={{ margin: '0 auto 16px', animation: 'spin 1s linear infinite' }}
+          />
+          <h2 style={{ margin: '0 0 12px', color: '#92400e' }}>Payment received — order processing</h2>
+          <p style={{ color: '#6b7280', marginBottom: 24 }}>{processingMessage}</p>
+          <p style={{ fontSize: 14, color: '#9ca3af', marginBottom: 24 }}>
+            We are confirming your order. Your cart is unchanged until confirmation completes.
+            {reconciliationContext?.orderNumber && (
+              <> Order reference: <strong>{reconciliationContext.orderNumber}</strong></>
+            )}
+          </p>
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => navigate('/orders')}
+              style={{ padding: '12px 20px', background: '#9c6649', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}
+            >
+              View orders
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/contact')}
+              style={{ padding: '12px 20px', background: '#f3f4f6', color: '#374151', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}
+            >
+              Contact support
+            </button>
+          </div>
+        </div>
       </div>
     );
   }

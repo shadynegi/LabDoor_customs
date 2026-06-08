@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Pencil, Plus, RefreshCw, Tag, Trash2, ToggleLeft, ToggleRight, X } from 'lucide-react';
-import { apiFetch } from '../config';
+import { apiFetch, catalogFetch } from '../config';
 import { toast } from 'sonner';
 import { logError } from '../lib/logger';
 import { useResponsive } from '../hooks/useResponsive';
@@ -18,6 +18,13 @@ interface Coupon {
   used_count?: number;
   is_active?: boolean;
   valid_until?: string;
+  applies_to?: 'all' | 'category' | 'product';
+  applies_to_ids?: number[];
+}
+
+interface ProductOption {
+  id: number;
+  name: string;
 }
 
 const PRESET_DISCOUNTS = [5, 10, 20, 25, 50] as const;
@@ -28,6 +35,9 @@ export default function AdminCouponsTab() {
   const [loading, setLoading] = useState(true);
   const [customCode, setCustomCode] = useState('');
   const [customPercent, setCustomPercent] = useState(10);
+  const [customAppliesTo, setCustomAppliesTo] = useState<'all' | 'category' | 'product'>('all');
+  const [customAppliesToIds, setCustomAppliesToIds] = useState('');
+  const [productOptions, setProductOptions] = useState<ProductOption[]>([]);
   const [editingCoupon, setEditingCoupon] = useState<Coupon | null>(null);
   const [couponToDelete, setCouponToDelete] = useState<Coupon | null>(null);
   const [editDescription, setEditDescription] = useState('');
@@ -63,10 +73,46 @@ export default function AdminCouponsTab() {
     fetchCoupons();
   }, [fetchCoupons]);
 
+  useEffect(() => {
+    const loadProducts = async () => {
+      try {
+        const response = await catalogFetch('/products?limit=100');
+        const data = await response.json();
+        if (data.success) {
+          setProductOptions(
+            (data.data || []).map((p: ProductOption) => ({ id: p.id, name: p.name }))
+          );
+        }
+      } catch (error) {
+        logError('Error loading products for coupons:', error);
+      }
+    };
+    void loadProducts();
+  }, []);
+
+  const parseAppliesToIds = (): number[] | null => {
+    if (customAppliesTo === 'all') return null;
+    const ids = customAppliesToIds
+      .split(',')
+      .map((s) => parseInt(s.trim(), 10))
+      .filter((n) => !Number.isNaN(n) && n > 0);
+    return ids.length > 0 ? ids : null;
+  };
+
   const createCoupon = async (code: string, percent: number) => {
     const normalized = code.trim().toUpperCase();
     if (!normalized) {
       toast.error('Coupon code is required');
+      return;
+    }
+
+    const appliesToIds = parseAppliesToIds();
+    if (customAppliesTo !== 'all' && !appliesToIds) {
+      toast.error(
+        customAppliesTo === 'product'
+          ? 'Select at least one product ID for product-scoped coupons'
+          : 'Enter at least one category ID for category-scoped coupons'
+      );
       return;
     }
 
@@ -80,6 +126,8 @@ export default function AdminCouponsTab() {
           discount_value: percent,
           minimum_order: 0,
           is_active: true,
+          applies_to: customAppliesTo,
+          applies_to_ids: appliesToIds,
         }),
       });
       const data = await response.json();
@@ -222,6 +270,48 @@ export default function AdminCouponsTab() {
               ))}
             </select>
           </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13 }}>
+            Applies to
+            <select
+              value={customAppliesTo}
+              onChange={(e) => setCustomAppliesTo(e.target.value as typeof customAppliesTo)}
+              style={{ padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8 }}
+            >
+              <option value="all">Entire order</option>
+              <option value="product">Specific products</option>
+              <option value="category">Specific categories</option>
+            </select>
+          </label>
+          {customAppliesTo === 'product' && (
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, minWidth: 200 }}>
+              Product IDs (comma-separated)
+              <input
+                list="coupon-product-ids"
+                value={customAppliesToIds}
+                onChange={(e) => setCustomAppliesToIds(e.target.value)}
+                placeholder="e.g. 12, 15"
+                style={{ padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8 }}
+              />
+              <datalist id="coupon-product-ids">
+                {productOptions.map((p) => (
+                  <option key={p.id} value={String(p.id)}>
+                    {p.name}
+                  </option>
+                ))}
+              </datalist>
+            </label>
+          )}
+          {customAppliesTo === 'category' && (
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13 }}>
+              Category IDs (comma-separated)
+              <input
+                value={customAppliesToIds}
+                onChange={(e) => setCustomAppliesToIds(e.target.value)}
+                placeholder="e.g. 1, 2"
+                style={{ padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8 }}
+              />
+            </label>
+          )}
           <button
             type="button"
             onClick={() => createCoupon(customCode, customPercent)}

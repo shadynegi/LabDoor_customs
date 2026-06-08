@@ -62,6 +62,7 @@ const InputField = React.memo(({
   inputMode,
   value,
   onChange,
+  onBlur,
   error,
 }: {
   id: string;
@@ -75,6 +76,7 @@ const InputField = React.memo(({
   inputMode?: "text" | "email" | "tel" | "numeric" | "decimal" | "search" | "url";
   value: string;
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onBlur?: (e: React.FocusEvent<HTMLInputElement>) => void;
   error?: string;
 }) => {
   const hasError = !!error;
@@ -136,6 +138,7 @@ const InputField = React.memo(({
           onBlur={(e) => {
             e.target.style.borderColor = hasError ? "#ef4444" : "#d1d5db";
             e.target.style.boxShadow = "none";
+            onBlur?.(e);
           }}
         />
       </div>
@@ -383,9 +386,20 @@ export default function Checkout() {
     return { isValid: Object.keys(newErrors).length === 0, errors: newErrors };
   };
 
+  const syncActivityEmail = useCallback((email: string) => {
+    const trimmed = email.trim();
+    if (trimmed && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      setUserEmail(trimmed);
+    }
+  }, []);
+
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target as HTMLInputElement & { name: FormField };
     setFormData(prev => ({ ...prev, [name]: value }));
+
+    if (name === 'email') {
+      syncActivityEmail(value);
+    }
     
     if (errors[name]) {
       setErrors(prev => {
@@ -394,7 +408,11 @@ export default function Checkout() {
         return newErrors;
       });
     }
-  }, [errors]);
+  }, [errors, syncActivityEmail]);
+
+  const handleEmailBlur = useCallback((e: React.FocusEvent<HTMLInputElement>) => {
+    syncActivityEmail(e.target.value);
+  }, [syncActivityEmail]);
 
   const handleCountryChange = useCallback((selectedOption: CountryOption | null) => {
     setFormData(prev => ({ ...prev, country: selectedOption?.value || "" }));
@@ -634,6 +652,7 @@ export default function Checkout() {
                     inputMode="email"
                     value={formData.email}
                     onChange={handleChange}
+                    onBlur={handleEmailBlur}
                     error={errors.email}
                   />
                   <InputField

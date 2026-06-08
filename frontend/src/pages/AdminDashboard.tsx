@@ -145,6 +145,12 @@ export default function AdminDashboard() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
+  const [productsError, setProductsError] = useState<string | null>(null);
+  const [messagesError, setMessagesError] = useState<string | null>(null);
+  const [productsPage, setProductsPage] = useState(1);
+  const [productsTotalPages, setProductsTotalPages] = useState(1);
+  const [productsTotal, setProductsTotal] = useState(0);
+  const [productsLoadingMore, setProductsLoadingMore] = useState(false);
   
   // UI states
   const [loading, setLoading] = useState(true);
@@ -155,6 +161,7 @@ export default function AdminDashboard() {
   const [orderTrackingNumber, setOrderTrackingNumber] = useState('');
   const [orderTrackingUrl, setOrderTrackingUrl] = useState('');
   const [orderCarrier, setOrderCarrier] = useState('Blue Dart');
+  const [orderEstimatedDelivery, setOrderEstimatedDelivery] = useState('');
   const [showDeletedCustomers, setShowDeletedCustomers] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [selectedMessage, setSelectedMessage] = useState<ContactMessage | null>(null);
@@ -182,6 +189,9 @@ export default function AdminDashboard() {
   }, [activeTab]);
 
   const loadData = async () => {
+    if (activeTab === 'coupons' || activeTab === 'reviews') {
+      return;
+    }
     setLoading(true);
     try {
       switch (activeTab) {
@@ -192,15 +202,13 @@ export default function AdminDashboard() {
           await fetchOrders();
           break;
         case 'products':
-          await fetchProducts();
+          await fetchProducts(1, false);
           break;
         case 'messages':
           await fetchMessages();
           break;
         case 'customers':
           await fetchCustomers();
-          break;
-        case 'coupons':
           break;
       }
     } finally {
@@ -256,9 +264,14 @@ export default function AdminDashboard() {
     }
   };
 
-  const fetchProducts = async () => {
+  const fetchProducts = async (page = 1, append = false) => {
+    if (append) {
+      setProductsLoadingMore(true);
+    } else {
+      setProductsError(null);
+    }
     try {
-      const response = await catalogFetch('/products?limit=100');
+      const response = await catalogFetch(`/products?limit=50&page=${page}`);
       const data = await response.json();
       if (data.success) {
         const parsed = (data.data || []).map((p: any) => ({
@@ -266,23 +279,47 @@ export default function AdminDashboard() {
           price: parseFloat(p.price),
           is_out_of_stock: p.is_out_of_stock || false,
         }));
-        setProducts(parsed);
+        setProducts((prev) => (append ? [...prev, ...parsed] : parsed));
+        setProductsPage(data.pagination?.page ?? page);
+        setProductsTotalPages(data.pagination?.totalPages ?? 1);
+        setProductsTotal(data.pagination?.total ?? parsed.length);
+      } else {
+        const err = data.error || 'Failed to load products';
+        setProductsError(err);
+        if (!append) setProducts([]);
+        toast.error(err);
       }
     } catch (error) {
       logError('Error fetching products:', error);
+      const err = 'Unable to load products. Check your connection and try again.';
+      setProductsError(err);
+      if (!append) setProducts([]);
+      toast.error(err);
+    } finally {
+      setProductsLoadingMore(false);
     }
   };
 
   const fetchMessages = async () => {
+    setMessagesError(null);
     try {
       const response = await apiFetch('/contact', {
       });
       const data = await response.json();
       if (data.success) {
         setMessages(data.data || []);
+      } else {
+        const err = data.error || 'Failed to load messages';
+        setMessagesError(err);
+        setMessages([]);
+        toast.error(err);
       }
     } catch (error) {
       logError('Error fetching messages:', error);
+      const err = 'Unable to load messages. Check your connection and try again.';
+      setMessagesError(err);
+      setMessages([]);
+      toast.error(err);
     }
   };
 
@@ -305,6 +342,9 @@ export default function AdminDashboard() {
       setOrderTrackingNumber(selectedOrder.tracking_number || '');
       setOrderTrackingUrl(selectedOrder.tracking_url || '');
       setOrderCarrier(selectedOrder.carrier || 'Blue Dart');
+      setOrderEstimatedDelivery(
+        selectedOrder.estimated_delivery ? selectedOrder.estimated_delivery.slice(0, 10) : ''
+      );
     }
   }, [selectedOrder?.id]);
 
@@ -410,6 +450,7 @@ export default function AdminDashboard() {
           tracking_number: orderTrackingNumber.trim(),
           tracking_url: orderTrackingUrl.trim() || undefined,
           carrier: orderCarrier.trim() || 'Blue Dart',
+          estimated_delivery: orderEstimatedDelivery.trim() || null,
         }),
       });
       const data = await response.json();
@@ -572,6 +613,36 @@ export default function AdminDashboard() {
       }
     } catch (error) {
       toast.error('Update failed');
+    }
+  };
+
+  const updateMessageStatus = async (messageId: string, status: ContactMessage['status']) => {
+    try {
+      const response = await apiFetch(`/contact/${messageId}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === messageId ? { ...m, status } : m))
+        );
+        setSelectedMessage((prev) =>
+          prev && prev.id === messageId ? { ...prev, status } : prev
+        );
+        toast.success(`Message marked ${status}`);
+      } else {
+        toast.error(data.error || 'Update failed');
+      }
+    } catch {
+      toast.error('Update failed');
+    }
+  };
+
+  const openMessage = async (msg: ContactMessage) => {
+    setSelectedMessage(msg);
+    if (msg.status === 'new') {
+      await updateMessageStatus(msg.id, 'read');
     }
   };
 
@@ -820,8 +891,19 @@ export default function AdminDashboard() {
 
   const renderProducts = () => (
     <div>
+      {productsError && (
+        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 12, padding: 16, marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <span style={{ color: '#991b1b', fontSize: 14 }}>{productsError}</span>
+          <button type="button" onClick={() => fetchProducts(1, false)} style={{ padding: '8px 14px', background: '#9c6649', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
+            Retry
+          </button>
+        </div>
+      )}
       {/* Toolbar */}
       <div style={{ background: 'white', borderRadius: 12, padding: 16, marginBottom: 16, border: '1px solid #e5e7eb', display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
+        <span style={{ fontSize: 13, color: '#6b7280' }}>
+          Showing {products.length} of {productsTotal} products
+        </span>
         <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
           <Search size={18} color="#9ca3af" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
           <input
@@ -986,6 +1068,18 @@ export default function AdminDashboard() {
         </table>
       </div>
       )}
+      {productsPage < productsTotalPages && (
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 16 }}>
+          <button
+            type="button"
+            disabled={productsLoadingMore}
+            onClick={() => fetchProducts(productsPage + 1, true)}
+            style={{ padding: '10px 20px', background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: productsLoadingMore ? 'not-allowed' : 'pointer', fontWeight: 600 }}
+          >
+            {productsLoadingMore ? 'Loading…' : `Load more (${products.length} of ${productsTotal})`}
+          </button>
+        </div>
+      )}
     </div>
   );
 
@@ -1082,6 +1176,14 @@ export default function AdminDashboard() {
 
   const renderMessages = () => (
     <div>
+      {messagesError && (
+        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 12, padding: 16, marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <span style={{ color: '#991b1b', fontSize: 14 }}>{messagesError}</span>
+          <button type="button" onClick={fetchMessages} style={{ padding: '8px 14px', background: '#9c6649', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
+            Retry
+          </button>
+        </div>
+      )}
       {/* Toolbar */}
       <div style={{ background: 'white', borderRadius: 12, padding: 16, marginBottom: 16, border: '1px solid #e5e7eb', display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
         <select value={messageStatusFilter} onChange={(e) => setMessageStatusFilter(e.target.value)}
@@ -1112,7 +1214,7 @@ export default function AdminDashboard() {
               e.target.checked ? newSet.add(msg.id) : newSet.delete(msg.id);
               setSelectedMessages(newSet);
             }} style={{ marginTop: 4 }} />
-            <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => setSelectedMessage(msg)}>
+            <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => void openMessage(msg)}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
                 <div>
                   <div style={{ fontWeight: 600, color: '#1f2937' }}>{msg.name}</div>
@@ -1318,6 +1420,15 @@ export default function AdminDashboard() {
                 <input value={orderTrackingUrl} onChange={(e) => setOrderTrackingUrl(e.target.value)}
                   style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8 }} />
               </label>
+              <label style={{ fontSize: 13, color: '#374151', display: 'block', marginBottom: 12 }}>
+                Estimated delivery
+                <input
+                  type="date"
+                  value={orderEstimatedDelivery}
+                  onChange={(e) => setOrderEstimatedDelivery(e.target.value)}
+                  style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8 }}
+                />
+              </label>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                 <button type="button" disabled={orderActionLoading} onClick={() => handleSaveTracking(selectedOrder.id)}
                   style={{ padding: '10px 16px', background: '#9c6649', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
@@ -1380,10 +1491,28 @@ export default function AdminDashboard() {
             <div style={{ background: '#f9fafb', borderRadius: 12, padding: 20, marginBottom: 20 }}>
               <p style={{ margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>{selectedMessage.message}</p>
             </div>
-            <div style={{ display: 'flex', gap: 12 }}>
-              <a href={`mailto:${selectedMessage.email}?subject=Re: ${selectedMessage.subject}`} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 14, background: '#9c6649', color: 'white', textDecoration: 'none', borderRadius: 8, fontWeight: 600 }}>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              <a href={`mailto:${selectedMessage.email}?subject=Re: ${selectedMessage.subject}`} style={{ flex: 1, minWidth: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 14, background: '#9c6649', color: 'white', textDecoration: 'none', borderRadius: 8, fontWeight: 600 }}>
                 <Mail size={18} /> Reply via Email
               </a>
+              {selectedMessage.status !== 'replied' && (
+                <button
+                  type="button"
+                  onClick={() => void updateMessageStatus(selectedMessage.id, 'replied')}
+                  style={{ flex: 1, minWidth: 140, padding: 14, background: '#10b981', color: 'white', border: 'none', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Mark replied
+                </button>
+              )}
+              {selectedMessage.status !== 'archived' && (
+                <button
+                  type="button"
+                  onClick={() => void updateMessageStatus(selectedMessage.id, 'archived')}
+                  style={{ flex: 1, minWidth: 140, padding: 14, background: '#6b7280', color: 'white', border: 'none', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Archive
+                </button>
+              )}
             </div>
           </div>
         </LiquidModal>
@@ -1396,7 +1525,7 @@ export default function AdminDashboard() {
           setProductFormOpen(false);
           setEditingProduct(null);
         }}
-        onSaved={fetchProducts}
+        onSaved={() => fetchProducts(1, false)}
       />
 
       {/* Customer History Modal */}

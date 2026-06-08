@@ -67,8 +67,10 @@ const flushQueue = async () => {
       body: JSON.stringify({ activities }),
     });
   } catch (error) {
-    // Silently fail - don't interrupt user experience
     logDebug('Activity tracking failed:', error);
+    if (import.meta.env.DEV) {
+      console.warn('[activity] batch flush failed', error);
+    }
   }
 };
 
@@ -170,6 +172,37 @@ export const trackFilterApply = (filters: Record<string, any>) => {
   });
 };
 
+export const trackContactSubmit = (subject?: string) => {
+  trackActivity({
+    actionType: 'contact_form_submit',
+    entityType: 'page',
+    metadata: { subject: subject?.slice(0, 120) },
+  });
+};
+
+export const trackSizeSelect = (productId: number | string, size: string) => {
+  trackActivity({
+    actionType: 'size_select',
+    entityType: 'product',
+    entityId: String(productId),
+    metadata: { size },
+  });
+};
+
+export const trackQuantityChange = (
+  productId: number | string,
+  productName: string,
+  quantity: number
+) => {
+  trackActivity({
+    actionType: 'quantity_change',
+    entityType: 'product',
+    entityId: String(productId),
+    entityName: productName,
+    metadata: { quantity },
+  });
+};
+
 /** Store email for analytics batches only when consent is granted (session-scoped). */
 export const setUserEmail = (email: string) => {
   if (!hasAnalyticsConsent()) return;
@@ -225,5 +258,8 @@ export default {
   trackPurchaseComplete,
   trackSearch,
   trackFilterApply,
+  trackContactSubmit,
+  trackSizeSelect,
+  trackQuantityChange,
   setUserEmail,
 };

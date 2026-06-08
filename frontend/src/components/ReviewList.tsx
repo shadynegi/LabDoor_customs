@@ -6,6 +6,7 @@ import { apiFetch } from '../config';
 import StarRating from './StarRating';
 import { ReviewListSkeleton } from './Skeletons';
 import { logError } from '../lib/logger';
+import { toast } from 'sonner';
 import { useResponsive } from '../hooks/useResponsive';
 import { gridCols } from '../lib/responsive';
 
@@ -54,6 +55,7 @@ const ReviewList: React.FC<ReviewListProps> = ({ productId, onWriteReview }) => 
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [votedReviewIds, setVotedReviewIds] = useState<Set<string>>(new Set());
 
   const fetchReviews = async () => {
     setLoading(true);
@@ -97,11 +99,16 @@ const ReviewList: React.FC<ReviewListProps> = ({ productId, onWriteReview }) => 
         body: JSON.stringify({ vote_type: voteType }),
       });
 
+      const data = await response.json().catch(() => ({}));
       if (response.ok) {
-        fetchReviews(); // Refresh to get updated counts
+        setVotedReviewIds((prev) => new Set(prev).add(reviewId));
+        fetchReviews();
+      } else {
+        toast.error(data.error || data.message || 'Could not record your vote');
       }
     } catch (error) {
       logError('Error voting:', error);
+      toast.error('Could not record your vote. Please try again.');
     }
   };
 
@@ -465,6 +472,7 @@ const ReviewList: React.FC<ReviewListProps> = ({ productId, onWriteReview }) => 
                   <span style={{ fontSize: 12, color: '#9ca3af' }}>Was this review helpful?</span>
                   <button
                     type="button"
+                    disabled={votedReviewIds.has(review.id)}
                     onClick={() => handleVote(review.id, 'helpful')}
                     aria-label={`Mark review helpful, ${review.helpful_count} votes`}
                     style={{
@@ -479,7 +487,8 @@ const ReviewList: React.FC<ReviewListProps> = ({ productId, onWriteReview }) => 
                       borderRadius: 6,
                       fontSize: 12,
                       color: '#6b7280',
-                      cursor: 'pointer',
+                      cursor: votedReviewIds.has(review.id) ? 'not-allowed' : 'pointer',
+                      opacity: votedReviewIds.has(review.id) ? 0.6 : 1,
                     }}
                   >
                     <ThumbsUp size={12} />
@@ -487,6 +496,7 @@ const ReviewList: React.FC<ReviewListProps> = ({ productId, onWriteReview }) => 
                   </button>
                   <button
                     type="button"
+                    disabled={votedReviewIds.has(review.id)}
                     onClick={() => handleVote(review.id, 'not_helpful')}
                     aria-label={`Mark review not helpful, ${review.not_helpful_count} votes`}
                     style={{

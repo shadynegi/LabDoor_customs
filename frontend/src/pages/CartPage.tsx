@@ -15,6 +15,7 @@ export default function CartPage() {
     removeFromCart,
     cartValidationError,
     isCartValidating,
+    retryCartValidation,
   } = useCart();
   const navigate = useNavigate();
   const { isMobile } = useResponsive();
@@ -344,7 +345,25 @@ export default function CartPage() {
                 fontSize: 14,
               }}
             >
-              {cartValidationError}
+              <p style={{ margin: '0 0 12px' }}>{cartValidationError}</p>
+              <button
+                type="button"
+                onClick={retryCartValidation}
+                disabled={isCartValidating}
+                style={{
+                  padding: '8px 14px',
+                  background: '#9c6649',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 8,
+                  cursor: isCartValidating ? 'not-allowed' : 'pointer',
+                  fontWeight: 600,
+                  fontSize: 13,
+                  opacity: isCartValidating ? 0.7 : 1,
+                }}
+              >
+                {isCartValidating ? 'Validating…' : 'Retry validation'}
+              </button>
             </div>
           )}
 

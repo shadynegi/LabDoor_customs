@@ -354,6 +354,7 @@ export default function MyOrders() {
   const { isMobile } = useResponsive();
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [refreshWarnings, setRefreshWarnings] = useState<string[]>([]);
   const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const trackedOrdersRef = useRef<TrackedOrderRef[]>([]);
 
@@ -434,13 +435,19 @@ export default function MyOrders() {
     }
 
     try {
-      const fetchedOrders: Order[] = [];
-      for (const ref of refs) {
-        const { response, data } = await lookupOrderByToken(ref.orderNumber, ref.token);
-        if (response.ok && data.success && data.data) {
-          fetchedOrders.push(normalizeOrder(data.data));
-        }
-      }
+      const results = await Promise.all(
+        refs.map(async (ref) => {
+          const { response, data } = await lookupOrderByToken(ref.orderNumber, ref.token);
+          return {
+            ref,
+            ok: Boolean(response.ok && data.success && data.data),
+            order: data.success && data.data ? normalizeOrder(data.data) : null,
+          };
+        })
+      );
+
+      const fetchedOrders = results.filter((r) => r.order).map((r) => r.order!);
+      const failedOrderNumbers = results.filter((r) => !r.ok).map((r) => r.ref.orderNumber);
 
       if (!isRefresh && fetchedOrders.length === 0) {
         setError('No orders found. Check your order number and access token.');
@@ -451,19 +458,34 @@ export default function MyOrders() {
       }
 
       if (isRefresh) {
-        setOrders((prev) => {
-          fetchedOrders.forEach((newOrder) => {
-            const oldOrder = prev.find((o) => o.id === newOrder.id);
-            if (oldOrder && oldOrder.status !== newOrder.status) {
-              toast.success('Order Updated!', {
-                description: `Order #${newOrder.order_number.slice(-8)} is now ${newOrder.status}`,
-              });
-            }
+        if (failedOrderNumbers.length > 0) {
+          setRefreshWarnings(failedOrderNumbers);
+          toast.warning('Some orders could not be refreshed', {
+            description: `Still showing last known status for: ${failedOrderNumbers.join(', ')}`,
+            duration: 6000,
           });
-          return fetchedOrders;
+        } else {
+          setRefreshWarnings([]);
+        }
+
+        setOrders((prev) => {
+          const byId = new Map(prev.map((o) => [o.id, o]));
+          for (const result of results) {
+            if (result.order) {
+              const oldOrder = byId.get(result.order.id);
+              if (oldOrder && oldOrder.status !== result.order.status) {
+                toast.success('Order Updated!', {
+                  description: `Order #${result.order.order_number.slice(-8)} is now ${result.order.status}`,
+                });
+              }
+              byId.set(result.order.id, result.order);
+            }
+          }
+          return Array.from(byId.values());
         });
       } else {
         setOrders(fetchedOrders);
+        setRefreshWarnings([]);
       }
 
       setLastUpdated(new Date());
@@ -548,10 +570,13 @@ export default function MyOrders() {
       if (await redeemEmailLink()) return;
 
       if (urlOrderNumber && urlToken) {
+        window.history.replaceState({}, '', '/orders');
+        toast.warning('Legacy tracking link detected', {
+          description: 'Token links in the URL are deprecated. Enter your order number and access token below, or use the link from your latest confirmation email.',
+          duration: 10000,
+        });
         setOrderNumber(urlOrderNumber);
         setAccessToken(urlToken);
-        void lookupOrder(urlOrderNumber, urlToken);
-        window.history.replaceState({}, '', '/orders');
       } else if (trackedOrdersRef.current.length > 0) {
         void refreshTrackedOrders(false);
       }
@@ -1073,6 +1098,11 @@ export default function MyOrders() {
                   <>Last updated: {formatTime(lastUpdated)}</>
                 )}
               </span>
+              {refreshWarnings.length > 0 && !refreshing && (
+                <span style={{ color: '#b45309', fontSize: 13 }}>
+                  Could not refresh: {refreshWarnings.join(', ')}
+                </span>
+              )}
             </div>
             
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
