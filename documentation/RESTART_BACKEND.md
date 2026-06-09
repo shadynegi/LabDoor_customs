@@ -79,9 +79,11 @@ Check Railway logs or stdout for Pino output (pretty-printed in dev, JSON in pro
 |-------------|---------|
 | `Request started` / `Request finished` | HTTP lifecycle with `requestId`, path, duration, status |
 | `Request timeout` | Route exceeded `REQUEST_TIMEOUT_MS` or `SLOW_REQUEST_TIMEOUT_MS`; includes `elapsedMs` and pool stats |
-| `[withRetry] transient failure` | DB connection blip (e.g. `ECONNRESET`); includes operation `label` |
+| `[withRetry] transient failure` | DB connection blip (e.g. `ECONNRESET`, `CONNECT_TIMEOUT`); includes operation `label` |
 | `Bootstrap: skipping …` | Schema/RLS already applied — normal with `BOOTSTRAP_SKIP_DDL` |
-| `Maintenance: step finished` | Background cleanup step with `durationMs` |
+| `Core bootstrap complete — deferred RLS/cache tasks may still be running in background` | Dev only — API is up; `Deferred bootstrap complete` follows when RLS/cache finish |
+| `Maintenance: step finished` | Initial maintenance step completed with `durationMs` |
+| `Maintenance: skipped (database unreachable)` | Scheduled cleanup skipped after ping/retry failed — common after laptop sleep; **not** proof of wrong `DATABASE_URL` if startup succeeded |
 
 Filter by `X-Request-Id` header or `requestId` field in logs. Set `LOG_LEVEL=debug` locally for health-check noise at debug level only.
 

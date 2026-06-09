@@ -143,10 +143,10 @@
 | Analytics | Order/revenue stats, product metrics, customer counts, geo breakdown, GA4/GSC config status; error state with retry |
 | Products | Paginated list (50/page, load more, total count); error state with retry; list, create, edit, delete; bulk stock updates; image validation (URL or ≤512KB data URL) |
 | Orders | Paginated list (50/page), **server-side search**, filter by status, bulk status updates (not cancellation); order modal: tracking, carrier, tracking URL, **estimated delivery**, notify shipped, status transitions, **mark paid** (PayPal capture verified via API + `admin_note` + `payment_id`), cancel with refund (paid orders cannot cancel without refund) |
-| Coupons | Preset percentage coupons (5/10/20/25/50%), custom codes with **scope** (`applies_to`: all / product / category + IDs), **edit** (description, max uses, expiry, active), activate/deactivate, delete |
+| Coupons | Preset percentage coupons (5/10/20/25/50%), custom codes with **scope** (`applies_to`: all / product / category + IDs), **server product search** for product scope, **edit** (description, max uses, expiry, active), activate/deactivate, delete |
 | Messages | Contact inbox — auto **mark read** on open; modal **Mark replied** / **Archive**; bulk updates; error state with retry |
 | Customers | Aggregated customer list, detail view, soft delete / restore, show deleted toggle |
-| Reviews | List/create/edit/delete; **customer email visible only here**; edit modal includes **admin response** (shown on storefront); filter by status; quick approve/reject; pagination (50/page); self-loads (no parent tab skeleton flash) |
+| Reviews | List/create/edit/delete; **server product search** when creating reviews; **customer email visible only here**; edit modal includes **admin response** (shown on storefront); filter by status; quick approve/reject; pagination (50/page); self-loads (no parent tab skeleton flash) |
 
 **API-only admin features** (no dedicated UI tab): activity log export, PayPal refund/test endpoints.
 
@@ -344,7 +344,7 @@ At create-payment, a row in `coupon_usage` reserves the coupon for the pending o
 
 - **Public API** (`GET /api/reviews/product/:productId`, `POST /api/reviews`, `POST /api/reviews/:id/vote`): responses pass through `toPublicReview()` in `backend/src/lib/reviewHelpers.ts`, which **omits `customer_email`**, `order_id`, `status`, and other internal fields. Storefront shows reviewer **name** only.
 - **Admin API** (`GET /api/reviews`, `POST /api/reviews/admin`, `PATCH /api/reviews/:id`) returns full rows including **`customer_email`** for moderation and the admin **Reviews** tab.
-- Public submit: rate-limited; new reviews always start as `pending`; success copy tells customers the review is **pending moderation**; email format and product existence validated server-side.
+- Public submit: rate-limited; new reviews always start as `pending`; success copy tells customers the review is **pending moderation**; submit and check use the same **generic eligibility message** when the product is missing or a duplicate review exists (no enumeration).
 - Storefront **ReviewForm** calls `POST /api/reviews/check` on email blur before submit (generic eligibility message; avoids email enumeration in URLs).
 - Votes: rate-limited; **only `approved` reviews** accept helpful/not-helpful votes; vote failures show a toast; buttons disable after a successful vote.
 - `POST /api/reviews/check` (email in JSON body) returns `{ can_review, message }` with the same generic message when the product is missing or ineligible (no product enumeration). Legacy `GET .../:email` is deprecated (PII in URL).
@@ -370,7 +370,7 @@ At create-payment, a row in `coupon_usage` reserves the coupon for the pending o
 - Frontend batches page views, cart actions, checkout events (`checkout_start`, `checkout_complete`, `purchase_complete`), size/quantity changes, and **contact submit** to `POST /api/activity/batch` only when analytics cookie consent is granted (`hasAnalyticsConsent()`). Checkout email is stored in `sessionStorage` only when consent is granted (`setUserEmail` on checkout email change/blur); cleared on cookie reject.
 - Allowed batch action types: `page_view`, `product_view`, `add_to_cart`, `remove_from_cart`, `checkout_start`, `checkout_complete`, `purchase_complete`, `search`, `filter_apply`, `contact_submit`, `size_select`, `quantity_change`.
 - Wired on storefront: `size_select` (product detail), `quantity_change` (cart +/-), `checkout_complete` (before PayPal redirect), `purchase_complete` (payment success).
-- `POST /api/activity/batch` is **CSRF-exempt** (supports `sendBeacon`) and rate-limited separately; max **20** events per batch. Response includes `inserted` and `skipped` counts; unknown action types are skipped (not persisted).
+- `POST /api/activity/batch` is **CSRF-exempt** (supports `sendBeacon`) and rate-limited separately; max **20** events per batch. Response includes `inserted` and `skipped` counts; unknown action types are skipped (not persisted). Returns **500** when every valid event in the batch fails to persist. `POST /api/activity/log` returns **500** on database insert failure.
 - IP addresses anonymized with daily-salted SHA-256 (`IP_SALT`); stored as `anon_{hash}`.
 - `product_view` and `add_to_cart` events can bump product metrics when `canBumpProductMetric()` allows (per-IP per-product rate limit).
 - Admin can query logs and export.
@@ -390,7 +390,7 @@ At create-payment, a row in `coupon_usage` reserves the coupon for the pending o
 | Actor | Mechanism |
 |-------|-----------|
 | Admin | Bcrypt password hash (`ADMIN_PASSWORD_HASH` in production); HMAC-signed session token in HttpOnly cookie; **SHA-256 hash** stored in `admin_sessions`; optional `Authorization: Bearer` header |
-| Customer orders | Per-order access token (hashed at rest); email links use one-time `order_access_exchanges` code (`GET /api/orders/access-exchange/:code`) |
+| Customer orders | Per-order access token (`access_token_hash` + `access_token_encrypted` at rest); email links use one-time `order_access_exchanges` code (`GET /api/orders/access-exchange/:code`) |
 | PayPal webhooks | PayPal signature verification via API |
 
 **JWT_SECRET:** used for admin token signing; complexity rules enforced when present (32+ chars, mixed case, number, special character).
@@ -579,6 +579,18 @@ Started after core bootstrap completes (`maintenanceJobs.ts`). The **initial run
 
 **Idempotency reaper:** uses partial index `idx_payment_idempotency_processing_created` (existence cached in memory after first check); batch size `IDEMPOTENCY_REAP_BATCH_SIZE` (default 50); max batches per run `IDEMPOTENCY_REAP_MAX_BATCHES` (default 10). On Supabase pooler, statements are capped at ~120s — batched reaper avoids statement timeouts. Healthy runs with nothing to reap stay silent (no periodic “no stuck keys” spam).
 
+### Maintenance warnings vs wrong `DATABASE_URL`
+
+A **correct** `DATABASE_URL` can still produce occasional maintenance warnings when the machine or network is briefly unreachable. Distinguish by **when** errors appear:
+
+| Symptom | Likely cause | Action |
+|---------|----------------|--------|
+| Bootstrap succeeds (`Bootstrap: database reachable`, cache warmed); API and checkout work; later `Maintenance: skipped (database unreachable)` with `CONNECT_TIMEOUT` or `ENOTFOUND` | Transient pool/DNS blip — laptop sleep, Wi‑Fi drop, VPN toggle | **None** — jobs retry on the next interval (15 min / 1 hour) when connectivity returns |
+| Bootstrap fails immediately or every API call returns 500/503; `Database ping timed out` at startup | Wrong host/port, paused Supabase project, firewall, or invalid credentials | Fix `DATABASE_URL`, wake project in Supabase dashboard, verify pooler port **6543** with `?pgbouncer=true` |
+| `[withRetry] transient failure` on live requests | Same as first row — pooler blip during a user request | Usually self-heals; increase `MAINTENANCE_DB_RETRIES` only if maintenance skips persist while you are actively online |
+
+**Wrong URL** fails at **first connection** (bootstrap ping). **Transient errors** appear **after hours of successful operation** — that pattern does not mean the URL is incorrect.
+
 ---
 
 ## SEO and sitemap
@@ -658,7 +670,7 @@ Started after core bootstrap completes (`maintenanceJobs.ts`). The **initial run
 | Public | No login required |
 | CSRF | State-changing methods require `X-CSRF-Token` header + `csrf_token` cookie (SPA uses `/api/csrf-token`) |
 | Admin | `admin_session` HttpOnly cookie or `Authorization: Bearer` |
-| Order token | Per-order access token via `?token=` query or `X-Order-Access-Token` header |
+| Order token | Per-order access token via `X-Order-Access-Token` header or `?aid=` query (legacy `?token=` URLs stripped on `/orders`) |
 | PayPal | Webhook signature verification (`PAYPAL_WEBHOOK_ID`) |
 
 Expanded request/response docs: [`API_DOCUMENTATION.md`](API_DOCUMENTATION.md)
@@ -806,7 +818,7 @@ Any unmatched `/api/*` path returns **404** JSON `{ error: "Route not found" }`.
 | `/shipping-policy` | `ShippingPolicy` | Shipping policy |
 | `/cart` | `CartPage` | Shopping cart |
 | `/checkout` | `Checkout` | Checkout form + PayPal redirect |
-| `/orders` | `MyOrders` | Order lookup via POST body; optional `?orderNumber=` & `?token=` deep link (token not sent in GET URLs) |
+| `/orders` | `MyOrders` | Order lookup via POST body; email links use `?code=`; legacy `?orderNumber=&token=` stripped with deprecation warning |
 | `/payment/success` | `PaymentSuccess` | PayPal return; query params `code` (exchange), `token` (PayPal order ID); optional `aid` (access token) |
 | `/payment/cancel` | `Cancel` | PayPal cancel return |
 
@@ -994,10 +1006,10 @@ npm run links:check
 
 | Suite | Tool | Coverage |
 |-------|------|----------|
-| Backend unit/API | Vitest | Checkout validation, `computeCheckoutPricingForCart`, payment idempotency, order tokens, checkout exchange, order token encryption, webhook errors, product images, admin session hashing, PayPal utils, refund idempotency, activity batch, order lookup |
+| Backend unit/API | Vitest | Checkout validation, capture 409, checkout exchange API, PayPal webhooks, admin mark-paid validation, `computeCheckoutPricingForCart`, payment idempotency, order tokens, RLS table list, activity batch/log, order lookup, reviews check |
 | Frontend E2E / UI | Playwright | Storefront smoke, products/cart/checkout/contact UI, navigation, cookie consent, mobile viewport (22 tests; mocked API) |
 
-**Total automated tests:** 114 (71 backend unit + 21 API + 22 Playwright UI).
+**Total automated tests:** 127 (73 backend unit + 30 API + 24 Playwright UI).
 
 | Link check | Custom script | Documentation internal links |
 

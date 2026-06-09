@@ -40,6 +40,20 @@ describe('POST /api/activity/batch', () => {
     expect(res.body.inserted).toBe(0);
   });
 
+  it('returns 500 when all valid events fail to persist', async () => {
+    sqlMock.mockRejectedValue(new Error('db unavailable'));
+
+    const res = await request(app)
+      .post('/api/activity/batch')
+      .send({
+        activities: [{ actionType: 'page_view', sessionId: 's1' }],
+      });
+
+    expect(res.status).toBe(500);
+    expect(res.body.success).toBe(false);
+    expect(res.body.inserted).toBe(0);
+  });
+
   it('rejects batches over 20 events', async () => {
     const activities = Array.from({ length: 21 }, (_, i) => ({
       actionType: 'page_view',

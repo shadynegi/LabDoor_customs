@@ -1,4 +1,8 @@
 import sql from './db';
+
+/** Generic copy for check/submit paths — avoids product or duplicate enumeration. */
+export const GENERIC_REVIEW_ELIGIBILITY_MESSAGE =
+  'A review may already exist for this product and email, or eligibility could not be confirmed.';
 import { validateOptionalProductImageUrl } from './productImage';
 import { orderAccessMatches } from './orderTokens';
 

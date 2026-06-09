@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { CheckCircle, Pencil, Plus, RefreshCw, Star, Trash2, X, XCircle } from 'lucide-react';
-import { apiFetch, catalogFetch } from '../config';
+import { apiFetch } from '../config';
+import AdminProductSearchPicker from './AdminProductSearchPicker';
 import { toast } from 'sonner';
 import { logError } from '../lib/logger';
 import { useResponsive } from '../hooks/useResponsive';
@@ -22,11 +23,6 @@ interface Review {
   created_at: string;
 }
 
-interface ProductOption {
-  id: number;
-  name: string;
-}
-
 const emptyForm = () => ({
   product_id: '',
   customer_name: '',
@@ -42,7 +38,6 @@ const emptyForm = () => ({
 export default function AdminReviewsTab() {
   const { isMobile } = useResponsive();
   const [reviews, setReviews] = useState<Review[]>([]);
-  const [products, setProducts] = useState<ProductOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('all');
   const [page, setPage] = useState(1);
@@ -97,27 +92,9 @@ export default function AdminReviewsTab() {
     }
   };
 
-  const fetchProducts = useCallback(async () => {
-    try {
-      const response = await catalogFetch('/products?limit=100');
-      const data = await response.json();
-      if (data.success) {
-        setProducts(
-          (data.data || []).map((p: { id: number; name: string }) => ({
-            id: p.id,
-            name: p.name,
-          }))
-        );
-      }
-    } catch (error) {
-      logError('Fetch products for reviews:', error);
-    }
-  }, []);
-
   useEffect(() => {
     void fetchReviews();
-    void fetchProducts();
-  }, [fetchReviews, fetchProducts]);
+  }, [fetchReviews]);
 
   const openCreate = () => {
     setEditingReview(null);
@@ -515,20 +492,14 @@ export default function AdminReviewsTab() {
           <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 14, fontWeight: 600 }}>
               Product
-              <select
-                required
+              <AdminProductSearchPicker
+                mode="single"
                 value={form.product_id}
-                onChange={(e) => setForm((f) => ({ ...f, product_id: e.target.value }))}
+                onChange={(productId) => setForm((f) => ({ ...f, product_id: productId }))}
                 disabled={Boolean(editingReview)}
-                style={{ padding: 12, borderRadius: 8, border: '1px solid #d1d5db' }}
-              >
-                <option value="">Select product…</option>
-                {products.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
+                placeholder="Search products by name…"
+                inputStyle={{ padding: 12, borderRadius: 8, border: '1px solid #d1d5db' }}
+              />
             </label>
 
             <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 14, fontWeight: 600 }}>

@@ -87,6 +87,8 @@ Starts the API (port 5000) and Vite dev server (port 5173) together.
 - API health: http://localhost:5000/api/health (or http://localhost:5173/api/health via proxy)
 - Admin login: http://localhost:5173/admin/login
 
+**Normal dev logs:** `API ready — bootstrap continues in background`, `Bootstrap: database reachable`, `Core bootstrap complete`, then `Maintenance jobs scheduled`. After ~2 minutes, `Maintenance: initial run complete`. If the laptop sleeps later, a single `Maintenance: skipped (database unreachable)` is expected — your `DATABASE_URL` is still fine; cleanup resumes on the next interval. See [`info.md` — Maintenance warnings vs wrong DATABASE_URL](info.md#maintenance-warnings-vs-wrong-database_url).
+
 **Production-like single server** (optional):
 
 ```bash

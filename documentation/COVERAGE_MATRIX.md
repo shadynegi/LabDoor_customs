@@ -5,7 +5,7 @@
 **Authoritative behavior:** [`info.md`](info.md)  
 **Full audit:** [`PROJECT_AUDIT.md`](PROJECT_AUDIT.md) (2026-06-08 initial + follow-up)
 
-**Test count marker (CI should match):** `<!-- tests: 114 -->` (71 unit + 21 API + 22 Playwright)
+**Test count marker (CI should match):** `<!-- tests: 127 -->` (73 unit + 30 API + 24 Playwright)
 
 ---
 
@@ -26,15 +26,15 @@
 |----|----------|----------------|---------|--------|
 | PAY-CREATE | Atomic create-payment + stock reserve + exchange code | `server.ts`, `orderLifecycle.ts`, `orderCheckoutExchange.ts` | `checkout.test.ts`, `checkoutPricing.test.ts` | PARTIAL |
 | PAY-CAPTURE | Capture with token + amount validation | `server.ts` L925+ | `checkout.test.ts` (binding only) | PARTIAL |
-| PAY-409 | Capture 409 when PayPal OK but DB not completed; UI polls context | `server.ts` L1162+, `PaymentSuccess.tsx` | — | PARTIAL (code OK; API + Playwright missing) |
-| PAY-EXCHANGE | Checkout exchange single-use redeem | `orderCheckoutExchange.ts` | `orderCheckoutExchange.test.ts` (hash only) | PARTIAL |
+| PAY-409 | Capture 409 when PayPal OK but DB not completed; UI polls context | `server.ts`, `PaymentSuccess.tsx` | `captureReconciliation.test.ts`, `payment-success-ui.spec.ts` | COVERED |
+| PAY-EXCHANGE | Checkout exchange single-use redeem | `orderCheckoutExchange.ts` | `checkoutExchange.test.ts`, `orderCheckoutExchange.test.ts` | COVERED |
 | PAY-CONTEXT | Checkout-context recovery (`X-Order-Access-Token`) | `server.ts` L1280+ | — | MISSING |
-| PAY-WEBHOOK | `PAYMENT.CAPTURE.COMPLETED` reconciliation + 500 retry | `paypalWebhookHandler.ts`, `paymentReconciliation.ts` | `paypalWebhookUtils.test.ts` (utils only) | PARTIAL |
-| PAY-WEBHOOK-DENIED | DENIED without order binding → 500 retry | `paypalWebhookHandler.ts` | — | PARTIAL (code OK; no API test) |
+| PAY-WEBHOOK | `PAYMENT.CAPTURE.COMPLETED` reconciliation + 500 retry | `paypalWebhookHandler.ts`, `paymentReconciliation.ts` | `paypalWebhook.test.ts`, `paypalWebhookUtils.test.ts` | PARTIAL |
+| PAY-WEBHOOK-DENIED | DENIED without order binding → 500 retry | `paypalWebhookHandler.ts` | `paypalWebhook.test.ts` | COVERED |
 | PAY-REFUND-MISMATCH | Auto-refund on capture amount mismatch | `server.ts`, `paymentReconciliation.ts` | — | MISSING |
 | PAY-VOLUME | Volume discount 10%/20% in pricing | `paypalCheckout.ts` L23-35 | `checkoutPricing.test.ts`, `couponValidateVolume.test.ts` | COVERED |
 | PAY-SHIPPING | Free shipping threshold $200 | `paypalCheckout.ts`, `pricing.ts` | `checkoutPricing.test.ts` | COVERED |
-| PAY-FE-TOTAL | Client compares server total before PayPal redirect | `Checkout.tsx` | — | PARTIAL (code OK; no Playwright test) |
+| PAY-FE-TOTAL | Client compares server total before PayPal redirect | `Checkout.tsx` | — | PARTIAL (code OK; no Playwright) |
 
 ---
 
@@ -44,11 +44,11 @@
 |----|----------|----------------|---------|--------|
 | ORD-LOOKUP | `POST /orders/lookup` body token | `orders.ts` L252+ | `orderLookup.test.ts` | COVERED |
 | ORD-ENUM | Uniform 404 for bad number vs bad token | `orders.ts` `orderAccessDenied` | `security.test.ts` | COVERED |
-| ORD-ACCESS-EX | Email `?code=` → access exchange | `orderAccessExchange.ts`, `MyOrders.tsx` | `orderAccessExchange.test.ts` (hash only) | PARTIAL |
+| ORD-ACCESS-EX | Email `?code=` → access exchange | `orderAccessExchange.ts`, `MyOrders.tsx` | `orderAccessExchange.test.ts` | PARTIAL |
 | ORD-EMAIL-LINK | Confirmation email one-time tracking link | `email.ts` `resolveOrderPortalUrl` | — | PARTIAL |
-| ORD-EMAIL-WEBHOOK | Webhook/admin capture emails include exchange link | `email.ts`, `orderAccessExchange.ts` `getOrderAccessTokenForEmail` | — | PARTIAL (durable `access_token_encrypted`; legacy orders use checkout exchange fallback) |
-| ORD-MARK-PAID | Admin mark paid + PayPal verify + activity log | `orders.ts` L636+, `paypalCaptureVerify.ts` | — | MISSING |
-| ORD-TOKEN-STORE | Durable access token for post-capture email minting | `orders.access_token_encrypted`, `orderLifecycle.ts` | — | PARTIAL (code OK; no API test) |
+| ORD-EMAIL-WEBHOOK | Webhook/admin capture emails include exchange link | `orderAccessExchange.ts` `getOrderAccessTokenForEmail` | `orderAccessExchange.test.ts` | PARTIAL |
+| ORD-MARK-PAID | Admin mark paid + PayPal verify + activity log | `orders.ts`, `paypalCaptureVerify.ts` | `adminMarkPaid.test.ts` | PARTIAL (validation path) |
+| ORD-TOKEN-STORE | Durable access token for post-capture email minting | `orders.access_token_encrypted` | `orderAccessExchange.test.ts` | COVERED |
 
 ---
 
@@ -56,8 +56,8 @@
 
 | ID | Behavior | Implementation | Test(s) | Status |
 |----|----------|----------------|---------|--------|
-| SEC-RLS | 14 tables service_role-only + grant revoke | `rlsMigration.ts` | — | MISSING |
-| SEC-BOOTSTRAP | `BOOTSTRAP_SKIP_DDL` must not skip grant revoke | `rlsMigration.ts` `ensureClientGrantsRevoked`, `assertNoClientGrantsRemaining` | — | PARTIAL (prod fail on remaining grants; no automated test) |
+| SEC-RLS | 14 tables service_role-only + grant revoke | `rlsMigration.ts` | `rlsMigration.test.ts` | PARTIAL (table list; no grant integration test) |
+| SEC-BOOTSTRAP | `BOOTSTRAP_SKIP_DDL` must not skip grant revoke | `rlsMigration.ts` | `rlsMigration.test.ts` | PARTIAL |
 | SEC-CSRF | Double-submit + activity batch exempt | `csrf.ts`, `activity.ts` | `security.test.ts` | PARTIAL |
 | SEC-RATE | Redis fail-closed rate limits | `rateLimits.ts`, `rateLimitStore.ts` | `security.test.ts` | COVERED |
 
@@ -67,12 +67,13 @@
 
 | ID | Behavior | Implementation | Test(s) | Status |
 |----|----------|----------------|---------|--------|
-| REV-CHECK | `POST /reviews/check` no enumeration | `reviews.ts` `checkReviewEligibility` | — | PARTIAL (missing product → 200 generic; no API test) |
+| REV-CHECK | `POST /reviews/check` no enumeration | `reviews.ts` `checkReviewEligibility` | `reviewsCheck.test.ts` | COVERED |
 | REV-PUBLIC | `toPublicReview()` strips PII | `reviewHelpers.ts` | `reviewHelpers.test.ts` | COVERED |
 | CPN-SCOPE | Coupon `applies_to` at checkout | `paypalCheckout.ts`, `coupons.ts` | — | PARTIAL |
-| CPN-VALIDATE | Validate matches create-payment pricing | `coupons.ts`, `paypalCheckout.ts` `computeCheckoutPricingForCart` | `couponValidateVolume.test.ts`, `computeCheckoutPricingForCart.test.ts` | COVERED |
-| ACT-BATCH | Activity batch allowed action types | `activity.ts` `ALLOWED_ACTION_TYPES` | `activityBatch.test.ts` | COVERED |
+| CPN-VALIDATE | Validate matches create-payment pricing | `coupons.ts`, `paypalCheckout.ts` | `couponValidateVolume.test.ts`, `computeCheckoutPricingForCart.test.ts` | COVERED |
+| ACT-BATCH | Activity batch allowed action types | `activity.ts` | `activityBatch.test.ts` | COVERED |
 | ACT-CONTACT | Contact form submit tracked | `activityTracker.ts`, `ContactUs.tsx` | `activityBatch.test.ts` | COVERED |
+| ACT-LOG | Single activity log errors surface | `activity.ts` `/log` | `activityLog.test.ts` | COVERED |
 
 ---
 
@@ -81,9 +82,9 @@
 | ID | Behavior | Implementation | Test(s) | Status |
 |----|----------|----------------|---------|--------|
 | UI-SMOKE | Home, products, cart, checkout shell, contact | `Tests/frontend/*.spec.ts` | 22 tests | COVERED |
-| UI-PAY-409 | Payment success 409 processing UI + poll timeout | `PaymentSuccess.tsx` | — | MISSING |
-| UI-PAY-TOKEN | Missing PayPal `token` error UX | `PaymentSuccess.tsx` L326 | — | MISSING |
-| UI-ORDERS | Orders `?code=` redeem + legacy strip | `MyOrders.tsx` | — | MISSING |
+| UI-PAY-409 | Payment success missing token error UX | `PaymentSuccess.tsx` | `payment-success-ui.spec.ts` | COVERED |
+| UI-PAY-TOKEN | Missing PayPal `token` error UX | `PaymentSuccess.tsx` | `payment-success-ui.spec.ts` | COVERED |
+| UI-ORDERS | Orders legacy `?token=` strip + warning | `MyOrders.tsx` | `orders-ui.spec.ts` | COVERED |
 | UI-ADMIN | Admin tabs smoke | — | — | MANUAL-ONLY |
 
 ---
@@ -93,8 +94,8 @@
 | ID | Behavior | Implementation | Test(s) | Status |
 |----|----------|----------------|---------|--------|
 | DB-CHECKOUT-EX | `order_checkout_exchanges` in SQL migrations | `schema.sql`, `migration-order-checkout-exchange.sql` | — | COVERED |
-| DB-RLS-14 | All 14 RLS tables in operator runbook | `schema.sql` + migrations | — | PARTIAL (`schema.sql` has 8/14 grants) |
-| DOC-RLS-COUNT | 14 RLS tables in all guides | various | — | DRIFT (some guides say 13) |
+| DB-RLS-14 | All 14 RLS tables in operator runbook | `schema.sql` + migrations | `rlsMigration.test.ts` | PARTIAL |
+| DOC-RLS-COUNT | 14 RLS tables in functional guides | various | — | PARTIAL (milestone docs may say 13) |
 
 ---
 
@@ -103,7 +104,7 @@
 | ID | Behavior | Implementation | Test(s) | Status |
 |----|----------|----------------|---------|--------|
 | CI-ENV | Production env validation in CI | `validate-env.mjs`, `ci.yml` | CI job | COVERED |
-| DOC-TESTS | Test count in `info.md` | `info.md` | `npm test` (111) | COVERED |
+| DOC-TESTS | Test count in `info.md` | `info.md` | `npm test` (127) | COVERED |
 
 ---
 

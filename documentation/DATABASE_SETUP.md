@@ -103,14 +103,17 @@ See [RLS_OPTIMIZATION.md](./RLS_OPTIMIZATION.md).
 
 ## Maintenance
 
-Scheduled after bootstrap (`maintenanceJobs.ts`); initial run deferred by `MAINTENANCE_DEFER_MS` (default 120s):
+Scheduled after **core** bootstrap (`maintenanceJobs.ts`); initial run deferred by `MAINTENANCE_DEFER_MS` (default 120s):
 
-- Expire abandoned pending orders (restore stock)
-- Clean expired idempotency rows (batched)
-- Reap stuck processing idempotency keys (batched, `SKIP LOCKED`, partial index)
-- Clean expired or used checkout / order-access exchange codes
+| Interval | Tasks |
+|----------|--------|
+| Once after defer | DB ping → expire stale orders → reap stuck idempotency keys |
+| Every 15 min | Ping → stuck idempotency reaper (silent when nothing to reap) |
+| Every 1 hour | Ping → idempotency cleanup → stale orders → checkout exchange cleanup → order access exchange cleanup |
 
-Logs: `Maintenance: step started` / `step finished` with `durationMs`.
+Each scheduled run **pings the database first**. If the pooler is temporarily unreachable (`CONNECT_TIMEOUT`, `ENOTFOUND` after sleep or offline), you get one compact `Maintenance: skipped (database unreachable)` line — not a sign of a wrong `DATABASE_URL` if bootstrap and API traffic already succeeded.
+
+Env tuning: `MAINTENANCE_DB_RETRIES` (default 2), `MAINTENANCE_DB_RETRY_MS` (default 1000). Full behavior: [`info.md` — Maintenance jobs](info.md#maintenance-jobs).
 
 ## Keep-alive
 

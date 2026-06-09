@@ -126,7 +126,7 @@ router.post('/log', async (req: Request, res: Response) => {
     res.json({ success: true });
   } catch (error: unknown) {
     logger.error('Activity log error:', error);
-    res.json({ success: true });
+    respond500(res, error, 'Failed to log activity');
   }
 });
 
@@ -208,6 +208,17 @@ router.post('/batch', async (req: Request, res: Response) => {
     }
 
     if (!res.headersSent) {
+      const attempted = activities.filter(
+        (activity) => activity?.actionType && ALLOWED_ACTION_TYPES.has(activity.actionType)
+      ).length;
+      if (attempted > 0 && inserted === 0) {
+        return res.status(500).json({
+          success: false,
+          error: 'Failed to persist activity batch',
+          inserted,
+          skipped,
+        });
+      }
       res.json({ success: true, inserted, skipped });
     }
   } catch (error: unknown) {

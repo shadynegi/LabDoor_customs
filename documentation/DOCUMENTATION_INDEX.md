@@ -19,7 +19,7 @@
 | Orders | Email `?code=` access exchange; legacy URL tokens deprecated; partial refresh keeps stale data |
 | RLS | 14 tables service_role-only; no public PostgREST product read |
 | Activity | Consent-gated batch; `contact_submit`, `purchase_complete`, `size_select`, `quantity_change`; CSRF-exempt `/activity/batch`; IP anonymized |
-| Admin | Products paginated; messages read-on-open; coupon scope; review admin response; estimated delivery |
+| Admin | Server product search; products paginated; messages read-on-open; coupon scope + edit; review admin response; estimated delivery |
 | Reviews | `POST /api/reviews/check` on email blur; pending-moderation copy; vote error toasts |
 | Mobile | Sticky CTAs, visualViewport keyboard offset, body scroll containment |
 
@@ -41,7 +41,8 @@
 
 | Document | Purpose |
 |----------|---------|
-| [PROJECT_AUDIT.md](PROJECT_AUDIT.md) | One-time full audit snapshot (2026-06-08) — remediation backlog |
+| [AUDIT_SUMMARY.md](AUDIT_SUMMARY.md) | Security controls reference + open gaps (synced with audit) |
+| [PROJECT_AUDIT.md](PROJECT_AUDIT.md) | Full audit snapshot (2026-06-08) + remediation log — **do not re-audit wholesale** |
 | [COVERAGE_MATRIX.md](COVERAGE_MATRIX.md) | Doc → code → test map — **update per PR** (avoids repeat audits) |
 
 ---

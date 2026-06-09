@@ -8,6 +8,7 @@ import { sanitizeString } from '../utils/sanitize';
 import { deriveReviewVoterId } from '../lib/reviewVoterId';
 import {
   checkVerifiedPurchase,
+  GENERIC_REVIEW_ELIGIBILITY_MESSAGE,
   sanitizeReviewImages,
   toPublicReview,
 } from '../lib/reviewHelpers';
@@ -250,10 +251,12 @@ router.post('/', async (req: Request, res: Response) => {
 
     const productExists = await sql`SELECT id FROM products WHERE id = ${product_id} LIMIT 1`;
     if (!productExists.length) {
-      return res.status(400).json({ success: false, error: 'Product not found' });
+      return res.status(400).json({
+        success: false,
+        error: GENERIC_REVIEW_ELIGIBILITY_MESSAGE,
+      });
     }
 
-    // Check if customer already reviewed this product
     const existingReview = await sql`
       SELECT id FROM reviews 
       WHERE product_id = ${product_id} 
@@ -264,7 +267,7 @@ router.post('/', async (req: Request, res: Response) => {
     if (existingReview.length > 0) {
       return res.status(400).json({
         success: false,
-        error: 'You have already reviewed this product'
+        error: GENERIC_REVIEW_ELIGIBILITY_MESSAGE,
       });
     }
 
@@ -639,8 +642,7 @@ async function checkReviewEligibility(productId: number, email: string) {
       status: 200 as const,
       data: {
         can_review: false,
-        message:
-          'A review may already exist for this product and email, or eligibility could not be confirmed.',
+        message: GENERIC_REVIEW_ELIGIBILITY_MESSAGE,
       },
     };
   }
@@ -659,7 +661,7 @@ async function checkReviewEligibility(productId: number, email: string) {
       can_review: canReview,
       message: canReview
         ? 'You may submit a review for this product.'
-        : 'A review may already exist for this product and email, or eligibility could not be confirmed.',
+        : GENERIC_REVIEW_ELIGIBILITY_MESSAGE,
     },
   };
 }

@@ -112,6 +112,24 @@ export async function installStorefrontApiMocks(
       return json(route, { success: true, data: product });
     }
 
+    if (path === '/products/search' && method === 'POST') {
+      let body: { query?: string } = {};
+      try {
+        body = route.request().postDataJSON() as typeof body;
+      } catch {
+        body = {};
+      }
+      const q = (body.query || '').toLowerCase();
+      const filtered = q
+        ? products.filter((p) => p.name.toLowerCase().includes(q))
+        : products;
+      return json(route, {
+        success: true,
+        data: filtered.slice(0, 20),
+        pagination: { page: 1, limit: 20, total: filtered.length, totalPages: 1, hasMore: false },
+      });
+    }
+
     if (path.startsWith('/products') && method === 'GET') {
       return json(route, paginateProducts(products, route.request().url()));
     }

@@ -42,6 +42,7 @@ If the analytics API fails, the tab shows an error message with a **Retry** butt
 - **Search** — debounced server-side query via `POST /api/products/search` (searches full catalog, not only loaded pages)
 - **Load more** — paginated list via `GET /api/products?limit=50&page=` when not searching
 - Error banner with **Retry** if the product list fails to load
+- **Coupons / Reviews** — product scope uses **server search** (`AdminProductSearchPicker` → `POST /api/products/search`), not a fixed 100-product list
 - Create new products (name, price, images, category, size, color, stock)
 - Edit existing products
 - Delete products

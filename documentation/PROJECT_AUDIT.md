@@ -5,7 +5,7 @@
 
 **Review method:** Read `info.md` + operational guides; parallel audit of `backend/src`, `frontend/src`, `Tests/`, CI, env templates; spot-verify critical findings in source.
 
-**Automated tests at audit time:** 99 passing (61 unit + 16 API + 22 Playwright). **After remediation (`3dbdef9`):** 105 passing. **After follow-up fixes:** 111 passing (68 unit + 21 API + 22 Playwright).
+**Automated tests at audit time:** 99 passing (61 unit + 16 API + 22 Playwright). **After remediation (`3dbdef9`):** 105. **After follow-up (`c6de967`):** 111. **Current:** **127** (73 unit + 30 API + 24 Playwright).
 
 ---
 
@@ -13,7 +13,7 @@
 
 The platform is **production-viable** for core storefront checkout, admin fulfillment, and PayPal capture/webhooks. Recent frontend work closed major gaps (409 payment UI, checkout exchange errors, admin messages, review eligibility, cart retry).
 
-**Remediation (2026-06-08):** Critical and high audit items **C1–C4, C6, H1–H8** were implemented in `3dbdef9`. **Follow-up (same day):** **F-01, F-02, F-04, F-06, F-07, DB-01, FE-01–FE-06** closed in code; partial **C5** coverage via activity batch, order lookup, and `computeCheckoutPricingForCart` tests. Remaining gaps: webhook/capture/mark-paid API tests, Playwright payment-edge specs — track via [`COVERAGE_MATRIX.md`](COVERAGE_MATRIX.md).
+**Remediation (2026-06-08):** Critical and high audit items **C1–C4, C6, H1–H8** in `3dbdef9`; follow-up **F-01–F-07, DB-01, FE-01–FE-06** in `c6de967`; maintenance resilience + docs in `5e3be15`. **C5** partially closed (activity batch, order lookup, pricing, transient DB tests). **Still open:** payment-path API tests, Playwright payment UI, RLS automation, M4/M13/M14 — see [Still open](#still-open-next-sprint) and [`COVERAGE_MATRIX.md`](COVERAGE_MATRIX.md).
 
 **Original top risks (snapshot at audit time — most now closed):**
 
@@ -146,53 +146,56 @@ The platform is **production-viable** for core storefront checkout, admin fulfil
 
 ## Medium priority (half-baked features & UX)
 
-| ID | Area | Files | Issue | Detailed fix |
-|----|------|-------|-------|--------------|
-| M1 | Admin coupons | `AdminCouponsTab.tsx` | Edit modal lacks `applies_to` / IDs | Extend edit form + PUT body; show scope in table |
-| M2 | Admin coupons | `AdminCouponsTab.tsx` | Presets inherit custom scope | Force `applies_to: 'all'` on preset creates |
-| M3 | Admin products | `AdminDashboard.tsx` | Search only over loaded pages | Server search or paginate-until-found |
-| M4 | Admin products | `AdminCouponsTab`, `AdminReviewsTab` | Product pickers cap at 100 | Async searchable product combobox |
-| M5 | Admin orders | `AdminDashboard.tsx` | Status filter drops active search | `fetchOrders(1, orderSearch)` on status change |
-| M6 | Admin UI | `AdminDashboard.tsx` | Coupons/reviews tab skeleton flash | `setLoading(false)` on self-loading tabs |
-| M7 | Activity | `activityTracker.ts` | `size_select`, `quantity_change` not wired | Call from ProductDetail size pick + CartContext qty changes |
-| M8 | Activity | `PaymentSuccess.tsx` | `purchase_complete` missing on 409 poll success | Call `trackPurchaseComplete` when poll completes |
-| M9 | Catalog | `productCatalogCache.ts` | TTL 3 min vs docs 15 min | Align code or docs |
-| M10 | Checkout | `Checkout.tsx` | No client/server total compare before redirect | Compare create-payment response to displayed total |
-| M11 | Payments | `orderCheckoutExchange.ts` | Hash collision → unredeemable code | Regenerate on `ON CONFLICT` |
-| M12 | Webhooks | `paypalWebhookHandler.ts` | DENIED without order binding logs 200 | Resolve order ID; return 500 if unresolved |
-| M13 | Activity API | `activity.ts` | DB errors return `success: true` | Return 500 or partial failure counts |
-| M14 | Reviews | `reviews.ts` | Submit vs check message inconsistency | Unify generic copy |
+**Status as of 2026-06-09** (code review vs original audit snapshot):
+
+| ID | Status | Notes |
+|----|--------|-------|
+| M1 | **Closed** | Coupon edit includes `applies_to` + IDs; scope column in table (`AdminCouponsTab.tsx`) |
+| M2 | **Closed** | Presets force `applies_to: 'all'` |
+| M3 | **Closed** | `POST /products/search` with debounce (`AdminDashboard.tsx`) |
+| M4 | **Closed** | `AdminProductSearchPicker` uses `POST /products/search` in coupons + reviews tabs |
+| M5 | **Closed** | Status filter preserves `orderSearch` |
+| M6 | **Closed** | Self-loading tabs call `setLoading(false)` |
+| M7 | **Closed** | `size_select`, `quantity_change` wired |
+| M8 | **Closed** | `purchase_complete` on 409 poll success |
+| M9 | **Closed** | Catalog cache TTL 15 min (matches `info.md`) |
+| M10 | **Closed** | Checkout blocks redirect on server/client total mismatch |
+| M11 | **Closed** | Exchange code hash collision retry (`ON CONFLICT`) |
+| M12 | **Closed** | Webhook DENIED → `processingFailed` when unbound |
+| M13 | **Closed** | `/activity/log` → 500 on DB failure; batch returns 500 when all valid events fail to persist |
+| M14 | **Closed** | Shared `GENERIC_REVIEW_ELIGIBILITY_MESSAGE` on check + submit |
 
 ---
 
 ## Low priority & info
 
-| Item | Notes |
-|------|--------|
-| API-only admin UI | Activity export, PayPal refund/test, health detail — documented, intentional |
-| `PROMO_COUPON_CODE` | Constant unused server-side — remove or implement |
-| RLS table count | Standardize **14** in all guides (some say 13) |
-| `test_guidelines.md` inventory | Stale file counts — regenerate from `Tests/` or link to reports |
-| `info.md` auth legend `?token=` | Contradicts deprecated URL tokens — update legend |
-| ReviewList “not helpful” button | Missing disabled styling after vote |
-| PaymentSuccess missing `token` | Redirects to `/` silently — show error + `/orders` link |
-| Dead code | `apiUtils.ts`, `tokens.ts` already removed |
+| Item | Status / notes |
+|------|----------------|
+| API-only admin UI | Documented, intentional |
+| `PROMO_COUPON_CODE` | **Open** — display-only on checkout; not enforced server-side |
+| RLS table count in boilerplate guides | **Partial** — `info.md` / `PROJECT_STATUS` say 14; many milestone docs still say 13 |
+| `test_guidelines.md` inventory | **Synced** — 114 tests (71+21+22) |
+| `info.md` auth legend `?token=` | **Open** — legend still mentions query token; storefront deprecates URL tokens |
+| ReviewList “not helpful” button | **Closed** — disabled styling after vote |
+| PaymentSuccess missing `token` | **Closed** — error UI with `/orders` link |
+| Dead code | `apiUtils.ts`, `tokens.ts` removed |
 
 ---
 
 ## What is fully implemented (verified OK)
 
-- PayPal create-payment atomic order + stock + exchange code
+- PayPal create-payment atomic order + stock + exchange code + `access_token_encrypted`
 - Capture idempotency, `ORDER_ALREADY_CAPTURED` handling, amount mismatch auto-refund (capture path)
-- **409** when capture succeeds but DB not completed (+ frontend processing UI)
-- Checkout exchange encryption at rest; access-exchange for email links
-- Coupon scope enforcement at checkout (`all` / `product` / `category`)
-- Admin bulk limits (500), status transition validation, mark-paid PayPal verify
-- CSRF, rate limits (Redis fail-closed), Cloudflare enforcement
-- Review PII stripping (`toPublicReview`), admin moderation UI
-- Storefront routes, cart validation + retry, legacy order URL deprecation
-- Maintenance jobs (idempotency reaper, stale orders, exchange cleanup)
-- 99 automated tests for helpers, partial API, UI smoke
+- **409** when capture succeeds but DB not completed (+ frontend processing UI + poll timeout UX)
+- Checkout/access exchange encryption; durable email link minting via encrypted order token
+- Coupon validate + create-payment share `computeCheckoutPricingForCart` (DB prices, volume discount)
+- Coupon scope enforcement at checkout (`all` / `product` / `category`); admin coupon edit scope
+- Admin bulk limits (500), status transition validation, mark-paid PayPal verify, server product search
+- CSRF, rate limits (Redis fail-closed), Cloudflare enforcement, production grant-revoke gate
+- Review PII stripping (`toPublicReview`), admin moderation UI, check endpoint anti-enumeration (product missing)
+- Storefront routes, cart validation + retry, client/server total compare, legacy order URL deprecation
+- Maintenance jobs with ping-first scheduling and transient-error handling (`dbErrors.ts`)
+- **127** automated tests (73 unit + 30 API + 24 Playwright)
 
 ---
 
@@ -249,10 +252,10 @@ Sprint 4 — Admin/storefront polish
 
 | ID | Severity | Issue | Next step |
 |----|----------|-------|-----------|
-| **C5** | Critical | Payment paths mostly untested (409, webhook, mark-paid, exchange redeem API) | `captureReconciliation.test.ts`, `paypalWebhook.test.ts`, Playwright payment specs |
-| **UI-PAY-409** | High | No Playwright for 409 poll / missing token | `payment-success-ui.spec.ts` |
-| **ORD-MARK-PAID** | High | Admin mark-paid untested | `adminMarkPaid.test.ts` |
-| **SEC-RLS** | Medium | No automated RLS/grant tests | `rlsMigration.test.ts` |
+| **C5** | Medium | Core payment paths covered; gaps remain | `PAY-CONTEXT`, `PAY-REFUND-MISMATCH`, full webhook COMPLETED happy path, mark-paid success path |
+| **UI-ORDERS** | Low | No Playwright for `?code=` email redeem flow | Extend `orders-ui.spec.ts` with mocked access-exchange |
+| **PAY-FE-TOTAL** | Low | Checkout total mismatch block untested in Playwright | Optional UI spec |
+| **DOC-RLS** | Low | ~40 milestone guides still say “13 tables” | Bulk-update boilerplate or remove stale intros |
 
 ### Test sprint order (closes C5 without re-auditing)
 
@@ -304,7 +307,11 @@ Sprint 4 — Admin/storefront polish
 | 2026-06-08 | F-07 | Webhook DENIED → 500 when order binding fails |
 | 2026-06-08 | F-04 | Production startup fails if client grants remain |
 | 2026-06-08 | DB-01 | Checkout exchange + access_token_encrypted migration SQL files |
-| 2026-06-08 | C5 | Partial — `activityBatch.test.ts`, `orderLookup.test.ts`, `computeCheckoutPricingForCart.test.ts` (111 tests total) |
+| 2026-06-08 | C5 | Partial — `activityBatch.test.ts`, `orderLookup.test.ts`, `computeCheckoutPricingForCart.test.ts` |
+| 2026-06-09 | — | Maintenance ping-first + transient DB handling (`5e3be15`); `dbErrors.ts` + `transientDbError.test.ts` |
+| 2026-06-09 | — | Docs: DATABASE_URL vs maintenance warnings; AUDIT_SUMMARY + audit reconciliation |
+| 2026-06-09 | M4/M13/M14 | Admin product search picker; activity log/batch errors; review message unification |
+| 2026-06-09 | C5 | Expanded — capture 409, webhook DENIED, checkout exchange API, mark-paid validation, reviews check, activity log, Playwright payment/orders UI (127 tests) |
 
 *Append a line when closing each Critical/High item.*
 

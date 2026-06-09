@@ -36,7 +36,7 @@ Lab Door Customs is a monorepo e-commerce platform for custom footwear sales.
 
 - **Admin:** HttpOnly session cookie, bcrypt password (`ADMIN_PASSWORD_HASH`), SHA-256 hashed sessions in DB.
 - **Customers:** Per-order access tokens (SHA-256 hashed at rest); PayPal return uses one-time exchange codes (AES-256-GCM encrypted in `order_checkout_exchanges`).
-- **Database:** Supabase PostgreSQL with service_role-only RLS on 13 tables; anon/authenticated PostgREST access revoked.
+- **Database:** Supabase PostgreSQL with service_role-only RLS on 14 tables; anon/authenticated PostgREST access revoked.
 - **API:** CSRF on mutating requests (except activity batch and PayPal webhook), rate limits, CORS whitelist, Cloudflare proxy in production.
 - **Activity:** Consent-gated on frontend; IP anonymized with `IP_SALT`; batch endpoint CSRF-exempt.
 - **PayPal:** Webhook signature verification, amount validation, idempotent create/capture/refund.

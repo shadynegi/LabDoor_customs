@@ -9,7 +9,7 @@ Find your Supabase PostgreSQL connection string.
 
 ## Current system behavior
 
-Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API (`backend/`), Vitest + Playwright tests (`Tests/`). Production runs one Express process serving `/api/*` and the built SPA; PostgreSQL is Supabase with backend **service_role** access — RLS and revoked grants block `anon`/`authenticated` PostgREST on 13 tables.
+Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API (`backend/`), Vitest + Playwright tests (`Tests/`). Production runs one Express process serving `/api/*` and the built SPA; PostgreSQL is Supabase with backend **service_role** access — RLS and revoked grants block `anon`/`authenticated` PostgREST on 14 tables.
 
 | Area | How it works |
 |------|----------------|
@@ -53,3 +53,17 @@ Use the **Direct connection** URI with port **5432** for running SQL scripts.
 ## GitHub keep-alive
 
 Set the pooler URL as `DATABASE_URL` secret for the keep-alive workflow.
+
+---
+
+## Troubleshooting connection logs
+
+| Log / symptom | Wrong URL? | What to do |
+|---------------|------------|------------|
+| `Bootstrap: database reachable` at startup, then hours later `Maintenance: skipped (database unreachable)` with `CONNECT_TIMEOUT` or `ENOTFOUND` | **No** — transient network/DNS (sleep, Wi‑Fi) | Wait for next maintenance interval or wake network; no URL change needed |
+| `Database ping timed out` during bootstrap; API never serves data | **Often yes** — host, password, paused project, or wrong port | Copy fresh URI from Supabase; use pooler **6543** with `?pgbouncer=true`; unpause project |
+| `[DB] PgBouncer pooler mode enabled` then steady operation | URL format is correct for the app | — |
+
+Use **pooler (6543)** for `DATABASE_URL` in the running app. Use **direct (5432)** only in the Supabase SQL editor or one-off migrations.
+
+**Reference:** [`info.md` — Maintenance warnings vs wrong DATABASE_URL](info.md#maintenance-warnings-vs-wrong-database_url)

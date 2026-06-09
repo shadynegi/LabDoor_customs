@@ -25,9 +25,10 @@ test.describe('Cart UI', () => {
     await page.goto('/cart');
     await expect(page.getByText(product.name)).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText('$98').first()).toBeVisible();
+    // Cart revalidates prices on load; wait for validation to finish before asserting CTA.
     await expect(
-      page.getByRole('button', { name: /Proceed to Checkout|Checkout/i }).first(),
-    ).toBeVisible();
+      page.getByRole('button', { name: 'Proceed to Checkout' }),
+    ).toBeVisible({ timeout: 15_000 });
   });
 
   test('cart badge reflects item count in navigation', async ({ page }) => {

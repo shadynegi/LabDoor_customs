@@ -10,7 +10,7 @@ import {
 import { logger } from './logger';
 
 /** Tables that must not be readable via anon/authenticated (PostgREST / GraphQL). */
-const CLIENT_REVOKED_TABLES = [
+export const CLIENT_REVOKED_TABLES = [
   'products',
   'orders',
   'contact_messages',

@@ -9,11 +9,11 @@ How to test Lab Door Customs locally, in CI, and manually. This is the single re
 
 ## Current system behavior
 
-Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API (`backend/`), Vitest + Playwright tests (`Tests/`). Production runs one Express process serving `/api/*` and the built SPA; PostgreSQL is Supabase with backend **service_role** access — RLS and revoked grants block `anon`/`authenticated` PostgREST on 13 tables.
+Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API (`backend/`), Vitest + Playwright tests (`Tests/`). Production runs one Express process serving `/api/*` and the built SPA; PostgreSQL is Supabase with backend **service_role** access — RLS and revoked grants block `anon`/`authenticated` PostgREST on 14 tables.
 
 | Area | How it works |
 |------|----------------|
-| **Checkout** | Cart validation with retry; PayPal `?code=` exchange; capture **409** → processing UI; checkout email synced to activity on change/blur. |
+| **Checkout** | Cart validation with retry; DB-backed coupon validate; server/client total compare; PayPal `?code=` exchange; capture **409** → processing UI + poll timeout; `checkout_complete` before redirect. |
 | **Orders** | Email links `GET /api/orders/access-exchange/:code`; legacy `?orderNumber=&token=` stripped; partial refresh keeps stale data + warning. |
 | **Admin** | Products paginated (load more); messages mark read on open; coupons scope UI; reviews admin response; estimated delivery; error/retry states. |
 | **Activity** | Consent-gated batch; `contact_submit` on contact success. |
@@ -41,16 +41,18 @@ If the user did not mention testing, **skip** `npm test`, `npm run test:all`, Pl
 
 | Suite | Tool | Location | Count | Needs live DB? |
 |-------|------|----------|-------|----------------|
-| Backend unit | Vitest | `Tests/backend/` | 15 files, 71 tests | No (mocked) |
-| API integration | Vitest + Supertest | `Tests/api/` | 6 files, 21 tests | No (mocked) |
-| Frontend E2E / UI | Playwright | `Tests/frontend/` | 8 files, 22 tests | No (mocked `/api` + static preview) |
+| Backend unit | Vitest | `Tests/backend/` | 17 files, 73 tests | No (mocked) |
+| API integration | Vitest + Supertest | `Tests/api/` | 12 files, 30 tests | No (mocked) |
+| Frontend E2E / UI | Playwright | `Tests/frontend/` | 10 files, 24 tests | No (mocked `/api` + static preview) |
 | Link checker | Custom script | repo root | — | No |
 
-**Total:** 114 automated tests — 71 backend unit + 21 API + 22 Playwright UI (desktop + mobile projects).
+**Total:** 127 automated tests — 73 backend unit + 30 API + 24 Playwright UI (desktop + mobile projects).
 
 Backend unit tests include: payment idempotency, order tokens, checkout exchange hashing, order token encryption, webhook errors, product image validation, admin session hashing, PayPal webhook utils, refund idempotency, checkout pricing, `computeCheckoutPricingForCart`, client IP, keep-alive.
 
-API tests include: checkout, health, orders, security, activity batch (`contact_submit`, unknown types, batch limit), order lookup (uniform 404).
+API tests include: checkout, capture 409 reconciliation, checkout exchange, PayPal webhook DENIED/COMPLETED errors, admin mark-paid validation, health, orders, security, activity batch/log, order lookup, reviews check.
+
+Playwright includes: payment-success missing-token UX, orders legacy URL deprecation warning.
 
 ---
 

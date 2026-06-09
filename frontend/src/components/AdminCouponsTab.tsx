@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Pencil, Plus, RefreshCw, Tag, Trash2, ToggleLeft, ToggleRight, X } from 'lucide-react';
-import { apiFetch, catalogFetch } from '../config';
+import { apiFetch } from '../config';
+import AdminProductSearchPicker from './AdminProductSearchPicker';
 import { toast } from 'sonner';
 import { logError } from '../lib/logger';
 import { useResponsive } from '../hooks/useResponsive';
@@ -22,11 +23,6 @@ interface Coupon {
   applies_to_ids?: number[];
 }
 
-interface ProductOption {
-  id: number;
-  name: string;
-}
-
 const PRESET_DISCOUNTS = [5, 10, 20, 25, 50] as const;
 
 export default function AdminCouponsTab() {
@@ -37,7 +33,6 @@ export default function AdminCouponsTab() {
   const [customPercent, setCustomPercent] = useState(10);
   const [customAppliesTo, setCustomAppliesTo] = useState<'all' | 'category' | 'product'>('all');
   const [customAppliesToIds, setCustomAppliesToIds] = useState('');
-  const [productOptions, setProductOptions] = useState<ProductOption[]>([]);
   const [editingCoupon, setEditingCoupon] = useState<Coupon | null>(null);
   const [couponToDelete, setCouponToDelete] = useState<Coupon | null>(null);
   const [editDescription, setEditDescription] = useState('');
@@ -74,23 +69,6 @@ export default function AdminCouponsTab() {
   useEffect(() => {
     fetchCoupons();
   }, [fetchCoupons]);
-
-  useEffect(() => {
-    const loadProducts = async () => {
-      try {
-        const response = await catalogFetch('/products?limit=100');
-        const data = await response.json();
-        if (data.success) {
-          setProductOptions(
-            (data.data || []).map((p: ProductOption) => ({ id: p.id, name: p.name }))
-          );
-        }
-      } catch (error) {
-        logError('Error loading products for coupons:', error);
-      }
-    };
-    void loadProducts();
-  }, []);
 
   const parseAppliesToIds = (): number[] | null => {
     if (customAppliesTo === 'all') return null;
@@ -313,22 +291,14 @@ export default function AdminCouponsTab() {
             </select>
           </label>
           {customAppliesTo === 'product' && (
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, minWidth: 200 }}>
-              Product IDs (comma-separated)
-              <input
-                list="coupon-product-ids"
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, minWidth: 280 }}>
+              Products
+              <AdminProductSearchPicker
+                mode="multi"
                 value={customAppliesToIds}
-                onChange={(e) => setCustomAppliesToIds(e.target.value)}
-                placeholder="e.g. 12, 15"
-                style={{ padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8 }}
+                onChange={setCustomAppliesToIds}
+                placeholder="Search to add products…"
               />
-              <datalist id="coupon-product-ids">
-                {productOptions.map((p) => (
-                  <option key={p.id} value={String(p.id)}>
-                    {p.name}
-                  </option>
-                ))}
-              </datalist>
             </label>
           )}
           {customAppliesTo === 'category' && (
@@ -544,9 +514,20 @@ export default function AdminCouponsTab() {
                 <option value="category">Category</option>
               </select>
             </label>
-            {editAppliesTo !== 'all' && (
+            {editAppliesTo === 'product' && (
               <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, marginBottom: 12 }}>
-                {editAppliesTo === 'product' ? 'Product IDs (comma-separated)' : 'Category IDs (comma-separated)'}
+                Products
+                <AdminProductSearchPicker
+                  mode="multi"
+                  value={editAppliesToIds}
+                  onChange={setEditAppliesToIds}
+                  placeholder="Search to add products…"
+                />
+              </label>
+            )}
+            {editAppliesTo === 'category' && (
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, marginBottom: 12 }}>
+                Category IDs (comma-separated)
                 <input
                   value={editAppliesToIds}
                   onChange={(e) => setEditAppliesToIds(e.target.value)}
