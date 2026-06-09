@@ -93,7 +93,11 @@ export async function ensureIdempotencyTable(): Promise<void> {
   await ensureIdempotencyIndexes();
 }
 
+let reaperIndexExistsCache: boolean | null = null;
+
 async function processingReaperIndexExists(): Promise<boolean> {
+  if (reaperIndexExistsCache !== null) return reaperIndexExistsCache;
+
   const rows = await sql`
     SELECT 1
     FROM pg_indexes
@@ -102,7 +106,8 @@ async function processingReaperIndexExists(): Promise<boolean> {
       AND indexname = 'idx_payment_idempotency_processing_created'
     LIMIT 1
   `;
-  return rows.length > 0;
+  reaperIndexExistsCache = rows.length > 0;
+  return reaperIndexExistsCache;
 }
 
 /** Safe on every boot — CREATE INDEX IF NOT EXISTS only (never during maintenance reaper). */
@@ -121,6 +126,7 @@ export async function ensureIdempotencyIndexes(): Promise<void> {
       WHERE status = 'processing'
     `;
     logger.info('Created idx_payment_idempotency_processing_created');
+    reaperIndexExistsCache = true;
   } catch (error) {
     logger.warn(
       'Could not create partial idempotency index — run migration-payment-idempotency.sql in Supabase:',
@@ -258,68 +264,58 @@ export async function reapStuckIdempotencyKeys(
   const maxBatches = parseInt(process.env.IDEMPOTENCY_REAP_MAX_BATCHES || '10', 10);
   let total = 0;
 
-  try {
-    if (!(await hasStuckIdempotencyKeys(staleMinutes))) {
-      logger.info('Maintenance: no stuck idempotency keys');
-      return 0;
-    }
-
-    for (let batch = 0; batch < maxBatches; batch++) {
-      // SKIP LOCKED avoids waiting on rows held by in-flight checkouts (Supabase 120s timeout).
-      const updated = await sql`
-        WITH batch AS (
-          SELECT id
-          FROM payment_idempotency
-          WHERE status = 'processing'
-            AND created_at < NOW() - ${staleMinutes} * interval '1 minute'
-          ORDER BY created_at ASC
-          LIMIT ${batchSize}
-          FOR UPDATE SKIP LOCKED
-        )
-        UPDATE payment_idempotency AS p
-        SET status = 'failed'
-        FROM batch
-        WHERE p.id = batch.id
-        RETURNING p.id
-      `;
-      total += updated.length;
-      if (updated.length < batchSize) break;
-    }
-
-    if (total > 0) {
-      logger.info(`Reaped ${total} stuck payment idempotency record(s)`);
-    }
-    return total;
-  } catch (error) {
-    logger.warn('Stuck idempotency reaper failed (non-fatal):', error);
-    return total;
+  if (!(await hasStuckIdempotencyKeys(staleMinutes))) {
+    return 0;
   }
+
+  for (let batch = 0; batch < maxBatches; batch++) {
+    // SKIP LOCKED avoids waiting on rows held by in-flight checkouts (Supabase 120s timeout).
+    const updated = await sql`
+      WITH batch AS (
+        SELECT id
+        FROM payment_idempotency
+        WHERE status = 'processing'
+          AND created_at < NOW() - ${staleMinutes} * interval '1 minute'
+        ORDER BY created_at ASC
+        LIMIT ${batchSize}
+        FOR UPDATE SKIP LOCKED
+      )
+      UPDATE payment_idempotency AS p
+      SET status = 'failed'
+      FROM batch
+      WHERE p.id = batch.id
+      RETURNING p.id
+    `;
+    total += updated.length;
+    if (updated.length < batchSize) break;
+  }
+
+  if (total > 0) {
+    logger.info(`Reaped ${total} stuck payment idempotency record(s)`);
+  }
+  return total;
 }
 
 export async function cleanupExpiredIdempotencyKeys(): Promise<void> {
   const batchSize = parseInt(process.env.IDEMPOTENCY_REAP_BATCH_SIZE || '50', 10);
   let total = 0;
 
-  try {
-    for (;;) {
-      const deleted = await sql`
-        DELETE FROM payment_idempotency
-        WHERE id IN (
-          SELECT id
-          FROM payment_idempotency
-          WHERE expires_at < NOW() AND status != 'processing'
-          ORDER BY expires_at ASC
-          LIMIT ${batchSize}
-        )
-        RETURNING id
-      `;
-      total += deleted.length;
-      if (deleted.length < batchSize) break;
-    }
-    if (total > 0) {
-      logger.info(`Cleaned up ${total} expired payment idempotency records`);
-    }
-  } catch (error) {
-    logger.warn('Idempotency cleanup failed (non-fatal):', error);
+  for (;;) {
+    const deleted = await sql`
+      DELETE FROM payment_idempotency
+      WHERE id IN (
+        SELECT id
+        FROM payment_idempotency
+        WHERE expires_at < NOW() AND status != 'processing'
+        ORDER BY expires_at ASC
+        LIMIT ${batchSize}
+      )
+      RETURNING id
+    `;
+    total += deleted.length;
+    if (deleted.length < batchSize) break;
+  }
+  if (total > 0) {
+    logger.info(`Cleaned up ${total} expired payment idempotency records`);
   }
 }

@@ -1559,7 +1559,9 @@ if (require.main === module) {
         serverReady = true;
         logger.info('Bootstrap complete — API ready');
       } else {
-        logger.info('Bootstrap complete (background)');
+        logger.info(
+          'Core bootstrap complete — deferred RLS/cache tasks may still be running in background'
+        );
       }
       startMaintenanceJobs();
     })

@@ -518,10 +518,11 @@ Each task runs on every start but **skips DDL** when `BOOTSTRAP_SKIP_DDL=true` o
 ```
 API ready — bootstrap continues in background (dev only)
 Bootstrap: skipping payment_idempotency DDL (already applied or BOOTSTRAP_SKIP_DDL)
-Bootstrap: skipping rls_policies (service_role policies already present)
+Core bootstrap complete — deferred RLS/cache tasks may still be running in background
 Deferred bootstrap complete
 Maintenance jobs scheduled (first run in 120000ms)
 Maintenance: step finished  step=reap_idempotency durationMs=…
+Maintenance: skipped (database unreachable)  — one line when laptop sleeps or DNS fails; retries resume on next interval
 ```
 
 See [RESTART_BACKEND.md](RESTART_BACKEND.md) and [DATABASE_SETUP.md](DATABASE_SETUP.md).
@@ -568,18 +569,15 @@ Powered by **Resend** (`RESEND_API_KEY`, `SENDER_EMAIL`, `COMPANY_NAME`, `COMPAN
 
 ## Maintenance jobs
 
-Started after bootstrap completes (`maintenanceJobs.ts`). Each run logs `Maintenance: step started` / `step finished` with `durationMs`.
+Started after core bootstrap completes (`maintenanceJobs.ts`). The **initial run** logs each step (`Maintenance: step started` / `step finished`). Scheduled hourly and 15-minute jobs **ping the database first**; if the pooler is unreachable (sleep, Wi‑Fi drop, `CONNECT_TIMEOUT`, `ENOTFOUND`), they log a single compact warning and skip — no stack traces per cleanup task.
 
 | Job | Interval | Action |
 |-----|----------|--------|
 | **Initial run** | `MAINTENANCE_DEFER_MS` after boot (default 120s) | DB ping → expire stale orders → reap stuck idempotency keys |
-| Idempotency cleanup | 1 hour | Delete expired non-processing rows (batched) |
-| Stale pending orders | 1 hour | Cancel pending orders older than `PENDING_ORDER_TTL_HOURS` (default 24), restore stock, release coupons |
-| Stuck idempotency reaper | 15 min | Mark long-running `processing` rows as `failed` (batched, `FOR UPDATE SKIP LOCKED`) |
-| Checkout exchange cleanup | 1 hour | Delete expired or used `order_checkout_exchanges` rows |
-| Order access exchange cleanup | 1 hour | Delete expired `order_access_exchanges` rows |
+| Hourly bundle | 1 hour | Ping → idempotency cleanup → stale orders → checkout exchange cleanup → order access exchange cleanup |
+| Stuck idempotency reaper | 15 min | Ping → mark long-running `processing` rows as `failed` (batched, `FOR UPDATE SKIP LOCKED`) |
 
-**Idempotency reaper:** uses partial index `idx_payment_idempotency_processing_created`; batch size `IDEMPOTENCY_REAP_BATCH_SIZE` (default 50); max batches per run `IDEMPOTENCY_REAP_MAX_BATCHES` (default 10). On Supabase pooler, statements are capped at ~120s — batched reaper avoids statement timeouts.
+**Idempotency reaper:** uses partial index `idx_payment_idempotency_processing_created` (existence cached in memory after first check); batch size `IDEMPOTENCY_REAP_BATCH_SIZE` (default 50); max batches per run `IDEMPOTENCY_REAP_MAX_BATCHES` (default 10). On Supabase pooler, statements are capped at ~120s — batched reaper avoids statement timeouts. Healthy runs with nothing to reap stay silent (no periodic “no stuck keys” spam).
 
 ---
 
@@ -879,6 +877,8 @@ Templates: `backend/env.template`, `frontend/env.template`
 | `IDEMPOTENCY_REAP_BATCH_SIZE` | 50 | Rows per reaper/cleanup batch |
 | `IDEMPOTENCY_REAP_MAX_BATCHES` | 10 | Max reaper batches per maintenance run |
 | `MAINTENANCE_DEFER_MS` | 120000 | Delay first maintenance run after bootstrap |
+| `MAINTENANCE_DB_RETRIES` | 2 | Retries per maintenance DB step on transient pool/network errors |
+| `MAINTENANCE_DB_RETRY_MS` | 1000 | Base backoff (ms) between maintenance DB retries |
 | `DB_STATEMENT_TIMEOUT_MS` | 300000 | Postgres `statement_timeout` per connection (client-side; Supabase pooler may still cap ~120s) |
 | `BOOTSTRAP_BLOCK_UNTIL_RLS` | — | Dev only: set `true` to block API ready until RLS migration finishes (production always waits) |
 | `BOOTSTRAP_BLOCK_API` | — | Dev only: set `true` to return 503 until full bootstrap completes (default: API ready immediately in dev) |
@@ -997,7 +997,7 @@ npm run links:check
 | Backend unit/API | Vitest | Checkout validation, `computeCheckoutPricingForCart`, payment idempotency, order tokens, checkout exchange, order token encryption, webhook errors, product images, admin session hashing, PayPal utils, refund idempotency, activity batch, order lookup |
 | Frontend E2E / UI | Playwright | Storefront smoke, products/cart/checkout/contact UI, navigation, cookie consent, mobile viewport (22 tests; mocked API) |
 
-**Total automated tests:** 111 (68 backend unit + 21 API + 22 Playwright UI).
+**Total automated tests:** 114 (71 backend unit + 21 API + 22 Playwright UI).
 
 | Link check | Custom script | Documentation internal links |
 

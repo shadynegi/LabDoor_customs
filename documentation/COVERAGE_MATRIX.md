@@ -5,7 +5,7 @@
 **Authoritative behavior:** [`info.md`](info.md)  
 **Full audit:** [`PROJECT_AUDIT.md`](PROJECT_AUDIT.md) (2026-06-08 initial + follow-up)
 
-**Test count marker (CI should match):** `<!-- tests: 111 -->` (68 unit + 21 API + 22 Playwright)
+**Test count marker (CI should match):** `<!-- tests: 114 -->` (71 unit + 21 API + 22 Playwright)
 
 ---
 

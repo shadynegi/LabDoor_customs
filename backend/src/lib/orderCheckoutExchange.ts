@@ -139,13 +139,9 @@ export async function redeemCheckoutExchangeCode(
 }
 
 export async function cleanupExpiredCheckoutExchanges(): Promise<void> {
-  try {
-    await sql`
-      DELETE FROM order_checkout_exchanges
-      WHERE expires_at < NOW() OR used_at IS NOT NULL
-    `;
-  } catch (error) {
-    logger.warn('Checkout exchange cleanup failed:', error);
-  }
+  await sql`
+    DELETE FROM order_checkout_exchanges
+    WHERE expires_at < NOW() OR used_at IS NOT NULL
+  `;
 }
 

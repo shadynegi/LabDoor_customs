@@ -41,12 +41,12 @@ If the user did not mention testing, **skip** `npm test`, `npm run test:all`, Pl
 
 | Suite | Tool | Location | Count | Needs live DB? |
 |-------|------|----------|-------|----------------|
-| Backend unit | Vitest | `Tests/backend/` | 14 files, 68 tests | No (mocked) |
+| Backend unit | Vitest | `Tests/backend/` | 15 files, 71 tests | No (mocked) |
 | API integration | Vitest + Supertest | `Tests/api/` | 6 files, 21 tests | No (mocked) |
 | Frontend E2E / UI | Playwright | `Tests/frontend/` | 8 files, 22 tests | No (mocked `/api` + static preview) |
 | Link checker | Custom script | repo root | — | No |
 
-**Total:** 111 automated tests — 68 backend unit + 21 API + 22 Playwright UI (desktop + mobile projects).
+**Total:** 114 automated tests — 71 backend unit + 21 API + 22 Playwright UI (desktop + mobile projects).
 
 Backend unit tests include: payment idempotency, order tokens, checkout exchange hashing, order token encryption, webhook errors, product image validation, admin session hashing, PayPal webhook utils, refund idempotency, checkout pricing, `computeCheckoutPricingForCart`, client IP, keep-alive.
 

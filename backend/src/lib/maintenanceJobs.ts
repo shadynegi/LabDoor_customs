@@ -1,5 +1,5 @@
 import { logger } from './logger';
-import { pingDatabase } from './db';
+import { pingDatabase, withRetry, isTransientDbError } from './db';
 import { expireStalePendingOrders } from './orderLifecycle';
 import {
   cleanupExpiredIdempotencyKeys,
@@ -8,36 +8,88 @@ import {
 import { cleanupExpiredCheckoutExchanges } from './orderCheckoutExchange';
 import { cleanupExpiredOrderAccessExchanges } from './orderAccessExchange';
 
+function dbErrorCode(err: unknown): string | undefined {
+  if (err && typeof err === 'object' && 'code' in err) {
+    const code = (err as { code: unknown }).code;
+    return code != null ? String(code) : undefined;
+  }
+  return undefined;
+}
+
+function logMaintenanceFailure(step: string, err: unknown): void {
+  const code = dbErrorCode(err);
+  const message = err instanceof Error ? err.message : String(err);
+
+  if (isTransientDbError(err)) {
+    logger.warn(
+      { step, code, err: message },
+      'Maintenance: skipped (database unreachable)'
+    );
+    return;
+  }
+
+  logger.warn({ step, code, err }, 'Maintenance: step failed');
+}
+
+async function runWithMaintenanceRetry<T>(
+  step: string,
+  fn: () => Promise<T>
+): Promise<T | undefined> {
+  try {
+    return await withRetry(fn, {
+      retries: parseInt(process.env.MAINTENANCE_DB_RETRIES || '2', 10),
+      baseMs: parseInt(process.env.MAINTENANCE_DB_RETRY_MS || '1000', 10),
+      label: `maintenance:${step}`,
+    });
+  } catch (err) {
+    logMaintenanceFailure(step, err);
+    return undefined;
+  }
+}
+
 async function runMaintenanceStep<T>(
   label: string,
   fn: () => Promise<T>
-): Promise<T> {
+): Promise<T | undefined> {
   const started = Date.now();
   logger.info({ step: label }, 'Maintenance: step started');
-  try {
-    const result = await fn();
-    logger.info({ step: label, durationMs: Date.now() - started, result }, 'Maintenance: step finished');
-    return result;
-  } catch (err) {
-    logger.warn(
-      { step: label, durationMs: Date.now() - started, err },
-      'Maintenance: step failed'
+  const result = await runWithMaintenanceRetry(label, fn);
+  if (result !== undefined) {
+    logger.info(
+      { step: label, durationMs: Date.now() - started, result },
+      'Maintenance: step finished'
     );
-    throw err;
   }
+  return result;
+}
+
+async function runHourlyMaintenance(): Promise<void> {
+  const ping = await runWithMaintenanceRetry('ping_database', () => pingDatabase());
+  if (ping === undefined) return;
+
+  await runWithMaintenanceRetry('idempotency_cleanup', cleanupExpiredIdempotencyKeys);
+  await runWithMaintenanceRetry('expire_stale_orders', () => expireStalePendingOrders());
+  await runWithMaintenanceRetry('checkout_exchange_cleanup', cleanupExpiredCheckoutExchanges);
+  await runWithMaintenanceRetry(
+    'order_access_exchange_cleanup',
+    cleanupExpiredOrderAccessExchanges
+  );
+}
+
+async function runFifteenMinuteMaintenance(): Promise<void> {
+  const ping = await runWithMaintenanceRetry('ping_database', () => pingDatabase());
+  if (ping === undefined) return;
+
+  await runWithMaintenanceRetry('reap_idempotency', () => reapStuckIdempotencyKeys());
 }
 
 async function runInitialMaintenance(): Promise<void> {
   const started = Date.now();
-  try {
-    logger.info('Maintenance: starting initial run');
-    await runMaintenanceStep('ping_database', () => pingDatabase());
-    await runMaintenanceStep('expire_stale_orders', () => expireStalePendingOrders());
-    await runMaintenanceStep('reap_idempotency', () => reapStuckIdempotencyKeys());
-    logger.info({ durationMs: Date.now() - started }, 'Maintenance: initial run complete');
-  } catch (err) {
-    logger.warn({ durationMs: Date.now() - started, err }, 'Maintenance: initial run aborted');
-  }
+  logger.info('Maintenance: starting initial run');
+  await runMaintenanceStep('ping_database', () => pingDatabase());
+  await runMaintenanceStep('expire_stale_orders', () => expireStalePendingOrders());
+  await runMaintenanceStep('reap_idempotency', () => reapStuckIdempotencyKeys());
+  logger.info({ durationMs: Date.now() - started }, 'Maintenance: initial run complete');
 }
 
 export function startMaintenanceJobs(): void {
@@ -45,32 +97,18 @@ export function startMaintenanceJobs(): void {
   const fifteenMinMs = 15 * 60 * 1000;
 
   setInterval(() => {
-    cleanupExpiredIdempotencyKeys().catch((err) =>
-      logger.warn('Idempotency cleanup failed:', err)
-    );
-    expireStalePendingOrders().catch((err) =>
-      logger.warn('Stale pending order cleanup failed:', err)
-    );
-    cleanupExpiredCheckoutExchanges().catch((err) =>
-      logger.warn('Checkout exchange cleanup failed:', err)
-    );
-    cleanupExpiredOrderAccessExchanges().catch((err) =>
-      logger.warn('Order access exchange cleanup failed:', err)
-    );
+    runHourlyMaintenance().catch((err) => logMaintenanceFailure('hourly_maintenance', err));
   }, hourMs);
 
   setInterval(() => {
-    reapStuckIdempotencyKeys().catch((err) =>
-      logger.warn('Stuck idempotency reaper failed:', err)
+    runFifteenMinuteMaintenance().catch((err) =>
+      logMaintenanceFailure('fifteen_minute_maintenance', err)
     );
   }, fifteenMinMs);
 
-  // Defer first run and ping DB so pooler connections are fresh after bootstrap.
   const deferMs = parseInt(process.env.MAINTENANCE_DEFER_MS || '120000', 10);
   setTimeout(() => {
-    runInitialMaintenance().catch((err) =>
-      logger.warn('Initial maintenance run failed:', err)
-    );
+    runInitialMaintenance().catch((err) => logMaintenanceFailure('initial_maintenance', err));
   }, deferMs);
 
   logger.info(`Maintenance jobs scheduled (first run in ${deferMs}ms)`);
