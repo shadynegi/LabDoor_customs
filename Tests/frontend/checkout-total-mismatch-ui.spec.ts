@@ -46,13 +46,15 @@ test.describe('Checkout total mismatch UI', () => {
     await page.getByLabel(/city/i).fill('Testville');
     await page.getByLabel(/state/i).fill('CA');
     await page.getByLabel(/ZIP \/ Postal Code/i).fill('12345');
-    await page.getByRole('combobox', { name: /country/i }).click();
-    await page.getByRole('option', { name: 'United States of America (the)' }).click();
+    await expect(page.getByText('United States of America (the)')).toBeVisible();
 
-    await page.getByText('All sales are final').first().scrollIntoViewIfNeeded();
-    await page.locator('input[type="checkbox"]').check();
+    const policyCheckbox = page.getByRole('checkbox', {
+      name: /understand that all sales are final/i,
+    }).first();
+    await policyCheckbox.scrollIntoViewIfNeeded();
+    await policyCheckbox.check();
 
-    const payButton = page.locator('button:visible', { hasText: 'Pay with PayPal' });
+    const payButton = page.getByRole('button', { name: /pay with paypal/i }).first();
     await expect(payButton).toBeEnabled({ timeout: 30_000 });
 
     const createPayment = page.waitForResponse(

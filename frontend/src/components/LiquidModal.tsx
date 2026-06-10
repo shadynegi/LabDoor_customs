@@ -1,5 +1,5 @@
 // LiquidModal - A modal wrapper with liquid glass effect
-import { type ReactNode, type CSSProperties } from 'react';
+import { type ReactNode, type CSSProperties, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LiquidWeb } from 'liquid-web/react';
 
@@ -11,7 +11,12 @@ interface LiquidModalProps {
   className?: string;
   contentStyle?: CSSProperties;
   overlayStyle?: CSSProperties;
+  /** Accessible name for the dialog (required for screen readers when no visible title) */
+  ariaLabel?: string;
 }
+
+const FOCUSABLE_SELECTOR =
+  'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 const LiquidModal: React.FC<LiquidModalProps> = ({
   isOpen,
@@ -21,7 +26,54 @@ const LiquidModal: React.FC<LiquidModalProps> = ({
   className = '',
   contentStyle = {},
   overlayStyle = {},
+  ariaLabel = 'Dialog',
 }) => {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    previousFocusRef.current = document.activeElement as HTMLElement | null;
+
+    const dialog = dialogRef.current;
+    const focusables = dialog
+      ? Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
+      : [];
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+
+    const focusTimer = window.setTimeout(() => first?.focus(), 0);
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+
+      if (event.key !== 'Tab' || focusables.length === 0) return;
+
+      if (event.shiftKey) {
+        if (document.activeElement === first) {
+          event.preventDefault();
+          last?.focus();
+        }
+      } else if (document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
+    };
+
+    document.addEventListener('keydown', onKeyDown);
+
+    return () => {
+      window.clearTimeout(focusTimer);
+      document.removeEventListener('keydown', onKeyDown);
+      previousFocusRef.current?.focus();
+    };
+  }, [isOpen, onClose]);
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -30,6 +82,7 @@ const LiquidModal: React.FC<LiquidModalProps> = ({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={onClose}
+          role="presentation"
           style={{
             position: 'fixed',
             top: 0,
@@ -47,6 +100,10 @@ const LiquidModal: React.FC<LiquidModalProps> = ({
           }}
         >
           <motion.div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label={ariaLabel}
             initial={{ scale: 0.9, y: 20 }}
             animate={{ scale: 1, y: 0 }}
             exit={{ scale: 0.9, y: 20 }}
@@ -92,4 +149,3 @@ const LiquidModal: React.FC<LiquidModalProps> = ({
 };
 
 export default LiquidModal;
-

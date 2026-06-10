@@ -1,7 +1,14 @@
 import sql, { withRetry } from './db';
+import { cached } from './cache';
+import { CACHE, TTL } from './cacheKeys';
 
 function analyticsQuery<T>(label: string, queryFn: () => Promise<T>): Promise<T> {
   return withRetry(queryFn, { retries: 2, baseMs: 500, label: `adminAnalytics:${label}` });
+}
+
+/** Cached admin analytics (Redis + in-memory; TTL 5–15 min). */
+export async function getAdminAnalytics() {
+  return cached(CACHE.adminAnalytics, TTL.adminAnalytics, fetchAdminAnalytics);
 }
 
 export async function fetchAdminAnalytics() {

@@ -41,7 +41,7 @@ There is **no** public read policy on `products` via PostgREST. Catalog data is 
 
 `migration-revoke-graphql-client-roles.sql` revokes `ALL` on application tables from `anon` and `authenticated`, then grants `ALL` to `service_role`. Boot applies revokes only when client grants are still present.
 
-Legacy permissive policies (authenticated product writes, public product read, etc.) are removed by **`migration-performance-linter-fixes.sql`** (run once in Supabase SQL editor) — not on every restart.
+Legacy permissive policies (authenticated product writes, public product read, etc.) are removed by **`migration-performance-linter-fixes.sql`** (applied on production Supabase; run once on new DBs) — not on every restart.
 
 ---
 
@@ -51,7 +51,8 @@ Legacy permissive policies (authenticated product writes, public product read, e
 |------|------|
 | `migration-rls-sensitive-tables.sql` | RLS on runtime-sensitive tables (skips missing tables) |
 | `migration-revoke-graphql-client-roles.sql` | Revoke anon/authenticated; fix `update_product_rating` search_path |
-| `migration-performance-linter-fixes.sql` | **Recommended once:** FK indexes (lint 0001); consolidate duplicate RLS policies (lint 0006) |
+| `migration-performance-linter-fixes.sql` | FK indexes (lint 0001); consolidate duplicate RLS policies (lint 0006). **Applied on production Supabase.** |
+| `migration-products-search-trgm.sql` | `pg_trgm` GIN indexes on `products` for server search. **Applied on production Supabase.** |
 | `migration-rls-tighten.sql` | Reference SQL mirroring boot migration |
 
 Re-run `migration-rls-sensitive-tables.sql` after first production boot if runtime tables (`payment_idempotency`, etc.) were created after the initial SQL run.

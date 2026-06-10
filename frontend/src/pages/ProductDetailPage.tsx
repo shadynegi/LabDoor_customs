@@ -1,6 +1,6 @@
 // ProductDetailPage - Individual product page with full details
 import { useState, useEffect, lazy, Suspense } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, ShoppingCart, Package, Shield, Truck, Check, RotateCcw, Image, AlertTriangle } from 'lucide-react';
 import { catalogFetch } from '../config';
@@ -16,6 +16,8 @@ import { logError } from '../lib/logger';
 import { useResponsive } from '../hooks/useResponsive';
 import MobileStickyCta from '../components/MobileStickyCta';
 import { trackProductView, trackSizeSelect } from '../utils/activityTracker';
+import { REPLACEMENT_POLICY_PATH } from '../constants/returnPolicy';
+import { FREE_SHIPPING_MESSAGE } from '../utils/pricing';
 
 const Product360Viewer = lazy(() =>
   import('../components/Product360Viewer').then((m) => ({ default: m.Product360Viewer }))
@@ -611,7 +613,7 @@ const ProductDetailPage: React.FC = () => {
               <div style={{ textAlign: 'center' }}>
                 <Truck size={24} color="#9c6649" style={{ margin: '0 auto 8px' }} />
                 <div style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>Free Shipping</div>
-                <div style={{ fontSize: 11, color: '#9ca3af' }}>On orders over $1000</div>
+                <div style={{ fontSize: 11, color: '#9ca3af' }}>{FREE_SHIPPING_MESSAGE}</div>
               </div>
               <div style={{ textAlign: 'center' }}>
                 <Shield size={24} color="#9c6649" style={{ margin: '0 auto 8px' }} />
@@ -620,8 +622,13 @@ const ProductDetailPage: React.FC = () => {
               </div>
               <div style={{ textAlign: 'center' }}>
                 <Package size={24} color="#9c6649" style={{ margin: '0 auto 8px' }} />
-                <div style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>Easy Returns</div>
-                <div style={{ fontSize: 11, color: '#9ca3af' }}>30-day guarantee</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>All Sales Final</div>
+                <Link
+                  to={REPLACEMENT_POLICY_PATH}
+                  style={{ fontSize: 11, color: '#9c6649', textDecoration: 'underline' }}
+                >
+                  Manufacturing-defect replacements
+                </Link>
               </div>
             </div>
           </motion.div>

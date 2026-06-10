@@ -103,9 +103,9 @@
 |-------|---------|
 | `/` | Home — hero carousel, product search bar, featured products |
 | `/products` | Catalog — filters, Fuse.js search, pagination; supports `?q=` deep links |
-| `/product/:id` | Product detail — 360° viewer (real multi-angle or static placeholder), reviews, JSON-LD, meta tags |
+| `/product/:id` | Product detail — 360° viewer (real multi-angle or static placeholder), reviews, JSON-LD, meta tags; trust badges aligned with store policy (free shipping over $200, secure payment, **all sales final** with link to replacement policy) |
 | `/cart` | Shopping cart (localStorage via `CartContext`) |
-| `/checkout` | Customer/shipping form, coupon validation, PayPal redirect |
+| `/checkout` | Customer/shipping form (country pre-selected to `country-list` US value), coupon validation, no-refund policy checkbox, PayPal redirect |
 | `/payment/success` | Redeems `?code=` via checkout exchange, captures payment; **409** shows “payment received — processing” (polls checkout-context; cart not cleared until confirmed); expired exchange shows explicit error |
 | `/payment/cancel` | Abandoned checkout; clears `pendingOrder`, `paypalReturnCode`, and `checkoutRecovery` from sessionStorage |
 | `/orders` | Customer order lookup (`POST /api/orders/lookup`); email links redeem `?code=` via `GET /api/orders/access-exchange/:code`; legacy `?orderNumber=&token=` URLs are stripped with a deprecation warning |
@@ -425,12 +425,12 @@ At create-payment, a row in `coupon_usage` reserves the coupon for the pending o
 
 - XSS sanitization via `xss` library (`utils/sanitize.ts`).
 - Parameterized SQL only (postgres.js tagged templates).
-- Order secrets stripped from API responses (`stripOrderSecrets`).
+- Order secrets stripped from API responses (`stripOrderSecrets` removes `access_token_hash` and `access_token_encrypted` — never returned in JSON).
 - Review PII stripped from public API responses (`toPublicReview` — no `customer_email` on storefront).
 - DB TLS verification in production (`DB_SSL_CA_PATH`; `rejectUnauthorized` defaults true).
 - PayPal order/capture IDs have partial unique indexes to prevent duplicate binding.
 - Product images validated on admin create/update: HTTPS/relative URLs or data URLs ≤512KB (`lib/productImage.ts`).
-- Supabase RLS at startup (`ensureRlsPolicies()`): all **14** application tables (including `order_access_exchanges`) use **service_role-only** policies; `anon` and `authenticated` grants are revoked — no public product read via PostgREST/GraphQL; all data access goes through Express. Boot is **non-destructive** when policies already exist (skips DROP/CREATE that caused pooler lock hangs); run `migration-performance-linter-fixes.sql` once in Supabase for lint 0006 cleanup.
+- Supabase RLS at startup (`ensureRlsPolicies()`): all **14** application tables (including `order_access_exchanges`) use **service_role-only** policies; `anon` and `authenticated` grants are revoked — no public product read via PostgREST/GraphQL; all data access goes through Express. Boot is **non-destructive** when policies already exist (skips DROP/CREATE that caused pooler lock hangs). Production Supabase has `migration-performance-linter-fixes.sql` applied (lint 0006 policy consolidation + FK indexes).
 
 ### Production environment gates
 
@@ -549,6 +549,7 @@ See [RESTART_BACKEND.md](RESTART_BACKEND.md) and [DATABASE_SETUP.md](DATABASE_SE
 | Product list pages | 60s | Product admin writes |
 | Single product | 120s | Product admin writes |
 | Coupon validation | 30s | Coupon admin writes |
+| Admin analytics (`GET /api/admin/analytics`) | 5–15 min (`ADMIN_ANALYTICS_CACHE_TTL_MS`, default 10 min) | TTL expiry (Redis + in-memory) |
 
 ### Cache warming
 
@@ -654,7 +655,8 @@ A **correct** `DATABASE_URL` can still produce occasional maintenance warnings w
 - `backend/src/database/migration-*.sql` — incremental migrations (run in Supabase SQL editor), including `migration-order-checkout-exchange.sql` and `migration-order-access-token-encrypted.sql`
 - **Boot applies (skip-if-exists):** `ensureIdempotencyTable()`, `ensureOrderPaymentSchema()`, `ensureCheckoutExchangeTable()`, `ensureOrderAccessExchangeTable()`, `ensureRlsPolicies()`
 - `backend/src/database/migration-rls-tighten.sql` — reference SQL for RLS (mirrors boot logic)
-- `backend/src/database/migration-performance-linter-fixes.sql` — **run once manually** in Supabase: FK indexes (lint 0001) and consolidate duplicate RLS policies (lint 0006). Not applied destructively at boot (use `BOOTSTRAP_FORCE_RLS=true` only if you intentionally want legacy DROP on restart).
+- `backend/src/database/migration-performance-linter-fixes.sql` — FK indexes (lint 0001) and consolidated RLS policies (lint 0006). **Applied on production Supabase** (June 2026). Not applied at boot; verify with SQL in [SUPABASE_SQL_TO_RUN.md](SUPABASE_SQL_TO_RUN.md).
+- `backend/src/database/migration-products-search-trgm.sql` — `pg_trgm` + GIN indexes on `products.name` / `products.description` for `POST /api/products/search`. **Applied on production Supabase** (June 2026).
 - `backend/src/database/migration-payment-idempotency.sql` — includes partial index for reaper (`idx_payment_idempotency_processing_created`); boot also creates this index via `ensureIdempotencyIndexes()` when missing
 
 ---
@@ -898,9 +900,10 @@ Templates: `backend/env.template`, `frontend/env.template`
 | `BOOTSTRAP_BLOCK_UNTIL_RLS` | — | Dev only: set `true` to block API ready until RLS migration finishes (production always waits) |
 | `BOOTSTRAP_BLOCK_API` | — | Dev only: set `true` to return 503 until full bootstrap completes (default: API ready immediately in dev) |
 | `BOOTSTRAP_SKIP_DDL` | — | Skip boot-time CREATE TABLE/INDEX when schema already exists in Supabase |
-| `BOOTSTRAP_FORCE_RLS` | — | Drop legacy RLS policies on boot (default off; run `migration-performance-linter-fixes.sql` once instead) |
+| `BOOTSTRAP_FORCE_RLS` | — | Drop legacy RLS policies on boot (default off; production already has `migration-performance-linter-fixes.sql` applied) |
 | `BOOTSTRAP_PING_TIMEOUT_MS` | 20000 | Fail fast if database is unreachable at bootstrap start |
 | `REQUEST_TIMEOUT_MS` | 60000 | HTTP request timeout |
+| `ADMIN_ANALYTICS_CACHE_TTL_MS` | 600000 (clamped 300000–900000) | Redis/in-memory TTL for `GET /api/admin/analytics` |
 | `SLOW_REQUEST_TIMEOUT_MS` | 180000 | Catalog, admin analytics, activity routes |
 | `VITE_API_TIMEOUT_MS` | 60000 | Frontend default `apiFetch` timeout |
 | `VITE_EXTENDED_API_TIMEOUT_MS` | 180000 | Frontend `slowApiFetch` (catalog, analytics, activity) |
@@ -1014,7 +1017,7 @@ npm run links:check
 | Backend unit/API | Vitest | Checkout validation + create-payment happy path, capture 409/refund mismatch, checkout-context API, checkout exchange, PayPal webhooks (COMPLETED + DENIED), admin mark-paid, coupon scope, `computeCheckoutPricingForCart`, payment idempotency, order tokens, RLS table list + grant revoke, email portal URL, activity batch/log, order lookup, reviews check |
 | Frontend E2E / UI | Playwright | Storefront smoke, products/cart/checkout/contact UI, navigation, cookie consent, payment-success/orders edge UI, checkout total mismatch, admin login/dashboard smoke, mobile viewport (28 tests; mocked API) |
 
-**Total automated tests:** 150 (81 backend unit + 41 API + 28 Playwright UI).
+**Total automated tests:** 156 (82 backend unit + 45 API + 29 Playwright UI).
 
 | Link check | Custom script | Documentation internal links |
 

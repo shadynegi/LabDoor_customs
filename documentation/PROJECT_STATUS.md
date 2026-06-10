@@ -26,7 +26,7 @@ Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_
 
 ## Storefront
 
-- Product catalog with filters, pagination, and Fuse.js search
+- Product catalog with filters, pagination, and Fuse.js search; server `POST /api/products/search` backed by `pg_trgm` GIN indexes on production Supabase
 - Product detail pages with 360° viewer (real video assets or spin placeholder), reviews, and structured data
 - Shopping cart (localStorage) with server price validation on each change and **retry** on validation failure
 - PayPal checkout with server-side pricing and coupon validation
@@ -102,6 +102,6 @@ Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_
 
 ## Testing
 
-- 150 automated tests (81 backend unit + 41 API + 28 Playwright UI)
+- 153 automated tests (81 backend unit + 43 API + 29 Playwright UI)
 - Playwright storefront smoke tests (home, products, checkout, contact)
 - Documentation link checker in CI

@@ -17,7 +17,7 @@ import { validateJwtSecretComplexity } from '../lib/jwtSecret';
 import { MAX_BULK_IDS, validateStatusTransition, type OrderStatus } from '../lib/orderStatus';
 import { stripOrderSecrets } from '../lib/orderTokens';
 import { respond500 } from '../lib/safeError';
-import { fetchAdminAnalytics } from '../lib/adminAnalytics';
+import { getAdminAnalytics } from '../lib/adminAnalytics';
 
 const router = Router();
 
@@ -400,7 +400,7 @@ router.get('/verify', async (req: Request, res: Response) => {
 // GET /admin/analytics — dashboard summary
 router.get('/analytics', verifyAdmin, async (_req: Request, res: Response) => {
   try {
-    const data = await fetchAdminAnalytics();
+    const data = await getAdminAnalytics();
     res.json({ success: true, data });
   } catch (error: unknown) {
     logger.error('Analytics error:', error);

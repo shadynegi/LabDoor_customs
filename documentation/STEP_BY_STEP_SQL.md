@@ -30,7 +30,7 @@ Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_
 ## Steps
 
 1. Connect to Supabase SQL Editor.
-2. Run `backend/src/database/schema.sql`, then incremental files in `backend/src/database/migration-*.sql` (see [`SUPABASE_SQL_TO_RUN.md`](./SUPABASE_SQL_TO_RUN.md)).
+2. Run `backend/src/database/schema.sql`, then incremental files in `backend/src/database/migration-*.sql`. On **production**, use the **Migration audit** section in [`SUPABASE_SQL_TO_RUN.md`](./SUPABASE_SQL_TO_RUN.md) to verify what is already applied before re-running scripts.
 3. Confirm core tables exist: `products`, `orders`, `order_items`, `customers`, `coupons`, `reviews`, `contact_messages`, `order_access_exchanges`, plus payment/runtime tables (`idempotency_keys`, `refund_events`, etc.).
 4. Set `DATABASE_URL` to pooler URI (6543) on backend.
 5. Start backend — runtime schema patches apply automatically for incremental DDL.

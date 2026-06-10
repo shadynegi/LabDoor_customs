@@ -4,35 +4,7 @@ import { catalogFetch } from '../config';
 import type { Product } from './useProducts';
 import { toast } from 'sonner';
 import { logError } from '../lib/logger';
-
-// Import actual product images
-import blueNikeImg from "../assets/Shoe_Design/blue nike.png";
-import goldBlackNikeImg from "../assets/Shoe_Design/gold black nike.png";
-import pinkNikeImg from "../assets/Shoe_Design/pink nike.png";
-import blackBrownNikeImg from "../assets/Shoe_Design/black and brown nike.png";
-import brownPinkNikeImg from "../assets/Shoe_Design/brown pink nike.png";
-import blueBg from "../assets/Backgrounds/blue.png";
-import goldBg from "../assets/Backgrounds/gold.png";
-import pinkBg from "../assets/Backgrounds/pink.png";
-import brownBg from "../assets/Backgrounds/brown.png";
-import brownPinkBg from "../assets/Backgrounds/brown pink.png";
-
-// Map database image references to actual imported images
-const imageMap: Record<string, string> = {
-  '/assets/blue-nike.png': blueNikeImg,
-  '/assets/gold-black-nike.png': goldBlackNikeImg,
-  '/assets/pink-nike.png': pinkNikeImg,
-  '/assets/black-brown-nike.png': blackBrownNikeImg,
-  '/assets/brown-pink-nike.png': brownPinkNikeImg,
-};
-
-const backgroundMap: Record<string, string> = {
-  '/assets/blue-bg.png': blueBg,
-  '/assets/gold-bg.png': goldBg,
-  '/assets/pink-bg.png': pinkBg,
-  '/assets/brown-bg.png': brownBg,
-  '/assets/brown-pink-bg.png': brownPinkBg,
-};
+import { resolveProductBackground, resolveProductImage } from '../lib/productImageMaps';
 
 interface PaginationInfo {
   page: number;
@@ -83,8 +55,8 @@ export const usePaginatedProducts = (limit: number = 10): UsePaginatedProductsRe
           price: typeof product.price === 'string' ? parseFloat(product.price) : product.price,
           rating: typeof product.rating === 'string' ? parseFloat(product.rating) : (product.rating || 0),
           review_count: typeof product.review_count === 'string' ? parseInt(product.review_count) : (product.review_count || 0),
-          image: imageMap[product.image] || product.image,
-          background: product.background ? (backgroundMap[product.background] || product.background) : undefined,
+          image: resolveProductImage(product.image),
+          background: resolveProductBackground(product.background),
         }));
         
         if (append) {

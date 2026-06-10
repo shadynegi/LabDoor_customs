@@ -7,6 +7,7 @@ import { apiFetch } from "../config";
 import { optimizeImageUrl } from "../utils/imageUrl";
 import Select, { type StylesConfig } from "react-select";
 import { getNames } from "country-list";
+import { resolveDefaultCheckoutCountry } from "../constants/checkoutForm";
 import {
   calculateCheckoutPricing,
   FREE_SHIPPING_MESSAGE,
@@ -172,7 +173,7 @@ const InputField = React.memo(({
 InputField.displayName = 'InputField';
 
 export default function Checkout() {
-  const { state, cartValidationError, isCartValidating } = useCart();
+  const { state, cartValidationError, isCartValidating, retryCartValidation } = useCart();
   const navigate = useNavigate();
   const { isMobile } = useResponsive();
   const [isProcessing, setIsProcessing] = useState(false);
@@ -189,7 +190,7 @@ export default function Checkout() {
     city: "",
     state: "",
     zipCode: "",
-    country: "United States",
+    country: resolveDefaultCheckoutCountry(),
   });
 
   // Coupon state
@@ -1166,7 +1167,25 @@ export default function Checkout() {
                     fontSize: 14,
                   }}
                 >
-                  {cartValidationError}
+                  <p style={{ margin: '0 0 12px' }}>{cartValidationError}</p>
+                  <button
+                    type="button"
+                    onClick={retryCartValidation}
+                    disabled={isCartValidating}
+                    style={{
+                      padding: '8px 14px',
+                      background: '#9c6649',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: 8,
+                      cursor: isCartValidating ? 'not-allowed' : 'pointer',
+                      fontWeight: 600,
+                      fontSize: 13,
+                      opacity: isCartValidating ? 0.7 : 1,
+                    }}
+                  >
+                    {isCartValidating ? 'Validating…' : 'Retry validation'}
+                  </button>
                 </div>
               )}
 
@@ -1296,6 +1315,57 @@ export default function Checkout() {
           disabled={isProcessing || checkoutBlocked || !policyAccepted}
           keyboardOffset={keyboardOffset}
           ariaLabel="Complete payment"
+          hint={
+            cartValidationError ? (
+              <div role="alert">
+                <p style={{ margin: '0 0 8px', color: '#991b1b' }}>{cartValidationError}</p>
+                <button
+                  type="button"
+                  onClick={retryCartValidation}
+                  disabled={isCartValidating}
+                  style={{
+                    padding: '6px 12px',
+                    background: '#9c6649',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: 8,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: isCartValidating ? 'not-allowed' : 'pointer',
+                    opacity: isCartValidating ? 0.7 : 1,
+                  }}
+                >
+                  {isCartValidating ? 'Validating…' : 'Retry validation'}
+                </button>
+              </div>
+            ) : !policyAccepted ? (
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 8,
+                  cursor: 'pointer',
+                  color: '#7c2d12',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={policyAccepted}
+                  onChange={(e) => {
+                    setPolicyAccepted(e.target.checked);
+                    if (e.target.checked) setPolicyError('');
+                  }}
+                  style={{ marginTop: 2, width: 16, height: 16, flexShrink: 0 }}
+                />
+                <span>
+                  Accept no-refund / replacement-only policy to pay.{' '}
+                  <Link to={REPLACEMENT_POLICY_PATH} style={{ color: '#9c6649', fontWeight: 600 }}>
+                    Policy
+                  </Link>
+                </span>
+              </label>
+            ) : undefined
+          }
         />
       )}
     </div>

@@ -1,31 +1,6 @@
 import { catalogFetch } from '../config';
 import type { Product } from '../hooks/useProducts';
-import blueNikeImg from '../assets/Shoe_Design/blue nike.png';
-import goldBlackNikeImg from '../assets/Shoe_Design/gold black nike.png';
-import pinkNikeImg from '../assets/Shoe_Design/pink nike.png';
-import blackBrownNikeImg from '../assets/Shoe_Design/black and brown nike.png';
-import brownPinkNikeImg from '../assets/Shoe_Design/brown pink nike.png';
-import blueBg from '../assets/Backgrounds/blue.png';
-import goldBg from '../assets/Backgrounds/gold.png';
-import pinkBg from '../assets/Backgrounds/pink.png';
-import brownBg from '../assets/Backgrounds/brown.png';
-import brownPinkBg from '../assets/Backgrounds/brown pink.png';
-
-const imageMap: Record<string, string> = {
-  '/assets/blue-nike.png': blueNikeImg,
-  '/assets/gold-black-nike.png': goldBlackNikeImg,
-  '/assets/pink-nike.png': pinkNikeImg,
-  '/assets/black-brown-nike.png': blackBrownNikeImg,
-  '/assets/brown-pink-nike.png': brownPinkNikeImg,
-};
-
-const backgroundMap: Record<string, string> = {
-  '/assets/blue-bg.png': blueBg,
-  '/assets/gold-bg.png': goldBg,
-  '/assets/pink-bg.png': pinkBg,
-  '/assets/brown-bg.png': brownBg,
-  '/assets/brown-pink-bg.png': brownPinkBg,
-};
+import { resolveProductBackground, resolveProductImage } from './productImageMaps';
 
 const CACHE_KEY = 'ldc_product_catalog_v1';
 const CACHE_TTL_MS = 15 * 60 * 1000;
@@ -45,10 +20,8 @@ export function normalizeProduct(product: Product): Product {
     review_count: typeof product.review_count === 'string'
       ? parseInt(String(product.review_count), 10)
       : (product.review_count || 0),
-    image: imageMap[product.image] || product.image,
-    background: product.background
-      ? (backgroundMap[product.background] || product.background)
-      : undefined,
+    image: resolveProductImage(product.image),
+    background: resolveProductBackground(product.background),
   };
 }
 

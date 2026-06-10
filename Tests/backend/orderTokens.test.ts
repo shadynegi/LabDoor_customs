@@ -40,13 +40,15 @@ describe('orderTokens', () => {
     expect(getOrderAccessTokenFromRequest(queryReq)).toBe('query-token');
   });
 
-  it('strips access_token_hash from API payloads', () => {
+  it('strips access token secrets from API payloads', () => {
     const safe = stripOrderSecrets({
       id: '1',
       order_number: 'GSS-1',
       access_token_hash: 'secret-hash',
+      access_token_encrypted: 'enc:secret-blob',
     });
     expect(safe).toEqual({ id: '1', order_number: 'GSS-1' });
     expect('access_token_hash' in safe).toBe(false);
+    expect('access_token_encrypted' in safe).toBe(false);
   });
 });

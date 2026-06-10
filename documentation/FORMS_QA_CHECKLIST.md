@@ -56,6 +56,7 @@ On CSRF 403, `apiFetch` refreshes the token and retries once.
 
 ## Checkout form (`/checkout`)
 
+- [ ] Country pre-selected (United States) on checkout load — no empty country dropdown
 - [ ] Required customer fields validated
 - [ ] Email format validated
 - [ ] Empty cart redirects or shows error
@@ -63,7 +64,7 @@ On CSRF 403, `apiFetch` refreshes the token and retries once.
 - [ ] No-refund / replacement-only policy checkbox required; PayPal button disabled until accepted
 - [ ] PayPal redirect occurs on valid submission
 - [ ] Checkout email updates activity batch identity on change/blur (with consent)
-- [ ] Cart validation failure shows **Retry validation** on cart page
+- [ ] Cart validation failure shows **Retry validation** on cart and checkout pages (desktop + mobile sticky hint)
 - [ ] Server rejects tampered totals (amount mismatch)
 - [ ] Payment success **409** shows processing UI (cart not cleared)
 - [ ] Expired checkout `code` shows explicit error on success page

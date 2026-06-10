@@ -334,11 +334,11 @@ export default function Home() {
             position: "absolute",
             right: isMobile ? 16 : 24
           }}>
-            <a href="/about" style={{ color: "rgba(255,255,255,0.85)", textDecoration: "none", transition: "color 0.2s", whiteSpace: "nowrap" }}>
+            <Link to="/about" style={{ color: "rgba(255,255,255,0.85)", textDecoration: "none", transition: "color 0.2s", whiteSpace: "nowrap" }}>
               About Us
-            </a>
-            <a href="/cart" style={{ position: "relative", display: "inline-block" }}>
-              <ShoppingCart size={40} color="rgba(255,255,255,0.85)" style={{ transition: "color 0.2s" }} />
+            </Link>
+            <Link to="/cart" aria-label={state.items.length > 0 ? `Cart, ${state.items.reduce((sum, item) => sum + item.quantity, 0)} items` : 'Cart'} style={{ position: "relative", display: "inline-block" }}>
+              <ShoppingCart size={40} color="rgba(255,255,255,0.85)" style={{ transition: "color 0.2s" }} aria-hidden="true" />
               {state.items.length > 0 && (
                 <span style={{
                   position: "absolute",
@@ -359,18 +359,18 @@ export default function Home() {
                   {state.items.reduce((sum, item) => sum + item.quantity, 0)}
                 </span>
               )}
-            </a>
+            </Link>
           </nav>
         )}
 
         {/* Mobile: Cart on Right */}
         {isMobile && (
-          <a href="/cart" style={{ 
+          <Link to="/cart" aria-label={state.items.length > 0 ? `Cart, ${state.items.reduce((sum, item) => sum + item.quantity, 0)} items` : 'Cart'} style={{
             position: "absolute",
             right: 16,
             display: "inline-block"
           }}>
-            <ShoppingCart size={40} color="rgba(255,255,255,0.85)" />
+            <ShoppingCart size={40} color="rgba(255,255,255,0.85)" aria-hidden="true" />
             {state.items.length > 0 && (
               <span style={{
                 position: "absolute",
@@ -391,7 +391,7 @@ export default function Home() {
                 {state.items.reduce((sum, item) => sum + item.quantity, 0)}
               </span>
             )}
-          </a>
+          </Link>
         )}
       </header>
 

@@ -25,4 +25,24 @@ test.describe('Checkout UI', () => {
     await expect(page.getByLabel(/full name/i)).toBeVisible();
     await expect(page.getByLabel(/email/i).first()).toBeVisible();
   });
+
+  test('checkout pre-selects United States country', async ({ page }) => {
+    const product = MOCK_PRODUCTS[0];
+    await seedCart(page, [
+      {
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        image: product.image,
+        quantity: 1,
+      },
+    ]);
+
+    await page.goto('/checkout');
+    await expect(page.getByText('Secure Checkout')).toBeVisible({ timeout: 15_000 });
+
+    await expect(page.getByText('United States of America (the)')).toBeVisible({
+      timeout: 10_000,
+    });
+  });
 });

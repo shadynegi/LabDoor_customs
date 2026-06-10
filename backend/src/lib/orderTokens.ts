@@ -40,7 +40,13 @@ export function orderAccessMatches(
   );
 }
 
-export function stripOrderSecrets<T extends Record<string, unknown>>(order: T): Omit<T, 'access_token_hash'> {
-  const { access_token_hash: _removed, ...safe } = order;
+export function stripOrderSecrets<T extends Record<string, unknown>>(
+  order: T
+): Omit<T, 'access_token_hash' | 'access_token_encrypted'> {
+  const {
+    access_token_hash: _hash,
+    access_token_encrypted: _encrypted,
+    ...safe
+  } = order;
   return safe;
 }

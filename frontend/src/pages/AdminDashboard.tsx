@@ -185,9 +185,51 @@ export default function AdminDashboard() {
   const [productFormOpen, setProductFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [adminDialog, setAdminDialog] = useState<AdminDialog>(null);
+  const tabLoadedRef = useRef<Set<Tab>>(new Set());
+
+  const invalidateTab = (tab: Tab) => {
+    tabLoadedRef.current.delete(tab);
+  };
+
+  const loadTabData = async (tab: Tab, options?: { force?: boolean }) => {
+    if (tab === 'coupons' || tab === 'reviews') {
+      setLoading(false);
+      return;
+    }
+
+    const force = options?.force ?? false;
+    if (!force && tabLoadedRef.current.has(tab)) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      switch (tab) {
+        case 'analytics':
+          await fetchAnalytics();
+          break;
+        case 'orders':
+          await fetchOrders();
+          break;
+        case 'products':
+          await fetchProducts(1, false);
+          break;
+        case 'messages':
+          await fetchMessages();
+          break;
+        case 'customers':
+          await fetchCustomers();
+          break;
+      }
+      tabLoadedRef.current.add(tab);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    loadData();
+    void loadTabData(activeTab);
   }, [activeTab]);
 
   useEffect(() => {
@@ -221,35 +263,6 @@ export default function AdminDashboard() {
     }, 300);
     return () => window.clearTimeout(handle);
   }, [productSearch]);
-
-  const loadData = async () => {
-    if (activeTab === 'coupons' || activeTab === 'reviews') {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    try {
-      switch (activeTab) {
-        case 'analytics':
-          await fetchAnalytics();
-          break;
-        case 'orders':
-          await fetchOrders();
-          break;
-        case 'products':
-          await fetchProducts(1, false);
-          break;
-        case 'messages':
-          await fetchMessages();
-          break;
-        case 'customers':
-          await fetchCustomers();
-          break;
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const fetchAnalytics = async () => {
     setAnalyticsError(null);
@@ -389,7 +402,8 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     if (activeTab === 'customers') {
-      fetchCustomers();
+      invalidateTab('customers');
+      void loadTabData('customers', { force: true });
     }
   }, [showDeletedCustomers]);
 
@@ -806,7 +820,7 @@ export default function AdminDashboard() {
           <p style={{ margin: '0 0 20px', color: '#6b7280' }}>{analyticsError}</p>
           <button
             type="button"
-            onClick={fetchAnalytics}
+            onClick={() => void loadTabData('analytics', { force: true })}
             style={{ padding: '10px 20px', background: '#9c6649', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}
           >
             Retry
@@ -933,7 +947,7 @@ export default function AdminDashboard() {
       {productsError && (
         <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 12, padding: 16, marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <span style={{ color: '#991b1b', fontSize: 14 }}>{productsError}</span>
-          <button type="button" onClick={() => fetchProducts(1, false)} style={{ padding: '8px 14px', background: '#9c6649', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
+          <button type="button" onClick={() => void loadTabData('products', { force: true })} style={{ padding: '8px 14px', background: '#9c6649', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
             Retry
           </button>
         </div>
@@ -999,15 +1013,19 @@ export default function AdminDashboard() {
                     ${product.price.toFixed(2)} · Stock {product.stock} · {product.size || '—'}
                   </div>
                   <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
-                    <button type="button" onClick={() => toggleProductStock(product.id, product.is_out_of_stock)}
-                      style={{ padding: '8px 12px', minHeight: 44, borderRadius: 8, border: 'none', cursor: 'pointer', background: product.is_out_of_stock ? '#fee2e2' : '#dcfce7', color: product.is_out_of_stock ? '#dc2626' : '#16a34a', fontWeight: 600, fontSize: 13 }}>
+                    <button
+                      type="button"
+                      aria-label={product.is_out_of_stock ? 'Mark in stock' : 'Mark out of stock'}
+                      onClick={() => toggleProductStock(product.id, product.is_out_of_stock)}
+                      style={{ padding: '8px 12px', minHeight: 44, borderRadius: 8, border: 'none', cursor: 'pointer', background: product.is_out_of_stock ? '#fee2e2' : '#dcfce7', color: product.is_out_of_stock ? '#dc2626' : '#16a34a', fontWeight: 600, fontSize: 13 }}
+                    >
                       {product.is_out_of_stock ? 'Out of Stock' : 'In Stock'}
                     </button>
-                    <button type="button" onClick={() => openEditProduct(product)} style={{ padding: 8, minHeight: 44, minWidth: 44, background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
-                      <Pencil size={16} color="#374151" />
+                    <button type="button" aria-label="Edit product" onClick={() => openEditProduct(product)} style={{ padding: 8, minHeight: 44, minWidth: 44, background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
+                      <Pencil size={16} color="#374151" aria-hidden="true" />
                     </button>
-                    <button type="button" onClick={() => setAdminDialog({ kind: 'deleteProduct', product })} style={{ padding: 8, minHeight: 44, minWidth: 44, background: '#fee2e2', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
-                      <Trash2 size={16} color="#dc2626" />
+                    <button type="button" aria-label="Delete product" onClick={() => setAdminDialog({ kind: 'deleteProduct', product })} style={{ padding: 8, minHeight: 44, minWidth: 44, background: '#fee2e2', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
+                      <Trash2 size={16} color="#dc2626" aria-hidden="true" />
                     </button>
                   </div>
                 </div>
@@ -1073,8 +1091,11 @@ export default function AdminDashboard() {
                 </td>
                 <td style={{ padding: 16, color: '#6b7280' }}>{product.view_count || 0}</td>
                 <td style={{ padding: 16, textAlign: 'center' }}>
-                  <button onClick={() => toggleProductStock(product.id, product.is_out_of_stock)}
+                  <button
+                    type="button"
+                    onClick={() => toggleProductStock(product.id, product.is_out_of_stock)}
                     title={product.is_out_of_stock ? 'Mark in stock' : 'Mark out of stock'}
+                    aria-label={product.is_out_of_stock ? 'Mark in stock' : 'Mark out of stock'}
                     style={{ width: 40, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer',
                       background: product.is_out_of_stock ? '#ef4444' : '#10b981', position: 'relative' }}>
                     <span style={{ position: 'absolute', width: 18, height: 18, borderRadius: '50%', background: 'white', top: 3,
@@ -1087,17 +1108,19 @@ export default function AdminDashboard() {
                       type="button"
                       onClick={() => openEditProduct(product)}
                       title="Edit"
+                      aria-label="Edit product"
                       style={{ padding: 8, background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: 'pointer' }}
                     >
-                      <Pencil size={16} color="#374151" />
+                      <Pencil size={16} color="#374151" aria-hidden="true" />
                     </button>
                     <button
                       type="button"
                       onClick={() => setAdminDialog({ kind: 'deleteProduct', product })}
                       title="Delete"
+                      aria-label="Delete product"
                       style={{ padding: 8, background: '#fee2e2', border: 'none', borderRadius: 8, cursor: 'pointer' }}
                     >
-                      <Trash2 size={16} color="#dc2626" />
+                      <Trash2 size={16} color="#dc2626" aria-hidden="true" />
                     </button>
                   </div>
                 </td>
@@ -1127,7 +1150,7 @@ export default function AdminDashboard() {
       {ordersError && (
         <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 12, padding: 16, marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
           <span style={{ color: '#b91c1c', fontSize: 14 }}>{ordersError}</span>
-          <button type="button" onClick={() => fetchOrders(ordersPage, orderSearch)}
+          <button type="button" onClick={() => void loadTabData('orders', { force: true })}
             style={{ padding: '8px 14px', background: 'white', border: '1px solid #fecaca', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
             Retry
           </button>
@@ -1179,8 +1202,8 @@ export default function AdminDashboard() {
         >
           Next
         </button>
-        <button onClick={() => fetchOrders(ordersPage)} style={{ padding: '10px 16px', background: '#9c6649', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <RefreshCw size={16} /> Refresh
+        <button type="button" onClick={() => void fetchOrders(ordersPage)} style={{ padding: '10px 16px', background: '#9c6649', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <RefreshCw size={16} aria-hidden="true" /> Refresh
         </button>
       </div>
 
@@ -1199,7 +1222,14 @@ export default function AdminDashboard() {
                 <div style={{ fontWeight: 700, fontSize: 16 }}>#{order.order_number}</div>
                 <div style={{ fontSize: 13, color: '#6b7280' }}>{new Date(order.created_at).toLocaleDateString()}</div>
               </div>
-              <div onClick={() => setSelectedOrder(order)}><Eye size={18} color="#6b7280" /></div>
+              <button
+                type="button"
+                aria-label="View order details"
+                onClick={() => setSelectedOrder(order)}
+                style={{ background: 'none', border: 'none', padding: 4, cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+              >
+                <Eye size={18} color="#6b7280" aria-hidden="true" />
+              </button>
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
               <span style={{ padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, background: `${getStatusColor(order.status)}15`, color: getStatusColor(order.status) }}>
@@ -1227,7 +1257,7 @@ export default function AdminDashboard() {
       {messagesError && (
         <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 12, padding: 16, marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <span style={{ color: '#991b1b', fontSize: 14 }}>{messagesError}</span>
-          <button type="button" onClick={fetchMessages} style={{ padding: '8px 14px', background: '#9c6649', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
+          <button type="button" onClick={() => void loadTabData('messages', { force: true })} style={{ padding: '8px 14px', background: '#9c6649', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
             Retry
           </button>
         </div>
@@ -1374,12 +1404,37 @@ export default function AdminDashboard() {
 
       {/* Tabs */}
       <div style={{ background: 'white', borderBottom: '1px solid #e5e7eb', position: 'sticky', top: adminHeaderHeight, zIndex: 99 }}>
-        <div style={{ maxWidth: 1400, margin: '0 auto', padding: '0 16px', display: 'flex', gap: 4, overflowX: 'auto' }}>
+        <div
+          role="tablist"
+          aria-label="Admin sections"
+          style={{ maxWidth: 1400, margin: '0 auto', padding: '0 16px', display: 'flex', gap: 4, overflowX: 'auto' }}
+        >
           {tabs.map(({ id, label, icon: Icon }) => (
-            <button key={id} onClick={() => setActiveTab(id)}
-              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '16px 20px', background: 'none', border: 'none', borderBottom: activeTab === id ? '3px solid #9c6649' : '3px solid transparent',
-                color: activeTab === id ? '#9c6649' : '#6b7280', fontSize: 14, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-              <Icon size={18} /> {label}
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              id={`admin-tab-${id}`}
+              aria-selected={activeTab === id}
+              aria-controls={`admin-tabpanel-${id}`}
+              tabIndex={activeTab === id ? 0 : -1}
+              onClick={() => setActiveTab(id)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '16px 20px',
+                background: 'none',
+                border: 'none',
+                borderBottom: activeTab === id ? '3px solid #9c6649' : '3px solid transparent',
+                color: activeTab === id ? '#9c6649' : '#6b7280',
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <Icon size={18} aria-hidden="true" /> {label}
             </button>
           ))}
         </div>
@@ -1393,7 +1448,11 @@ export default function AdminDashboard() {
             <DashboardSkeleton isMobile={isMobile} />
           </>
         ) : (
-          <>
+          <div
+            role="tabpanel"
+            id={`admin-tabpanel-${activeTab}`}
+            aria-labelledby={`admin-tab-${activeTab}`}
+          >
             {activeTab === 'analytics' && renderAnalytics()}
             {activeTab === 'products' && renderProducts()}
             {activeTab === 'orders' && renderOrders()}
@@ -1401,20 +1460,20 @@ export default function AdminDashboard() {
             {activeTab === 'reviews' && <AdminReviewsTab />}
             {activeTab === 'messages' && renderMessages()}
             {activeTab === 'customers' && renderCustomers()}
-          </>
+          </div>
         )}
       </div>
 
       {/* Order Detail Modal */}
       {selectedOrder && (
-        <LiquidModal isOpen={!!selectedOrder} onClose={() => setSelectedOrder(null)} maxWidth={700}>
+        <LiquidModal isOpen={!!selectedOrder} onClose={() => setSelectedOrder(null)} maxWidth={700} ariaLabel="Order details">
           <div className="responsive-modal-body">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
               <div>
                 <h2 style={{ margin: 0, fontSize: isMobile ? 20 : 24, fontWeight: 800 }}>#{selectedOrder.order_number}</h2>
                 <p style={{ margin: 0, fontSize: 14, color: '#6b7280', marginTop: 4 }}>{new Date(selectedOrder.created_at).toLocaleString()}</p>
               </div>
-              <button onClick={() => setSelectedOrder(null)} style={{ background: '#f3f4f6', border: 'none', borderRadius: 8, padding: 8, cursor: 'pointer' }}><X size={20} /></button>
+              <button type="button" aria-label="Close" onClick={() => setSelectedOrder(null)} style={{ background: '#f3f4f6', border: 'none', borderRadius: 8, padding: 8, cursor: 'pointer' }}><X size={20} aria-hidden="true" /></button>
             </div>
             <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
               <span style={{ padding: '6px 16px', borderRadius: 20, fontSize: 13, fontWeight: 600, background: `${getStatusColor(selectedOrder.status)}15`, color: getStatusColor(selectedOrder.status) }}>{selectedOrder.status}</span>
@@ -1528,14 +1587,14 @@ export default function AdminDashboard() {
 
       {/* Message Detail Modal */}
       {selectedMessage && (
-        <LiquidModal isOpen={!!selectedMessage} onClose={() => setSelectedMessage(null)} maxWidth={600}>
+        <LiquidModal isOpen={!!selectedMessage} onClose={() => setSelectedMessage(null)} maxWidth={600} ariaLabel="Message details">
           <div style={{ padding: 24 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
               <div>
                 <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>{selectedMessage.subject}</h2>
                 <p style={{ margin: 0, fontSize: 14, color: '#6b7280', marginTop: 4 }}>From: {selectedMessage.name} ({selectedMessage.email})</p>
               </div>
-              <button onClick={() => setSelectedMessage(null)} style={{ background: '#f3f4f6', border: 'none', borderRadius: 8, padding: 8, cursor: 'pointer' }}><X size={20} /></button>
+              <button type="button" aria-label="Close" onClick={() => setSelectedMessage(null)} style={{ background: '#f3f4f6', border: 'none', borderRadius: 8, padding: 8, cursor: 'pointer' }}><X size={20} aria-hidden="true" /></button>
             </div>
             <div style={{ background: '#f9fafb', borderRadius: 12, padding: 20, marginBottom: 20 }}>
               <p style={{ margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>{selectedMessage.message}</p>
@@ -1579,14 +1638,14 @@ export default function AdminDashboard() {
 
       {/* Customer History Modal */}
       {selectedCustomer && (
-        <LiquidModal isOpen={!!selectedCustomer} onClose={() => { setSelectedCustomer(null); setCustomerOrders([]); }} maxWidth={800}>
+        <LiquidModal isOpen={!!selectedCustomer} onClose={() => { setSelectedCustomer(null); setCustomerOrders([]); }} maxWidth={800} ariaLabel="Customer history">
           <div style={{ padding: 24 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
               <div>
                 <h2 style={{ margin: 0, fontSize: 24, fontWeight: 800 }}>{selectedCustomer.name || 'Customer'}</h2>
                 <p style={{ margin: 0, fontSize: 14, color: '#6b7280', marginTop: 4 }}>{selectedCustomer.email}</p>
               </div>
-              <button onClick={() => { setSelectedCustomer(null); setCustomerOrders([]); }} style={{ background: '#f3f4f6', border: 'none', borderRadius: 8, padding: 8, cursor: 'pointer' }}><X size={20} /></button>
+              <button type="button" aria-label="Close" onClick={() => { setSelectedCustomer(null); setCustomerOrders([]); }} style={{ background: '#f3f4f6', border: 'none', borderRadius: 8, padding: 8, cursor: 'pointer' }}><X size={20} aria-hidden="true" /></button>
             </div>
             <div className="admin-stats-row" style={{ marginBottom: 24 }}>
               <div style={{ background: '#f9fafb', padding: 16, borderRadius: 12, textAlign: 'center' }}>

@@ -5,7 +5,7 @@
 **Authoritative behavior:** [`info.md`](info.md)  
 **Full audit:** [`PROJECT_AUDIT.md`](PROJECT_AUDIT.md) (2026-06-08 initial + follow-up)
 
-**Test count marker (CI should match):** `<!-- tests: 150 -->` (81 unit + 41 API + 28 Playwright)
+**Test count marker (CI should match):** `<!-- tests: 153 -->` (81 unit + 43 API + 29 Playwright)
 
 ---
 
@@ -36,7 +36,7 @@
 | PAY-SHIPPING | Free shipping threshold $200 | `paypalCheckout.ts`, `pricing.ts` | `checkoutPricing.test.ts` | COVERED |
 | PAY-FE-TOTAL | Client compares server total before PayPal redirect | `Checkout.tsx` | `checkout-total-mismatch-ui.spec.ts` | COVERED |
 | PAY-POLICY | `policy_accepted: true` required on create-payment | `server.ts`, `returnPolicy.ts`, `Checkout.tsx` | `checkout.test.ts`, `createPaymentHappy.test.ts` | COVERED |
-| POL-ADMIN | Admin refund + paid-order cancel return 403 | `server.ts`, `orders.ts`, `returnPolicy.ts` | `security.test.ts` (refund auth); manual QA | PARTIAL |
+| POL-ADMIN | Admin refund + paid-order cancel return 403 | `server.ts`, `orders.ts`, `returnPolicy.ts`, `orderTokens.ts` | `orderPolicyAdmin.test.ts`, `security.test.ts` (unauth refund) | COVERED |
 
 ---
 
@@ -88,6 +88,8 @@
 | UI-PAY-TOKEN | Missing PayPal `token` error UX | `PaymentSuccess.tsx` | `payment-success-ui.spec.ts` | COVERED |
 | UI-ORDERS | Orders legacy `?token=` strip + `?code=` email redeem | `MyOrders.tsx` | `orders-ui.spec.ts` | COVERED |
 | UI-ADMIN | Admin login redirect + dashboard analytics smoke | `AdminLogin.tsx`, `AdminDashboard.tsx` | `admin-ui.spec.ts` | COVERED |
+| UI-CHECKOUT-COUNTRY | Checkout country pre-selected (`country-list` US value) | `Checkout.tsx`, `constants/checkoutForm.ts` | `checkout-ui.spec.ts` | COVERED |
+| UI-PRODUCT-POLICY | Product detail trust badges match no-refund policy | `ProductDetailPage.tsx`, `constants/returnPolicy.ts` | manual QA | MANUAL-ONLY |
 
 ---
 
@@ -106,7 +108,8 @@
 | ID | Behavior | Implementation | Test(s) | Status |
 |----|----------|----------------|---------|--------|
 | CI-ENV | Production env validation in CI | `validate-env.mjs`, `ci.yml` | CI job | COVERED |
-| DOC-TESTS | Test count in `info.md` | `info.md` | `npm test` (150) | COVERED |
+| SEC-ORDER-SECRETS | `access_token_hash` + `access_token_encrypted` stripped from order JSON | `orderTokens.ts` `stripOrderSecrets` | `orderTokens.test.ts` | COVERED |
+| DOC-TESTS | Test count in `info.md` | `info.md` | `npm test` (153) | COVERED |
 
 ---
 

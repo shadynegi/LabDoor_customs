@@ -94,7 +94,8 @@ Applied via `migration-reviews.sql`:
 
 - **14 tables** have RLS with service_role-only policies (including `order_access_exchanges`).
 - **`anon` and `authenticated` grants are revoked** — no public product catalog via PostgREST/GraphQL.
-- Boot is **non-destructive** when policies exist; run `migration-performance-linter-fixes.sql` once for lint 0006.
+- Boot is **non-destructive** when policies exist. Production Supabase has `migration-performance-linter-fixes.sql` applied (lint 0006); run once on new databases.
+- Product search: `migration-products-search-trgm.sql` is applied on production Supabase (`pg_trgm` + GIN indexes).
 - The Express backend connects with **service_role** credentials for all API operations.
 
 See [RLS_OPTIMIZATION.md](./RLS_OPTIMIZATION.md).

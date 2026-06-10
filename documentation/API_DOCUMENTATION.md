@@ -157,6 +157,8 @@ Wrong order number, missing token, or invalid token all return **404** `{ "error
 
 Paid orders return **403** (no-refund store policy).
 
+**Order JSON responses** never include `access_token_hash`, `access_token_encrypted`, or plaintext access tokens (`stripOrderSecrets`).
+
 ---
 
 ## Coupons (`/coupons`)

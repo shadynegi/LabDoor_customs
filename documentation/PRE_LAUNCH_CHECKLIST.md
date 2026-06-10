@@ -8,7 +8,7 @@ Tick every item before pointing production traffic at Lab Door Customs.
 
 ## Phase 1 — Database (Supabase)
 
-Run in the **Supabase SQL Editor** (or psql on port 5432). Scripts live in `backend/src/database/`.
+Run in the **Supabase SQL Editor** (or psql on port 5432). Scripts live in `backend/src/database/`. **Production:** see [SUPABASE_SQL_TO_RUN.md](./SUPABASE_SQL_TO_RUN.md) → *Migration audit* — verify before re-running; performance + search migrations are already applied.
 
 - [ ] Base schema applied (`schema.sql` on fresh DB, or already present from prior setup)
 - [ ] `migration-reviews.sql` (if reviews not yet enabled)
@@ -18,7 +18,8 @@ Run in the **Supabase SQL Editor** (or psql on port 5432). Scripts live in `back
 - [ ] `migration-rls-drop-authenticated-policies.sql` (if applicable)
 - [ ] `migration-revoke-graphql-client-roles.sql`
 - [ ] `migration-order-access-exchange.sql` — order email tracking links
-- [ ] `migration-performance-linter-fixes.sql` (recommended)
+- [x] `migration-performance-linter-fixes.sql` (applied on production Supabase)
+- [x] `migration-products-search-trgm.sql` (applied on production Supabase)
 - [ ] Payment/checkout tables present **or** confirmed created on first backend boot (`order_checkout_exchanges`, `order_access_exchanges`, `payment_idempotency`, etc.)
 
 **After SQL:**

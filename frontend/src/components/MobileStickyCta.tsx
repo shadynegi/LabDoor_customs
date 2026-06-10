@@ -11,6 +11,8 @@ interface MobileStickyCtaProps {
   ariaLabel?: string;
   /** Stack buttons vertically on narrow screens (cart page) */
   stacked?: boolean;
+  /** Shown above actions when provided (e.g. policy acceptance, validation errors) */
+  hint?: ReactNode;
 }
 
 export function MobileStickyCta({
@@ -23,6 +25,7 @@ export function MobileStickyCta({
   keyboardOffset = 0,
   ariaLabel = 'Checkout actions',
   stacked = false,
+  hint,
 }: MobileStickyCtaProps) {
   const wrapperStyle: CSSProperties = {
     bottom: keyboardOffset > 0 ? keyboardOffset : undefined,
@@ -31,11 +34,12 @@ export function MobileStickyCta({
 
   return (
     <div
-      className={`mobile-sticky-cta${stacked ? ' mobile-sticky-cta--stacked' : ''}`}
+      className={`mobile-sticky-cta${stacked ? ' mobile-sticky-cta--stacked' : ''}${hint ? ' mobile-sticky-cta--with-hint' : ''}`}
       style={wrapperStyle}
       role="region"
       aria-label={ariaLabel}
     >
+      {hint && <div className="mobile-sticky-cta__hint">{hint}</div>}
       {amount && (
         <div className="mobile-sticky-cta__total">
           <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 2 }}>Total</div>

@@ -426,7 +426,7 @@ export default function CartPage() {
               {isCartValidating ? 'Validating cart…' : 'Proceed to Checkout'}
             </button>
             <button 
-              onClick={() => navigate("/")}
+              onClick={() => navigate("/products")}
               style={{ 
                 padding: isMobile ? "14px 24px" : "16px 32px",
                 background: "white", 
