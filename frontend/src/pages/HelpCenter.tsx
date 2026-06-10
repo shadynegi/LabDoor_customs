@@ -327,17 +327,17 @@ export default function HelpCenter() {
 
                 <div style={{ marginBottom: 24 }}>
                   <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12, color: "#1f2937" }}>
-                    Returns & Refunds
+                    No Refund & Replacement Policy
                   </h3>
                   <p style={{ lineHeight: 1.8, color: "#6b7280", marginBottom: 12 }}>
-                    We want you to be completely satisfied with your purchase:
+                    <strong>All sales are final.</strong> We do not offer refunds or returns for fit, size,
+                    color, or change of mind.
                   </p>
                   <ul style={{ paddingLeft: 20, lineHeight: 1.8, color: "#6b7280" }}>
-                    <li>30-day return policy for unworn items in original packaging</li>
-                    <li>Returns must include all original tags and documentation</li>
-                    <li>Refunds processed within 5-7 business days of receiving return</li>
-                    <li>Shipping costs are non-refundable (unless item is defective)</li>
-                    <li>Sale items are final sale unless defective</li>
+                    <li>Replacements are available only for verified manufacturing defects</li>
+                    <li>Contact support within 30 days of delivery with your order number and photos</li>
+                    <li>Approved replacements ship the same item when stock is available</li>
+                    <li>See the full <a href="/returns-policy" style={{ color: "#9c6649" }}>Replacement Policy</a></li>
                   </ul>
                 </div>
 
@@ -391,7 +391,7 @@ export default function HelpCenter() {
                   borderLeft: "4px solid #9c6649"
                 }}>
                   <p style={{ margin: 0, color: "#4b5563", fontSize: 14 }}>
-                    For questions about these Terms & Conditions, contact us at legal@gaultiershoes.com
+                    For questions about these Terms & Conditions, contact us at legal@labdoorcustoms.com
                   </p>
                 </div>
               </div>

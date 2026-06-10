@@ -83,6 +83,7 @@ describe('POST /api/paypal/create-payment happy path', () => {
         zipCode: '12345',
         country: 'United States',
       },
+      policy_accepted: true,
       items: [{ product_id: 1, quantity: 1 }],
     });
 

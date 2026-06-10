@@ -42,15 +42,15 @@ If the user did not mention testing, **skip** `npm test`, `npm run test:all`, Pl
 | Suite | Tool | Location | Count | Needs live DB? |
 |-------|------|----------|-------|----------------|
 | Backend unit | Vitest | `Tests/backend/` | 20 files, 81 tests | No (mocked) |
-| API integration | Vitest + Supertest | `Tests/api/` | 15 files, 40 tests | No (mocked) |
+| API integration | Vitest + Supertest | `Tests/api/` | 15 files, 41 tests | No (mocked) |
 | Frontend E2E / UI | Playwright | `Tests/frontend/` | 12 files, 28 tests | No (mocked `/api` + static preview) |
 | Link checker | Custom script | repo root | — | No |
 
-**Total:** 149 automated tests — 81 backend unit + 40 API + 28 Playwright UI (desktop + mobile projects).
+**Total:** 150 automated tests — 81 backend unit + 41 API + 28 Playwright UI (desktop + mobile projects).
 
 Backend unit tests include: payment idempotency, order tokens, checkout exchange hashing, order token encryption, webhook errors, product image validation, admin session hashing, PayPal webhook utils, refund idempotency, checkout pricing, coupon scope (`applies_to`), `computeCheckoutPricingForCart`, RLS table list + bootstrap contract, RLS grant revoke under `BOOTSTRAP_SKIP_DDL`, email portal URL (`buildOrderPortalUrl`), client IP, keep-alive.
 
-API tests include: checkout (incl. client amount mismatch), create-payment happy path (mocked PayPal + exchange), capture 409 reconciliation, capture refund mismatch, checkout-context recovery, checkout exchange, PayPal webhook COMPLETED/DENIED, admin mark-paid (validation + success), health, orders, security, activity batch/log, order lookup, reviews check.
+API tests include: checkout (incl. client amount mismatch + policy acceptance), create-payment happy path (mocked PayPal + exchange), capture 409 reconciliation, capture refund mismatch, checkout-context recovery, checkout exchange, PayPal webhook COMPLETED/DENIED, admin mark-paid (validation + success), health, orders, security, activity batch/log, order lookup, reviews check.
 
 Playwright includes: payment-success missing-token UX, orders legacy URL deprecation + `?code=` email redeem, checkout server/client total mismatch block, admin login redirect + dashboard analytics smoke.
 
@@ -132,7 +132,7 @@ Each report includes:
 
 Generated reports are **gitignored**; only `documentation/TEST_RESULTS.md` is tracked.
 
-`npm test` auto-builds the frontend (if needed) and installs Playwright in `Tests/` on first UI run. Use `test:watch` (Vitest) or `test:raw` / `test:frontend:raw` to run **without** writing a report.
+`npm test` always rebuilds the frontend with test `VITE_*` defaults before Playwright, then installs Playwright in `Tests/` on first UI run. Use `test:watch` (Vitest) or `test:raw` / `test:frontend:raw` to run **without** writing a report.
 
 ---
 
@@ -302,7 +302,7 @@ Expect `success: true` with database and Redis status.
 
 1. Browse products, search, filter
 2. Add to cart, adjust quantities
-3. Proceed to checkout, fill shipping form
+3. Proceed to checkout, fill shipping form; accept no-refund / replacement-only policy checkbox
 4. Apply valid/invalid coupon codes
 5. Complete PayPal sandbox payment; verify **409** processing UI if reconciliation lags; verify expired `code` error path
 6. Verify confirmation email and order lookup (`?code=` link; legacy URL token deprecation)
@@ -315,7 +315,7 @@ Expect `success: true` with database and Redis status.
 3. Create/edit a product
 4. View and update an order (status, tracking)
 5. Send shipping notification
-6. Cancel a test order with refund
+6. Cancel an **unpaid pending** test order (paid orders return 403 — no refund)
 7. Read and archive contact messages
 
 ### PayPal webhooks

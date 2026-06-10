@@ -37,7 +37,7 @@ Mutating requests require CSRF token (`X-CSRF-Token` header + cookie) except Pay
 | POST | `/paypal/capture-payment/:orderId` | Order token + CSRF | Capture approved payment; **409** if PayPal succeeds but order is not `payment_status=completed` (storefront shows processing UI, polls checkout-context, does not clear cart) |
 | GET | `/paypal/checkout-exchange/:code` | Public | Atomically redeem one-time checkout code → `accessToken` |
 | GET | `/paypal/checkout-context/:paypalOrderId` | Order token | Checkout recovery when exchange code is unavailable |
-| POST | `/paypal/refund/:captureId` | Admin | Refund capture (partial or full) |
+| POST | `/paypal/refund/:captureId` | Admin | **403** — customer refunds disabled (no-refund store policy) |
 | GET | `/paypal/test` | Admin | PayPal connectivity test |
 | GET | `/paypal/order/:orderId` | Admin | Fetch PayPal order details |
 
@@ -45,12 +45,15 @@ Mutating requests require CSRF token (`X-CSRF-Token` header + cookie) except Pay
 
 ```json
 {
+  "policy_accepted": true,
   "customerInfo": { "fullName", "email", "phone", "address", "city", "state", "zipCode", "country" },
   "items": [{ "product_id", "quantity", "size_system", "size_value" }],
   "coupon_code": "optional",
   "amount": "optional client total for validation"
 }
 ```
+
+`policy_accepted` must be `true` (customer agrees to no-refund / manufacturing-defect replacement-only policy).
 
 Headers: `X-Idempotency-Key` (optional), `X-CSRF-Token`
 
@@ -119,7 +122,7 @@ Headers: `X-Idempotency-Key` (PayPal order ID or client key), `X-CSRF-Token`
 | PUT | `/:id` | Admin | Update fulfillment fields including `estimated_delivery` (not payment_status) |
 | PATCH | `/:id/status` | Admin | Update order status |
 | PATCH | `/:id/payment-status` | Admin | Mark paid: `admin_note` + `payment_id`; **PayPal capture verified** via API before update |
-| POST | `/:id/cancel` | Admin | Cancel order; **paid orders require refund** (`process_refund: true`) |
+| POST | `/:id/cancel` | Admin | Cancel **unpaid pending** orders only; paid orders return **403** |
 | DELETE | `/:id` | Admin | Delete order (blocked if paid) |
 | POST | `/:id/notify-shipped` | Admin | Send shipping email |
 
@@ -148,10 +151,11 @@ Wrong order number, missing token, or invalid token all return **404** `{ "error
 
 ```json
 {
-  "reason": "optional",
-  "process_refund": true
+  "reason": "optional cancellation note"
 }
 ```
+
+Paid orders return **403** (no-refund store policy).
 
 ---
 

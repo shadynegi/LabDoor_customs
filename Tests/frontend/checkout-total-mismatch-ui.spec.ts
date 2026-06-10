@@ -46,13 +46,28 @@ test.describe('Checkout total mismatch UI', () => {
     await page.getByLabel(/city/i).fill('Testville');
     await page.getByLabel(/state/i).fill('CA');
     await page.getByLabel(/ZIP \/ Postal Code/i).fill('12345');
+    await page.getByRole('combobox', { name: /country/i }).click();
+    await page.getByRole('option', { name: 'United States of America (the)' }).click();
+
+    await page.getByText('All sales are final').first().scrollIntoViewIfNeeded();
+    await page.locator('input[type="checkbox"]').check();
 
     const payButton = page.locator('button:visible', { hasText: 'Pay with PayPal' });
     await expect(payButton).toBeEnabled({ timeout: 30_000 });
 
+    const createPayment = page.waitForResponse(
+      (response) =>
+        response.url().includes('/paypal/create-payment') &&
+        response.request().method() === 'POST',
+      { timeout: 30_000 },
+    );
     await payButton.click();
+    const paymentResponse = await createPayment;
+    expect(paymentResponse.ok()).toBeTruthy();
 
-    await expect(page.getByText(/Pricing was updated/i)).toBeVisible({ timeout: 30_000 });
+    await expect(
+      page.locator('[data-sonner-toast]').filter({ hasText: /Pricing was updated/i }),
+    ).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText(/\$999\.99/)).toBeVisible();
     await expect(page).toHaveURL(/\/checkout/);
     await expect(

@@ -260,9 +260,15 @@ function runVitest(scope) {
 }
 
 function ensureFrontendBuild() {
-  if (existsSync(frontendDist)) return null;
-  return runCommand('Frontend build (required for UI tests)', 'npm', ['run', 'build', '-w', 'frontend'], {
+  const env = { ...process.env };
+  // Playwright preview uses localhost VITE_* — not a production/CI deploy build.
+  delete env.CI;
+  env.VITE_API_BASE_URL = env.VITE_API_BASE_URL || '/api';
+  env.VITE_SITE_URL = env.VITE_SITE_URL || 'http://127.0.0.1:4173';
+  env.VITE_SENTRY_DSN = env.VITE_SENTRY_DSN || 'https://example@sentry.io/0';
+  return runCommand('Frontend build (Playwright preview)', 'npm', ['run', 'build', '-w', 'frontend'], {
     cwd: repoRoot,
+    env,
   });
 }
 
@@ -318,7 +324,8 @@ function runPlaywright() {
       env: {
         ...process.env,
         PLAYWRIGHT_JSON_OUTPUT: tmpJson,
-        CI: process.env.CI ?? '',
+        // Default CI so Playwright does not reuse a stale preview after ensureFrontendBuild().
+        CI: process.env.CI ?? 'true',
       },
     },
   );

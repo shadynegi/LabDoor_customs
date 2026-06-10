@@ -1,5 +1,10 @@
 import { Resend } from 'resend';
 import { withRetry } from './db';
+import {
+  NO_REFUND_POLICY_SHORT,
+  REPLACEMENT_POLICY_SHORT,
+  REPLACEMENT_SUPPORT_EMAIL,
+} from './returnPolicy';
 import { logger } from './logger';
 import {
   createOrderAccessExchangeCode,
@@ -387,6 +392,20 @@ export class EmailService {
       <p style="text-align: center; color: #6b7280; font-size: 13px; margin: 0 0 24px 0;">
         This secure link is valid for 30 days. You can also track your order anytime with your order number and access token at ${(process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '')}/orders
       </p>
+
+      <div style="background-color: #fff7ed; border-radius: 8px; padding: 20px; margin-bottom: 24px; border: 1px solid #fed7aa;">
+        <h3 style="margin: 0 0 10px 0; color: #9a3412; font-size: 16px; font-weight: 700;">
+          No refund — replacement for manufacturing defects only
+        </h3>
+        <p style="margin: 0 0 8px 0; color: #7c2d12; font-size: 14px; line-height: 1.6;">
+          ${NO_REFUND_POLICY_SHORT}
+        </p>
+        <p style="margin: 0; color: #7c2d12; font-size: 14px; line-height: 1.6;">
+          ${REPLACEMENT_POLICY_SHORT} Contact
+          <a href="mailto:${REPLACEMENT_SUPPORT_EMAIL}" style="color: #9c6649;">${REPLACEMENT_SUPPORT_EMAIL}</a>
+          with your order number and photos.
+        </p>
+      </div>
     </div>
 
     <!-- Footer -->
@@ -557,8 +576,9 @@ export class EmailService {
       `
       : `
       <div style="background-color: #f9fafb; border-radius: 8px; padding: 20px; margin-bottom: 24px; border: 1px solid #e5e7eb;">
-        <p style="margin: 0; color: #6b7280; font-size: 14px;">
-          No refund was processed for this order. If you believe this is an error, please contact support.
+        <p style="margin: 0; color: #6b7280; font-size: 14px; line-height: 1.6;">
+          ${NO_REFUND_POLICY_SHORT} For manufacturing defects, contact
+          <a href="mailto:${REPLACEMENT_SUPPORT_EMAIL}">${REPLACEMENT_SUPPORT_EMAIL}</a>.
         </p>
       </div>
       `;

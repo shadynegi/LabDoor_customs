@@ -1,25 +1,48 @@
-// src/pages/ReturnsPolicy.tsx
+// Replacement policy — all sales final; manufacturing-defect replacements only
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useResponsive } from '../hooks/useResponsive';
-import { ArrowLeft, RotateCcw, CheckCircle, XCircle, Clock, CreditCard, HelpCircle } from 'lucide-react';
+import {
+  ArrowLeft,
+  ShieldCheck,
+  XCircle,
+  Package,
+  Camera,
+  Mail,
+  AlertTriangle,
+} from 'lucide-react';
+import {
+  NO_REFUND_POLICY_SHORT,
+  REPLACEMENT_POLICY_SHORT,
+  REPLACEMENT_SUPPORT_EMAIL,
+} from '../constants/returnPolicy';
 
 export default function ReturnsPolicy() {
   const navigate = useNavigate();
   const { isMobile } = useResponsive();
 
-  const Section = ({ icon: Icon, title, children }: { icon: any; title: string; children: React.ReactNode }) => (
+  const Section = ({
+    icon: Icon,
+    title,
+    children,
+  }: {
+    icon: React.ComponentType<{ size?: number; color?: string }>;
+    title: string;
+    children: React.ReactNode;
+  }) => (
     <div style={{ marginBottom: 32 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-        <div style={{
-          width: 40,
-          height: 40,
-          borderRadius: 10,
-          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}>
+        <div
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: 10,
+            background: 'linear-gradient(135deg, #361906 0%, #9c6649 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
           <Icon size={20} color="white" />
         </div>
         <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1f2937', margin: 0 }}>{title}</h2>
@@ -31,14 +54,16 @@ export default function ReturnsPolicy() {
   );
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)',
-      padding: isMobile ? '20px' : '40px',
-    }}>
+    <div
+      style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)',
+        padding: isMobile ? '20px' : '40px',
+      }}
+    >
       <div style={{ maxWidth: 900, margin: '0 auto' }}>
-        {/* Back Button */}
         <button
+          type="button"
           onClick={() => navigate(-1)}
           style={{
             display: 'flex',
@@ -60,119 +85,143 @@ export default function ReturnsPolicy() {
           Back
         </button>
 
-        {/* Header */}
-        <div style={{
-          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-          borderRadius: 20,
-          padding: isMobile ? '32px 24px' : '48px',
-          marginBottom: 32,
-          textAlign: 'center',
-          color: 'white',
-        }}>
-          <RotateCcw size={48} style={{ marginBottom: 16 }} />
+        <div
+          style={{
+            background: 'linear-gradient(135deg, #361906 0%, #9c6649 100%)',
+            borderRadius: 20,
+            padding: isMobile ? '32px 24px' : '48px',
+            marginBottom: 32,
+            textAlign: 'center',
+            color: 'white',
+          }}
+        >
+          <ShieldCheck size={48} style={{ marginBottom: 16 }} />
           <h1 style={{ fontSize: isMobile ? 32 : 42, fontWeight: 800, marginBottom: 12 }}>
-            Returns & Refunds
+            Replacement Policy
           </h1>
-          <p style={{ opacity: 0.9, fontSize: 16 }}>
-            30-Day Hassle-Free Returns
+          <p style={{ opacity: 0.95, fontSize: 16, maxWidth: 560, margin: '0 auto' }}>
+            All sales are final — no refunds. Replacements are offered only for verified manufacturing
+            defects.
           </p>
         </div>
 
-        {/* Content */}
-        <div style={{
-          background: 'white',
-          borderRadius: 20,
-          padding: isMobile ? 24 : 48,
-          boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-        }}>
+        <div
+          style={{
+            background: '#fff7ed',
+            border: '2px solid #fdba74',
+            borderRadius: 16,
+            padding: 20,
+            marginBottom: 24,
+            color: '#9a3412',
+            fontSize: 15,
+            lineHeight: 1.7,
+          }}
+        >
+          <strong>No refund policy:</strong> {NO_REFUND_POLICY_SHORT}
+        </div>
+
+        <div
+          style={{
+            background: 'white',
+            borderRadius: 20,
+            padding: isMobile ? 24 : 48,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+          }}
+        >
           <p style={{ fontSize: 16, color: '#6b7280', lineHeight: 1.8, marginBottom: 32 }}>
-            We want you to be completely satisfied with your purchase. If for any reason you're not 
-            happy with your order, we offer a straightforward 30-day return policy.
+            {REPLACEMENT_POLICY_SHORT} By completing checkout, you agree to this policy and our{' '}
+            <Link to="/terms-of-service" style={{ color: '#9c6649', fontWeight: 600 }}>
+              Terms of Service
+            </Link>
+            .
           </p>
 
-          <Section icon={CheckCircle} title="What Can Be Returned">
+          <Section icon={XCircle} title="What we do not offer">
             <ul style={{ paddingLeft: 20 }}>
-              <li>Unworn items in original condition</li>
-              <li>Items with all original tags attached</li>
-              <li>Items in original packaging/box</li>
-              <li>Items returned within 30 days of delivery</li>
-              <li>Defective or damaged items (contact us immediately)</li>
+              <li>Refunds to your original payment method (PayPal or card)</li>
+              <li>Returns or exchanges for size, fit, color, or change of mind</li>
+              <li>Store credit in place of a refund</li>
+              <li>Replacements for wear-and-tear, misuse, or damage after delivery</li>
             </ul>
           </Section>
 
-          <Section icon={XCircle} title="What Cannot Be Returned">
+          <Section icon={ShieldCheck} title="When a replacement may be approved">
+            <p style={{ marginBottom: 12 }}>A one-time replacement of the <strong>same item</strong> may be approved when:</p>
             <ul style={{ paddingLeft: 20 }}>
-              <li>Worn or used items</li>
-              <li>Items without original tags</li>
-              <li>Items marked as "Final Sale"</li>
-              <li>Gift cards</li>
-              <li>Items returned after 30 days</li>
-              <li>Items damaged due to misuse or improper care</li>
+              <li>You contact us within <strong>30 days of delivery</strong></li>
+              <li>The issue is a <strong>manufacturing defect</strong> (e.g. sole separation, structural flaw, misaligned stitching from production — not normal wear)</li>
+              <li>The shoes were not worn beyond inspection needed to identify the defect</li>
+              <li>We can verify the defect with photos or video you provide</li>
+              <li>Replacement stock is available for your size and style</li>
             </ul>
           </Section>
 
-          <Section icon={RotateCcw} title="How to Return">
+          <Section icon={Camera} title="How to request a replacement">
             <ol style={{ paddingLeft: 20 }}>
               <li style={{ marginBottom: 12 }}>
-                <strong>Contact Us:</strong> Email returns@labdoorcustoms.com with your order number 
-                and reason for return
+                Email{' '}
+                <a href={`mailto:${REPLACEMENT_SUPPORT_EMAIL}`} style={{ color: '#9c6649', fontWeight: 600 }}>
+                  {REPLACEMENT_SUPPORT_EMAIL}
+                </a>{' '}
+                with your <strong>order number</strong> and a clear description of the defect
               </li>
               <li style={{ marginBottom: 12 }}>
-                <strong>Receive Authorization:</strong> We'll send you a return authorization number 
-                and shipping instructions within 24-48 hours
+                Attach <strong>photos or video</strong> showing the defect and the overall product
               </li>
               <li style={{ marginBottom: 12 }}>
-                <strong>Pack Securely:</strong> Place items in original packaging with all tags attached
+                Our team reviews your claim within <strong>2–3 business days</strong>
               </li>
               <li style={{ marginBottom: 12 }}>
-                <strong>Ship:</strong> Send to the address provided (customer pays return shipping 
-                unless item is defective)
+                If approved, we ship a replacement pair; you may be asked to return the defective pair
+                (we cover return shipping when the defect is verified)
               </li>
-              <li>
-                <strong>Receive Refund:</strong> Once we receive and inspect your return, we'll 
-                process your refund
-              </li>
+              <li>Replacement fulfillment typically ships within 5–10 business days after approval</li>
             </ol>
           </Section>
 
-          <Section icon={CreditCard} title="Refund Processing">
-            <ul style={{ paddingLeft: 20 }}>
-              <li>Refunds are processed within 5-7 business days of receiving the return</li>
-              <li>Refunds are issued to the original payment method</li>
-              <li>Original shipping costs are non-refundable (unless item is defective)</li>
-              <li>You will receive an email confirmation when your refund is processed</li>
-              <li>Allow 3-5 additional business days for the refund to appear in your account</li>
-            </ul>
-          </Section>
-
-          <Section icon={Clock} title="Exchanges">
-            <p style={{ marginBottom: 12 }}>
-              Need a different size or color? We're happy to help!
-            </p>
-            <ul style={{ paddingLeft: 20 }}>
-              <li>Contact us within 30 days of delivery for exchanges</li>
-              <li>Subject to availability of the replacement item</li>
-              <li>Free exchange shipping for defective items</li>
-              <li>Standard return shipping applies for size/preference exchanges</li>
-            </ul>
-          </Section>
-
-          <Section icon={HelpCircle} title="Questions?">
+          <Section icon={Package} title="PayPal purchases">
             <p>
-              Our customer service team is here to help with any return-related questions.
+              Payments are processed through PayPal. Because all sales are final, PayPal&apos;s standard
+              buyer protection does not entitle you to a refund for preference or fit issues. If you
+              believe you have a manufacturing defect, follow the replacement process above — do not
+              open a PayPal dispute for a refund before contacting us.
             </p>
-            <div style={{
-              marginTop: 16,
-              padding: 20,
-              background: '#f0fdf4',
-              borderRadius: 12,
-              border: '1px solid #10b981',
-            }}>
+          </Section>
+
+          <Section icon={AlertTriangle} title="Important notes">
+            <ul style={{ paddingLeft: 20 }}>
+              <li>Approval is at Lab Door Customs&apos; sole discretion after review</li>
+              <li>One replacement per order line for a verified manufacturing defect</li>
+              <li>Custom or made-to-order items follow the same no-refund rule</li>
+              <li>
+                See also our{' '}
+                <Link to="/terms-of-service" style={{ color: '#9c6649' }}>
+                  Terms of Service
+                </Link>{' '}
+                and{' '}
+                <Link to="/help" style={{ color: '#9c6649' }}>
+                  Help Center
+                </Link>
+              </li>
+            </ul>
+          </Section>
+
+          <Section icon={Mail} title="Contact">
+            <div
+              style={{
+                marginTop: 8,
+                padding: 20,
+                background: '#f9fafb',
+                borderRadius: 12,
+                border: '1px solid #e5e7eb',
+              }}
+            >
               <p style={{ margin: 0, marginBottom: 8 }}>
-                <strong>Email:</strong> returns@labdoorcustoms.com
+                <strong>Replacement requests:</strong>{' '}
+                <a href={`mailto:${REPLACEMENT_SUPPORT_EMAIL}`}>{REPLACEMENT_SUPPORT_EMAIL}</a>
               </p>
               <p style={{ margin: 0 }}>
-                <strong>Response Time:</strong> Within 24 hours
+                <strong>Response time:</strong> Within 2–3 business days
               </p>
             </div>
           </Section>

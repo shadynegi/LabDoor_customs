@@ -5,7 +5,7 @@
 
 **Review method:** Read `info.md` + operational guides; parallel audit of `backend/src`, `frontend/src`, `Tests/`, CI, env templates; spot-verify critical findings in source.
 
-**Automated tests at audit time:** 99 passing (61 unit + 16 API + 22 Playwright). **After remediation (`3dbdef9`):** 105. **After follow-up (`c6de967`):** 111. **After test sprint (`8303997`):** 127. **After core-gap sprint:** 141. **Current:** **149** (81 unit + 40 API + 28 Playwright).
+**Automated tests at audit time:** 99 passing (61 unit + 16 API + 22 Playwright). **After remediation (`3dbdef9`):** 105. **After follow-up (`c6de967`):** 111. **After test sprint (`8303997`):** 127. **After core-gap sprint:** 141. **After audit test gaps:** 149. **Current:** **150** (81 unit + 41 API + 28 Playwright).
 
 ---
 

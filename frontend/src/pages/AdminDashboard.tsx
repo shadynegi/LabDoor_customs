@@ -529,7 +529,7 @@ export default function AdminDashboard() {
     try {
       const response = await apiFetch(`/orders/${orderId}/cancel`, {
         method: 'POST',
-        body: JSON.stringify({ reason, process_refund: true }),
+        body: JSON.stringify({ reason }),
       });
       const data = await response.json();
       if (data.success) {
@@ -1514,10 +1514,11 @@ export default function AdminDashboard() {
                   Mark paid
                 </button>
               )}
-              {selectedOrder.status !== 'cancelled' && selectedOrder.status !== 'delivered' && (
+              {selectedOrder.payment_status === 'pending' &&
+                selectedOrder.status !== 'cancelled' && (
                 <button type="button" disabled={orderActionLoading} onClick={() => setAdminDialog({ kind: 'cancelOrder', orderId: selectedOrder.id })}
                   style={{ padding: '10px 16px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <Ban size={16} /> Cancel order
+                  <Ban size={16} /> Cancel unpaid order
                 </button>
               )}
             </div>
@@ -1652,8 +1653,8 @@ export default function AdminDashboard() {
           open
           variant="prompt"
           title="Cancel order"
-          message="Optionally provide a cancellation reason. A refund will be processed when applicable."
-          confirmLabel="Cancel order"
+          message="Cancels unpaid pending orders only. Paid orders cannot be refunded — use the replacement workflow for manufacturing defects."
+          confirmLabel="Cancel unpaid order"
           inputLabel="Cancellation reason (optional)"
           inputPlaceholder="Optional"
           inputRequired={false}

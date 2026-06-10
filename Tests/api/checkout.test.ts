@@ -26,6 +26,7 @@ describe('checkout path', () => {
     const res = await withCsrf(agent.post('/api/paypal/create-payment'), csrfToken).send({
       amount: '50.00',
       currency: 'USD',
+      policy_accepted: true,
       customerInfo: { fullName: 'Test User', email: 'test@example.com' },
       items: [{ product_id: 1, quantity: 1 }],
     });
@@ -50,12 +51,36 @@ describe('checkout path', () => {
     const { agent, csrfToken } = await createCsrfAgent();
     const res = await withCsrf(agent.post('/api/paypal/create-payment'), csrfToken).send({
       currency: 'USD',
+      policy_accepted: true,
       customerInfo: { fullName: 'Test User', email: 'not-an-email' },
       items: [{ product_id: 1, quantity: 1 }],
     });
 
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('Invalid email format');
+  });
+
+  it('rejects create-payment without policy acceptance', async () => {
+    sqlMock.mockResolvedValueOnce([
+      {
+        id: 1,
+        name: 'Test Shoe',
+        price: 100,
+        image: '/assets/test.png',
+        stock: 10,
+        is_out_of_stock: false,
+      },
+    ]);
+
+    const { agent, csrfToken } = await createCsrfAgent();
+    const res = await withCsrf(agent.post('/api/paypal/create-payment'), csrfToken).send({
+      currency: 'USD',
+      customerInfo: { fullName: 'Test User', email: 'test@example.com' },
+      items: [{ product_id: 1, quantity: 1 }],
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Policy acceptance required');
   });
 
   it('requires serverOrderId when capturing payment', async () => {

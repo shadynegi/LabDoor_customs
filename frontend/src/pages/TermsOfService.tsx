@@ -2,7 +2,9 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useResponsive } from '../hooks/useResponsive';
-import { ArrowLeft, FileText, Scale, ShoppingBag, AlertTriangle, Copyright, Globe } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { ArrowLeft, FileText, Scale, ShoppingBag, AlertTriangle, Copyright, Globe, ShieldCheck } from 'lucide-react';
+import { NO_REFUND_POLICY_SHORT, REPLACEMENT_POLICY_SHORT, REPLACEMENT_SUPPORT_EMAIL } from '../constants/returnPolicy';
 
 export default function TermsOfService() {
   const navigate = useNavigate();
@@ -99,6 +101,24 @@ export default function TermsOfService() {
             </p>
           </Section>
 
+          <Section icon={ShieldCheck} title="No Refund & Replacement Policy">
+            <p style={{ marginBottom: 12 }}>
+              <strong>All sales are final.</strong> {NO_REFUND_POLICY_SHORT}
+            </p>
+            <p style={{ marginBottom: 12 }}>{REPLACEMENT_POLICY_SHORT}</p>
+            <ul style={{ paddingLeft: 20, marginBottom: 12 }}>
+              <li>By placing an order, you acknowledge and agree to this no-refund policy</li>
+              <li>Replacements are not guaranteed until we verify a manufacturing defect</li>
+              <li>Contact <a href={`mailto:${REPLACEMENT_SUPPORT_EMAIL}`}>{REPLACEMENT_SUPPORT_EMAIL}</a> with your order number and photos</li>
+            </ul>
+            <p style={{ margin: 0 }}>
+              Full details:{' '}
+              <Link to="/returns-policy" style={{ color: '#9c6649', fontWeight: 600 }}>
+                Replacement Policy
+              </Link>
+            </p>
+          </Section>
+
           <Section icon={ShoppingBag} title="Product Information & Pricing">
             <p style={{ marginBottom: 12 }}>
               We strive to provide accurate product descriptions and pricing. However:
@@ -119,9 +139,9 @@ export default function TermsOfService() {
             <ul style={{ paddingLeft: 20 }}>
               <li>You warrant that you are legally capable of entering into binding contracts</li>
               <li>You warrant that all information provided is true and accurate</li>
-              <li>Payment is required at the time of order placement</li>
-              <li>We accept payments through PayPal and major credit cards</li>
-              <li>Orders are subject to product availability</li>
+              <li>Payment is required at the time of order placement via PayPal</li>
+              <li>You must accept the No Refund & Replacement Policy before checkout</li>
+              <li>Orders are subject to product availability and are final once paid</li>
             </ul>
           </Section>
 

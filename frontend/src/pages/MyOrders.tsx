@@ -26,6 +26,8 @@ import {
   KeyRound
 } from 'lucide-react';
 import { apiFetch } from '../config';
+import { Link } from 'react-router-dom';
+import { REPLACEMENT_POLICY_PATH, REPLACEMENT_SUPPORT_EMAIL } from '../constants/returnPolicy';
 import { toast } from 'sonner';
 import { OrdersListSkeleton } from '../components/Skeletons';
 import { logError } from '../lib/logger';
@@ -717,6 +719,29 @@ export default function MyOrders() {
             margin: '0 auto',
           }}>
             Enter your order number and access token from your confirmation email to track deliveries
+          </p>
+          <p
+            style={{
+              fontSize: 13,
+              color: '#78350f',
+              maxWidth: 640,
+              margin: '16px auto 0',
+              lineHeight: 1.55,
+              background: 'rgba(255,255,255,0.85)',
+              padding: '12px 16px',
+              borderRadius: 10,
+              border: '1px solid #fed7aa',
+            }}
+          >
+            <strong>All sales are final (no refunds).</strong> Manufacturing-defect replacements only — see{' '}
+            <Link to={REPLACEMENT_POLICY_PATH} style={{ color: '#9c6649', fontWeight: 600 }}>
+              Replacement Policy
+            </Link>{' '}
+            or email{' '}
+            <a href={`mailto:${REPLACEMENT_SUPPORT_EMAIL}`} style={{ color: '#9c6649' }}>
+              {REPLACEMENT_SUPPORT_EMAIL}
+            </a>
+            .
           </p>
         </motion.div>
 

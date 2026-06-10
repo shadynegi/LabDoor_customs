@@ -331,7 +331,8 @@ function AppShell() {
             <Route path="/help" element={<RouteErrorBoundary title="Help page error"><HelpCenter /></RouteErrorBoundary>} />
             <Route path="/privacy-policy" element={<RouteErrorBoundary title="Privacy policy error"><PrivacyPolicy /></RouteErrorBoundary>} />
             <Route path="/terms-of-service" element={<RouteErrorBoundary title="Terms of service error"><TermsOfService /></RouteErrorBoundary>} />
-            <Route path="/returns-policy" element={<RouteErrorBoundary title="Returns policy error"><ReturnsPolicy /></RouteErrorBoundary>} />
+            <Route path="/returns-policy" element={<RouteErrorBoundary title="Replacement policy error"><ReturnsPolicy /></RouteErrorBoundary>} />
+            <Route path="/replacement-policy" element={<RouteErrorBoundary title="Replacement policy error"><ReturnsPolicy /></RouteErrorBoundary>} />
             <Route path="/shipping-policy" element={<RouteErrorBoundary title="Shipping policy error"><ShippingPolicy /></RouteErrorBoundary>} />
             <Route path="/orders" element={<RouteErrorBoundary title="Orders page error"><MyOrders /></RouteErrorBoundary>} />
             <Route path="/admin/login" element={<RouteErrorBoundary title="Admin login error"><AdminLogin /></RouteErrorBoundary>} />
@@ -390,6 +391,16 @@ function AppShell() {
         }}>
           <p style={{ margin: 0 }}>
             © {new Date().getFullYear()} Lab Door Customs. All rights reserved.
+          </p>
+          <p style={{ margin: '10px 0 0', fontSize: 13, lineHeight: 1.6 }}>
+            <strong>All sales final.</strong> No refunds — replacements for manufacturing defects only.{' '}
+            <Link to="/returns-policy" style={{ color: '#9c6649' }}>Replacement Policy</Link>
+            {' · '}
+            <Link to="/terms-of-service" style={{ color: '#9c6649' }}>Terms</Link>
+            {' · '}
+            <Link to="/shipping-policy" style={{ color: '#9c6649' }}>Shipping</Link>
+            {' · '}
+            <Link to="/help" style={{ color: '#9c6649' }}>Help</Link>
           </p>
           <button
             type="button"

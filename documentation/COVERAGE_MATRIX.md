@@ -5,7 +5,7 @@
 **Authoritative behavior:** [`info.md`](info.md)  
 **Full audit:** [`PROJECT_AUDIT.md`](PROJECT_AUDIT.md) (2026-06-08 initial + follow-up)
 
-**Test count marker (CI should match):** `<!-- tests: 149 -->` (81 unit + 40 API + 28 Playwright)
+**Test count marker (CI should match):** `<!-- tests: 150 -->` (81 unit + 41 API + 28 Playwright)
 
 ---
 
@@ -104,7 +104,7 @@
 | ID | Behavior | Implementation | Test(s) | Status |
 |----|----------|----------------|---------|--------|
 | CI-ENV | Production env validation in CI | `validate-env.mjs`, `ci.yml` | CI job | COVERED |
-| DOC-TESTS | Test count in `info.md` | `info.md` | `npm test` (149) | COVERED |
+| DOC-TESTS | Test count in `info.md` | `info.md` | `npm test` (150) | COVERED |
 
 ---
 

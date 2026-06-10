@@ -22,7 +22,7 @@ Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API
 
 Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_ENCRYPTION_KEY`, `IP_SALT`, `ADMIN_PASSWORD_HASH`.
 
-**Automated tests:** 149 (81 backend unit + 40 API + 28 Playwright) — see [`test_guidelines.md`](test_guidelines.md).
+**Automated tests:** 150 (81 backend unit + 41 API + 28 Playwright) — see [`test_guidelines.md`](test_guidelines.md).
 
 ---
 
@@ -61,7 +61,7 @@ Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_
 - Order tracking: one-time `order_access_exchanges` codes in email links (no long-lived token in URL)
 - `schema.sql` + boot migrations apply service_role-only RLS; `ensureRlsPolicies()` non-destructive when policies exist
 - Manual mark paid: PayPal capture verified via API before DB update
-- Paid orders cannot cancel without refund
+- Paid orders cannot be cancelled or refunded (no-refund store policy; replacements for manufacturing defects only)
 - Webhook/refund errors sanitized (no internal messages to clients)
 - Parameterized SQL via postgres.js
 - Admin routes require session middleware

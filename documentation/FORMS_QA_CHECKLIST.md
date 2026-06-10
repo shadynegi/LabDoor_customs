@@ -83,7 +83,8 @@ On CSRF 403, `apiFetch` refreshes the token and retries once.
 
 - [ ] Product create/edit validates required fields
 - [ ] Order status update succeeds
-- [ ] Cancel order with refund shows confirmation
+- [ ] Cancel **unpaid pending** order shows confirmation (no refund option for paid orders)
+- [ ] Checkout policy acceptance checkbox required before PayPal redirect
 - [ ] Opening a new contact message marks it read; Mark replied / Archive work in modal
 - [ ] Custom coupon create supports applies_to scope (all / product / category)
 - [ ] Review edit saves admin response visible on storefront

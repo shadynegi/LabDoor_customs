@@ -15,7 +15,7 @@ Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API
 |------|----------------|
 | **Checkout** | Cart validation with retry; `?code=` exchange on success page; **409** → processing UI + checkout-context poll (cart not cleared); expired code → explicit error. |
 | **Orders** | `GET /api/orders/access-exchange/:code` for email links; legacy URL tokens deprecated. |
-| **Admin** | Bulk updates max **500** IDs; manual mark paid verifies PayPal capture via API; paid orders cannot cancel without refund. |
+| **Admin** | Bulk updates max **500** IDs; manual mark paid verifies PayPal capture via API; paid orders cannot cancel or refund (no-refund policy). |
 | **Activity** | Consent-gated batch including `contact_submit`. |
 | **Reviews** | `POST /api/reviews/check` on email blur; pending-moderation success copy. |
 | **Mobile** | Sticky CTAs with keyboard lift on checkout; cookie banner top on purchase routes; cart stacked CTA at 320px; OOS hides product sticky bar; admin product cards on phones. |
@@ -64,10 +64,12 @@ Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_
 
 ---
 
-## Test refunds
+## Test refund policy (no customer refunds)
 
-1. Admin dashboard → cancel completed order with refund enabled.
-2. Or `POST /api/paypal/refund/:captureId` as admin.
+1. Checkout requires accepting the no-refund / replacement-only policy (`policy_accepted: true` on create-payment).
+2. `POST /api/paypal/refund/:captureId` as admin returns **403**.
+3. `POST /api/orders/:id/cancel` on a paid order returns **403**; cancel **unpaid pending** orders only.
+4. Operational auto-refund still runs on capture amount mismatch (see `captureRefundMismatch.test.ts`).
 
 ---
 

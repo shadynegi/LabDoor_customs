@@ -14,7 +14,7 @@
 |------|----------|
 | Monorepo | `frontend/` (React/Vite), `backend/` (Express), `Tests/` (Vitest + Playwright) |
 | Production | One Express process: `/api/*` + built SPA; Supabase PostgreSQL via service_role |
-| Checkout | Server-bound PayPal orders; `?code=` exchange; capture **409** processing UI; email synced to activity on change/blur |
+| Checkout | Server-bound PayPal orders; `policy_accepted` required; no-refund / replacement-only policy; `?code=` exchange; capture **409** processing UI; email synced to activity on change/blur |
 | Cart | `POST /api/products/validate-cart` on item changes with retry; Fuse search catalog cache (15 min TTL) |
 | Orders | Email `?code=` access exchange; legacy URL tokens deprecated; partial refresh keeps stale data |
 | RLS | 14 tables service_role-only; no public PostgREST product read |

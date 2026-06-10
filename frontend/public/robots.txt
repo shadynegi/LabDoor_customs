@@ -7,4 +7,4 @@ Disallow: /checkout
 Disallow: /cart
 Disallow: /payment/
 
-Sitemap: https://www.labdoorcustoms.com/sitemap.xml
+Sitemap: http://127.0.0.1:4173/sitemap.xml

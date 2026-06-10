@@ -56,15 +56,13 @@ Each manual mark is recorded in `activity_logs` as `admin_mark_paid`.
 
 ---
 
-## Cancellation
+## Cancellation and replacements
 
-**Pending orders:** Cancel restores inventory immediately.
+**Store policy:** All sales are final — no customer refunds. Manufacturing-defect replacements are handled via support email (see Replacement Policy on the storefront).
 
-**Completed orders:** Cancel with `process_refund: true`:
+**Pending unpaid orders:** **Cancel unpaid order** in the admin modal restores inventory immediately.
 
-- Refunds remaining balance via PayPal
-- Marks order refunded, restores inventory
-- Reverses customer credit stats
+**Paid / completed orders:** Cannot be cancelled or refunded through the admin dashboard or API. Use the manual replacement workflow for verified manufacturing defects.
 
 ---
 
@@ -79,4 +77,4 @@ Each manual mark is recorded in `activity_logs` as `admin_mark_paid`.
 | Cancel | `POST /api/orders/:id/cancel` |
 | Ship notify | `POST /api/orders/:id/notify-shipped` |
 | Mark paid (manual) | `PATCH /api/orders/:id/payment-status` — `{ "payment_status": "completed", "admin_note": "..." }` |
-| Refund | `POST /api/paypal/refund/:captureId` |
+| Refund | `POST /api/paypal/refund/:captureId` — **disabled** (403; no-refund policy) |

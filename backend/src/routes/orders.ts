@@ -14,9 +14,7 @@ import {
 import { isAdminAuthenticated, verifyAdmin } from './admin';
 import { restoreInventoryTransactional } from '../lib/inventory';
 import { cancelPendingOrderAndRestoreStock } from '../lib/orderLifecycle';
-import { refundPayPalCapture } from '../lib/paypalRefund';
-import { syncOrderAfterRefund, isOrderFullyRefunded } from '../lib/refundSync';
-import { buildPayPalRefundDedupeKey } from '../lib/refundIdempotency';
+import { PAID_ORDER_CANCEL_DISABLED_MESSAGE } from '../lib/returnPolicy';
 import { getClientIp } from '../lib/clientIp';
 import { validateStatusTransition, type OrderStatus } from '../lib/orderStatus';
 import { verifyPayPalCaptureForOrder } from '../lib/paypalCaptureVerify';
@@ -815,14 +813,14 @@ router.patch('/:id/payment-status', verifyAdmin, async (req: Request, res: Respo
 });
 
 // ============================================
-// ORDER CANCELLATION WITH REFUND
+// ORDER CANCELLATION (unpaid pending only — no customer refunds)
 // ============================================
 
-// POST cancel order with optional refund
+// POST cancel order — unpaid pending orders only (no customer refunds)
 router.post('/:id/cancel', verifyAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { reason, process_refund = true } = req.body;
+    const { reason } = req.body;
 
     // Get current order
     const orderResult = await sql`SELECT * FROM orders WHERE id = ${id}`;
@@ -878,150 +876,10 @@ router.post('/:id/cancel', verifyAdmin, async (req: Request, res: Response) => {
       });
     }
 
-    // Process PayPal refund if payment was completed and refund is requested
-    let refundResult: {
-      success: boolean;
-      refundId?: string;
-      amount?: string;
-      error?: string;
-    } = { success: false };
-
-    if (
-      process_refund &&
-      order.payment_status === 'completed' &&
-      !order.paypal_capture_id
-    ) {
-      return res.status(409).json({
-        success: false,
-        error: 'Missing PayPal capture ID',
-        message:
-          'This order cannot be auto-refunded. Reconcile the payment in PayPal before cancelling.',
-      });
-    }
-
-    if (process_refund && order.payment_status === 'completed' && order.paypal_capture_id) {
-      logger.info('Processing PayPal refund for order:', order.order_number);
-
-      const orderTotal = parseFloat(String(order.total ?? '0'));
-      const priorRefunded = parseFloat(String(order.refunded_amount ?? '0'));
-      const remaining = Math.max(0, orderTotal - priorRefunded);
-
-      refundResult = await refundPayPalCapture(
-        order.paypal_capture_id,
-        remaining > 0 ? remaining.toFixed(2) : undefined,
-        'USD'
-      );
-
-      if (!refundResult.success) {
-        logger.error('❌ Refund failed for order:', order.order_number, refundResult.error);
-        return res.status(502).json({
-          success: false,
-          error: 'Refund failed',
-          message: 'Order was not cancelled. Resolve the PayPal refund manually before retrying.',
-          refund: {
-            processed: false,
-          },
-        });
-      }
-
-      logger.info('✅ Refund processed for order:', order.order_number, 'Refund ID:', refundResult.refundId);
-
-      const refundAmount =
-        refundResult.amount ??
-        (remaining > 0 ? remaining.toFixed(2) : orderTotal.toFixed(2));
-
-      await syncOrderAfterRefund(order.paypal_capture_id, {
-        fullRefund: true,
-        refundAmount,
-        dedupeKey: refundResult.refundId
-          ? buildPayPalRefundDedupeKey(refundResult.refundId)
-          : undefined,
-        source: 'admin_cancel',
-      });
-
-      const orderRefunded = await isOrderFullyRefunded(id);
-      if (!orderRefunded) {
-        return res.status(502).json({
-          success: false,
-          error: 'Refund sync failed',
-          message:
-            'PayPal refund succeeded but the order could not be marked refunded. Reconcile manually.',
-          refund: {
-            processed: true,
-            refundId: refundResult.refundId,
-          },
-        });
-      }
-    } else if (order.payment_status === 'completed' && !process_refund) {
-      return res.status(400).json({
-        success: false,
-        error: 'Paid orders cannot be cancelled without processing a refund',
-      });
-    }
-
-    const updateResult = await sql`
-      SELECT * FROM orders WHERE id = ${id}
-    `;
-
-    if (!updateResult.length) {
-      return res.status(404).json({ success: false, error: 'Order not found after refund sync' });
-    }
-
-    const parsedResult: Order = {
-      ...(updateResult[0] as Order),
-      items,
-      shipping_address:
-        typeof updateResult[0].shipping_address === 'string'
-          ? JSON.parse(updateResult[0].shipping_address)
-          : (updateResult[0].shipping_address as ShippingAddress),
-    };
-
-    // Send cancellation email
-    try {
-      emailService.sendOrderCancellation({
-        customerName: parsedResult.customer_name,
-        customerEmail: parsedResult.customer_email,
-        orderNumber: parsedResult.order_number!,
-        items: parsedResult.items.map((item: any) => ({
-          product_name: item.product_name,
-          product_image: item.product_image || item.image,
-          quantity: item.quantity,
-          price: parseFloat(item.price?.toString() || '0'),
-          size_value: item.size_value,
-          size_system: item.size_system,
-        })),
-        subtotal: parseFloat(parsedResult.subtotal?.toString() || '0'),
-        shipping_cost: parseFloat(parsedResult.shipping_cost?.toString() || '0'),
-        tax: parseFloat(parsedResult.tax?.toString() || '0'),
-        total: parseFloat(parsedResult.total?.toString() || '0'),
-        shippingAddress: parsedResult.shipping_address,
-        cancellationReason: reason,
-        refundProcessed: refundResult.success,
-        refundId: refundResult.refundId,
-      })
-        .then((result) => {
-          if (result.success) {
-            logger.info('✅ Cancellation email sent for order:', parsedResult.order_number);
-          } else {
-            logger.error('❌ Failed to send cancellation email:', result.error);
-          }
-        })
-        .catch((err) => {
-          logger.error('❌ Error sending cancellation email:', err);
-        });
-    } catch (emailError) {
-      logger.error('❌ Error sending cancellation email:', emailError);
-    }
-
-    return res.json({
-      success: true,
-      data: parsedResult,
-      refund: {
-        processed: refundResult.success,
-        refund_id: refundResult.refundId,
-        message: refundResult.success ? 'Refund processed successfully' : 'Refund not processed',
-      },
-      message: `Order cancelled successfully${refundResult.success ? ' and refund processed' : ''}`,
+    return res.status(403).json({
+      success: false,
+      error: 'Refunds not available',
+      message: PAID_ORDER_CANCEL_DISABLED_MESSAGE,
     });
   } catch (error: unknown) {
     logger.error('Error cancelling order:', error);
@@ -1049,7 +907,7 @@ router.delete('/:id', verifyAdmin, async (req: Request, res: Response) => {
       return res.status(409).json({
         success: false,
         error: 'Cannot delete a completed order',
-        message: 'Cancel and refund the order before deleting it from the database.',
+        message: 'Completed orders cannot be deleted. Mark cancelled in PayPal only if required for reconciliation.',
       });
     }
 

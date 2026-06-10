@@ -43,9 +43,9 @@ Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_
 - One-time checkout exchange codes in PayPal return URL (`?code=`); tokens encrypted at rest; atomic single-use redeem
 - PayPal capture with access token, amount validation, idempotency, and 409 when capture succeeds but DB order is not completed
 - PayPal webhooks (capture completed/denied, refund/reversal) with signature verification, amount fallback, and 500 on reconciliation failure
-- Admin refunds with remaining-balance validation and deduplication
-- Admin cancel with PayPal refund and full DB sync
-- Cumulative `refunded_amount` tracking with inventory restore on full refund
+- **No-refund store policy** — checkout requires `policy_accepted: true`; admin refund/cancel of paid orders returns **403**
+- Operational auto-refund on capture amount mismatch; webhook refund/reversal sync for chargebacks
+- Cumulative `refunded_amount` tracking with inventory restore on full operational refund
 - Abandoned pending order cleanup (configurable TTL)
 - Payment idempotency for create and capture operations
 
@@ -102,6 +102,6 @@ Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_
 
 ## Testing
 
-- 149 automated tests (81 backend unit + 40 API + 28 Playwright UI)
+- 150 automated tests (81 backend unit + 41 API + 28 Playwright UI)
 - Playwright storefront smoke tests (home, products, checkout, contact)
 - Documentation link checker in CI

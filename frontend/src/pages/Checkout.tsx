@@ -1,7 +1,7 @@
 // src/pages/Checkout.tsx
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useCart } from "./CartContext";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { apiFetch } from "../config";
 import { optimizeImageUrl } from "../utils/imageUrl";
@@ -19,6 +19,11 @@ import { logError } from "../lib/logger";
 import { useResponsive } from "../hooks/useResponsive";
 import MobileStickyCta from "../components/MobileStickyCta";
 import { setUserEmail, trackCheckoutStart, trackCheckoutComplete } from "../utils/activityTracker";
+import {
+  POLICY_CHECKOUT_LABEL,
+  REPLACEMENT_POLICY_PATH,
+  NO_REFUND_POLICY_SHORT,
+} from "../constants/returnPolicy";
 import {
   CreditCard,
   User,
@@ -198,6 +203,8 @@ export default function Checkout() {
     discount_amount: number;
   } | null>(null);
   const [couponError, setCouponError] = useState("");
+  const [policyAccepted, setPolicyAccepted] = useState(false);
+  const [policyError, setPolicyError] = useState("");
 
   useEffect(() => {
     if (state.items.length > 0) {
@@ -439,6 +446,16 @@ export default function Checkout() {
   }, [errors]);
 
   const handlePayPalPayment = async () => {
+    if (!policyAccepted) {
+      setPolicyError("You must accept the No Refund & Replacement Policy to continue.");
+      toast.error("Policy acceptance required", {
+        description: "Please confirm you understand our no-refund, replacement-only policy.",
+        duration: 6000,
+      });
+      return;
+    }
+    setPolicyError("");
+
     const validation = validateForm();
     if (!validation.isValid) {
       const firstErrorField = Object.keys(validation.errors)[0] as FormField;
@@ -461,6 +478,7 @@ export default function Checkout() {
           amount: total.toFixed(2),
           currency: 'USD',
           description: `Order for ${state.items.length} items`,
+          policy_accepted: true,
           coupon_code: appliedCoupon?.code,
           customerInfo: formData,
           items: state.items.map(item => ({
@@ -1152,9 +1170,62 @@ export default function Checkout() {
                 </div>
               )}
 
+              <div
+                style={{
+                  marginBottom: 16,
+                  padding: 16,
+                  background: '#fff7ed',
+                  border: '1px solid #fed7aa',
+                  borderRadius: 12,
+                  fontSize: 13,
+                  color: '#7c2d12',
+                  lineHeight: 1.6,
+                }}
+              >
+                <strong>All sales are final.</strong> {NO_REFUND_POLICY_SHORT}{' '}
+                <Link to={REPLACEMENT_POLICY_PATH} style={{ color: '#9c6649', fontWeight: 600 }}>
+                  Replacement Policy
+                </Link>
+              </div>
+
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 10,
+                  marginBottom: 16,
+                  fontSize: 13,
+                  color: '#374151',
+                  lineHeight: 1.5,
+                  cursor: 'pointer',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={policyAccepted}
+                  onChange={(e) => {
+                    setPolicyAccepted(e.target.checked);
+                    if (e.target.checked) setPolicyError('');
+                  }}
+                  style={{ marginTop: 3, width: 18, height: 18, flexShrink: 0 }}
+                />
+                <span>
+                  {POLICY_CHECKOUT_LABEL}{' '}
+                  <Link to="/terms-of-service" style={{ color: '#9c6649' }}>
+                    Terms of Service
+                  </Link>
+                  .
+                </span>
+              </label>
+              {policyError && (
+                <p role="alert" style={{ color: '#dc2626', fontSize: 13, margin: '0 0 12px' }}>
+                  {policyError}
+                </p>
+              )}
+
               <button
                 onClick={handlePayPalPayment}
-                disabled={isProcessing || checkoutBlocked}
+                disabled={isProcessing || checkoutBlocked || !policyAccepted}
                 style={{
                   width: "100%",
                   padding: "16px",
@@ -1222,7 +1293,7 @@ export default function Checkout() {
           amount={`$${total.toFixed(2)}`}
           label={isProcessing ? "Processing…" : "Pay with PayPal"}
           onClick={handlePayPalPayment}
-          disabled={isProcessing || checkoutBlocked}
+          disabled={isProcessing || checkoutBlocked || !policyAccepted}
           keyboardOffset={keyboardOffset}
           ariaLabel="Complete payment"
         />

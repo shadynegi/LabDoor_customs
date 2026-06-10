@@ -85,7 +85,7 @@
 |-------|--------------|
 | Frontend | React 19, React Router 7, TypeScript, Vite 7, Framer Motion, Fuse.js, Sonner, liquid-web |
 | Backend | Node.js 20, Express 4, TypeScript, postgres.js, Helmet, compression |
-| Payments | PayPal Checkout (create + capture + webhooks + refunds) |
+| Payments | PayPal Checkout (create + capture + webhooks); no customer refunds; operational/webhook refund sync only |
 | Database | Supabase PostgreSQL (PgBouncer pooler on port 6543 recommended) |
 | Cache | Redis 6 (required in production) + in-memory fallback |
 | Email | Resend |
@@ -111,7 +111,7 @@
 | `/orders` | Customer order lookup (`POST /api/orders/lookup`); email links redeem `?code=` via `GET /api/orders/access-exchange/:code`; legacy `?orderNumber=&token=` URLs are stripped with a deprecation warning |
 | `/contact` | Contact form with CSRF-protected POST |
 | `/about`, `/help` | Static content |
-| `/privacy-policy`, `/terms-of-service`, `/returns-policy`, `/shipping-policy` | Legal pages |
+| `/privacy-policy`, `/terms-of-service`, `/returns-policy`, `/replacement-policy`, `/shipping-policy` | Legal pages (no-refund / manufacturing-defect replacement policy) |
 | `/admin/login` | Admin authentication |
 | `/adminshivamdashboard` | Protected admin dashboard |
 
@@ -142,13 +142,15 @@
 |-----|-----------|
 | Analytics | Order/revenue stats, product metrics, customer counts, geo breakdown, GA4/GSC config status; error state with retry |
 | Products | Paginated list (50/page, load more, total count); error state with retry; list, create, edit, delete; bulk stock updates; image validation (URL or ≤512KB data URL) |
-| Orders | Paginated list (50/page), **server-side search**, filter by status, bulk status updates (not cancellation); order modal: tracking, carrier, tracking URL, **estimated delivery**, notify shipped, status transitions, **mark paid** (PayPal capture verified via API + `admin_note` + `payment_id`), cancel with refund (paid orders cannot cancel without refund) |
+| Orders | Paginated list (50/page), **server-side search**, filter by status, bulk status updates (not cancellation); order modal: tracking, carrier, tracking URL, **estimated delivery**, notify shipped, status transitions, **mark paid** (PayPal capture verified via API + `admin_note` + `payment_id`), **cancel unpaid pending orders only** (no customer refunds) |
 | Coupons | Preset percentage coupons (5/10/20/25/50%), custom codes with **scope** (`applies_to`: all / product / category + IDs), **server product search** for product scope, **edit** (description, max uses, expiry, active), activate/deactivate, delete |
 | Messages | Contact inbox — auto **mark read** on open; modal **Mark replied** / **Archive**; bulk updates; error state with retry |
 | Customers | Aggregated customer list, detail view, soft delete / restore, show deleted toggle |
 | Reviews | List/create/edit/delete; **server product search** when creating reviews; **customer email visible only here**; edit modal includes **admin response** (shown on storefront); filter by status; quick approve/reject; pagination (50/page); self-loads (no parent tab skeleton flash) |
 
-**API-only admin features** (no dedicated UI tab): activity log export, PayPal refund/test endpoints.
+**API-only admin features** (no dedicated UI tab): activity log export, PayPal test endpoint. Admin PayPal refunds are **disabled** (no-refund store policy).
+
+**Store policy:** All sales final — no refunds. Replacements only for verified manufacturing defects (`/returns-policy`). Checkout requires `policy_accepted: true` on create-payment.
 
 ---
 
@@ -186,16 +188,17 @@ Payment success page redeems ?code= via GET /api/paypal/checkout-exchange/:code
 
 ### Create payment (`POST /api/paypal/create-payment`)
 
-1. Validates each cart line against the database (product exists, price, stock).
-2. Resolves coupon discount with scope rules (`applies_to`: all, product, or category).
-3. Calculates pricing: subtotal, shipping ($25 or free over $200), tax ($0), discount, total.
-4. Claims a **create_payment** idempotency key (header `X-Idempotency-Key` or fingerprint hash).
-5. Atomically inserts a pending order and decrements product stock; stores `access_token_hash` and **AES-256-GCM** `access_token_encrypted` on the order row for durable post-capture email link minting.
-6. Reserves coupon usage in `coupon_usage`.
-7. Creates a PayPal order with `reference_id` / `custom_id` set to the server order UUID.
-8. Creates a one-time **checkout exchange code** (stored hashed in `order_checkout_exchanges`, 30-minute TTL, single use).
-9. Stores `paypal_order_id` on the order; returns PayPal approval links and `serverOrderId` (access token is **not** returned — redeem checkout exchange code on return).
-10. On any failure after order creation: rolls back pending order, restores stock, marks idempotency key failed.
+1. Requires `policy_accepted: true` in the request body (customer agrees to no-refund / manufacturing-defect replacement-only policy).
+2. Validates each cart line against the database (product exists, price, stock).
+3. Resolves coupon discount with scope rules (`applies_to`: all, product, or category).
+4. Calculates pricing: subtotal, shipping ($25 or free over $200), tax ($0), discount, total.
+5. Claims a **create_payment** idempotency key (header `X-Idempotency-Key` or fingerprint hash).
+6. Atomically inserts a pending order and decrements product stock; stores `access_token_hash` and **AES-256-GCM** `access_token_encrypted` on the order row for durable post-capture email link minting.
+7. Reserves coupon usage in `coupon_usage`.
+8. Creates a PayPal order with `reference_id` / `custom_id` set to the server order UUID.
+9. Creates a one-time **checkout exchange code** (stored hashed in `order_checkout_exchanges`, 30-minute TTL, single use).
+10. Stores `paypal_order_id` on the order; returns PayPal approval links and `serverOrderId` (access token is **not** returned — redeem checkout exchange code on return).
+11. On any failure after order creation: rolls back pending order, restores stock, marks idempotency key failed.
 
 **PayPal return URL:** `{FRONTEND_URL}/payment/success?code={exchangeCode}` — PayPal appends `&token={paypalOrderId}`. Access token is **not** in the URL.
 
@@ -236,19 +239,18 @@ Payment success page redeems ?code= via GET /api/paypal/checkout-exchange/:code
 
 Returns **500** on processing failure so PayPal retries.
 
-### Refunds
+### Refunds and replacements
+
+**Customer policy:** No refunds. Manufacturing-defect replacements are handled manually via support email (see Replacement Policy).
 
 | Path | Auth | Behavior |
 |------|------|----------|
-| `POST /api/paypal/refund/:captureId` | Admin | Validates remaining balance; partial or full refund via PayPal; `PayPal-Request-Id` idempotency |
-| `POST /api/orders/:id/cancel` | Admin | Pending: cancel + restore stock; completed + refund: PayPal refund then full DB sync |
+| `POST /api/paypal/refund/:captureId` | Admin | **403** — customer refunds disabled by store policy |
+| `POST /api/orders/:id/cancel` | Admin | **Pending payment only:** cancel + restore stock. Paid orders return **403** (no refund). |
 
-**Refund sync (`syncOrderAfterRefund`):**
+**Operational refunds (not customer policy):** Capture amount mismatch may auto-refund via `paypalRefund.ts` before the order is fulfilled.
 
-- Tracks cumulative `refunded_amount` on the order (capped at order total).
-- Full refund: restores inventory, marks order refunded/cancelled, reverses customer credit, releases coupon.
-- Partial refund: adjusts customer `total_spent`; order stays active.
-- **Deduplication:** `processed_refund_events` table prevents double-processing of webhook redeliveries or admin+webhook overlap (keyed by PayPal refund ID or webhook transmission ID).
+**Webhook refund sync (`syncOrderAfterRefund`):** Still processes PayPal-initiated `REFUNDED`/`REVERSED` events (chargebacks, operational reversals) with `processed_refund_events` deduplication.
 
 ### Payment idempotency
 
@@ -302,7 +304,7 @@ Statuses: `processing`, `completed`, `failed`. Stuck `processing` rows are reape
 
 - Update fulfillment status, tracking, carrier, estimated delivery.
 - Cancel pending orders (restores stock automatically).
-- Cancel completed orders with PayPal refund (syncs DB, inventory, customer stats).
+- Cancel **unpaid** pending orders only; paid orders use replacement workflow for manufacturing defects (no admin refund).
 - Send shipping notification email.
 - **Mark paid manually** via `PATCH /api/orders/:id/payment-status` with `payment_status: completed`, `admin_note` (≥3 chars), and `payment_id` (PayPal capture ID or external reference, ≥5 chars); logged to `activity_logs` as `admin_mark_paid`.
 - **Bulk updates** — `POST /api/admin/*/bulk-update` accepts at most **500** IDs per request; order bulk update validates status transitions and rejects `cancelled` and any `payment_status` change.
@@ -562,7 +564,7 @@ Powered by **Resend** (`RESEND_API_KEY`, `SENDER_EMAIL`, `COMPANY_NAME`, `COMPAN
 |-------|---------|
 | Order confirmation | After successful PayPal capture — includes tracking URL with access token |
 | Shipping notification | Admin `POST /api/orders/:id/notify-shipped` |
-| Order cancellation | Admin cancel with refund details |
+| Order cancellation | Admin cancel of **unpaid pending** orders (no customer refunds) |
 | Contact auto-reply | Contact form submission |
 
 ---
@@ -689,7 +691,7 @@ Expanded request/response docs: [`API_DOCUMENTATION.md`](API_DOCUMENTATION.md)
 | GET | `/api/paypal/checkout-exchange/:code` | Public | Redeem one-time checkout code → access token |
 | GET | `/api/paypal/checkout-context/:paypalOrderId` | Order token | Checkout recovery when exchange code is unavailable |
 | GET | `/api/paypal/order/:orderId` | Admin | Fetch PayPal order details |
-| POST | `/api/paypal/refund/:captureId` | Admin + CSRF | Issue full or partial refund |
+| POST | `/api/paypal/refund/:captureId` | Admin + CSRF | **403** — customer refunds disabled (no-refund store policy) |
 
 Any unmatched `/api/*` path returns **404** JSON `{ error: "Route not found" }`.
 
@@ -814,7 +816,8 @@ Any unmatched `/api/*` path returns **404** JSON `{ error: "Route not found" }`.
 | `/help` | `HelpCenter` | Help / FAQ |
 | `/privacy-policy` | `PrivacyPolicy` | Privacy policy |
 | `/terms-of-service` | `TermsOfService` | Terms of service |
-| `/returns-policy` | `ReturnsPolicy` | Returns policy |
+| `/returns-policy` | `ReturnsPolicy` | No-refund / manufacturing-defect replacement policy |
+| `/replacement-policy` | `ReturnsPolicy` | Alias for returns policy |
 | `/shipping-policy` | `ShippingPolicy` | Shipping policy |
 | `/cart` | `CartPage` | Shopping cart |
 | `/checkout` | `Checkout` | Checkout form + PayPal redirect |
@@ -846,7 +849,7 @@ Any unmatched `/api/*` path returns **404** JSON `{ error: "Route not found" }`.
 
 ### Sitemap static paths (also in `generate-sitemap.mjs`)
 
-`/`, `/products`, `/about`, `/contact`, `/help`, `/privacy-policy`, `/terms-of-service`, `/returns-policy`, `/shipping-policy`, plus dynamic `/product/{id}` entries from `GET /api/products/sitemap-urls` at build time.
+`/`, `/products`, `/about`, `/contact`, `/help`, `/privacy-policy`, `/terms-of-service`, `/returns-policy`, `/replacement-policy`, `/shipping-policy`, plus dynamic `/product/{id}` entries from `GET /api/products/sitemap-urls` at build time.
 
 ### URLs referenced in navigation (not separate routes)
 
@@ -1011,7 +1014,7 @@ npm run links:check
 | Backend unit/API | Vitest | Checkout validation + create-payment happy path, capture 409/refund mismatch, checkout-context API, checkout exchange, PayPal webhooks (COMPLETED + DENIED), admin mark-paid, coupon scope, `computeCheckoutPricingForCart`, payment idempotency, order tokens, RLS table list + grant revoke, email portal URL, activity batch/log, order lookup, reviews check |
 | Frontend E2E / UI | Playwright | Storefront smoke, products/cart/checkout/contact UI, navigation, cookie consent, payment-success/orders edge UI, checkout total mismatch, admin login/dashboard smoke, mobile viewport (28 tests; mocked API) |
 
-**Total automated tests:** 149 (81 backend unit + 40 API + 28 Playwright UI).
+**Total automated tests:** 150 (81 backend unit + 41 API + 28 Playwright UI).
 
 | Link check | Custom script | Documentation internal links |
 

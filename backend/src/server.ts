@@ -53,8 +53,7 @@ import { mountRateLimits } from './middleware/rateLimits';
 import { startMaintenanceJobs } from './lib/maintenanceJobs';
 import { ensureActivityLogsTable } from './lib/activitySchema';
 import { registerGracefulShutdown } from './lib/gracefulShutdown';
-import { syncOrderAfterRefund, isFullRefundAmount, validateAdminRefundAmount } from './lib/refundSync';
-import { buildPayPalRefundDedupeKey } from './lib/refundIdempotency';
+import { POLICY_ACCEPTANCE_REQUIRED_MESSAGE } from './lib/returnPolicy';
 import {
   reserveCouponForOrder,
   getCouponForOrder,
@@ -453,6 +452,8 @@ interface CreatePaymentRequest {
     country?: string;
   };
   items: CheckoutCartItemInput[];
+  /** Required — customer must accept no-refund / replacement-only policy before checkout. */
+  policy_accepted?: boolean;
   /** Ignored — totals are calculated server-side from DB prices. */
   amount?: string;
   breakdown?: {
@@ -646,6 +647,14 @@ app.post("/api/paypal/create-payment", async (req: Request, res: Response) => {
       return res.status(400).json({
         success: false,
         error: "Customer name and email are required",
+      });
+    }
+
+    if (body.policy_accepted !== true) {
+      return res.status(400).json({
+        success: false,
+        error: 'Policy acceptance required',
+        message: POLICY_ACCEPTANCE_REQUIRED_MESSAGE,
       });
     }
 
@@ -1382,86 +1391,14 @@ app.get("/api/paypal/order/:orderId", verifyAdmin, async (req: Request, res: Res
   }
 });
 
-// Refund Payment (admin only — unauthenticated access allowed refunds for any capture ID)
-app.post("/api/paypal/refund/:captureId", verifyAdmin, async (req: Request, res: Response) => {
-  try {
-    const { captureId } = req.params;
-    const { amount, currency = 'USD' } = req.body;
-
-    if (!captureId) {
-      return res.status(400).json({
-        success: false,
-        error: "Capture ID is required",
-      });
-    }
-
-    const headerKey = (req.headers['x-idempotency-key'] as string | undefined)?.trim();
-    const idempotencyKey =
-      headerKey && headerKey.length >= 8
-        ? headerKey
-        : `admin-refund-${captureId}-${amount || 'remaining'}`;
-
-    const validation = await validateAdminRefundAmount(captureId, amount, currency);
-    if (!validation.ok) {
-      return res.status(validation.status).json({
-        success: false,
-        error: validation.error,
-        message: validation.message,
-      });
-    }
-
-    const { refundAmount, orderTotal, priorRefunded } = validation.data;
-    const accessToken = await getPayPalAccessToken();
-
-    const response = await paypalFetch(`${PAYPAL_API}/v2/payments/captures/${captureId}/refund`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-        "PayPal-Request-Id": idempotencyKey,
-      },
-      body: JSON.stringify({
-        amount: {
-          currency_code: currency,
-          value: refundAmount,
-        },
-      }),
-    });
-
-    if (!response.ok) {
-      const errorData = await parseJson<any>(response);
-      logger.error("Refund Error:", errorData);
-      throw new Error(`Refund failed: ${response.status}`);
-    }
-
-    const data = await parseJson<PayPalRefundResponse>(response);
-
-    logger.info("✅ Refund processed:", data?.id);
-
-    const resolvedRefundAmount = data.amount?.value || refundAmount;
-    const cumulativeAfter = priorRefunded + parseFloat(resolvedRefundAmount);
-    const fullRefund = isFullRefundAmount(orderTotal, cumulativeAfter.toFixed(2));
-
-    const orderSync = await syncOrderAfterRefund(captureId, {
-      fullRefund,
-      refundAmount: resolvedRefundAmount,
-      dedupeKey: data.id ? buildPayPalRefundDedupeKey(data.id) : undefined,
-      source: 'admin_api',
-    });
-
-    res.json({
-      success: true,
-      refundId: data.id,
-      status: data.status,
-      order: orderSync,
-    });
-  } catch (error: any) {
-    logger.error("Refund error:", error);
-    res.status(500).json({
-      success: false,
-      error: clientErrorMessage(error, 'Failed to process refund'),
-    });
-  }
+// Refund Payment — disabled (no-refund store policy; operational auto-refunds use paypalRefund.ts internally)
+app.post("/api/paypal/refund/:captureId", verifyAdmin, async (_req: Request, res: Response) => {
+  const { CUSTOMER_REFUND_DISABLED_MESSAGE } = await import('./lib/returnPolicy');
+  res.status(403).json({
+    success: false,
+    error: 'Refunds not available',
+    message: CUSTOMER_REFUND_DISABLED_MESSAGE,
+  });
 });
 
 // API 404 — JSON only under /api

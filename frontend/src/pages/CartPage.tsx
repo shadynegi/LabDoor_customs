@@ -6,6 +6,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Trash2, Plus, Minus, ShoppingBag } from "lucide-react";
 import { calculateCheckoutPricing, FREE_SHIPPING_MESSAGE, VOLUME_DISCOUNT_INFO } from "../utils/pricing";
 import { optimizeImageUrl } from "../utils/imageUrl";
+import { NO_REFUND_POLICY_SHORT, REPLACEMENT_POLICY_PATH } from "../constants/returnPolicy";
 
 export default function CartPage() {
   const {
@@ -331,6 +332,24 @@ export default function CartPage() {
               <span>${total.toFixed(2)}</span>
             </div>
           </div>
+
+          <p
+            style={{
+              marginTop: 16,
+              padding: 14,
+              background: '#fff7ed',
+              border: '1px solid #fed7aa',
+              borderRadius: 12,
+              fontSize: 13,
+              color: '#7c2d12',
+              lineHeight: 1.55,
+            }}
+          >
+            <strong>All sales final.</strong> {NO_REFUND_POLICY_SHORT}{' '}
+            <Link to={REPLACEMENT_POLICY_PATH} style={{ color: '#9c6649', fontWeight: 600 }}>
+              Replacement Policy
+            </Link>
+          </p>
 
           {cartValidationError && (
             <div

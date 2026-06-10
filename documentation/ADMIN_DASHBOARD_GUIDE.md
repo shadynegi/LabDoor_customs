@@ -70,7 +70,7 @@ Click an order card to open fulfillment actions:
 - **Notify shipped** — `POST /api/orders/:id/notify-shipped` (requires tracking number)
 - **Status** — Mark processing, shipped, or delivered (valid transitions enforced)
 - **Mark paid** — prompts for a reason, then `PATCH /api/orders/:id/payment-status` with `completed`, `admin_note` (≥3 chars), and `payment_id` (external reference or capture ID, ≥5 chars); logged to `activity_logs` as `admin_mark_paid`
-- **Cancel order** — prompts for optional reason; dismiss the prompt to abort. Uses `POST /api/orders/:id/cancel` with optional PayPal refund
+- **Cancel order** — prompts for optional reason; dismiss the prompt to abort. Uses `POST /api/orders/:id/cancel` (**unpaid pending orders only** — no customer refunds)
 
 ### Bulk updates
 
@@ -78,19 +78,15 @@ Bulk status dropdown supports processing, shipped, and delivered only. **Cancell
 
 ### Cancel orders
 
-**Pending orders:** Cancels and restores inventory automatically.
+**Store policy:** All sales are final — no customer refunds. Manufacturing-defect replacements are handled manually via support email (see `/returns-policy` on the storefront).
 
-**Completed orders with refund:**
+**Pending (unpaid) orders:** Cancel restores inventory automatically.
 
-1. Set `process_refund: true` in cancel request.
-2. Backend refunds remaining balance via PayPal.
-3. Order marked refunded, inventory restored, customer stats reversed.
-
-If PayPal refund succeeds but DB sync fails, the API returns 502 — reconcile manually in PayPal dashboard.
+**Paid / completed orders:** Cancel and refund endpoints return **403**. Use the replacement workflow for verified manufacturing defects — not the admin dashboard.
 
 ### Payment status
 
-`PATCH /api/orders/:id/payment-status` allows marking pending orders as **completed** when accompanied by `admin_note` (≥3 characters). Use cancel/refund flows to move away from completed.
+`PATCH /api/orders/:id/payment-status` allows marking pending orders as **completed** when accompanied by `admin_note` (≥3 characters). Paid orders cannot be cancelled through the API.
 
 ---
 
@@ -157,7 +153,7 @@ These are available via API but do not have dedicated dashboard tabs:
 | Feature | Endpoints |
 |---------|-----------|
 | Activity logs | `GET /api/activity/logs`, `/export` |
-| PayPal refunds | `POST /api/paypal/refund/:captureId` |
+| PayPal refunds | `POST /api/paypal/refund/:captureId` — **disabled** (403; no-refund policy) |
 | PayPal test | `GET /api/paypal/test` |
 
 ---
@@ -170,7 +166,7 @@ These are available via API but do not have dedicated dashboard tabs:
 | `POST /api/admin/orders/bulk-update` | Bulk order status updates (not cancellation) |
 | `POST /api/admin/messages/bulk-update` | Bulk message status updates |
 
-Use dedicated cancel/refund endpoints for order cancellation — not bulk update.
+Use the dedicated cancel endpoint for unpaid pending orders — not bulk update.
 
 ---
 

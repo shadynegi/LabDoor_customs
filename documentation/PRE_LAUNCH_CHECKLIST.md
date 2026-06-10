@@ -191,7 +191,7 @@ CI does **not** run a live PayPal payment. Complete these on **desktop and a rea
 - [ ] Monitor Sentry for new errors
 - [ ] Watch `/api/health` (Railway or external uptime)
 - [ ] Confirm Redis memory stable (rate-limit keys)
-- [ ] Spot-check admin refund/cancel flow if you expect support volume
+- [ ] Spot-check admin cancel of unpaid pending orders; confirm paid orders cannot cancel/refund (no-refund policy)
 - [ ] Google Search Console / sitemap submitted if using SEO vars
 
 ---
