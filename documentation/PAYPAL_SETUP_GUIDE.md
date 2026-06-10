@@ -4,6 +4,8 @@ Configure PayPal Checkout for Lab Door Customs.
 
 **Full reference:** [`info.md`](info.md)
 
+**Store policy:** Lab Door Customs does not offer customer refunds. Admin `POST /api/paypal/refund/:captureId` returns **403**. Operational refund webhooks (`PAYMENT.CAPTURE.REFUNDED` / `REVERSED`) still sync chargebacks and capture-amount corrections.
+
 ---
 
 ## Sandbox (development)

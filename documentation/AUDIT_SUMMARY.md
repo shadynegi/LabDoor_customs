@@ -13,9 +13,9 @@ Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API
 
 | Area | How it works |
 |------|----------------|
-| **Checkout** | Cart validation with retry; DB-backed coupon validate; client/server total compare before PayPal; `?code=` exchange; capture **409** → processing UI with poll timeout; `checkout_complete` before redirect. |
+| **Checkout** | Cart validation with retry; `policy_accepted` required (no-refund policy); DB-backed coupon validate; client/server total compare before PayPal; `?code=` exchange; capture **409** → processing UI with poll timeout; `checkout_complete` before redirect. |
 | **Orders** | `access_token_encrypted` for durable email links; `GET /api/orders/access-exchange/:code`; legacy `?orderNumber=&token=` stripped; uniform **404** on lookup; partial refresh keeps stale data + warning. |
-| **Admin** | Server product search; products paginated (load more); messages mark read on open; coupons scope on create **and edit**; reviews admin response; estimated delivery; error/retry states. |
+| **Admin** | Server product search; products paginated (load more); messages mark read on open; coupons scope on create **and edit**; reviews admin response; estimated delivery; error/retry states; **no customer refunds** (cancel unpaid pending only). |
 | **Activity** | Consent-gated batch (`inserted`/`skipped` counts); `contact_submit`, `purchase_complete`, `size_select`, `quantity_change` wired. |
 | **Reviews** | `POST /api/reviews/check` on email blur (generic message, no product enumeration); pending-moderation copy; vote error toasts. |
 | **Maintenance** | Ping-first scheduled jobs; transient pool errors (`CONNECT_TIMEOUT`, `ENOTFOUND`) skip with one log line — not a wrong `DATABASE_URL` if bootstrap succeeded. |

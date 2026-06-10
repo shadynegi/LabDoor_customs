@@ -132,7 +132,7 @@ Each report includes:
 
 Generated reports are **gitignored**; only `documentation/TEST_RESULTS.md` is tracked.
 
-`npm test` always rebuilds the frontend with test `VITE_*` defaults before Playwright, then installs Playwright in `Tests/` on first UI run. Use `test:watch` (Vitest) or `test:raw` / `test:frontend:raw` to run **without** writing a report.
+`npm test` always rebuilds the frontend with test `VITE_*` defaults before Playwright (preview build clears `CI` so localhost `VITE_SITE_URL` passes validate-env), defaults `CI=true` for Playwright only so the preview server is not reused stale, then installs Playwright in `Tests/` on first UI run. Use `test:watch` (Vitest) or `test:raw` / `test:frontend:raw` to run **without** writing a report.
 
 ---
 

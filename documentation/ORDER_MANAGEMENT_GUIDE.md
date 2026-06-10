@@ -76,5 +76,5 @@ Each manual mark is recorded in `activity_logs` as `admin_mark_paid`.
 | Status | `PATCH /api/orders/:id/status` |
 | Cancel | `POST /api/orders/:id/cancel` |
 | Ship notify | `POST /api/orders/:id/notify-shipped` |
-| Mark paid (manual) | `PATCH /api/orders/:id/payment-status` — `{ "payment_status": "completed", "admin_note": "..." }` |
+| Mark paid (manual) | `PATCH /api/orders/:id/payment-status` — `{ "payment_status": "completed", "admin_note": "...", "payment_id": "..." }` |
 | Refund | `POST /api/paypal/refund/:captureId` — **disabled** (403; no-refund policy) |

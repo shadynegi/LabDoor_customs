@@ -13,7 +13,7 @@ Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API
 
 | Area | How it works |
 |------|----------------|
-| **Checkout** | `?code=` exchange on success page; **409** → processing UI (polls checkout-context); expired code → explicit error; alternate `?aid=` recovery. |
+| **Checkout** | `policy_accepted` required on create-payment; no-refund / replacement-only policy checkbox on storefront; `?code=` exchange on success page; **409** → processing UI (polls checkout-context); expired code → explicit error; alternate `?aid=` recovery. |
 | **Admin** | Bulk updates max **500** IDs; manual mark paid verifies PayPal capture via API; paid orders cannot cancel or refund (no-refund policy); product cards on mobile. |
 | **Activity** | `POST /api/activity/batch` is CSRF-exempt and rate-limited; frontend sends only with analytics cookie consent; IPs anonymized with `IP_SALT`. |
 | **Reviews** | Public responses strip PII (`toPublicReview()`); admin shows email. Eligibility via `POST /api/reviews/check` (email in body). Votes on approved reviews only. |
@@ -31,8 +31,9 @@ Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_
 - Verify `PAYPAL_CLIENT_ID` and `PAYPAL_SECRET` in backend `.env`.
 - Confirm `PAYPAL_MODE` matches credential type (sandbox vs live).
 
-### Create payment fails (500)
+### Create payment fails (400 / 500)
 
+- **400 `Policy acceptance required`:** Frontend must send `policy_accepted: true` and customer must check the policy checkbox on `/checkout`.
 - Check backend logs for PayPal auth errors.
 - Verify cart items exist and have sufficient stock.
 - Check idempotency: previous failed attempt may need reclaim (retry after pending order cancelled).
@@ -52,11 +53,11 @@ Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_
 - Check backend logs for signature verification failures.
 - Webhook uses raw body parser — must not go through JSON parser first.
 
-### Refund fails
+### Admin refund or paid-order cancel returns 403
 
-- Admin refund validates against remaining balance (`total - refunded_amount`).
-- PayPal capture must exist (`paypal_capture_id` on order).
-- Check PayPal dashboard for capture status.
+- **Expected:** Customer refunds are disabled (`POST /api/paypal/refund/:captureId` → **403**). Paid orders cannot be cancelled (`POST /api/orders/:id/cancel` → **403**).
+- Use the manufacturing-defect **replacement** workflow via support email — not the admin dashboard.
+- **Operational refunds** (capture amount mismatch auto-refund, PayPal chargebacks) still sync via webhooks — check PayPal dashboard and `processed_refund_events` if reconciliation looks wrong.
 
 ---
 

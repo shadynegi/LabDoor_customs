@@ -13,7 +13,7 @@ Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API
 
 | Area | How it works |
 |------|----------------|
-| **Checkout** | Cart validation with retry; PayPal `?code=` exchange; capture **409** → processing UI; checkout email synced to activity on change/blur. |
+| **Checkout** | Cart validation with retry; `policy_accepted` required; no-refund policy checkbox; PayPal `?code=` exchange; capture **409** → processing UI; checkout email synced to activity on change/blur. |
 | **Orders** | Email links `GET /api/orders/access-exchange/:code`; legacy `?orderNumber=&token=` stripped; partial refresh keeps stale data + warning. 
 | **Admin** | Products paginated (load more); messages mark read on open; coupons scope UI; reviews admin response; estimated delivery; error/retry states. |
 | **Activity** | Consent-gated batch; `contact_submit` on contact success. |
@@ -60,6 +60,7 @@ On CSRF 403, `apiFetch` refreshes the token and retries once.
 - [ ] Email format validated
 - [ ] Empty cart redirects or shows error
 - [ ] Coupon validation shows correct discount/error
+- [ ] No-refund / replacement-only policy checkbox required; PayPal button disabled until accepted
 - [ ] PayPal redirect occurs on valid submission
 - [ ] Checkout email updates activity batch identity on change/blur (with consent)
 - [ ] Cart validation failure shows **Retry validation** on cart page
@@ -84,7 +85,6 @@ On CSRF 403, `apiFetch` refreshes the token and retries once.
 - [ ] Product create/edit validates required fields
 - [ ] Order status update succeeds
 - [ ] Cancel **unpaid pending** order shows confirmation (no refund option for paid orders)
-- [ ] Checkout policy acceptance checkbox required before PayPal redirect
 - [ ] Opening a new contact message marks it read; Mark replied / Archive work in modal
 - [ ] Custom coupon create supports applies_to scope (all / product / category)
 - [ ] Review edit saves admin response visible on storefront

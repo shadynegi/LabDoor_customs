@@ -13,7 +13,7 @@ Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API
 
 | Area | How it works |
 |------|----------------|
-| **Checkout** | Cart validation with retry; PayPal `?code=` exchange; capture **409** shows processing UI (polls checkout-context; cart held); checkout email synced to activity on change/blur. |
+| **Checkout** | Cart validation with retry; `policy_accepted` required; no-refund policy checkbox; PayPal `?code=` exchange; capture **409** shows processing UI (polls checkout-context; cart held); checkout email synced to activity on change/blur. |
 | **Orders** | Email links `GET /api/orders/access-exchange/:code`; legacy `?orderNumber=&token=` stripped; partial refresh keeps stale data + warning. |
 | **Admin** | Products paginated (load more); messages mark read on open; coupons support scope; reviews admin response; estimated delivery on orders; tab error/retry states. |
 | **Activity** | Consent-gated batch; `contact_submit` on contact success; IPs anonymized with `IP_SALT`. |
@@ -32,7 +32,7 @@ Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_
 - PayPal checkout with server-side pricing and coupon validation
 - Payment success page: redeems checkout exchange `?code=`, captures payment; handles **409** reconciliation UI; surfaces expired exchange errors; strips sensitive params from URL on success
 - Customer order lookup at `/orders` via `POST /api/orders/lookup`
-- Contact form, policy pages, cookie consent, GA4 and activity tracking (consent-gated)
+- Contact form; legal pages including no-refund / manufacturing-defect replacement policy (`/returns-policy`, `/replacement-policy`); cookie consent; GA4 and activity tracking (consent-gated)
 - Mobile sticky CTAs, checkout keyboard offset, responsive layouts — see [MOBILE_RESPONSIVE.md](./MOBILE_RESPONSIVE.md)
 
 ---

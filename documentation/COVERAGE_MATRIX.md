@@ -35,6 +35,8 @@
 | PAY-VOLUME | Volume discount 10%/20% in pricing | `paypalCheckout.ts` L23-35 | `checkoutPricing.test.ts`, `couponValidateVolume.test.ts` | COVERED |
 | PAY-SHIPPING | Free shipping threshold $200 | `paypalCheckout.ts`, `pricing.ts` | `checkoutPricing.test.ts` | COVERED |
 | PAY-FE-TOTAL | Client compares server total before PayPal redirect | `Checkout.tsx` | `checkout-total-mismatch-ui.spec.ts` | COVERED |
+| PAY-POLICY | `policy_accepted: true` required on create-payment | `server.ts`, `returnPolicy.ts`, `Checkout.tsx` | `checkout.test.ts`, `createPaymentHappy.test.ts` | COVERED |
+| POL-ADMIN | Admin refund + paid-order cancel return 403 | `server.ts`, `orders.ts`, `returnPolicy.ts` | `security.test.ts` (refund auth); manual QA | PARTIAL |
 
 ---
 

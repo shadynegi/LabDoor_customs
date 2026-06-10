@@ -150,7 +150,7 @@
 
 **API-only admin features** (no dedicated UI tab): activity log export, PayPal test endpoint. Admin PayPal refunds are **disabled** (no-refund store policy).
 
-**Store policy:** All sales final — no refunds. Replacements only for verified manufacturing defects (`/returns-policy`). Checkout requires `policy_accepted: true` on create-payment.
+**Store policy:** All sales final — no refunds. Replacements only for verified manufacturing defects within **30 days of delivery** (`/returns-policy`; `/replacement-policy` is an alias). Checkout requires `policy_accepted: true` on create-payment. Shared policy text lives in `backend/src/lib/returnPolicy.ts` and `frontend/src/constants/returnPolicy.ts`. Manufacturing-defect claims: `support@labdoorcustoms.com`.
 
 ---
 

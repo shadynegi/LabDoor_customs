@@ -314,6 +314,7 @@ Sprint 4 — Admin/storefront polish
 | 2026-06-10 | ORD-EMAIL-LINK | `emailPortalUrl.test.ts` — `buildOrderPortalUrl` unit coverage |
 | 2026-06-10 | SEC-BOOTSTRAP | `rlsGrantRevoke.test.ts` — grant revoke runs when `BOOTSTRAP_SKIP_DDL` |
 | 2026-06-10 | UI-ADMIN | `admin-ui.spec.ts` — login redirect + dashboard analytics smoke (149 tests) |
+| 2026-06-10 | PAY-POLICY / POL-ADMIN | No-refund store policy — `policy_accepted`, admin refund/cancel 403, storefront policy pages (`1406729`; 150 tests) |
 
 *Append a line when closing each Critical/High item.*
 
