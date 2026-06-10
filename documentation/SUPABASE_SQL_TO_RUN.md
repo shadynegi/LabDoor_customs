@@ -22,6 +22,7 @@ Located in `backend/src/database/`:
 - `migration-order-access-exchange.sql` — one-time order tracking link codes (email; no token in URL)
 - `migration-order-checkout-exchange.sql` — PayPal return checkout exchange codes (`order_checkout_exchanges`)
 - `migration-order-access-token-encrypted.sql` — `orders.access_token_encrypted` for durable post-capture email link minting
+- `migration-ldcoff10-coupon.sql` — optional seed for storefront promo code **LDCOFF10** (10% off; customer must apply at checkout)
 - `migration-performance-linter-fixes.sql` — **run once manually:** FK indexes (lint 0001) + consolidate duplicate RLS policies (lint 0006) on `activity_logs`, `reviews`, `admin_sessions`, `contact_messages`, `orders`, `review_votes`
 - `migration-payment-idempotency.sql` — idempotency table + indexes including partial index `idx_payment_idempotency_processing_created` for maintenance reaper
 

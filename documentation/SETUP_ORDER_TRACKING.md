@@ -9,7 +9,7 @@ Configure customer order lookup.
 
 ## Current system behavior
 
-Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API (`backend/`), Vitest + Playwright tests (`Tests/`). Production runs one Express process serving `/api/*` and the built SPA; PostgreSQL is Supabase with backend **service_role** access — RLS and revoked grants block `anon`/`authenticated` PostgREST on 13 tables.
+Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API (`backend/`), Vitest + Playwright tests (`Tests/`). Production runs one Express process serving `/api/*` and the built SPA; PostgreSQL is Supabase with backend **service_role** access — RLS and revoked grants block `anon`/`authenticated` PostgREST on 14 tables.
 
 | Area | How it works |
 |------|----------------|
@@ -32,7 +32,7 @@ Each order receives a unique access token at PayPal create-payment time. The tok
 - Validated server-side against `access_token_hash` on the order row (only the hash is stored)
 - Used for order lookup and payment capture — **not** placed in the PayPal return URL
 
-After PayPal approval, the customer returns to `/payment/success?code=...&token=...`. The frontend redeems the one-time `code` via checkout exchange to obtain the access token for capture.
+After PayPal approval, the customer returns to `/payment/success?code=...`. The frontend redeems the one-time `code` via checkout exchange to obtain the access token for capture.
 
 ---
 
@@ -52,7 +52,7 @@ The My Orders page sends lookup requests with `POST /api/orders/lookup` so token
 | Endpoint | Purpose |
 |----------|---------|
 | `POST /api/orders/lookup` | Preferred customer lookup — `{ orderNumber, accessToken }` in JSON body |
-| `GET /api/orders/number/:orderNumber` | Alternate lookup — token via `?token=` or `X-Order-Access-Token` header |
+| `GET /api/orders/number/:orderNumber` | Alternate lookup — token via `X-Order-Access-Token` header or `?aid=` query (legacy `?token=` not accepted) |
 | `GET /api/orders/customer/:email` | Admin only (public email listing blocked) |
 | `GET /api/paypal/checkout-exchange/:code` | Redeem one-time code after PayPal redirect |
 | `GET /api/orders/access-exchange/:code` | Redeem one-time email tracking link → `orderNumber` + `accessToken` |
@@ -61,6 +61,6 @@ The My Orders page sends lookup requests with `POST /api/orders/lookup` so token
 
 ## Email
 
-Order confirmation (sent after capture) includes the tracking URL with embedded token.
+Order confirmation (sent after capture) includes a **View Order Status** link: `/orders?code=...` (one-time access exchange — no long-lived token in the URL).
 
 Requires Resend configuration: `RESEND_API_KEY`, `SENDER_EMAIL`.

@@ -165,11 +165,93 @@ export async function installStorefrontApiMocks(
       return json(route, { success: true });
     }
 
+    const orderAccessExchangeMatch = path.match(/^\/orders\/access-exchange\/([^/]+)$/);
+    if (orderAccessExchangeMatch && method === 'GET') {
+      const code = decodeURIComponent(orderAccessExchangeMatch[1]);
+      if (code === 'EMAIL-LINK-CODE') {
+        return json(route, {
+          success: true,
+          data: {
+            orderNumber: 'GSS-EMAIL-TEST-ABC',
+            accessToken: 'a'.repeat(64),
+            serverOrderId: '00000000-0000-0000-0000-00000000ee01',
+          },
+        });
+      }
+      return json(route, { success: false, error: 'Invalid or expired tracking link' }, 404);
+    }
+
+    if (path === '/orders/lookup' && method === 'POST') {
+      let body: { orderNumber?: string; accessToken?: string } = {};
+      try {
+        body = route.request().postDataJSON() as typeof body;
+      } catch {
+        body = {};
+      }
+
+      if (
+        body.orderNumber === 'GSS-EMAIL-TEST-ABC' &&
+        body.accessToken === 'a'.repeat(64)
+      ) {
+        return json(route, {
+          success: true,
+          data: {
+            id: '00000000-0000-0000-0000-00000000ee01',
+            order_number: 'GSS-EMAIL-TEST-ABC',
+            customer_email: 'buyer@example.com',
+            customer_name: 'Test Buyer',
+            shipping_address: {},
+            items: [],
+            subtotal: 98,
+            shipping_cost: 0,
+            tax: 0,
+            total: 98,
+            payment_status: 'completed',
+            status: 'processing',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        });
+      }
+
+      return json(
+        route,
+        { success: false, error: 'Order not found or invalid credentials' },
+        404,
+      );
+    }
+
     if (path.startsWith('/orders') && method === 'GET') {
       return json(route, { success: true, data: [] });
     }
 
     // Unhandled API — avoid hanging on proxy to offline backend
     return json(route, { success: true, data: null });
+  });
+}
+
+/** Override create-payment to return a server total that differs from the client cart total. */
+export async function installPaymentTotalMismatchMock(page: Page): Promise<void> {
+  await page.route('**/api/**', async (route) => {
+    const path = apiPath(route.request().url());
+    const method = route.request().method();
+
+    if (path === '/paypal/create-payment' && method === 'POST') {
+      return json(route, {
+        success: true,
+        total: 999.99,
+        orderId: 'PAYPAL-MISMATCH',
+        serverOrderId: '00000000-0000-0000-0000-00000000ff01',
+        orderNumber: 'GSS-MISMATCH',
+        links: [
+          {
+            rel: 'approve',
+            href: 'https://www.sandbox.paypal.com/checkoutnow?token=PAYPAL-MISMATCH',
+          },
+        ],
+      });
+    }
+
+    await route.fallback();
   });
 }

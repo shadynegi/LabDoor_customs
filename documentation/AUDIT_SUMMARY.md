@@ -22,7 +22,7 @@ Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API
 
 Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_ENCRYPTION_KEY`, `IP_SALT`, `ADMIN_PASSWORD_HASH`.
 
-**Automated tests:** 127 (73 backend unit + 30 API + 24 Playwright) — see [`test_guidelines.md`](test_guidelines.md).
+**Automated tests:** 149 (81 backend unit + 40 API + 28 Playwright) — see [`test_guidelines.md`](test_guidelines.md).
 
 ---
 
@@ -76,12 +76,12 @@ Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_
 
 ---
 
-## Open security / quality gaps
+## Remaining low-priority gaps
 
 Track in [`PROJECT_AUDIT.md`](PROJECT_AUDIT.md) and [`COVERAGE_MATRIX.md`](COVERAGE_MATRIX.md):
 
 | Priority | Gap |
 |----------|-----|
-| Medium (tests) | `PAY-CONTEXT`, capture amount-mismatch auto-refund, full webhook COMPLETED happy path |
-| Low | Playwright for orders `?code=` email redeem; checkout client/server total mismatch UI |
-| Low | Milestone docs boilerplate still says “13 RLS tables” in some `*_COMPLETE.md` files |
+| Low (tests) | Full create-payment happy path; email portal URL unit test |
+| Low | Admin dashboard Playwright smoke; RLS grant-revoke DB integration test |
+| Future | PayPal dispute webhooks, OpenAPI spec, Sentry release maps (see `CRITICAL_FIXES_TODO.md`) |

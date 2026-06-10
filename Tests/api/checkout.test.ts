@@ -10,6 +10,30 @@ describe('checkout path', () => {
     sqlMock.mockResolvedValue([]);
   });
 
+  it('rejects create-payment when client amount does not match server total', async () => {
+    sqlMock.mockResolvedValueOnce([
+      {
+        id: 1,
+        name: 'Test Shoe',
+        price: 100,
+        image: '/assets/test.png',
+        stock: 10,
+        is_out_of_stock: false,
+      },
+    ]);
+
+    const { agent, csrfToken } = await createCsrfAgent();
+    const res = await withCsrf(agent.post('/api/paypal/create-payment'), csrfToken).send({
+      amount: '50.00',
+      currency: 'USD',
+      customerInfo: { fullName: 'Test User', email: 'test@example.com' },
+      items: [{ product_id: 1, quantity: 1 }],
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Amount mismatch');
+  });
+
   it('rejects create-payment without cart items', async () => {
     const { agent, csrfToken } = await createCsrfAgent();
     const res = await withCsrf(agent.post('/api/paypal/create-payment'), csrfToken).send({

@@ -5,7 +5,7 @@
 
 **Review method:** Read `info.md` + operational guides; parallel audit of `backend/src`, `frontend/src`, `Tests/`, CI, env templates; spot-verify critical findings in source.
 
-**Automated tests at audit time:** 99 passing (61 unit + 16 API + 22 Playwright). **After remediation (`3dbdef9`):** 105. **After follow-up (`c6de967`):** 111. **Current:** **127** (73 unit + 30 API + 24 Playwright).
+**Automated tests at audit time:** 99 passing (61 unit + 16 API + 22 Playwright). **After remediation (`3dbdef9`):** 105. **After follow-up (`c6de967`):** 111. **After test sprint (`8303997`):** 127. **After core-gap sprint:** 141. **Current:** **149** (81 unit + 40 API + 28 Playwright).
 
 ---
 
@@ -13,7 +13,7 @@
 
 The platform is **production-viable** for core storefront checkout, admin fulfillment, and PayPal capture/webhooks. Recent frontend work closed major gaps (409 payment UI, checkout exchange errors, admin messages, review eligibility, cart retry).
 
-**Remediation (2026-06-08):** Critical and high audit items **C1–C4, C6, H1–H8** in `3dbdef9`; follow-up **F-01–F-07, DB-01, FE-01–FE-06** in `c6de967`; maintenance resilience + docs in `5e3be15`. **C5** partially closed (activity batch, order lookup, pricing, transient DB tests). **Still open:** payment-path API tests, Playwright payment UI, RLS automation, M4/M13/M14 — see [Still open](#still-open-next-sprint) and [`COVERAGE_MATRIX.md`](COVERAGE_MATRIX.md).
+**Remediation (2026-06-08):** Critical and high audit items **C1–C4, C6, H1–H8** in `3dbdef9`; follow-up **F-01–F-07, DB-01, FE-01–FE-06** in `c6de967`; maintenance resilience + docs in `5e3be15`; payment/UI test sprint in `8303997`+ (checkout-context, refund mismatch, webhook COMPLETED, mark-paid success, coupon scope, orders `?code=`, checkout total mismatch). See [`COVERAGE_MATRIX.md`](COVERAGE_MATRIX.md).
 
 **Original top risks (snapshot at audit time — most now closed):**
 
@@ -172,10 +172,10 @@ The platform is **production-viable** for core storefront checkout, admin fulfil
 | Item | Status / notes |
 |------|----------------|
 | API-only admin UI | Documented, intentional |
-| `PROMO_COUPON_CODE` | **Open** — display-only on checkout; not enforced server-side |
-| RLS table count in boilerplate guides | **Partial** — `info.md` / `PROJECT_STATUS` say 14; many milestone docs still say 13 |
-| `test_guidelines.md` inventory | **Synced** — 114 tests (71+21+22) |
-| `info.md` auth legend `?token=` | **Open** — legend still mentions query token; storefront deprecates URL tokens |
+| `PROMO_COUPON_CODE` | **Closed (by design)** — storefront hint for `LDCOFF10`; customer must apply code; seed via `migration-ldcoff10-coupon.sql` |
+| RLS table count in boilerplate guides | **Closed** — milestone intros updated to 14 tables (`CLIENT_REVOKED_TABLES`) |
+| `test_guidelines.md` inventory | **Synced** — 127 tests (73+30+24) |
+| `info.md` auth legend `?token=` | **Closed** — documents `?aid=` + header; legacy `?token=` strip noted for `/orders` only |
 | ReviewList “not helpful” button | **Closed** — disabled styling after vote |
 | PaymentSuccess missing `token` | **Closed** — error UI with `/orders` link |
 | Dead code | `apiUtils.ts`, `tokens.ts` removed |
@@ -195,7 +195,7 @@ The platform is **production-viable** for core storefront checkout, admin fulfil
 - Review PII stripping (`toPublicReview`), admin moderation UI, check endpoint anti-enumeration (product missing)
 - Storefront routes, cart validation + retry, client/server total compare, legacy order URL deprecation
 - Maintenance jobs with ping-first scheduling and transient-error handling (`dbErrors.ts`)
-- **127** automated tests (73 unit + 30 API + 24 Playwright)
+- **149** automated tests (81 unit + 40 API + 28 Playwright)
 
 ---
 
@@ -252,10 +252,7 @@ Sprint 4 — Admin/storefront polish
 
 | ID | Severity | Issue | Next step |
 |----|----------|-------|-----------|
-| **C5** | Medium | Core payment paths covered; gaps remain | `PAY-CONTEXT`, `PAY-REFUND-MISMATCH`, full webhook COMPLETED happy path, mark-paid success path |
-| **UI-ORDERS** | Low | No Playwright for `?code=` email redeem flow | Extend `orders-ui.spec.ts` with mocked access-exchange |
-| **PAY-FE-TOTAL** | Low | Checkout total mismatch block untested in Playwright | Optional UI spec |
-| **DOC-RLS** | Low | ~40 milestone guides still say “13 tables” | Bulk-update boilerplate or remove stale intros |
+| **Future** | Low | PayPal disputes/chargebacks, OpenAPI, Sentry release maps | See `CRITICAL_FIXES_TODO.md` |
 
 ### Test sprint order (closes C5 without re-auditing)
 
@@ -312,6 +309,11 @@ Sprint 4 — Admin/storefront polish
 | 2026-06-09 | — | Docs: DATABASE_URL vs maintenance warnings; AUDIT_SUMMARY + audit reconciliation |
 | 2026-06-09 | M4/M13/M14 | Admin product search picker; activity log/batch errors; review message unification |
 | 2026-06-09 | C5 | Expanded — capture 409, webhook DENIED, checkout exchange API, mark-paid validation, reviews check, activity log, Playwright payment/orders UI (127 tests) |
+| 2026-06-09 | C5 | Closed core gaps — checkout-context, capture refund mismatch, webhook COMPLETED, mark-paid success, coupon scope, orders `?code=`, checkout total mismatch UI (141 tests) |
+| 2026-06-10 | PAY-CREATE | `createPaymentHappy.test.ts` — mocked PayPal + exchange row happy path |
+| 2026-06-10 | ORD-EMAIL-LINK | `emailPortalUrl.test.ts` — `buildOrderPortalUrl` unit coverage |
+| 2026-06-10 | SEC-BOOTSTRAP | `rlsGrantRevoke.test.ts` — grant revoke runs when `BOOTSTRAP_SKIP_DDL` |
+| 2026-06-10 | UI-ADMIN | `admin-ui.spec.ts` — login redirect + dashboard analytics smoke (149 tests) |
 
 *Append a line when closing each Critical/High item.*
 

@@ -964,7 +964,7 @@ See [`PRE_LAUNCH_CHECKLIST.md`](PRE_LAUNCH_CHECKLIST.md) before first production
 
 ```bash
 # From repository root (monorepo)
-cp backend/env.template backend/.env   # DATABASE_URL, PayPal sandbox, etc.
+cp backend/env.template backend/.env   # DATABASE_URL, PayPal sandbox, ADMIN_PASSWORD_HASH, etc.
 cp frontend/env.template frontend/.env # VITE_API_BASE_URL=/api (default)
 npm install                            # installs frontend + backend workspaces
 npm run dev                            # API :5000 + Vite :5173 (proxy /api)
@@ -978,6 +978,8 @@ npm run dev                            # API :5000 + Vite :5173 (proxy /api)
 npm run build
 cd backend && SERVE_FRONTEND=true npm start   # http://localhost:5000
 ```
+
+**Admin password:** generate `ADMIN_PASSWORD_HASH` with `node backend/scripts/generate-admin-hash.mjs "your-password"` (plaintext `ADMIN_PASSWORD` is rejected at startup).
 
 **Strict env validation** is skipped locally unless `CI=true` or `NODE_ENV=production`.
 
@@ -1006,10 +1008,10 @@ npm run links:check
 
 | Suite | Tool | Coverage |
 |-------|------|----------|
-| Backend unit/API | Vitest | Checkout validation, capture 409, checkout exchange API, PayPal webhooks, admin mark-paid validation, `computeCheckoutPricingForCart`, payment idempotency, order tokens, RLS table list, activity batch/log, order lookup, reviews check |
-| Frontend E2E / UI | Playwright | Storefront smoke, products/cart/checkout/contact UI, navigation, cookie consent, mobile viewport (22 tests; mocked API) |
+| Backend unit/API | Vitest | Checkout validation + create-payment happy path, capture 409/refund mismatch, checkout-context API, checkout exchange, PayPal webhooks (COMPLETED + DENIED), admin mark-paid, coupon scope, `computeCheckoutPricingForCart`, payment idempotency, order tokens, RLS table list + grant revoke, email portal URL, activity batch/log, order lookup, reviews check |
+| Frontend E2E / UI | Playwright | Storefront smoke, products/cart/checkout/contact UI, navigation, cookie consent, payment-success/orders edge UI, checkout total mismatch, admin login/dashboard smoke, mobile viewport (28 tests; mocked API) |
 
-**Total automated tests:** 127 (73 backend unit + 30 API + 24 Playwright UI).
+**Total automated tests:** 149 (81 backend unit + 40 API + 28 Playwright UI).
 
 | Link check | Custom script | Documentation internal links |
 

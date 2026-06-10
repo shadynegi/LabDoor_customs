@@ -9,7 +9,7 @@ How customers look up their orders.
 
 ## Current system behavior
 
-Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API (`backend/`), Vitest + Playwright tests (`Tests/`). Production runs one Express process serving `/api/*` and the built SPA; PostgreSQL is Supabase with backend **service_role** access — RLS and revoked grants block `anon`/`authenticated` PostgREST on 13 tables.
+Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API (`backend/`), Vitest + Playwright tests (`Tests/`). Production runs one Express process serving `/api/*` and the built SPA; PostgreSQL is Supabase with backend **service_role** access — RLS and revoked grants block `anon`/`authenticated` PostgREST on 14 tables.
 
 | Area | How it works |
 |------|----------------|
@@ -58,7 +58,7 @@ Content-Type: application/json
 
 Returns order details with items and shipping address. Secrets are stripped from the response.
 
-**Alternate lookup:** `GET /api/orders/number/:orderNumber?token={accessToken}`
+**Alternate lookup:** `GET /api/orders/number/:orderNumber` with `X-Order-Access-Token` header or `?aid={accessToken}` (prefer `POST /api/orders/lookup` so tokens stay out of URLs).
 
 ---
 

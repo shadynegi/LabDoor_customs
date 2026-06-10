@@ -7,7 +7,7 @@ Items not yet implemented that may be considered for future work.
 
 ## Current system behavior
 
-Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API (`backend/`), Vitest + Playwright tests (`Tests/`). Production runs one Express process serving `/api/*` and the built SPA; PostgreSQL is Supabase with backend **service_role** access — RLS and revoked grants block `anon`/`authenticated` PostgREST on 13 tables.
+Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API (`backend/`), Vitest + Playwright tests (`Tests/`). Production runs one Express process serving `/api/*` and the built SPA; PostgreSQL is Supabase with backend **service_role** access — RLS and revoked grants block `anon`/`authenticated` PostgREST on 14 tables.
 
 | Area | How it works |
 |------|----------------|
@@ -23,7 +23,7 @@ Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_
 
 ## Known gaps
 
-- Admin **Mark paid** can set `payment_status: completed` without PayPal verification (intentional for offline payments; requires `admin_note` and activity log)
+- Admin **Mark paid** requires `admin_note`, `payment_id`, and PayPal capture verification via API before DB update (see `adminMarkPaid.test.ts`)
 - No PayPal dispute/chargeback webhook handlers
 - Sentry release/source maps not wired in CI
 - Frontend security headers depend on static host configuration

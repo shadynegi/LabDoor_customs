@@ -72,6 +72,27 @@ const getProductImageUrl = (image: string | undefined): string => {
   return `https://via.placeholder.com/100x100?text=Product`;
 };
 
+/** Build a one-time order portal URL for confirmation / shipping emails. */
+export async function buildOrderPortalUrl(
+  data: Pick<OrderEmailData, 'orderId' | 'accessToken'>,
+  frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
+): Promise<string> {
+  const base = frontendUrl.replace(/\/$/, '');
+
+  if (data.orderId) {
+    if (data.accessToken) {
+      const code = await createOrderAccessExchangeCode(data.orderId, data.accessToken);
+      return `${base}/orders?code=${encodeURIComponent(code)}`;
+    }
+    const code = await issueOrderTrackingExchangeFromOrder(data.orderId);
+    if (code) {
+      return `${base}/orders?code=${encodeURIComponent(code)}`;
+    }
+  }
+
+  return `${base}/orders`;
+}
+
 export class EmailService {
   private senderEmail: string;
   private companyName: string;
@@ -84,20 +105,7 @@ export class EmailService {
   }
 
   private async resolveOrderPortalUrl(data: OrderEmailData): Promise<string> {
-    const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
-
-    if (data.orderId) {
-      if (data.accessToken) {
-        const code = await createOrderAccessExchangeCode(data.orderId, data.accessToken);
-        return `${frontendUrl}/orders?code=${encodeURIComponent(code)}`;
-      }
-      const code = await issueOrderTrackingExchangeFromOrder(data.orderId);
-      if (code) {
-        return `${frontendUrl}/orders?code=${encodeURIComponent(code)}`;
-      }
-    }
-
-    return `${frontendUrl}/orders`;
+    return buildOrderPortalUrl(data);
   }
 
   /**

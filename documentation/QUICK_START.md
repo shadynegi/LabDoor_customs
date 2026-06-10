@@ -39,7 +39,7 @@ PAYPAL_CLIENT_ID=your_sandbox_client_id
 PAYPAL_SECRET=your_sandbox_secret
 PAYPAL_MODE=sandbox
 ADMIN_USERNAME=admin
-ADMIN_PASSWORD=your_password
+ADMIN_PASSWORD_HASH=$2b$12$your_bcrypt_hash_here
 JWT_SECRET=your_secure_jwt_secret_at_least_32_characters_long
 ORDER_TOKEN_ENCRYPTION_KEY=your_32_char_encryption_key_for_checkout_tokens
 IP_SALT=random_salt_for_ip_anonymization
@@ -48,6 +48,14 @@ SENDER_EMAIL=noreply@yourdomain.com
 ```
 
 `ORDER_TOKEN_ENCRYPTION_KEY` and `IP_SALT` are required in production (`validate-env.mjs`).
+
+Generate `ADMIN_PASSWORD_HASH` locally (never use plaintext `ADMIN_PASSWORD`):
+
+```bash
+node backend/scripts/generate-admin-hash.mjs "your-secure-password"
+```
+
+In development you may also call `POST /api/admin/generate-hash` — that route returns **403 in production**.
 
 **Recommended after running SQL in Supabase:**
 

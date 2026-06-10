@@ -41,18 +41,18 @@ If the user did not mention testing, **skip** `npm test`, `npm run test:all`, Pl
 
 | Suite | Tool | Location | Count | Needs live DB? |
 |-------|------|----------|-------|----------------|
-| Backend unit | Vitest | `Tests/backend/` | 17 files, 73 tests | No (mocked) |
-| API integration | Vitest + Supertest | `Tests/api/` | 12 files, 30 tests | No (mocked) |
-| Frontend E2E / UI | Playwright | `Tests/frontend/` | 10 files, 24 tests | No (mocked `/api` + static preview) |
+| Backend unit | Vitest | `Tests/backend/` | 20 files, 81 tests | No (mocked) |
+| API integration | Vitest + Supertest | `Tests/api/` | 15 files, 40 tests | No (mocked) |
+| Frontend E2E / UI | Playwright | `Tests/frontend/` | 12 files, 28 tests | No (mocked `/api` + static preview) |
 | Link checker | Custom script | repo root | — | No |
 
-**Total:** 127 automated tests — 73 backend unit + 30 API + 24 Playwright UI (desktop + mobile projects).
+**Total:** 149 automated tests — 81 backend unit + 40 API + 28 Playwright UI (desktop + mobile projects).
 
-Backend unit tests include: payment idempotency, order tokens, checkout exchange hashing, order token encryption, webhook errors, product image validation, admin session hashing, PayPal webhook utils, refund idempotency, checkout pricing, `computeCheckoutPricingForCart`, client IP, keep-alive.
+Backend unit tests include: payment idempotency, order tokens, checkout exchange hashing, order token encryption, webhook errors, product image validation, admin session hashing, PayPal webhook utils, refund idempotency, checkout pricing, coupon scope (`applies_to`), `computeCheckoutPricingForCart`, RLS table list + bootstrap contract, RLS grant revoke under `BOOTSTRAP_SKIP_DDL`, email portal URL (`buildOrderPortalUrl`), client IP, keep-alive.
 
-API tests include: checkout, capture 409 reconciliation, checkout exchange, PayPal webhook DENIED/COMPLETED errors, admin mark-paid validation, health, orders, security, activity batch/log, order lookup, reviews check.
+API tests include: checkout (incl. client amount mismatch), create-payment happy path (mocked PayPal + exchange), capture 409 reconciliation, capture refund mismatch, checkout-context recovery, checkout exchange, PayPal webhook COMPLETED/DENIED, admin mark-paid (validation + success), health, orders, security, activity batch/log, order lookup, reviews check.
 
-Playwright includes: payment-success missing-token UX, orders legacy URL deprecation warning.
+Playwright includes: payment-success missing-token UX, orders legacy URL deprecation + `?code=` email redeem, checkout server/client total mismatch block, admin login redirect + dashboard analytics smoke.
 
 ---
 

@@ -7,4 +7,11 @@ test.describe('Orders page UI', () => {
       page.getByText(/Token links in the URL are deprecated/i)
     ).toBeVisible({ timeout: 15_000 });
   });
+
+  test('redeems email ?code= link and shows order status', async ({ page }) => {
+    await page.goto('/orders?code=EMAIL-LINK-CODE');
+    await expect(page.getByText(/preparing your order/i).first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/\$98(\.00)?/)).toBeVisible();
+    await expect(page).toHaveURL(/\/orders$/);
+  });
 });

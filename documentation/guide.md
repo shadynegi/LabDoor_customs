@@ -58,7 +58,7 @@ PAYPAL_CLIENT_ID=your_sandbox_client_id
 PAYPAL_SECRET=your_sandbox_secret
 PAYPAL_MODE=sandbox
 ADMIN_USERNAME=admin
-ADMIN_PASSWORD=your_password
+ADMIN_PASSWORD_HASH=$2b$12$your_bcrypt_hash_here
 JWT_SECRET=your_secure_jwt_secret_at_least_32_characters_long
 ORDER_TOKEN_ENCRYPTION_KEY=your_32_char_encryption_key_for_checkout_tokens
 IP_SALT=random_salt_for_ip_anonymization
@@ -73,6 +73,8 @@ VITE_API_BASE_URL=/api
 ```
 
 Vite proxies `/api` to the backend during development.
+
+Generate the admin hash with `node backend/scripts/generate-admin-hash.mjs "your-secure-password"` (or `POST /api/admin/generate-hash` in local dev only).
 
 See [SETUP_GUIDE.md](SETUP_GUIDE.md) and [info.md](info.md) for the full variable list.
 

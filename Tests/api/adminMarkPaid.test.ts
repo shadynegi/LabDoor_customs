@@ -1,8 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import request from 'supertest';
 import { app } from '../../backend/src/server';
 import { sqlMock } from '../setup';
 import { createCsrfAgent, withCsrf } from '../helpers/http';
+import * as paymentReconciliation from '../../backend/src/lib/paymentReconciliation';
+import * as postPaymentCapture from '../../backend/src/lib/postPaymentCapture';
 
 vi.mock('../../backend/src/routes/admin', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../backend/src/routes/admin')>();
@@ -22,8 +24,56 @@ vi.mock('../../backend/src/lib/paypalCaptureVerify', () => ({
 }));
 
 describe('PATCH /api/orders/:id/payment-status', () => {
+  const orderId = '00000000-0000-0000-0000-000000000077';
+
   beforeEach(() => {
     sqlMock.mockReset();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('marks pending order paid when PayPal capture verifies', async () => {
+    const completedOrder = {
+      id: orderId,
+      order_number: 'GSS-PAID-1',
+      payment_status: 'completed',
+      status: 'processing',
+      total: 99,
+      paypal_capture_id: 'CAP-ADMIN-1',
+    };
+
+    sqlMock.mockResolvedValueOnce([
+      {
+        payment_status: 'pending',
+        order_number: 'GSS-PAID-1',
+        total: 99,
+        paypal_order_id: 'PP-PAID-1',
+        paypal_capture_id: null,
+      },
+    ]);
+
+    vi.spyOn(paymentReconciliation, 'completeOrderPaymentCapture').mockResolvedValue({
+      updated: true,
+      order: completedOrder,
+    } as Awaited<ReturnType<typeof paymentReconciliation.completeOrderPaymentCapture>>);
+    vi.spyOn(postPaymentCapture, 'sendPostCaptureNotifications').mockResolvedValue();
+
+    const { agent, csrfToken } = await createCsrfAgent();
+    const res = await withCsrf(
+      agent.patch(`/api/orders/${orderId}/payment-status`),
+      csrfToken
+    ).send({
+      payment_status: 'completed',
+      admin_note: 'Paid via bank transfer',
+      payment_id: 'CAP-ADMIN-1',
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.payment_status).toBe('completed');
+    expect(res.body.message).toMatch(/updated successfully/i);
   });
 
   it('requires admin_note and payment_id when marking pending order paid', async () => {
@@ -39,7 +89,7 @@ describe('PATCH /api/orders/:id/payment-status', () => {
 
     const { agent, csrfToken } = await createCsrfAgent();
     const res = await withCsrf(
-      agent.patch('/api/orders/00000000-0000-0000-0000-000000000077/payment-status'),
+      agent.patch(`/api/orders/${orderId}/payment-status`),
       csrfToken
     ).send({ payment_status: 'completed' });
 
