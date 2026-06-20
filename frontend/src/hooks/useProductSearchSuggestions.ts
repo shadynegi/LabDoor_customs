@@ -1,7 +1,6 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { fetchSearchSuggestions } from '../lib/productSearchApi';
 import type { Product } from './useProducts';
-import { CATALOG_CLEARED_EVENT, getProductCatalog } from '../lib/productCatalogCache';
-import { createProductFuse, fuseSearchProducts, SUGGESTION_LIMIT } from '../lib/productFuseSearch';
 
 export interface UseProductSearchSuggestionsResult {
   searchQuery: string;
@@ -11,52 +10,47 @@ export interface UseProductSearchSuggestionsResult {
   clearSearch: () => void;
 }
 
-/** Lightweight Fuse.js suggestions hook (catalog cache + dropdown). */
+/** Server-backed search suggestions for the Home hero search bar. */
 export function useProductSearchSuggestions(): UseProductSearchSuggestionsResult {
   const [searchQuery, setSearchQuery] = useState('');
-  const [catalog, setCatalog] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
-  const fuseRef = useRef<ReturnType<typeof createProductFuse> | null>(null);
+  const [suggestions, setSuggestions] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(false);
+  const requestRef = useRef(0);
 
   useEffect(() => {
-    let cancelled = false;
+    const trimmed = searchQuery.trim();
+    if (!trimmed) {
+      setSuggestions([]);
+      setLoading(false);
+      return;
+    }
 
-    const loadCatalog = async () => {
+    const requestId = ++requestRef.current;
+    const timer = setTimeout(async () => {
       try {
         setLoading(true);
-        const products = await getProductCatalog();
-        if (!cancelled) {
-          setCatalog(products);
-          fuseRef.current = createProductFuse(products);
+        const next = await fetchSearchSuggestions(trimmed);
+        if (requestId === requestRef.current) {
+          setSuggestions(next);
         }
       } catch {
-        if (!cancelled) {
-          setCatalog([]);
-          fuseRef.current = null;
+        if (requestId === requestRef.current) {
+          setSuggestions([]);
         }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (requestId === requestRef.current) {
+          setLoading(false);
+        }
       }
-    };
+    }, 200);
 
-    const onCatalogCleared = () => {
-      void loadCatalog();
-    };
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
-    loadCatalog();
-    window.addEventListener(CATALOG_CLEARED_EVENT, onCatalogCleared);
-    return () => {
-      cancelled = true;
-      window.removeEventListener(CATALOG_CLEARED_EVENT, onCatalogCleared);
-    };
-  }, []);
-
-  const suggestions = useMemo(() => {
-    if (!searchQuery.trim() || !fuseRef.current) return [];
-    return fuseSearchProducts(fuseRef.current, searchQuery, SUGGESTION_LIMIT);
-  }, [searchQuery, catalog]);
-
-  const clearSearch = () => setSearchQuery('');
+  const clearSearch = () => {
+    setSearchQuery('');
+    setSuggestions([]);
+  };
 
   return {
     searchQuery,

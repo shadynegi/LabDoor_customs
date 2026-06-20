@@ -4,7 +4,6 @@ import { catalogFetch } from '../config';
 import type { Product } from './useProducts';
 import { toast } from 'sonner';
 import { logError } from '../lib/logger';
-import { resolveProductBackground, resolveProductImage } from '../lib/productImageMaps';
 
 interface PaginationInfo {
   page: number;
@@ -55,8 +54,6 @@ export const usePaginatedProducts = (limit: number = 10): UsePaginatedProductsRe
           price: typeof product.price === 'string' ? parseFloat(product.price) : product.price,
           rating: typeof product.rating === 'string' ? parseFloat(product.rating) : (product.rating || 0),
           review_count: typeof product.review_count === 'string' ? parseInt(product.review_count) : (product.review_count || 0),
-          image: resolveProductImage(product.image),
-          background: resolveProductBackground(product.background),
         }));
         
         if (append) {

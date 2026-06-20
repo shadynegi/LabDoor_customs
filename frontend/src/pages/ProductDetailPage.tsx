@@ -9,7 +9,8 @@ import { useCart, type SizeSystem } from './CartContext';
 import StarRating from '../components/StarRating';
 import ErrorMessage from '../components/ErrorMessage';
 import { generatePlaceholder360Images, get360VideoPath } from '../utils/product360Images';
-import { optimizeImageUrl } from '../utils/imageUrl';
+import { resolveProductImage } from '../lib/productImageMaps';
+import { buildResponsiveProductImg, PRODUCT_IMAGE_SIZES } from '../lib/responsiveImage';
 import MetaTags from '../components/MetaTags';
 import ProductJsonLd from '../components/ProductJsonLd';
 import { logError } from '../lib/logger';
@@ -24,35 +25,6 @@ const Product360Viewer = lazy(() =>
 );
 const ProductReviews = lazy(() => import('../components/ProductReviews'));
 import { ProductDetailSkeleton } from '../components/Skeletons';
-
-// Import actual product images
-import blueNikeImg from "../assets/Shoe_Design/blue nike.png";
-import goldBlackNikeImg from "../assets/Shoe_Design/gold black nike.png";
-import pinkNikeImg from "../assets/Shoe_Design/pink nike.png";
-import blackBrownNikeImg from "../assets/Shoe_Design/black and brown nike.png";
-import brownPinkNikeImg from "../assets/Shoe_Design/brown pink nike.png";
-import blueBg from "../assets/Backgrounds/blue.png";
-import goldBg from "../assets/Backgrounds/gold.png";
-import pinkBg from "../assets/Backgrounds/pink.png";
-import brownBg from "../assets/Backgrounds/brown.png";
-import brownPinkBg from "../assets/Backgrounds/brown pink.png";
-
-// Map database image references to actual imported images
-const imageMap: Record<string, string> = {
-  '/assets/blue-nike.png': blueNikeImg,
-  '/assets/gold-black-nike.png': goldBlackNikeImg,
-  '/assets/pink-nike.png': pinkNikeImg,
-  '/assets/black-brown-nike.png': blackBrownNikeImg,
-  '/assets/brown-pink-nike.png': brownPinkNikeImg,
-};
-
-const backgroundMap: Record<string, string> = {
-  '/assets/blue-bg.png': blueBg,
-  '/assets/gold-bg.png': goldBg,
-  '/assets/pink-bg.png': pinkBg,
-  '/assets/brown-bg.png': brownBg,
-  '/assets/brown-pink-bg.png': brownPinkBg,
-};
 
 const ProductDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -96,8 +68,6 @@ const ProductDetailPage: React.FC = () => {
             price: typeof data.data.price === 'string' ? parseFloat(data.data.price) : data.data.price,
             rating: typeof data.data.rating === 'string' ? parseFloat(data.data.rating) : (data.data.rating || 0),
             review_count: typeof data.data.review_count === 'string' ? parseInt(data.data.review_count) : (data.data.review_count || 0),
-            image: imageMap[data.data.image] || data.data.image,
-            background: data.data.background ? (backgroundMap[data.data.background] || data.data.background) : undefined,
           };
           setProduct(productData);
           trackProductView(productData.id, productData.name);
@@ -172,9 +142,17 @@ const ProductDetailPage: React.FC = () => {
     );
   }
 
-  const productImage = product.image
-    ? optimizeImageUrl(product.image, { width: 1200 })
-    : undefined;
+  const productImage = product.image ? resolveProductImage(product.image) : undefined;
+  const detailImgProps = product.image
+    ? buildResponsiveProductImg(product.image, {
+        alt: product.name,
+        sizes: PRODUCT_IMAGE_SIZES.detail,
+        loading: 'eager',
+        fetchPriority: 'high',
+        width: isMobile ? 320 : 480,
+        height: isMobile ? 320 : 480,
+      })
+    : null;
 
   return (
     <div
@@ -358,12 +336,7 @@ const ProductDetailPage: React.FC = () => {
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.95 }}
-                  src={optimizeImageUrl(product.image, { width: isMobile ? 640 : 960 })}
-                  alt={product.name}
-                  width={isMobile ? 320 : 480}
-                  height={isMobile ? 320 : 480}
-                  loading="lazy"
-                  decoding="async"
+                  {...(detailImgProps ?? { src: '', alt: product.name })}
                   style={{
                     width: '80%',
                     height: 'auto',

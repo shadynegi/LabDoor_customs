@@ -1,14 +1,8 @@
-// Custom hook for client-side product search (Fuse.js) and filters
+// Server-backed product search and suggestions (replaces client-side Fuse.js catalog)
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { catalogFetch } from '../config';
 import type { Product } from './useProducts';
-import { CATALOG_CLEARED_EVENT, getProductCatalog } from '../lib/productCatalogCache';
-import {
-  createProductFuse,
-  fuseSearchProducts,
-  searchProductCatalog,
-  SUGGESTION_LIMIT,
-} from '../lib/productFuseSearch';
+import { searchProductsApi } from '../lib/productSearchApi';
 import type { SearchFilters, FilterOptions, SortOption } from '../types/productSearch';
 import { logError } from '../lib/logger';
 import { trackFilterApply, trackSearch } from '../utils/activityTracker';
@@ -40,24 +34,19 @@ interface UseProductSearchResult {
 
 const DEFAULT_FILTERS: SearchFilters = {};
 
-/**
- * Client-side product search with Fuse.js typo tolerance.
- * Catalog is fetched once and cached in localStorage for 15 minutes.
- */
 export const useProductSearch = (debounceMs: number = 300): UseProductSearchResult => {
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
-  const [catalog, setCatalog] = useState<Product[]>([]);
-  const [catalogLoading, setCatalogLoading] = useState(true);
   const [results, setResults] = useState<Product[]>([]);
+  const [suggestions, setSuggestions] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<SearchFilters>(DEFAULT_FILTERS);
   const [filterOptions, setFilterOptions] = useState<FilterOptions | null>(null);
   const [loadingFilterOptions, setLoadingFilterOptions] = useState(false);
-  const fuseRef = useRef<ReturnType<typeof createProductFuse> | null>(null);
-  const catalogLoadedRef = useRef(false);
   const filtersLoadedRef = useRef(false);
+  const suggestionRequestRef = useRef(0);
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
@@ -70,26 +59,11 @@ export const useProductSearch = (debounceMs: number = 300): UseProductSearchResu
     return count;
   }, [filters]);
 
-  const isFiltering = activeFilterCount > 0 || (filters.sortBy !== undefined && filters.sortBy !== 'default');
+  const isFiltering =
+    activeFilterCount > 0 || (filters.sortBy !== undefined && filters.sortBy !== 'default');
 
-  const ensureCatalogLoaded = useCallback(async (force = false) => {
-    if (catalogLoadedRef.current && !force) return;
-
-    try {
-      setCatalogLoading(true);
-      setError(null);
-      const products = await getProductCatalog(force);
-      catalogLoadedRef.current = true;
-      setCatalog(products);
-      fuseRef.current = createProductFuse(products);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load products');
-      setCatalog([]);
-      fuseRef.current = null;
-      catalogLoadedRef.current = false;
-    } finally {
-      setCatalogLoading(false);
-    }
+  const ensureCatalogLoaded = useCallback(async () => {
+    // No-op: catalog is no longer prefetched client-side
   }, []);
 
   const ensureFilterOptionsLoaded = useCallback(async () => {
@@ -132,37 +106,45 @@ export const useProductSearch = (debounceMs: number = 300): UseProductSearchResu
   }, []);
 
   useEffect(() => {
-    const onCatalogCleared = () => {
-      catalogLoadedRef.current = false;
-      filtersLoadedRef.current = false;
-      void ensureCatalogLoaded(true);
-      void ensureFilterOptionsLoaded();
-    };
-    window.addEventListener(CATALOG_CLEARED_EVENT, onCatalogCleared);
-    return () => window.removeEventListener(CATALOG_CLEARED_EVENT, onCatalogCleared);
-  }, [ensureCatalogLoaded, ensureFilterOptionsLoaded]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedQuery(searchQuery);
-    }, debounceMs);
-
+    const timer = setTimeout(() => setDebouncedQuery(searchQuery), debounceMs);
     return () => clearTimeout(timer);
   }, [searchQuery, debounceMs]);
 
   useEffect(() => {
-    if (debouncedQuery.trim() || isFiltering) {
-      void ensureCatalogLoaded();
-    }
     if (isFiltering) {
       void ensureFilterOptionsLoaded();
     }
-  }, [debouncedQuery, isFiltering, ensureCatalogLoaded, ensureFilterOptionsLoaded]);
+  }, [isFiltering, ensureFilterOptionsLoaded]);
 
-  const suggestions = useMemo(() => {
-    if (!searchQuery.trim() || !fuseRef.current) return [];
-    return fuseSearchProducts(fuseRef.current, searchQuery, SUGGESTION_LIMIT);
-  }, [searchQuery, catalog]);
+  useEffect(() => {
+    const trimmed = searchQuery.trim();
+    if (!trimmed) {
+      setSuggestions([]);
+      return;
+    }
+
+    const requestId = ++suggestionRequestRef.current;
+    const timer = setTimeout(async () => {
+      try {
+        setSuggestionsLoading(true);
+        const { fetchSearchSuggestions } = await import('../lib/productSearchApi');
+        const next = await fetchSearchSuggestions(trimmed);
+        if (requestId === suggestionRequestRef.current) {
+          setSuggestions(next);
+        }
+      } catch {
+        if (requestId === suggestionRequestRef.current) {
+          setSuggestions([]);
+        }
+      } finally {
+        if (requestId === suggestionRequestRef.current) {
+          setSuggestionsLoading(false);
+        }
+      }
+    }, Math.min(debounceMs, 200));
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, debounceMs]);
 
   useEffect(() => {
     const hasQuery = debouncedQuery.trim().length > 0;
@@ -175,41 +157,41 @@ export const useProductSearch = (debounceMs: number = 300): UseProductSearchResu
       return;
     }
 
-    if (catalogLoading) {
+    let cancelled = false;
+
+    const run = async () => {
       setLoading(true);
-      return;
-    }
-
-    if (catalog.length === 0) {
-      setResults([]);
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const nextResults = searchProductCatalog(
-        catalog,
-        debouncedQuery,
-        filters,
-        hasFilters
-      );
-      setResults(nextResults);
-      if (hasQuery) {
-        trackSearch(debouncedQuery.trim(), nextResults.length);
+      setError(null);
+      try {
+        const nextResults = await searchProductsApi({
+          query: debouncedQuery,
+          filters,
+          limit: 100,
+        });
+        if (!cancelled) {
+          setResults(nextResults);
+          if (hasQuery) {
+            trackSearch(debouncedQuery.trim(), nextResults.length);
+          }
+          if (hasFilters) {
+            trackFilterApply(filters as Record<string, unknown>);
+          }
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Search failed');
+          setResults([]);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-      if (hasFilters) {
-        trackFilterApply(filters as Record<string, unknown>);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Search failed');
-      setResults([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [debouncedQuery, filters, isFiltering, catalog, catalogLoading]);
+    };
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [debouncedQuery, filters, isFiltering]);
 
   const updateFilter = useCallback(<K extends keyof SearchFilters>(key: K, value: SearchFilters[K]) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
@@ -218,6 +200,7 @@ export const useProductSearch = (debounceMs: number = 300): UseProductSearchResu
   const clearSearch = useCallback(() => {
     setSearchQuery('');
     setDebouncedQuery('');
+    setSuggestions([]);
   }, []);
 
   const clearFilters = useCallback(() => {
@@ -229,6 +212,7 @@ export const useProductSearch = (debounceMs: number = 300): UseProductSearchResu
     setDebouncedQuery('');
     setFilters(DEFAULT_FILTERS);
     setResults([]);
+    setSuggestions([]);
     setError(null);
   }, []);
 
@@ -237,8 +221,8 @@ export const useProductSearch = (debounceMs: number = 300): UseProductSearchResu
     setSearchQuery,
     results,
     suggestions,
-    loading: loading || catalogLoading,
-    catalogLoading,
+    loading: loading || suggestionsLoading,
+    catalogLoading: false,
     error,
     isSearching: searchQuery.trim().length > 0,
     isFiltering,

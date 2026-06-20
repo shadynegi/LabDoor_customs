@@ -52,7 +52,7 @@ Backend unit tests include: payment idempotency, order tokens, checkout exchange
 
 API tests include: checkout (incl. client amount mismatch + policy acceptance), create-payment happy path (mocked PayPal + exchange), capture 409 reconciliation, capture refund mismatch, checkout-context recovery, checkout exchange, PayPal webhook COMPLETED/DENIED, admin mark-paid (validation + success), no-refund policy (admin refund/cancel 403), health, orders, security, activity batch/log, order lookup, reviews check.
 
-Playwright includes: payment-success missing-token UX, orders legacy URL deprecation + `?code=` email redeem, checkout server/client total mismatch block, checkout country pre-select, admin login redirect + dashboard analytics smoke, **deep flows** (`deep-flows-ui.spec.ts`: catalog `?q=` search, product trust badges + reviews, checkout policy gate + coupon + create-payment, cart quantity, payment-success 409 processing UI).
+Playwright includes: payment-success missing-token UX, orders legacy URL deprecation + `?code=` email redeem, checkout server/client total mismatch block, checkout country pre-select (native `<select>`), admin login redirect + dashboard analytics smoke, **deep flows** (`deep-flows-ui.spec.ts`: catalog `?q=` server search, product trust badges + reviews, checkout policy gate + coupon + create-payment, cart quantity, payment-success 409 processing UI).
 
 ---
 
@@ -174,7 +174,8 @@ API tests mock the database layer for fast isolated runs.
 ### Frontend (Playwright)
 
 ```bash
-npm run build -w frontend
+npm run build -w frontend   # optimize-assets → sitemap → vite build → build:budget
+npm run measure:dist -w frontend   # optional size report
 cd Tests && npm run test:frontend:install   # first time only
 npm run test:frontend                       # from repository root
 ```
@@ -190,6 +191,10 @@ npm run links:check   # from repo root
 ```
 
 Validates internal links in documentation markdown files.
+
+### Frontend performance (build)
+
+Production frontend builds run `optimize-assets` (WebP from source PNGs) and `build:budget` (fails if `dist/assets` exceeds limits). See [`PERFORMANCE_BASELINE.md`](PERFORMANCE_BASELINE.md).
 
 ---
 

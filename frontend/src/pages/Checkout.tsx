@@ -4,8 +4,7 @@ import { useCart } from "./CartContext";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { apiFetch } from "../config";
-import { optimizeImageUrl } from "../utils/imageUrl";
-import Select, { type StylesConfig } from "react-select";
+import { buildResponsiveProductImg, PRODUCT_IMAGE_SIZES } from "../lib/responsiveImage";
 import { getNames } from "country-list";
 import { resolveDefaultCheckoutCountry } from "../constants/checkoutForm";
 import {
@@ -53,7 +52,6 @@ interface FormData {
 
 type FormField = keyof FormData;
 type FormErrors = Partial<Record<FormField, string>>;
-type CountryOption = { value: string; label: string };
 
 // Move InputField OUTSIDE of Checkout component
 const InputField = React.memo(({
@@ -310,40 +308,7 @@ export default function Checkout() {
     setCouponError('Cart changed — please re-apply your coupon.');
   }, [cartSignature]);
 
-  const countryOptions = useMemo(() => {
-    const countries = getNames();
-    return countries.map((name: string) => ({ value: name, label: name }));
-  }, []);
-
-  const selectStyles: StylesConfig<CountryOption, false> = useMemo(() => ({
-    control: (base, state) => ({
-      ...base,
-      borderColor: errors.country ? "#ef4444" : state.isFocused ? "#9c6649" : "#d1d5db",
-      borderWidth: errors.country ? 2 : 1,
-      borderRadius: 8,
-      padding: "4px",
-      boxShadow: state.isFocused && !errors.country ? "0 0 0 3px rgba(102,126,234,0.1)" : "none",
-      "&:hover": {
-        borderColor: errors.country ? "#ef4444" : "#9c6649",
-      },
-    }),
-    option: (base, state) => ({
-      ...base,
-      backgroundColor: state.isSelected
-        ? "#9c6649"
-        : state.isFocused
-        ? "#f3f4f6"
-        : "white",
-      color: state.isSelected ? "white" : "#1f2937",
-      cursor: "pointer",
-    }),
-    menu: (base) => ({
-      ...base,
-      borderRadius: 8,
-      boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1)",
-      zIndex: 9999,
-    }),
-  }), [errors.country]);
+  const countryNames = useMemo(() => getNames(), []);
 
   // Calculate totals using shared utility
   const totalItemCount = state.items.reduce((sum, item) => sum + item.quantity, 0);
@@ -434,8 +399,8 @@ export default function Checkout() {
     syncActivityEmail(e.target.value);
   }, [syncActivityEmail]);
 
-  const handleCountryChange = useCallback((selectedOption: CountryOption | null) => {
-    setFormData(prev => ({ ...prev, country: selectedOption?.value || "" }));
+  const handleCountryChange = useCallback((value: string) => {
+    setFormData(prev => ({ ...prev, country: value }));
     
     if (errors.country) {
       setErrors(prev => {
@@ -788,21 +753,30 @@ export default function Checkout() {
                     >
                       Country <span style={{ color: "#ef4444" }}>*</span>
                     </label>
-                    <Select
-                      inputId="country-input"
+                    <select
+                      id="country-input"
                       name="country"
-                      value={countryOptions.find((option: CountryOption) => option.value === formData.country)}
-                      onChange={handleCountryChange}
-                      options={countryOptions}
-                      styles={selectStyles}
-                      placeholder="Select a country..."
-                      isSearchable
-                      isClearable
-                      menuPortalTarget={typeof document !== 'undefined' ? document.body : undefined}
-                      menuPosition="fixed"
+                      value={formData.country}
+                      onChange={(e) => handleCountryChange(e.target.value)}
                       aria-invalid={countryHasError}
                       aria-describedby={countryErrorId}
-                    />
+                      style={{
+                        width: "100%",
+                        padding: "12px 14px",
+                        fontSize: 15,
+                        borderRadius: 8,
+                        border: countryHasError ? "2px solid #ef4444" : "1px solid #d1d5db",
+                        background: "white",
+                        color: "#1f2937",
+                      }}
+                    >
+                      <option value="">Select a country...</option>
+                      {countryNames.map((name) => (
+                        <option key={name} value={name}>
+                          {name}
+                        </option>
+                      ))}
+                    </select>
                     {countryHasError && (
                       <motion.div
                         id={countryErrorId}
@@ -881,12 +855,12 @@ export default function Checkout() {
                       }}
                     >
                       <img
-                        src={optimizeImageUrl(item.image, { width: 160 })}
-                        alt={item.name}
-                        width={80}
-                        height={80}
-                        loading="lazy"
-                        decoding="async"
+                        {...buildResponsiveProductImg(item.image, {
+                          alt: item.name,
+                          sizes: PRODUCT_IMAGE_SIZES.checkout,
+                          width: 80,
+                          height: 80,
+                        })}
                         style={{
                           width: "100%",
                           height: "100%",

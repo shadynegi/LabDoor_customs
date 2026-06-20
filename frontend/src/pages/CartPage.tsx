@@ -5,7 +5,7 @@ import { useCart } from "./CartContext";
 import { Link, useNavigate } from "react-router-dom";
 import { Trash2, Plus, Minus, ShoppingBag } from "lucide-react";
 import { calculateCheckoutPricing, FREE_SHIPPING_MESSAGE, VOLUME_DISCOUNT_INFO } from "../utils/pricing";
-import { optimizeImageUrl } from "../utils/imageUrl";
+import { buildResponsiveProductImg, PRODUCT_IMAGE_SIZES } from "../lib/responsiveImage";
 import { NO_REFUND_POLICY_SHORT, REPLACEMENT_POLICY_PATH } from "../constants/returnPolicy";
 
 export default function CartPage() {
@@ -99,12 +99,12 @@ export default function CartPage() {
                     width: isMobile ? "100%" : "auto"
                   }}>
                     <img 
-                      src={optimizeImageUrl(item.image, { width: 180 })} 
-                      alt={item.name}
-                      width={isMobile ? 70 : 90}
-                      height={isMobile ? 70 : 90}
-                      loading="lazy"
-                      decoding="async"
+                      {...buildResponsiveProductImg(item.image, {
+                        alt: item.name,
+                        sizes: PRODUCT_IMAGE_SIZES.cart,
+                        width: isMobile ? 70 : 90,
+                        height: isMobile ? 70 : 90,
+                      })}
                       onError={(e) => {
                         e.currentTarget.style.display = 'none';
                       }}

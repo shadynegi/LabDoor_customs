@@ -10,7 +10,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
 import ProductFilters from '../components/ProductFilters';
 import { ProductGridSkeleton, SkeletonStyles } from '../components/Skeletons';
-import { optimizeImageUrl } from '../utils/imageUrl';
+import { buildResponsiveProductImg, PRODUCT_IMAGE_SIZES } from '../lib/responsiveImage';
 import MetaTags from '../components/MetaTags';
 import { useResponsive } from '../hooks/useResponsive';
 
@@ -377,12 +377,12 @@ const ProductsPage = () => {
                   </span>
                 )}
                 <img
-                  src={optimizeImageUrl(product.image, { width: 480 })}
-                  alt={product.name}
-                  width={480}
-                  height={480}
-                  loading="lazy"
-                  decoding="async"
+                  {...buildResponsiveProductImg(product.image, {
+                    alt: product.name,
+                    sizes: PRODUCT_IMAGE_SIZES.grid,
+                    width: 480,
+                    height: 480,
+                  })}
                   style={{
                     position: 'absolute',
                     top: 0,

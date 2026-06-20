@@ -26,7 +26,8 @@ Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_
 
 ## Storefront
 
-- Product catalog with filters, pagination, and Fuse.js search; server `POST /api/products/search` backed by `pg_trgm` GIN indexes on production Supabase
+- Product catalog with filters, pagination, and **server-side search** (`POST /api/products/search`, `pg_trgm` on Supabase); Home/Products suggestions debounced to same API
+- Optimized storefront assets: WebP variants + responsive `srcSet` for 5 shoe images, 5 backgrounds, and logos; build size budgets (`PERFORMANCE_BASELINE.md`)
 - Product detail pages with 360° viewer (real video assets or spin placeholder), reviews, and structured data
 - Shopping cart (localStorage) with server price validation on each change and **retry** on validation failure
 - PayPal checkout with server-side pricing and coupon validation
@@ -74,7 +75,7 @@ Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_
 - Sentry required in production (backend + frontend build)
 - Health endpoint (`/api/health`) with DB, Redis (503 if required but down), and PayPal status
 - Maintenance jobs: idempotency cleanup (batched), stale order expiry, stuck key reaper (`SKIP LOCKED`), checkout/access exchange cleanup; deferred initial run
-- CI: backend validate-env + tests, frontend build with env validation, E2E smoke, sitemap gate
+- CI: backend validate-env + tests, frontend build with env validation + asset budget, E2E smoke, sitemap gate
 
 ---
 

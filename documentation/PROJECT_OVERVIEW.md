@@ -24,7 +24,7 @@ Lab Door Customs is a monorepo e-commerce platform for custom footwear sales.
 
 ## Data flow
 
-1. Customer browses products via Express API (Redis-cached list/detail) and client-side Fuse search over a full-catalog localStorage cache (15-minute TTL, paginated fetch).
+1. Customer browses products via Express API (Redis-cached list/detail) and **server-side search** (`POST /api/products/search` with debounced UI on Home and `/products`).
 2. Cart stored in browser localStorage; each change triggers `POST /api/products/validate-cart` to refresh server prices and stock.
 3. Checkout calls `POST /api/paypal/create-payment` — server validates cart, creates pending order, reserves stock and coupon, binds PayPal order, issues a one-time checkout exchange code.
 4. PayPal redirects to `/payment/success?code=...&token=...`; PaymentSuccess redeems the code via `GET /api/paypal/checkout-exchange/:code` for the order access token, then `POST /api/paypal/capture-payment` (with `serverOrderId` + `accessToken`) completes payment.

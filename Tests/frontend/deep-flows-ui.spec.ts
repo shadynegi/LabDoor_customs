@@ -94,6 +94,8 @@ test.describe('Deep storefront flows', () => {
   });
 
   test('checkout submits create-payment after policy acceptance', async ({ page }) => {
+    test.setTimeout(60_000);
+
     const product = MOCK_PRODUCTS[0];
     await seedCart(page, [
       {
@@ -105,28 +107,6 @@ test.describe('Deep storefront flows', () => {
       },
     ]);
 
-    let createPaymentCalled = false;
-    await page.route('**/api/paypal/create-payment', async (route) => {
-      createPaymentCalled = true;
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          success: true,
-          total: 123,
-          orderId: 'PAYPAL-OK',
-          serverOrderId: '00000000-0000-0000-0000-00000000dd01',
-          orderNumber: 'GSS-CHECKOUT-TEST',
-          links: [
-            {
-              rel: 'approve',
-              href: 'https://www.sandbox.paypal.com/checkoutnow?token=PAYPAL-OK',
-            },
-          ],
-        }),
-      });
-    });
-
     await page.goto('/checkout');
     await expect(page.getByText('Secure Checkout')).toBeVisible({ timeout: 15_000 });
     await fillCheckoutCustomerForm(page);
@@ -137,9 +117,16 @@ test.describe('Deep storefront flows', () => {
 
     const payButton = page.locator('button:visible', { hasText: 'Pay with PayPal' });
     await expect(payButton).toBeEnabled({ timeout: 15_000 });
-    await payButton.click();
 
-    await expect.poll(() => createPaymentCalled, { timeout: 15_000 }).toBe(true);
+    const createPayment = page.waitForResponse(
+      (response) =>
+        response.url().includes('/paypal/create-payment') &&
+        response.request().method() === 'POST',
+      { timeout: 45_000 },
+    );
+    await payButton.click();
+    const paymentResponse = await createPayment;
+    expect(paymentResponse.ok()).toBeTruthy();
   });
 
   test('payment success shows processing UI on capture 409', async ({ page }) => {

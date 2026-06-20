@@ -32,16 +32,19 @@ Authoritative reference: [`info.md`](info.md) (or [`info.md`](info.md) from subf
 
 ## Static assets
 
-Located in `frontend/src/assets/` and `frontend/public/`:
+Source PNGs live in `frontend/src/assets/` (5 shoe designs + 5 backgrounds + logos). Build runs `npm run optimize-assets` to generate WebP variants in `frontend/src/assets/optimized/` and `frontend/src/lib/generatedImageAssets.ts`.
 
-- Logo, favicon, hero images
-- Referenced in components via import or public path
+| Asset set | Source | Optimized widths |
+|-----------|--------|------------------|
+| Shoe products | `Shoe_Design/*.png` | 320, 640, 1200 px WebP |
+| Backgrounds | `Backgrounds/*.png` | 1280, 1920 px WebP |
+| Logos | `Logo/*.png` | 200–400 px WebP |
 
-## Admin upload
-
-Product images added via admin dashboard as URLs (hosted externally or on CDN).
+Mapping: `frontend/src/lib/productImageMaps.ts` (DB paths like `/assets/blue-nike.png` → bundled WebP). Display: `frontend/src/lib/responsiveImage.ts` (`srcSet` / `sizes`).
 
 ## Performance
 
-- Lazy load on product grids
-- Appropriate sizing for mobile and desktop breakpoints
+- `npm run build:budget` enforces dist size limits (see [`PERFORMANCE_BASELINE.md`](PERFORMANCE_BASELINE.md))
+- Lazy load on product grids; LCP preload on Home hero
+- Supabase Storage URLs use `optimizeImageUrl()` transforms
+- Appropriate `srcset` / `sizes` on catalog and checkout thumbnails

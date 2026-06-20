@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react';
 import { catalogFetch } from '../config';
 import { toast } from 'sonner';
 import { logError } from '../lib/logger';
-import { resolveProductBackground, resolveProductImage } from '../lib/productImageMaps';
 
 export interface Product {
   id: number;
@@ -56,12 +55,9 @@ export const useProducts = (): UseProductsResult => {
       const data = await response.json();
 
       if (data.success && data.data) {
-        // Map database image paths to actual imported images and convert price to number
         const productsWithImages = data.data.map((product: Product) => ({
           ...product,
           price: typeof product.price === 'string' ? parseFloat(product.price) : product.price,
-          image: resolveProductImage(product.image),
-          background: resolveProductBackground(product.background),
         }));
         setProducts(productsWithImages);
       } else {

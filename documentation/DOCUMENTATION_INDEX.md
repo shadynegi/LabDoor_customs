@@ -15,7 +15,7 @@
 | Monorepo | `frontend/` (React/Vite), `backend/` (Express), `Tests/` (Vitest + Playwright) |
 | Production | One Express process: `/api/*` + built SPA; Supabase PostgreSQL via service_role |
 | Checkout | Server-bound PayPal orders; `policy_accepted` required; no-refund / replacement-only policy; `?code=` exchange; capture **409** processing UI; email synced to activity on change/blur |
-| Cart | `POST /api/products/validate-cart` on item changes with retry; Fuse search catalog cache (15 min TTL) |
+| Cart | `POST /api/products/validate-cart` on item changes with retry; catalog search via `POST /api/products/search` (no full-catalog client cache) |
 | Orders | Email `?code=` access exchange; legacy URL tokens deprecated; partial refresh keeps stale data |
 | RLS | 14 tables service_role-only; no public PostgREST product read |
 | Activity | Consent-gated batch; `contact_submit`, `purchase_complete`, `size_select`, `quantity_change`; CSRF-exempt `/activity/batch`; IP anonymized |
@@ -45,6 +45,8 @@
 | [AUDIT_SUMMARY.md](AUDIT_SUMMARY.md) | Security controls reference + open gaps (synced with audit) |
 | [PROJECT_AUDIT.md](PROJECT_AUDIT.md) | Full audit snapshot (2026-06-08) + remediation log — **do not re-audit wholesale** |
 | [COVERAGE_MATRIX.md](COVERAGE_MATRIX.md) | Doc → code → test map — **update per PR** (avoids repeat audits) |
+| [PERFORMANCE_BASELINE.md](./PERFORMANCE_BASELINE.md) | Frontend bundle budgets, WebP asset pipeline, optimization metrics |
+| [MEDIA_ASSET_GUIDE.md](./MEDIA_ASSET_GUIDE.md) | Static and product image conventions |
 
 ---
 

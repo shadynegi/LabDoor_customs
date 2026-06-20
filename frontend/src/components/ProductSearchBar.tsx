@@ -2,7 +2,7 @@ import { useState, useRef, type KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Product } from '../hooks/useProducts';
-import { optimizeImageUrl } from '../utils/imageUrl';
+import { buildResponsiveProductImg, PRODUCT_IMAGE_SIZES } from '../lib/responsiveImage';
 
 export type ProductSearchBarVariant = 'light' | 'hero';
 
@@ -259,10 +259,12 @@ export default function ProductSearchBar({
                 >
                   {product.image && (
                     <img
-                      src={optimizeImageUrl(product.image, { width: 48 })}
-                      alt=""
-                      width={40}
-                      height={40}
+                      {...buildResponsiveProductImg(product.image, {
+                        alt: '',
+                        sizes: PRODUCT_IMAGE_SIZES.thumb,
+                        width: 40,
+                        height: 40,
+                      })}
                       style={{ borderRadius: 8, objectFit: 'cover' }}
                     />
                   )}

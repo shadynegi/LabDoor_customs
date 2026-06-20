@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import type { Product } from '../hooks/useProducts';
-import { optimizeImageUrl } from '../utils/imageUrl';
+import { buildResponsiveProductImg, PRODUCT_IMAGE_SIZES } from '../lib/responsiveImage';
 import { useResponsive } from '../hooks/useResponsive';
 
 interface ProductCarouselProps {
@@ -101,12 +101,12 @@ const ProductCarousel: React.FC<ProductCarouselProps> = ({ products }) => {
             }}
           >
             <img
-              src={optimizeImageUrl(product.image, { width: 320 })}
-              alt={product.name}
-              width={320}
-              height={320}
-              loading="lazy"
-              decoding="async"
+              {...buildResponsiveProductImg(product.image, {
+                alt: product.name,
+                sizes: PRODUCT_IMAGE_SIZES.thumb,
+                width: 320,
+                height: 320,
+              })}
               style={{
                 width: '100%',
                 height: '100%',

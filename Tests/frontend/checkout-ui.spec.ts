@@ -41,7 +41,7 @@ test.describe('Checkout UI', () => {
     await page.goto('/checkout');
     await expect(page.getByText('Secure Checkout')).toBeVisible({ timeout: 15_000 });
 
-    await expect(page.getByText('United States of America (the)')).toBeVisible({
+    await expect(page.locator('#country-input')).toHaveValue('United States of America (the)', {
       timeout: 10_000,
     });
   });

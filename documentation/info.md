@@ -83,7 +83,7 @@
 
 | Layer | Technologies |
 |-------|--------------|
-| Frontend | React 19, React Router 7, TypeScript, Vite 7, Framer Motion, Fuse.js, Sonner, liquid-web |
+| Frontend | React 19, React Router 7, TypeScript, Vite 7, Framer Motion, Sonner, liquid-web |
 | Backend | Node.js 20, Express 4, TypeScript, postgres.js, Helmet, compression |
 | Payments | PayPal Checkout (create + capture + webhooks); no customer refunds; operational/webhook refund sync only |
 | Database | Supabase PostgreSQL (PgBouncer pooler on port 6543 recommended) |
@@ -102,10 +102,10 @@
 | Route | Purpose |
 |-------|---------|
 | `/` | Home — hero carousel, product search bar, featured products |
-| `/products` | Catalog — filters, Fuse.js search, pagination; supports `?q=` deep links |
+| `/products` | Catalog — filters, server search (`POST /api/products/search`), pagination; supports `?q=` deep links |
 | `/product/:id` | Product detail — 360° viewer (real multi-angle or static placeholder), reviews, JSON-LD, meta tags; trust badges aligned with store policy (free shipping over $200, secure payment, **all sales final** with link to replacement policy) |
 | `/cart` | Shopping cart (localStorage via `CartContext`) |
-| `/checkout` | Customer/shipping form (country pre-selected to `country-list` US value), coupon validation, no-refund policy checkbox, PayPal redirect |
+| `/checkout` | Customer/shipping form (native country `<select>`, pre-selected US via `country-list`), coupon validation, no-refund policy checkbox, PayPal redirect |
 | `/payment/success` | Redeems `?code=` via checkout exchange, captures payment; **409** shows “payment received — processing” (polls checkout-context; cart not cleared until confirmed); expired exchange shows explicit error |
 | `/payment/cancel` | Abandoned checkout; clears `pendingOrder`, `paypalReturnCode`, and `checkoutRecovery` from sessionStorage |
 | `/orders` | Customer order lookup (`POST /api/orders/lookup`); email links redeem `?code=` via `GET /api/orders/access-exchange/:code`; legacy `?orderNumber=&token=` URLs are stripped with a deprecation warning |
@@ -118,7 +118,7 @@
 ### Search and catalog
 
 - **Server:** paginated product list, filters, single-product fetch, sitemap URL export — cached in Redis when available.
-- **Client:** Fuse.js fuzzy search over a full catalog cache — `getProductCatalog()` paginates through all products (`limit=100` per page) and stores results in localStorage for 15 minutes; shared search bar on Home and Products pages.
+- **Client:** Search and filters call `POST /api/products/search` (debounced); suggestions on Home use the same endpoint with `limit=10`. No full-catalog client download.
 
 ### Cart and pricing display
 
@@ -707,7 +707,7 @@ Any unmatched `/api/*` path returns **404** JSON `{ error: "Route not found" }`.
 | GET | `/api/products/sitemap-urls` | Public | Product IDs/paths for sitemap generation |
 | GET | `/api/products/category/:category` | Public | Products by category slug |
 | GET | `/api/products/:id` | Public | Single product by ID |
-| POST | `/api/products/search` | Public + CSRF | Fuse.js product search |
+| POST | `/api/products/search` | Public + CSRF | Product search and filters |
 | POST | `/api/products/validate-cart` | Public + CSRF | Validate cart lines (price, stock, existence) |
 | POST | `/api/products` | Admin + CSRF | Create product |
 | PUT | `/api/products/:id` | Admin + CSRF | Update product |
@@ -967,6 +967,15 @@ See [`PRE_LAUNCH_CHECKLIST.md`](PRE_LAUNCH_CHECKLIST.md) before first production
 
 ---
 
+## Performance and assets
+
+- **Build:** `npm run optimize-assets -w frontend` generates WebP variants from the 5 shoe PNGs, 5 background PNGs, and logos; output in `frontend/src/assets/optimized/` and `frontend/src/lib/generatedImageAssets.ts`.
+- **Budget:** `npm run build:budget -w frontend` fails CI/local builds if `dist/assets` exceeds limits (see [`PERFORMANCE_BASELINE.md`](PERFORMANCE_BASELINE.md)).
+- **Display:** `productImageMaps.ts` + `responsiveImage.ts` provide `srcSet`/`sizes`; Home preloads hero + adjacent backgrounds.
+- **Search:** server-side `POST /api/products/search` (no client full-catalog download).
+
+---
+
 ## Local development
 
 ```bash
@@ -1005,7 +1014,9 @@ npm run test:backend             # Backend unit only
 npm run test:api                 # API integration only
 npm run test:frontend            # Playwright UI only
 npm run validate-env             # backend + frontend env checks
-npm run build                    # frontend + backend
+npm run build                    # frontend (optimize-assets + budget check) + backend
+npm run build -w frontend        # includes optimize-assets, sitemap, build:budget
+npm run measure:dist -w frontend # dist/assets size report
 npm run links:check
 ```
 
@@ -1042,5 +1053,7 @@ API tests mock the database layer (`Tests/setup.ts`) for fast isolated runs.
 | [ADMIN_DASHBOARD_GUIDE.md](ADMIN_DASHBOARD_GUIDE.md) | Admin UI |
 | [PAYPAL_SETUP_GUIDE.md](PAYPAL_SETUP_GUIDE.md) | PayPal credentials and webhooks |
 | [DATABASE_SETUP.md](DATABASE_SETUP.md) | Schema and migrations |
+| [PERFORMANCE_BASELINE.md](PERFORMANCE_BASELINE.md) | Bundle budgets, WebP pipeline, before/after metrics |
+| [MEDIA_ASSET_GUIDE.md](MEDIA_ASSET_GUIDE.md) | Product and static image conventions |
 
 **Full index:** [DOCUMENTATION_INDEX.md](DOCUMENTATION_INDEX.md)

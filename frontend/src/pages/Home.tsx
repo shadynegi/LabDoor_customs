@@ -12,15 +12,15 @@ import LiquidButton from "../components/LiquidButton";
 import LiquidModal from "../components/LiquidModal";
 import { trackProductView } from "../utils/activityTracker";
 import { HomePageSkeleton } from "../components/Skeletons";
-import { optimizeImageUrl } from "../utils/imageUrl";
+import { buildResponsiveProductImg, PRODUCT_IMAGE_SIZES } from "../lib/responsiveImage";
+import { resolveProductBackgroundForViewport } from "../lib/productImageMaps";
 import MetaTags from "../components/MetaTags";
 import { DEFAULT_META } from "../lib/site";
 import { useResponsive } from "../hooks/useResponsive";
 
 const ProductCarousel = lazy(() => import("../components/ProductCarousel"));
 
-import logoHomePageText from "../assets/Logo/LogoHomePageText.png";
-import logoHomePage from "../assets/Logo/LogoAllPages.png";
+import { logo_all_pages, logo_home_text } from "../lib/productImageMaps";
 
 const imageVariants: Variants = {
   enter: (direction: number) => ({
@@ -119,22 +119,46 @@ export default function Home() {
     }
   }, [index, products]);
 
-  const heroImageSrc =
-    products[index]?.image
-      ? optimizeImageUrl(products[index].image, { width: isMobile ? 560 : 900 })
-      : '';
+  const current = products[index];
+  const heroImg = current
+    ? buildResponsiveProductImg(current.image, {
+        alt: current.name,
+        sizes: PRODUCT_IMAGE_SIZES.hero,
+        loading: 'eager',
+        fetchPriority: 'high',
+        width: 562,
+        height: 562,
+      })
+    : null;
+
+  const backgroundUrl = current?.background
+    ? resolveProductBackgroundForViewport(current.background, isMobile ? 1280 : 1920)
+    : undefined;
 
   useEffect(() => {
-    if (!heroImageSrc || loading) return;
-    const link = document.createElement('link');
-    link.rel = 'preload';
-    link.as = 'image';
-    link.href = heroImageSrc;
-    document.head.appendChild(link);
-    return () => {
-      document.head.removeChild(link);
+    if (!products.length || loading) return;
+    const preload = (bg?: string) => {
+      if (!bg) return;
+      const img = new Image();
+      img.src = bg;
     };
-  }, [heroImageSrc, loading]);
+    const cur = products[index];
+    const next = products[(index + 1) % productsCount];
+    preload(cur?.background ? resolveProductBackgroundForViewport(cur.background, isMobile ? 1280 : 1920) : undefined);
+    preload(next?.background ? resolveProductBackgroundForViewport(next.background, isMobile ? 1280 : 1920) : undefined);
+    if (heroImg?.src) {
+      const link = document.createElement('link');
+      link.rel = 'preload';
+      link.as = 'image';
+      link.href = heroImg.src;
+      if (heroImg.srcSet) link.setAttribute('imagesrcset', heroImg.srcSet);
+      if (heroImg.sizes) link.setAttribute('imagesizes', heroImg.sizes);
+      document.head.appendChild(link);
+      return () => {
+        document.head.removeChild(link);
+      };
+    }
+  }, [index, products, productsCount, loading, isMobile, heroImg?.src, heroImg?.srcSet, heroImg?.sizes]);
 
   // Show loading state with skeleton
   if (loading) {
@@ -167,8 +191,6 @@ export default function Home() {
       </div>
     );
   }
-
-  const current = products[index];
 
   // Size options for each system
   const sizeOptions = {
@@ -245,7 +267,7 @@ export default function Home() {
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundImage: `linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url(${current.background})`,
+            backgroundImage: `linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url(${backgroundUrl ?? ''})`,
             backgroundSize: "cover",
             backgroundPosition: "center",
             zIndex: 0,
@@ -278,11 +300,13 @@ export default function Home() {
           textDecoration: "none",
         }}>
           <img 
-            src={logoHomePage} 
+            src={logo_all_pages.default}
+            srcSet={logo_all_pages.srcSet}
+            sizes="135px"
             alt="Lab Door Customs"
             width={135}
             height={68}
-            loading="lazy"
+            loading="eager"
             decoding="async"
             style={{ 
               height: isSmallMobile ? 36 : (isMobile ? 50.625 : 67.5),
@@ -303,11 +327,13 @@ export default function Home() {
         {!isSmallMobile && (
         <Link to="/" style={{ display: "flex", alignItems: "center", textDecoration: "none" }}>
           <img 
-            src={logoHomePageText} 
+            src={logo_home_text.default}
+            srcSet={logo_home_text.srcSet}
+            sizes="200px"
             alt="Lab Door Customs"
             width={200}
             height={68}
-            loading="lazy"
+            loading="eager"
             decoding="async"
             style={{ 
               height: isMobile ? 50.625 : 67.5,
@@ -556,12 +582,7 @@ export default function Home() {
                 }}
               >
                 <motion.img
-                  src={heroImageSrc}
-                  alt={current.name}
-                  width={562}
-                  height={562}
-                  loading="eager"
-                  decoding="async"
+                  {...(heroImg ?? { src: '', alt: current.name })}
                   className="hero-product-img"
                   style={{
                     height: "auto",

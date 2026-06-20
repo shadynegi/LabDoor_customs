@@ -9,8 +9,7 @@ import { Toaster } from "sonner";
 import { trackPageView } from "./utils/activityTracker";
 import CookieConsent, { openCookiePreferences } from "./components/CookieConsent";
 import { trackGaPageView } from "./lib/analytics";
-import logoAllPagesText from "./assets/Logo/LogoAllPagesText.png";
-import logoAllPages from "./assets/Logo/LogoAllPages.png";
+import { logo_all_pages, logo_all_pages_text } from "./lib/productImageMaps";
 import { useResponsive } from "./hooks/useResponsive";
 
 // Lazy load pages for better performance (code splitting for 1000+ users)
@@ -138,11 +137,13 @@ function Navigation() {
         }}
       >
         <img 
-          src={logoAllPages} 
+          src={logo_all_pages.default}
+          srcSet={logo_all_pages.srcSet}
+          sizes="50px"
           alt="Lab Door Customs Logo"
           width={50}
           height={50}
-          loading="lazy"
+          loading="eager"
           decoding="async"
           style={{ 
             height: isSmallMobile ? 36 : (isMobile ? 40 : 50),
@@ -172,7 +173,9 @@ function Navigation() {
           }}
         >
           <img 
-            src={logoAllPagesText} 
+            src={logo_all_pages_text.default}
+            srcSet={logo_all_pages_text.srcSet}
+            sizes="200px"
             alt="Lab Door Customs"
             width={160}
             height={48}
