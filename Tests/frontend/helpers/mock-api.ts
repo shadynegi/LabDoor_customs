@@ -161,6 +161,124 @@ export async function installStorefrontApiMocks(
       return json(route, { success: true, message: 'Message sent successfully!' });
     }
 
+    if (path === '/coupons/validate' && method === 'POST') {
+      let body: {
+        code?: string;
+        items?: Array<{ product_id: number; quantity: number; price?: number }>;
+      } = {};
+      try {
+        body = route.request().postDataJSON() as typeof body;
+      } catch {
+        body = {};
+      }
+      const code = (body.code || '').trim().toUpperCase();
+      if (code === 'LDCOFF10') {
+        const subtotal = (body.items ?? []).reduce(
+          (sum, line) => sum + (line.price ?? 98) * line.quantity,
+          0,
+        );
+        const couponDiscount = Math.round(subtotal * 0.1 * 100) / 100;
+        const shipping = subtotal >= 200 ? 0 : 25;
+        const total = Math.round((subtotal + shipping - couponDiscount) * 100) / 100;
+        return json(route, {
+          success: true,
+          valid: true,
+          coupon: {
+            id: 'mock-coupon-ldcoff10',
+            code: 'LDCOFF10',
+            description: '10% off',
+            discount_type: 'percentage',
+            discount_value: 10,
+          },
+          discount_amount: couponDiscount,
+          pricing: {
+            subtotal,
+            shipping,
+            volume_discount: 0,
+            coupon_discount: couponDiscount,
+            total,
+          },
+          message: '10% discount applied!',
+        });
+      }
+      return json(route, {
+        success: true,
+        valid: false,
+        message: 'Invalid coupon code',
+        error_code: 'NOT_FOUND',
+      });
+    }
+
+    const checkoutExchangeMatch = path.match(/^\/paypal\/checkout-exchange\/([^/]+)$/);
+    if (checkoutExchangeMatch && method === 'GET') {
+      const code = decodeURIComponent(checkoutExchangeMatch[1]);
+      if (code === 'RECON-CODE' || code === 'CHECKOUT-OK') {
+        return json(route, {
+          success: true,
+          accessToken: 'b'.repeat(64),
+          serverOrderId: '00000000-0000-0000-0000-00000000cc01',
+          orderNumber: 'GSS-RECON-TEST',
+          total: 98,
+        });
+      }
+      return json(route, { success: false, error: 'Invalid or expired checkout code' }, 404);
+    }
+
+    const captureMatch = path.match(/^\/paypal\/capture-payment\/([^/]+)$/);
+    if (captureMatch && method === 'POST') {
+      const paypalOrderId = decodeURIComponent(captureMatch[1]);
+      if (paypalOrderId === 'PAYPAL-409') {
+        return json(
+          route,
+          {
+            success: false,
+            error: 'Payment received — order processing',
+            message:
+              'Payment received — your order is still being confirmed. This usually resolves within a minute.',
+          },
+          409,
+        );
+      }
+      if (paypalOrderId === 'PAYPAL-OK') {
+        return json(route, {
+          success: true,
+          order: {
+            order_number: 'GSS-PAID-TEST',
+            total: 98,
+            payment_status: 'completed',
+            status: 'processing',
+            shipping_address: {},
+          },
+        });
+      }
+    }
+
+    if (path.startsWith('/paypal/checkout-context/') && method === 'GET') {
+      return json(route, {
+        success: true,
+        alreadyCompleted: false,
+        serverOrderId: '00000000-0000-0000-0000-00000000cc01',
+        orderNumber: 'GSS-RECON-TEST',
+        total: 98,
+      });
+    }
+
+    if (path === '/paypal/create-payment' && method === 'POST') {
+      return json(route, {
+        success: true,
+        total: 123,
+        orderId: 'PAYPAL-OK',
+        serverOrderId: '00000000-0000-0000-0000-00000000dd01',
+        orderNumber: 'GSS-CHECKOUT-TEST',
+        links: [
+          {
+            rel: 'approve',
+            href: 'https://www.sandbox.paypal.com/checkoutnow?token=PAYPAL-OK',
+          },
+        ],
+      });
+    }
+
     if (path === '/activity/batch' && method === 'POST') {
       return json(route, { success: true });
     }

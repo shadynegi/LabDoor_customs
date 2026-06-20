@@ -5,7 +5,7 @@
 **Authoritative behavior:** [`info.md`](info.md)  
 **Full audit:** [`PROJECT_AUDIT.md`](PROJECT_AUDIT.md) (2026-06-08 initial + follow-up)
 
-**Test count marker (CI should match):** `<!-- tests: 153 -->` (81 unit + 43 API + 29 Playwright)
+**Test count marker (CI should match):** `<!-- tests: 167 -->` (84 unit + 46 API + 37 Playwright)
 
 ---
 
@@ -83,13 +83,14 @@
 
 | ID | Behavior | Implementation | Test(s) | Status |
 |----|----------|----------------|---------|--------|
-| UI-SMOKE | Home, products, cart, checkout shell, contact | `Tests/frontend/*.spec.ts` | 28 tests | COVERED |
+| UI-SMOKE | Home, products, cart, checkout shell, contact | `Tests/frontend/*.spec.ts` | 37 tests | COVERED |
 | UI-PAY-409 | Payment success missing token error UX | `PaymentSuccess.tsx` | `payment-success-ui.spec.ts` | COVERED |
 | UI-PAY-TOKEN | Missing PayPal `token` error UX | `PaymentSuccess.tsx` | `payment-success-ui.spec.ts` | COVERED |
 | UI-ORDERS | Orders legacy `?token=` strip + `?code=` email redeem | `MyOrders.tsx` | `orders-ui.spec.ts` | COVERED |
 | UI-ADMIN | Admin login redirect + dashboard analytics smoke | `AdminLogin.tsx`, `AdminDashboard.tsx` | `admin-ui.spec.ts` | COVERED |
 | UI-CHECKOUT-COUNTRY | Checkout country pre-selected (`country-list` US value) | `Checkout.tsx`, `constants/checkoutForm.ts` | `checkout-ui.spec.ts` | COVERED |
-| UI-PRODUCT-POLICY | Product detail trust badges match no-refund policy | `ProductDetailPage.tsx`, `constants/returnPolicy.ts` | manual QA | MANUAL-ONLY |
+| UI-PRODUCT-POLICY | Product detail trust badges match no-refund policy | `ProductDetailPage.tsx`, `constants/returnPolicy.ts` | `deep-flows-ui.spec.ts` | COVERED |
+| UI-DEEP-FLOWS | Search, policy gate, coupon, create-payment, 409 processing | `deep-flows-ui.spec.ts`, `mock-api.ts` | `deep-flows-ui.spec.ts` | COVERED |
 
 ---
 
@@ -109,7 +110,7 @@
 |----|----------|----------------|---------|--------|
 | CI-ENV | Production env validation in CI | `validate-env.mjs`, `ci.yml` | CI job | COVERED |
 | SEC-ORDER-SECRETS | `access_token_hash` + `access_token_encrypted` stripped from order JSON | `orderTokens.ts` `stripOrderSecrets` | `orderTokens.test.ts` | COVERED |
-| DOC-TESTS | Test count in `info.md` | `info.md` | `npm test` (153) | COVERED |
+| DOC-TESTS | Test count in `info.md` | `info.md` | `npm test` (167) | COVERED |
 
 ---
 

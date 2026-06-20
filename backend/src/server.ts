@@ -86,6 +86,7 @@ import { ensureRlsPolicies } from './lib/rlsMigration';
 import { assertJwtSecretForProduction } from './lib/jwtSecret';
 import { purgeLegacyAdminSessions } from './lib/adminSessionMigration';
 import { mountFrontend } from './lib/serveFrontend';
+import { registerProcessErrorHandlers } from './lib/processErrorHandlers';
 
 // Import routes
 import productsRouter from "./routes/products";
@@ -98,6 +99,7 @@ import couponsRouter from "./routes/coupons";
 
 dotenv.config();
 initSentry();
+registerProcessErrorHandlers();
 
 // Validate required environment variables at startup (mirrors scripts/validate-env.mjs)
 const validateEnvVars = () => {

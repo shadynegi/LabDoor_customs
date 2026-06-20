@@ -5,6 +5,7 @@ export const sqlMock = vi.fn(async () => [] as unknown[]);
 vi.mock('../backend/src/lib/db', () => ({
   default: sqlMock,
   withRetry: async <T>(fn: () => Promise<T>) => fn(),
+  query: async <T>(fn: () => Promise<T>, _label?: string) => fn(),
   runInChunks: async <T>(
     items: T[],
     fn: (item: T) => Promise<void>,

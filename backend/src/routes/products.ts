@@ -2,7 +2,7 @@
 import { logger } from '../lib/logger';
 import { respond500 } from '../lib/safeError';
 import { Router, Request, Response } from 'express';
-import sql from '../lib/db';
+import sql, { query as dbQuery } from '../lib/db';
 import { cached } from '../lib/cache';
 import { CACHE, TTL, invalidateProductCaches } from '../lib/cacheKeys';
 import { parsePagination, paginationMeta } from '../lib/pagination';
@@ -52,14 +52,20 @@ router.get('/', async (req: Request, res: Response) => {
       CACHE.productsList(page, limit),
       TTL.productsList,
       async () => {
-        const countResult = await sql`SELECT COUNT(*) as total FROM products`;
+        const countResult = await dbQuery(
+          () => sql`SELECT COUNT(*) as total FROM products`,
+          'products:listCount'
+        );
         const total = parseInt(countResult[0]?.total || '0');
-        const products = await sql`
+        const products = await dbQuery(
+          () => sql`
           SELECT * FROM products 
           ORDER BY id ASC
           LIMIT ${limit}
           OFFSET ${offset}
-        `;
+        `,
+          'products:list'
+        );
         return {
           data: products || [],
           pagination: paginationMeta(total, parsed.params),
@@ -121,25 +127,29 @@ router.post('/validate-cart', async (req: Request, res: Response) => {
 router.get('/filters', async (_req: Request, res: Response) => {
   try {
     // Parallel filter queries (independent reads) — chunked via Promise.all, not sequential
-    const [categories, sizes, priceRange, ratingStats] = await Promise.all([
-      sql`
+    const [categories, sizes, priceRange, ratingStats] = await dbQuery(
+      () =>
+        Promise.all([
+          sql`
         SELECT DISTINCT category FROM products 
         WHERE category IS NOT NULL 
         ORDER BY category ASC
       `,
-      sql`
+          sql`
         SELECT DISTINCT size FROM products 
         WHERE size IS NOT NULL 
         ORDER BY size ASC
       `,
-      sql`
+          sql`
         SELECT MIN(price) as min_price, MAX(price) as max_price FROM products
       `,
-      sql`
+          sql`
         SELECT MIN(rating) as min_rating, MAX(rating) as max_rating, AVG(rating) as avg_rating
         FROM products
       `,
-    ]);
+        ]),
+      'products:filters'
+    );
 
     res.json({
       success: true,
@@ -181,16 +191,20 @@ router.get('/category/:category', async (req: Request, res: Response) => {
     }
     const { limit, offset } = parsed.params;
 
-    const [products, countResult] = await Promise.all([
-      sql`
+    const [products, countResult] = await dbQuery(
+      () =>
+        Promise.all([
+          sql`
         SELECT * FROM products 
         WHERE category = ${category}
         ORDER BY id ASC
         LIMIT ${limit}
         OFFSET ${offset}
       `,
-      sql`SELECT COUNT(*) as total FROM products WHERE category = ${category}`,
-    ]);
+          sql`SELECT COUNT(*) as total FROM products WHERE category = ${category}`,
+        ]),
+      'products:byCategory'
+    );
     const total = parseInt(countResult[0]?.total || '0');
 
     res.json({
@@ -208,9 +222,12 @@ router.get('/category/:category', async (req: Request, res: Response) => {
 // GET product URLs for sitemap generation
 router.get('/sitemap-urls', async (_req: Request, res: Response) => {
   try {
-    const products = await sql`
+    const products = await dbQuery(
+      () => sql`
       SELECT id, updated_at FROM products ORDER BY id ASC
-    `;
+    `,
+      'products:sitemapUrls'
+    );
     res.json({
       success: true,
       data: (products || []).map((p) => ({
@@ -231,11 +248,14 @@ router.get('/:id', async (req: Request, res: Response) => {
     const { id } = req.params;
 
     const row = await cached(CACHE.productSingle(id), TTL.productSingle, async () => {
-      const product = await sql`
+      const product = await dbQuery(
+        () => sql`
         SELECT * FROM products 
         WHERE id = ${id}
         LIMIT 1
-      `;
+      `,
+        'products:single'
+      );
       return product[0] ?? null;
     });
 
@@ -300,7 +320,8 @@ router.post('/', verifyAdmin, async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: backgroundResult.error });
     }
 
-    const result = await sql`
+    const result = await dbQuery(
+      () => sql`
       INSERT INTO products (name, price, image, description, background, category, size, color, stock, rating, review_count)
       VALUES (
         ${productData.name},
@@ -316,7 +337,9 @@ router.post('/', verifyAdmin, async (req: Request, res: Response) => {
         ${productData.review_count || 0}
       )
       RETURNING *
-    `;
+    `,
+      'products:create'
+    );
 
     invalidateProductCaches();
 
@@ -358,7 +381,8 @@ router.put('/:id', verifyAdmin, async (req: Request, res: Response) => {
       backgroundValue = bgResult.value;
     }
 
-    const result = await sql`
+    const result = await dbQuery(
+      () => sql`
       UPDATE products SET
         name = COALESCE(${updates.name || null}, name),
         price = COALESCE(${updates.price || null}, price),
@@ -373,7 +397,9 @@ router.put('/:id', verifyAdmin, async (req: Request, res: Response) => {
         updated_at = NOW()
       WHERE id = ${id}
       RETURNING *
-    `;
+    `,
+      'products:update'
+    );
 
     if (!result || result.length === 0) {
       return res.status(404).json({
@@ -400,11 +426,14 @@ router.delete('/:id', verifyAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    const result = await sql`
+    const result = await dbQuery(
+      () => sql`
       DELETE FROM products 
       WHERE id = ${id}
       RETURNING id
-    `;
+    `,
+      'products:delete'
+    );
 
     if (!result || result.length === 0) {
       return res.status(404).json({
@@ -493,14 +522,18 @@ router.post('/search', async (req: Request, res: Response) => {
     const hasRating = ratingMin !== null;
 
     if (!hasSearchQuery && !hasCategory && !hasSize && !hasColor && !hasPriceRange && !hasRating) {
-      products = await sql`
+      products = await dbQuery(
+        () => sql`
         SELECT * FROM products 
         ${getSortOrder()}
         LIMIT ${limit}
         OFFSET ${offset}
-      `;
+      `,
+        'products:search'
+      );
     } else {
-      products = await sql`
+      products = await dbQuery(
+        () => sql`
         SELECT * FROM products 
         WHERE 1=1
         ${hasSearchQuery ? sql`AND (name ILIKE ${searchPattern} OR description ILIKE ${searchPattern})` : sql``}
@@ -513,7 +546,9 @@ router.post('/search', async (req: Request, res: Response) => {
         ${getSortOrder()}
         LIMIT ${limit}
         OFFSET ${offset}
-      `;
+      `,
+        'products:searchFiltered'
+      );
     }
 
     res.json({

@@ -2,7 +2,7 @@
 import { logger } from '../lib/logger';
 import { respond500 } from '../lib/safeError';
 import { Router, Request, Response } from 'express';
-import sql from '../lib/db';
+import sql, { query as dbQuery } from '../lib/db';
 import { upsertCustomerFromOrder } from '../lib/customers';
 import { emailService } from '../lib/email';
 import { parsePagination, paginationMeta } from '../lib/pagination';
@@ -135,7 +135,7 @@ router.get('/', verifyAdmin, async (req: Request, res: Response) => {
     const searchRaw = String(search || '').trim();
     const searchPattern = searchRaw ? `%${searchRaw}%` : null;
 
-    const orders = await sql`
+    const orders = await dbQuery(() => sql`
       SELECT * FROM orders
       WHERE (${statusStr ? sql`status = ${statusStr}` : sql`TRUE`})
         AND (${paymentStatusStr ? sql`payment_status = ${paymentStatusStr}` : sql`TRUE`})
@@ -150,9 +150,9 @@ router.get('/', verifyAdmin, async (req: Request, res: Response) => {
         )
       ORDER BY created_at DESC
       LIMIT ${limitNum} OFFSET ${offsetNum}
-    `;
+    `, 'orders:q1');
 
-    const countResult = await sql`
+    const countResult = await dbQuery(() => sql`
       SELECT COUNT(*) as count FROM orders
       WHERE (${statusStr ? sql`status = ${statusStr}` : sql`TRUE`})
         AND (${paymentStatusStr ? sql`payment_status = ${paymentStatusStr}` : sql`TRUE`})
@@ -165,7 +165,7 @@ router.get('/', verifyAdmin, async (req: Request, res: Response) => {
             )`
             : sql`TRUE`}
         )
-    `;
+    `, 'orders:q2');
 
     const totalCount = Number(countResult[0].count);
 
@@ -187,7 +187,7 @@ router.get('/', verifyAdmin, async (req: Request, res: Response) => {
 // GET order statistics (Admin dashboard) — before /:id
 router.get('/stats/summary', verifyAdmin, async (req: Request, res: Response) => {
   try {
-    const stats = await sql`
+    const stats = await dbQuery(() => sql`
       SELECT 
         COUNT(*) as total_orders,
         COALESCE(SUM(total), 0) as total_revenue,
@@ -196,7 +196,7 @@ router.get('/stats/summary', verifyAdmin, async (req: Request, res: Response) =>
         COALESCE(SUM(CASE WHEN payment_status = 'completed' THEN total END), 0) as revenue_completed,
         COALESCE(SUM(CASE WHEN payment_status = 'pending' THEN total END), 0) as revenue_pending
       FROM orders
-    `;
+    `, 'orders:q3');
 
     const result = stats[0];
 
@@ -261,11 +261,11 @@ router.post('/lookup', async (req: Request, res: Response) => {
       });
     }
 
-    const order = await sql`
+    const order = await dbQuery(() => sql`
       SELECT * FROM orders
       WHERE order_number = ${orderNumber.trim()}
       LIMIT 1
-    `;
+    `, 'orders:q4');
 
     if (!order?.length || !orderAccessMatches(order[0].access_token_hash, accessToken.trim())) {
       return orderAccessDenied(res);
@@ -292,11 +292,11 @@ router.get('/number/:orderNumber', async (req: Request, res: Response) => {
       return orderAccessDenied(res);
     }
 
-    const order = await sql`
+    const order = await dbQuery(() => sql`
       SELECT * FROM orders 
       WHERE order_number = ${orderNumber}
       LIMIT 1
-    `;
+    `, 'orders:q5');
 
     if (
       !order?.length ||
@@ -334,19 +334,19 @@ router.get('/customer/:email', async (req: Request, res: Response) => {
     }
     const { limit, offset } = parsed.params;
 
-    const orders = await sql`
+    const orders = await dbQuery(() => sql`
       SELECT * FROM orders 
       WHERE customer_email = ${email}
       ORDER BY created_at DESC
       LIMIT ${limit}
       OFFSET ${offset}
-    `;
+    `, 'orders:q6');
 
     const parsedOrders = orders.map((order: Record<string, unknown>) => parseOrderRow(order));
 
-    const countResult = await sql`
+    const countResult = await dbQuery(() => sql`
       SELECT COUNT(*) as total FROM orders WHERE customer_email = ${email}
-    `;
+    `, 'orders:q7');
     const total = parseInt(countResult[0]?.total || '0');
 
     res.json({
@@ -372,11 +372,11 @@ router.get('/:id', async (req: Request, res: Response) => {
       return orderAccessDenied(res);
     }
 
-    const order = await sql`
+    const order = await dbQuery(() => sql`
       SELECT * FROM orders 
       WHERE id = ${id}
       LIMIT 1
-    `;
+    `, 'orders:q8');
 
     if (
       !order?.length ||
@@ -402,7 +402,7 @@ router.put('/:id', verifyAdmin, async (req: Request, res: Response) => {
     const updates: Partial<Order> = req.body;
 
     // Get current order
-    const currentOrder = await sql`SELECT * FROM orders WHERE id = ${id}`;
+    const currentOrder = await dbQuery(() => sql`SELECT * FROM orders WHERE id = ${id}`, 'orders:q9');
     
     if (!currentOrder || currentOrder.length === 0) {
       return res.status(404).json({
@@ -438,7 +438,7 @@ router.put('/:id', verifyAdmin, async (req: Request, res: Response) => {
       });
     }
 
-    const result = await sql`
+    const result = await dbQuery(() => sql`
       UPDATE orders SET
         status = COALESCE(${updates.status || null}, status),
         tracking_number = COALESCE(${updates.tracking_number || null}, tracking_number),
@@ -448,7 +448,7 @@ router.put('/:id', verifyAdmin, async (req: Request, res: Response) => {
         updated_at = NOW()
       WHERE id = ${id}
       RETURNING *
-    `;
+    `, 'orders:q10');
 
 // Parse JSON fields if they are strings
 const parsedResult = parseOrderRow(result[0] as Record<string, unknown>) as Order;
@@ -530,7 +530,7 @@ router.patch('/:id/status', verifyAdmin, async (req: Request, res: Response) => 
     }
 
     // Get current order
-    const currentOrder = await sql`SELECT * FROM orders WHERE id = ${id}`;
+    const currentOrder = await dbQuery(() => sql`SELECT * FROM orders WHERE id = ${id}`, 'orders:q11');
     
     if (!currentOrder || currentOrder.length === 0) {
       return res.status(404).json({
@@ -557,13 +557,13 @@ router.patch('/:id/status', verifyAdmin, async (req: Request, res: Response) => 
     const willBeShipped = status === 'shipped';
     const shouldSendShippingEmail = !wasShipped && willBeShipped;
 
-    const result = await sql`
+    const result = await dbQuery(() => sql`
       UPDATE orders SET
         status = ${status},
         updated_at = NOW()
       WHERE id = ${id}
       RETURNING *
-    `;
+    `, 'orders:q12');
 
     if (!result || result.length === 0) {
       return res.status(404).json({
@@ -659,10 +659,10 @@ router.patch('/:id/payment-status', verifyAdmin, async (req: Request, res: Respo
       });
     }
 
-    const currentOrder = await sql`
+    const currentOrder = await dbQuery(() => sql`
       SELECT payment_status, order_number, total, paypal_order_id, paypal_capture_id
       FROM orders WHERE id = ${id}
-    `;
+    `, 'orders:q13');
     if (!currentOrder.length) {
       return res.status(404).json({
         success: false,
@@ -723,7 +723,7 @@ router.patch('/:id/payment-status', verifyAdmin, async (req: Request, res: Respo
           error: 'Could not mark order failed — order may not be pending',
         });
       }
-      const failedRow = await sql`SELECT * FROM orders WHERE id = ${id} LIMIT 1`;
+      const failedRow = await dbQuery(() => sql`SELECT * FROM orders WHERE id = ${id} LIMIT 1`, 'orders:q14');
       const parsedFailed = parseOrderRow(failedRow[0] as Record<string, unknown>) as Order;
       return res.json({
         success: true,
@@ -754,7 +754,9 @@ router.patch('/:id/payment-status', verifyAdmin, async (req: Request, res: Respo
         await sendPostCaptureNotifications(completedOrder);
       }
 
-      await sql`
+      await dbQuery(
+        () =>
+          sql`
         INSERT INTO activity_logs (action_type, metadata, ip_address, user_agent)
         VALUES (
           'admin_mark_paid',
@@ -767,7 +769,9 @@ router.patch('/:id/payment-status', verifyAdmin, async (req: Request, res: Respo
           ${getClientIp(req)},
           ${req.get('user-agent') || 'admin'}
         )
-      `.catch((err) => logger.warn('Failed to log admin mark paid:', err));
+      `,
+        'orders:adminMarkPaidLog'
+      ).catch((err) => logger.warn('Failed to log admin mark paid:', err));
 
       const parsedCompleted = parseOrderRow(completedOrder as Record<string, unknown>) as Order;
       return res.json({
@@ -782,7 +786,8 @@ router.patch('/:id/payment-status', verifyAdmin, async (req: Request, res: Respo
         ? String(payment_id).trim()
         : null;
 
-    const result = await sql`
+    const result = await dbQuery(
+      () => sql`
       UPDATE orders SET
         payment_status = ${payment_status},
         payment_id = COALESCE(${payment_id || null}, payment_id),
@@ -790,7 +795,9 @@ router.patch('/:id/payment-status', verifyAdmin, async (req: Request, res: Respo
         updated_at = NOW()
       WHERE id = ${id}
       RETURNING *
-    `;
+    `,
+      'orders:updatePaymentStatus'
+    );
 
     if (!result || result.length === 0) {
       return res.status(404).json({
@@ -823,7 +830,7 @@ router.post('/:id/cancel', verifyAdmin, async (req: Request, res: Response) => {
     const { reason } = req.body;
 
     // Get current order
-    const orderResult = await sql`SELECT * FROM orders WHERE id = ${id}`;
+    const orderResult = await dbQuery(() => sql`SELECT * FROM orders WHERE id = ${id}`, 'orders:q16');
     
     if (!orderResult || orderResult.length === 0) {
       return res.status(404).json({
@@ -858,7 +865,7 @@ router.post('/:id/cancel', verifyAdmin, async (req: Request, res: Response) => {
         });
       }
 
-      const pendingResult = await sql`SELECT * FROM orders WHERE id = ${id}`;
+      const pendingResult = await dbQuery(() => sql`SELECT * FROM orders WHERE id = ${id}`, 'orders:q17');
       const parsedPending = {
         ...pendingResult[0],
         items,
@@ -892,9 +899,9 @@ router.delete('/:id', verifyAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    const existing = await sql`
+    const existing = await dbQuery(() => sql`
       SELECT id, payment_status FROM orders WHERE id = ${id}
-    `;
+    `, 'orders:q18');
 
     if (!existing.length) {
       return res.status(404).json({
@@ -911,11 +918,11 @@ router.delete('/:id', verifyAdmin, async (req: Request, res: Response) => {
       });
     }
 
-    const result = await sql`
+    const result = await dbQuery(() => sql`
       DELETE FROM orders 
       WHERE id = ${id}
       RETURNING id
-    `;
+    `, 'orders:q19');
 
     res.json({
       success: true,
@@ -932,9 +939,9 @@ router.post('/:id/notify-shipped', verifyAdmin, async (req: Request, res: Respon
   try {
     const { id } = req.params;
 
-    const order = await sql`
+    const order = await dbQuery(() => sql`
       SELECT * FROM orders WHERE id = ${id}
-    `;
+    `, 'orders:q20');
 
     if (!order || order.length === 0) {
       return res.status(404).json({

@@ -97,7 +97,7 @@ Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_
 2. `DATABASE_URL` uses pooler port **6543** with `pgbouncer=true`.
 3. Log `pool` stats on timeout — high `activeConnections` may indicate pool exhaustion.
 4. Catalog/admin routes use 180s timeout (`SLOW_REQUEST_TIMEOUT_MS`); others use 60s (`REQUEST_TIMEOUT_MS`).
-5. After laptop sleep, restart dev server — stale pooler connections may show `ECONNRESET` in `[withRetry]` logs.
+5. After laptop sleep, restart dev server — stale pooler connections may show `ECONNRESET` in `[withRetry]` logs. The API also registers process-level handlers that log unhandled rejections without exiting; catalog/activity routes retry transient DB errors via `query()`.
 
 ---
 

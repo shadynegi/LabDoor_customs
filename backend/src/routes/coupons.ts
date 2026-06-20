@@ -2,7 +2,7 @@
 import { logger } from '../lib/logger';
 import { respond500 } from '../lib/safeError';
 import { Router, Request, Response } from 'express';
-import sql from '../lib/db';
+import sql, { query as dbQuery } from '../lib/db';
 import { cached } from '../lib/cache';
 import { CACHE, TTL, invalidateCouponCaches } from '../lib/cacheKeys';
 import { verifyAdmin } from './admin';
@@ -113,9 +113,9 @@ router.post('/validate', async (req: Request, res: Response) => {
           };
         }
 
-        const coupons = await sql`
+        const coupons = await dbQuery(() => sql`
           SELECT * FROM coupons WHERE id = ${couponId} LIMIT 1
-        `;
+        `, 'coupons:q1');
         const coupon = coupons[0] as Coupon;
 
         return {
@@ -199,9 +199,9 @@ router.get('/:id', verifyAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    const coupon = await sql`
+    const coupon = await dbQuery(() => sql`
       SELECT * FROM coupons WHERE id = ${id}
-    `;
+    `, 'coupons:q2');
 
     if (!coupon || coupon.length === 0) {
       return res.status(404).json({
@@ -211,13 +211,13 @@ router.get('/:id', verifyAdmin, async (req: Request, res: Response) => {
     }
 
     // Get usage stats
-    const usageStats = await sql`
+    const usageStats = await dbQuery(() => sql`
       SELECT 
         COUNT(*) as total_uses,
         COALESCE(SUM(discount_amount), 0) as total_discount_given
       FROM coupon_usage 
       WHERE coupon_id = ${id}
-    `;
+    `, 'coupons:q3');
 
     res.json({
       success: true,
@@ -271,9 +271,9 @@ router.post('/', verifyAdmin, async (req: Request, res: Response) => {
     }
 
     // Check for duplicate code
-    const existing = await sql`
+    const existing = await dbQuery(() => sql`
       SELECT id FROM coupons WHERE UPPER(code) = UPPER(${couponData.code.trim()})
-    `;
+    `, 'coupons:q4');
 
     if (existing && existing.length > 0) {
       return res.status(400).json({
@@ -282,7 +282,7 @@ router.post('/', verifyAdmin, async (req: Request, res: Response) => {
       });
     }
 
-    const result = await sql`
+    const result = await dbQuery(() => sql`
       INSERT INTO coupons (
         code, description, discount_type, discount_value,
         minimum_order, maximum_discount, max_uses, max_uses_per_customer,
@@ -303,7 +303,7 @@ router.post('/', verifyAdmin, async (req: Request, res: Response) => {
         ${couponData.applies_to_ids || null}
       )
       RETURNING *
-    `;
+    `, 'coupons:q5');
 
     invalidateCouponCaches();
 
@@ -327,7 +327,7 @@ router.put('/:id', verifyAdmin, async (req: Request, res: Response) => {
     const updates: Partial<Coupon> = req.body;
 
     // Check coupon exists
-    const existing = await sql`SELECT id FROM coupons WHERE id = ${id}`;
+    const existing = await dbQuery(() => sql`SELECT id FROM coupons WHERE id = ${id}`, 'coupons:q6');
     if (!existing || existing.length === 0) {
       return res.status(404).json({
         success: false,
@@ -337,10 +337,11 @@ router.put('/:id', verifyAdmin, async (req: Request, res: Response) => {
 
     // Check for duplicate code if code is being updated
     if (updates.code) {
-      const duplicate = await sql`
+      const code = updates.code.trim();
+      const duplicate = await dbQuery(() => sql`
         SELECT id FROM coupons 
-        WHERE UPPER(code) = UPPER(${updates.code.trim()}) AND id != ${id}
-      `;
+        WHERE UPPER(code) = UPPER(${code}) AND id != ${id}
+      `, 'coupons:q7');
       if (duplicate && duplicate.length > 0) {
         return res.status(400).json({
           success: false,
@@ -349,7 +350,7 @@ router.put('/:id', verifyAdmin, async (req: Request, res: Response) => {
       }
     }
 
-    const result = await sql`
+    const result = await dbQuery(() => sql`
       UPDATE coupons SET
         code = COALESCE(${updates.code?.trim().toUpperCase() || null}, code),
         description = COALESCE(${updates.description || null}, description),
@@ -367,7 +368,7 @@ router.put('/:id', verifyAdmin, async (req: Request, res: Response) => {
         updated_at = NOW()
       WHERE id = ${id}
       RETURNING *
-    `;
+    `, 'coupons:q8');
 
     invalidateCouponCaches();
 
@@ -387,13 +388,13 @@ router.patch('/:id/toggle', verifyAdmin, async (req: Request, res: Response) => 
   try {
     const { id } = req.params;
 
-    const result = await sql`
+    const result = await dbQuery(() => sql`
       UPDATE coupons SET
         is_active = NOT is_active,
         updated_at = NOW()
       WHERE id = ${id}
       RETURNING *
-    `;
+    `, 'coupons:q9');
 
     if (!result || result.length === 0) {
       return res.status(404).json({
@@ -420,10 +421,10 @@ router.delete('/:id', verifyAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    const result = await sql`
+    const result = await dbQuery(() => sql`
       DELETE FROM coupons WHERE id = ${id}
       RETURNING id
-    `;
+    `, 'coupons:q10');
 
     if (!result || result.length === 0) {
       return res.status(404).json({
@@ -450,7 +451,7 @@ router.get('/:id/usage', verifyAdmin, async (req: Request, res: Response) => {
     const { id } = req.params;
     const { limit = 50, offset = 0 } = req.query;
 
-    const usage = await sql`
+    const usage = await dbQuery(() => sql`
       SELECT 
         cu.*,
         o.order_number
@@ -459,11 +460,11 @@ router.get('/:id/usage', verifyAdmin, async (req: Request, res: Response) => {
       WHERE cu.coupon_id = ${id}
       ORDER BY cu.used_at DESC
       LIMIT ${Number(limit)} OFFSET ${Number(offset)}
-    `;
+    `, 'coupons:q11');
 
-    const countResult = await sql`
+    const countResult = await dbQuery(() => sql`
       SELECT COUNT(*) as count FROM coupon_usage WHERE coupon_id = ${id}
-    `;
+    `, 'coupons:q12');
 
     res.json({
       success: true,

@@ -41,18 +41,18 @@ If the user did not mention testing, **skip** `npm test`, `npm run test:all`, Pl
 
 | Suite | Tool | Location | Count | Needs live DB? |
 |-------|------|----------|-------|----------------|
-| Backend unit | Vitest | `Tests/backend/` | 22 files, 82 tests | No (mocked) |
+| Backend unit | Vitest | `Tests/backend/` | 23 files, 84 tests | No (mocked) |
 | API integration | Vitest + Supertest | `Tests/api/` | 18 files, 45 tests | No (mocked) |
-| Frontend E2E / UI | Playwright | `Tests/frontend/` | 12 files, 29 tests | No (mocked `/api` + static preview) |
+| Frontend E2E / UI | Playwright | `Tests/frontend/` | 13 files, 37 tests | No (mocked `/api` + static preview) |
 | Link checker | Custom script | repo root | — | No |
 
-**Total:** 156 automated tests — 82 backend unit + 45 API + 29 Playwright UI (desktop + mobile projects).
+**Total:** 167 automated tests — 84 backend unit + 46 API + 37 Playwright UI (desktop + mobile projects).
 
 Backend unit tests include: payment idempotency, order tokens, checkout exchange hashing, order token encryption, webhook errors, product image validation, admin session hashing, PayPal webhook utils, refund idempotency, checkout pricing, coupon scope (`applies_to`), `computeCheckoutPricingForCart`, RLS table list + bootstrap contract, RLS grant revoke under `BOOTSTRAP_SKIP_DDL`, email portal URL (`buildOrderPortalUrl`), client IP, keep-alive.
 
 API tests include: checkout (incl. client amount mismatch + policy acceptance), create-payment happy path (mocked PayPal + exchange), capture 409 reconciliation, capture refund mismatch, checkout-context recovery, checkout exchange, PayPal webhook COMPLETED/DENIED, admin mark-paid (validation + success), no-refund policy (admin refund/cancel 403), health, orders, security, activity batch/log, order lookup, reviews check.
 
-Playwright includes: payment-success missing-token UX, orders legacy URL deprecation + `?code=` email redeem, checkout server/client total mismatch block, checkout country pre-select, admin login redirect + dashboard analytics smoke.
+Playwright includes: payment-success missing-token UX, orders legacy URL deprecation + `?code=` email redeem, checkout server/client total mismatch block, checkout country pre-select, admin login redirect + dashboard analytics smoke, **deep flows** (`deep-flows-ui.spec.ts`: catalog `?q=` search, product trust badges + reviews, checkout policy gate + coupon + create-payment, cart quantity, payment-success 409 processing UI).
 
 ---
 

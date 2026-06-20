@@ -1,7 +1,7 @@
 // backend/src/routes/reviews.ts - Customer Reviews API
 import { logger } from '../lib/logger';
 import { Router, Request, Response } from 'express';
-import sql from '../lib/db';
+import sql, { query as dbQuery } from '../lib/db';
 import { parsePagination, paginationMeta } from '../lib/pagination';
 import { verifyAdmin } from './admin';
 import { sanitizeString } from '../utils/sanitize';
@@ -57,7 +57,7 @@ router.get('/product/:productId', async (req: Request, res: Response) => {
     let reviews;
     
     if (rating && verified_only === 'true') {
-      reviews = await sql`
+      reviews = await dbQuery(() => sql`
         SELECT * FROM reviews 
         WHERE product_id = ${parseInt(productId)}
           AND status = 'approved'
@@ -69,9 +69,9 @@ router.get('/product/:productId', async (req: Request, res: Response) => {
                   sort_by === 'oldest' ? sql`created_at ASC` :
                   sql`created_at DESC`}
         LIMIT ${limitNum} OFFSET ${offset}
-      `;
+      `, 'reviews:q1');
     } else if (rating) {
-      reviews = await sql`
+      reviews = await dbQuery(() => sql`
         SELECT * FROM reviews 
         WHERE product_id = ${parseInt(productId)}
           AND status = 'approved'
@@ -82,9 +82,9 @@ router.get('/product/:productId', async (req: Request, res: Response) => {
                   sort_by === 'oldest' ? sql`created_at ASC` :
                   sql`created_at DESC`}
         LIMIT ${limitNum} OFFSET ${offset}
-      `;
+      `, 'reviews:q2');
     } else if (verified_only === 'true') {
-      reviews = await sql`
+      reviews = await dbQuery(() => sql`
         SELECT * FROM reviews 
         WHERE product_id = ${parseInt(productId)}
           AND status = 'approved'
@@ -95,9 +95,9 @@ router.get('/product/:productId', async (req: Request, res: Response) => {
                   sort_by === 'oldest' ? sql`created_at ASC` :
                   sql`created_at DESC`}
         LIMIT ${limitNum} OFFSET ${offset}
-      `;
+      `, 'reviews:q3');
     } else {
-      reviews = await sql`
+      reviews = await dbQuery(() => sql`
         SELECT * FROM reviews 
         WHERE product_id = ${parseInt(productId)}
           AND status = 'approved'
@@ -107,11 +107,11 @@ router.get('/product/:productId', async (req: Request, res: Response) => {
                   sort_by === 'oldest' ? sql`created_at ASC` :
                   sql`created_at DESC`}
         LIMIT ${limitNum} OFFSET ${offset}
-      `;
+      `, 'reviews:q4');
     }
 
     // Get total count and rating breakdown
-    const stats = await sql`
+    const stats = await dbQuery(() => sql`
       SELECT 
         COUNT(*) as total_reviews,
         COALESCE(AVG(rating)::DECIMAL(3,2), 0) as average_rating,
@@ -125,7 +125,7 @@ router.get('/product/:productId', async (req: Request, res: Response) => {
       FROM reviews 
       WHERE product_id = ${parseInt(productId)}
         AND status = 'approved'
-    `;
+    `, 'reviews:q5');
 
     res.json({
       success: true,
@@ -178,7 +178,7 @@ router.post('/admin', verifyAdmin, async (req: Request, res: Response) => {
         ? sanitizeString(String(customer_email)).toLowerCase().slice(0, 255)
         : `admin-review-${Date.now()}@internal.local`;
 
-    const productExists = await sql`SELECT id FROM products WHERE id = ${product_id} LIMIT 1`;
+    const productExists = await dbQuery(() => sql`SELECT id FROM products WHERE id = ${product_id} LIMIT 1`, 'reviews:q6');
     if (!productExists.length) {
       return res.status(400).json({ success: false, error: 'Product not found' });
     }
@@ -187,7 +187,7 @@ router.post('/admin', verifyAdmin, async (req: Request, res: Response) => {
     const sanitizedContent = content ? sanitizeString(content) : null;
     const sanitizedName = sanitizeString(customer_name);
 
-    const result = await sql`
+    const result = await dbQuery(() => sql`
       INSERT INTO reviews (
         product_id, customer_email, customer_name, rating, title, content,
         is_verified_purchase, is_recommended, status
@@ -203,7 +203,7 @@ router.post('/admin', verifyAdmin, async (req: Request, res: Response) => {
         ${status}
       )
       RETURNING *
-    `;
+    `, 'reviews:q7');
 
     res.status(201).json({ success: true, data: result[0] });
   } catch (error: unknown) {
@@ -249,7 +249,7 @@ router.post('/', async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: 'Valid email is required' });
     }
 
-    const productExists = await sql`SELECT id FROM products WHERE id = ${product_id} LIMIT 1`;
+    const productExists = await dbQuery(() => sql`SELECT id FROM products WHERE id = ${product_id} LIMIT 1`, 'reviews:q8');
     if (!productExists.length) {
       return res.status(400).json({
         success: false,
@@ -257,12 +257,12 @@ router.post('/', async (req: Request, res: Response) => {
       });
     }
 
-    const existingReview = await sql`
+    const existingReview = await dbQuery(() => sql`
       SELECT id FROM reviews 
       WHERE product_id = ${product_id} 
         AND customer_email = ${normalizedEmail}
       LIMIT 1
-    `;
+    `, 'reviews:q9');
 
     if (existingReview.length > 0) {
       return res.status(400).json({
@@ -283,7 +283,7 @@ router.post('/', async (req: Request, res: Response) => {
     const sanitizedCons = cons?.map((c) => sanitizeString(c)).filter(Boolean) || [];
     const sanitizedImages = sanitizeReviewImages(images);
 
-    const result = await sql`
+    const result = await dbQuery(() => sql`
       INSERT INTO reviews (
         product_id,
         customer_email,
@@ -314,7 +314,7 @@ router.post('/', async (req: Request, res: Response) => {
         'pending'
       )
       RETURNING *
-    `;
+    `, 'reviews:q10');
 
     res.status(201).json({
       success: true,
@@ -341,9 +341,9 @@ router.post('/:id/vote', async (req: Request, res: Response) => {
       });
     }
 
-    const reviewRow = await sql`
+    const reviewRow = await dbQuery(() => sql`
       SELECT id, status FROM reviews WHERE id = ${id} LIMIT 1
-    `;
+    `, 'reviews:q11');
     if (!reviewRow.length || reviewRow[0].status !== 'approved') {
       return res.status(404).json({
         success: false,
@@ -352,23 +352,23 @@ router.post('/:id/vote', async (req: Request, res: Response) => {
     }
 
     // Check if already voted
-    const existingVote = await sql`
+    const existingVote = await dbQuery(() => sql`
       SELECT id, vote_type FROM review_votes 
       WHERE review_id = ${id} 
         AND voter_identifier = ${voter_identifier}
       LIMIT 1
-    `;
+    `, 'reviews:q12');
 
     if (existingVote.length > 0) {
       // If same vote, remove it (toggle off)
       if (existingVote[0].vote_type === vote_type) {
-        await sql`DELETE FROM review_votes WHERE id = ${existingVote[0].id}`;
+        await dbQuery(() => sql`DELETE FROM review_votes WHERE id = ${existingVote[0].id}`, 'reviews:q13');
         
         // Update review counts
         if (vote_type === 'helpful') {
-          await sql`UPDATE reviews SET helpful_count = helpful_count - 1 WHERE id = ${id}`;
+          await dbQuery(() => sql`UPDATE reviews SET helpful_count = helpful_count - 1 WHERE id = ${id}`, 'reviews:q14');
         } else {
-          await sql`UPDATE reviews SET not_helpful_count = not_helpful_count - 1 WHERE id = ${id}`;
+          await dbQuery(() => sql`UPDATE reviews SET not_helpful_count = not_helpful_count - 1 WHERE id = ${id}`, 'reviews:q15');
         }
         
         return res.json({
@@ -379,25 +379,25 @@ router.post('/:id/vote', async (req: Request, res: Response) => {
       }
       
       // If different vote, update it
-      await sql`
+      await dbQuery(() => sql`
         UPDATE review_votes 
         SET vote_type = ${vote_type}, created_at = NOW()
         WHERE id = ${existingVote[0].id}
-      `;
+      `, 'reviews:q16');
       
       // Update review counts
       if (vote_type === 'helpful') {
-        await sql`
+        await dbQuery(() => sql`
           UPDATE reviews 
           SET helpful_count = helpful_count + 1, not_helpful_count = not_helpful_count - 1 
           WHERE id = ${id}
-        `;
+        `, 'reviews:q17');
       } else {
-        await sql`
+        await dbQuery(() => sql`
           UPDATE reviews 
           SET helpful_count = helpful_count - 1, not_helpful_count = not_helpful_count + 1 
           WHERE id = ${id}
-        `;
+        `, 'reviews:q18');
       }
       
       return res.json({
@@ -408,16 +408,16 @@ router.post('/:id/vote', async (req: Request, res: Response) => {
     }
 
     // Create new vote
-    await sql`
+    await dbQuery(() => sql`
       INSERT INTO review_votes (review_id, voter_identifier, vote_type)
       VALUES (${id}, ${voter_identifier}, ${vote_type})
-    `;
+    `, 'reviews:q19');
 
     // Update review count
     if (vote_type === 'helpful') {
-      await sql`UPDATE reviews SET helpful_count = helpful_count + 1 WHERE id = ${id}`;
+      await dbQuery(() => sql`UPDATE reviews SET helpful_count = helpful_count + 1 WHERE id = ${id}`, 'reviews:q20');
     } else {
-      await sql`UPDATE reviews SET not_helpful_count = not_helpful_count + 1 WHERE id = ${id}`;
+      await dbQuery(() => sql`UPDATE reviews SET not_helpful_count = not_helpful_count + 1 WHERE id = ${id}`, 'reviews:q21');
     }
 
     res.json({
@@ -450,7 +450,7 @@ router.get('/', verifyAdmin, async (req: Request, res: Response) => {
     let countResult;
     
     if (statusStr && productIdNum !== undefined) {
-      reviews = await sql`
+      reviews = await dbQuery(() => sql`
         SELECT r.*, p.name as product_name
         FROM reviews r
         LEFT JOIN products p ON r.product_id = p.id
@@ -458,48 +458,48 @@ router.get('/', verifyAdmin, async (req: Request, res: Response) => {
           AND r.product_id = ${productIdNum}
         ORDER BY r.created_at DESC
         LIMIT ${limitNum} OFFSET ${offset}
-      `;
-      countResult = await sql`
+      `, 'reviews:q22');
+      countResult = await dbQuery(() => sql`
         SELECT COUNT(*) as total FROM reviews 
         WHERE status = ${statusStr} AND product_id = ${productIdNum}
-      `;
+      `, 'reviews:q23');
     } else if (statusStr) {
-      reviews = await sql`
+      reviews = await dbQuery(() => sql`
         SELECT r.*, p.name as product_name
         FROM reviews r
         LEFT JOIN products p ON r.product_id = p.id
         WHERE r.status = ${statusStr}
         ORDER BY r.created_at DESC
         LIMIT ${limitNum} OFFSET ${offset}
-      `;
-      countResult = await sql`
+      `, 'reviews:q24');
+      countResult = await dbQuery(() => sql`
         SELECT COUNT(*) as total FROM reviews WHERE status = ${statusStr}
-      `;
+      `, 'reviews:q25');
     } else if (productIdNum !== undefined) {
-      reviews = await sql`
+      reviews = await dbQuery(() => sql`
         SELECT r.*, p.name as product_name
         FROM reviews r
         LEFT JOIN products p ON r.product_id = p.id
         WHERE r.product_id = ${productIdNum}
         ORDER BY r.created_at DESC
         LIMIT ${limitNum} OFFSET ${offset}
-      `;
-      countResult = await sql`
+      `, 'reviews:q26');
+      countResult = await dbQuery(() => sql`
         SELECT COUNT(*) as total FROM reviews WHERE product_id = ${productIdNum}
-      `;
+      `, 'reviews:q27');
     } else {
-      reviews = await sql`
+      reviews = await dbQuery(() => sql`
         SELECT r.*, p.name as product_name
         FROM reviews r
         LEFT JOIN products p ON r.product_id = p.id
         ORDER BY r.created_at DESC
         LIMIT ${limitNum} OFFSET ${offset}
-      `;
-      countResult = await sql`SELECT COUNT(*) as total FROM reviews`;
+      `, 'reviews:q28');
+      countResult = await dbQuery(() => sql`SELECT COUNT(*) as total FROM reviews`, 'reviews:q29');
     }
 
     // Get stats
-    const stats = await sql`
+    const stats = await dbQuery(() => sql`
       SELECT 
         COUNT(*) as total,
         COUNT(*) FILTER (WHERE status = 'pending') as pending,
@@ -507,7 +507,7 @@ router.get('/', verifyAdmin, async (req: Request, res: Response) => {
         COUNT(*) FILTER (WHERE status = 'rejected') as rejected,
         COUNT(*) FILTER (WHERE status = 'flagged') as flagged
       FROM reviews
-    `;
+    `, 'reviews:q30');
 
     res.json({
       success: true,
@@ -548,7 +548,7 @@ router.patch('/:id', verifyAdmin, async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: 'Rating must be between 1 and 5' });
     }
 
-    const existing = await sql`SELECT id FROM reviews WHERE id = ${id} LIMIT 1`;
+    const existing = await dbQuery(() => sql`SELECT id FROM reviews WHERE id = ${id} LIMIT 1`, 'reviews:q31');
     if (!existing.length) {
       return res.status(404).json({ success: false, error: 'Review not found' });
     }
@@ -563,13 +563,13 @@ router.patch('/:id', verifyAdmin, async (req: Request, res: Response) => {
         : undefined;
 
     if (product_id !== undefined) {
-      const productExists = await sql`SELECT id FROM products WHERE id = ${product_id} LIMIT 1`;
+      const productExists = await dbQuery(() => sql`SELECT id FROM products WHERE id = ${product_id} LIMIT 1`, 'reviews:q32');
       if (!productExists.length) {
         return res.status(400).json({ success: false, error: 'Product not found' });
       }
     }
 
-    const result = await sql`
+    const result = await dbQuery(() => sql`
       UPDATE reviews SET
         product_id = COALESCE(${product_id ?? null}, product_id),
         status = COALESCE(${status ?? null}, status),
@@ -593,7 +593,7 @@ router.patch('/:id', verifyAdmin, async (req: Request, res: Response) => {
         updated_at = NOW()
       WHERE id = ${id}
       RETURNING *
-    `;
+    `, 'reviews:q33');
 
     res.json({ success: true, data: result[0] });
   } catch (error: unknown) {
@@ -607,9 +607,9 @@ router.delete('/:id', verifyAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    const result = await sql`
+    const result = await dbQuery(() => sql`
       DELETE FROM reviews WHERE id = ${id} RETURNING id, product_id
-    `;
+    `, 'reviews:q34');
 
     if (result.length === 0) {
       return res.status(404).json({
@@ -634,9 +634,9 @@ async function checkReviewEligibility(productId: number, email: string) {
     return { status: 400 as const, error: 'Invalid email' };
   }
 
-  const product = await sql`
+  const product = await dbQuery(() => sql`
     SELECT id FROM products WHERE id = ${productId} LIMIT 1
-  `;
+  `, 'reviews:q35');
   if (!product.length) {
     return {
       status: 200 as const,
@@ -647,12 +647,12 @@ async function checkReviewEligibility(productId: number, email: string) {
     };
   }
 
-  const existingReview = await sql`
+  const existingReview = await dbQuery(() => sql`
     SELECT 1 FROM reviews
     WHERE product_id = ${productId}
       AND customer_email = ${normalizedEmail}
     LIMIT 1
-  `;
+  `, 'reviews:q36');
 
   const canReview = existingReview.length === 0;
   return {

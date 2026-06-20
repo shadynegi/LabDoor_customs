@@ -237,7 +237,7 @@ export async function query<T>(queryFn: () => Promise<T>, label?: string): Promi
   totalQueries++;
 
   try {
-    return await withRetry(queryFn);
+    return await withRetry(queryFn, { label });
   } finally {
     activeConnections--;
     const duration = Date.now() - startTime;

@@ -3,7 +3,7 @@ import { logger } from '../lib/logger';
 import { respond500 } from '../lib/safeError';
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
-import sql from '../lib/db';
+import sql, { query as dbQuery } from '../lib/db';
 import { parsePagination, paginationMeta } from '../lib/pagination';
 import { verifyAdmin } from './admin';
 import { getClientIp } from '../lib/clientIp';
@@ -50,13 +50,22 @@ async function bumpProductMetric(actionType: string, entityId: string | number |
   const id = typeof entityId === 'string' ? parseInt(entityId, 10) : entityId;
   if (!Number.isFinite(id)) return;
 
-  const exists = await sql`SELECT id FROM products WHERE id = ${id} LIMIT 1`;
+  const exists = await dbQuery(
+    () => sql`SELECT id FROM products WHERE id = ${id} LIMIT 1`,
+    'activity:productExists'
+  );
   if (!exists.length) return;
 
   if (actionType === 'product_view') {
-    await sql`UPDATE products SET view_count = view_count + 1 WHERE id = ${id}`.catch(() => {});
+    await dbQuery(
+      () => sql`UPDATE products SET view_count = view_count + 1 WHERE id = ${id}`,
+      'activity:bumpView'
+    ).catch(() => {});
   } else if (actionType === 'add_to_cart') {
-    await sql`UPDATE products SET cart_count = cart_count + 1 WHERE id = ${id}`.catch(() => {});
+    await dbQuery(
+      () => sql`UPDATE products SET cart_count = cart_count + 1 WHERE id = ${id}`,
+      'activity:bumpCart'
+    ).catch(() => {});
   }
 }
 
@@ -96,7 +105,8 @@ router.post('/log', async (req: Request, res: Response) => {
       referrer,
     });
 
-    await sql`
+    await dbQuery(
+      () => sql`
       INSERT INTO activity_logs (
         session_id, user_email, action_type, entity_type, entity_id,
         entity_name, metadata, ip_address, user_agent, page_url, referrer
@@ -113,7 +123,9 @@ router.post('/log', async (req: Request, res: Response) => {
         ${clean.pageUrl},
         ${clean.referrer}
       )
-    `;
+    `,
+      'activity:log'
+    );
 
     if (
       (actionType === 'product_view' || actionType === 'add_to_cart') &&
@@ -174,7 +186,8 @@ router.post('/batch', async (req: Request, res: Response) => {
           referrer: activity.referrer,
         });
 
-        const rows = await sql`
+        const rows = await dbQuery(
+          () => sql`
           INSERT INTO activity_logs (
             session_id, user_email, action_type, entity_type, entity_id,
             entity_name, metadata, ip_address, user_agent, page_url, referrer
@@ -192,7 +205,9 @@ router.post('/batch', async (req: Request, res: Response) => {
             ${clean.referrer}
           )
           RETURNING id
-        `;
+        `,
+          'activity:batchInsert'
+        );
         if (rows.length) inserted += 1;
 
         if (
@@ -291,8 +306,10 @@ router.get('/logs', verifyAdmin, async (req: Request, res: Response) => {
     const start = startDate ? String(startDate) : null;
     const end = endDate ? String(endDate) : null;
 
-    const [logs, countResult] = await Promise.all([
-      sql`
+    const [logs, countResult] = await dbQuery(
+      () =>
+        Promise.all([
+          sql`
         SELECT * FROM activity_logs
         WHERE 1=1
         ${action ? sql`AND action_type = ${action}` : sql``}
@@ -303,7 +320,7 @@ router.get('/logs', verifyAdmin, async (req: Request, res: Response) => {
         ORDER BY created_at DESC
         LIMIT ${limit} OFFSET ${offset}
       `,
-      sql`
+          sql`
         SELECT COUNT(*) as count FROM activity_logs
         WHERE 1=1
         ${action ? sql`AND action_type = ${action}` : sql``}
@@ -312,7 +329,9 @@ router.get('/logs', verifyAdmin, async (req: Request, res: Response) => {
         ${start ? sql`AND created_at >= ${start}::timestamptz` : sql``}
         ${end ? sql`AND created_at <= ${end}::timestamptz` : sql``}
       `,
-    ]);
+        ]),
+      'activity:logs'
+    );
 
     const total = parseInt(countResult[0]?.count || '0');
 
@@ -334,14 +353,17 @@ router.get('/logs', verifyAdmin, async (req: Request, res: Response) => {
 // GET /activity/stats - Get activity statistics (admin only)
 router.get('/stats', verifyAdmin, async (req: Request, res: Response) => {
   try {
-    const actionBreakdown = await sql`
+    const [actionBreakdown, dailyActivity, uniqueStats, topPages, topProductViews, topProductCartAdds] =
+      await dbQuery(
+        () =>
+          Promise.all([
+            sql`
       SELECT action_type, COUNT(*) as count
       FROM activity_logs
       GROUP BY action_type
       ORDER BY count DESC
-    `;
-
-    const dailyActivity = await sql`
+    `,
+            sql`
       SELECT
         DATE(created_at) as date,
         COUNT(*) as total_actions,
@@ -354,43 +376,42 @@ router.get('/stats', verifyAdmin, async (req: Request, res: Response) => {
       WHERE created_at >= NOW() - INTERVAL '30 days'
       GROUP BY DATE(created_at)
       ORDER BY date DESC
-    `;
-
-    const uniqueStats = await sql`
+    `,
+            sql`
       SELECT
         COUNT(DISTINCT session_id) as unique_sessions,
         COUNT(DISTINCT user_email) FILTER (WHERE user_email IS NOT NULL) as unique_users,
         COUNT(DISTINCT ip_address) as unique_ips
       FROM activity_logs
       WHERE created_at >= NOW() - INTERVAL '30 days'
-    `;
-
-    const topPages = await sql`
+    `,
+            sql`
       SELECT page_url, COUNT(*) as views
       FROM activity_logs
       WHERE action_type = 'page_view' AND page_url IS NOT NULL
       GROUP BY page_url
       ORDER BY views DESC
       LIMIT 10
-    `;
-
-    const topProductViews = await sql`
+    `,
+            sql`
       SELECT entity_id, entity_name, COUNT(*) as views
       FROM activity_logs
       WHERE action_type = 'product_view' AND entity_id IS NOT NULL
       GROUP BY entity_id, entity_name
       ORDER BY views DESC
       LIMIT 10
-    `;
-
-    const topProductCartAdds = await sql`
+    `,
+            sql`
       SELECT entity_id, entity_name, COUNT(*) as cart_adds
       FROM activity_logs
       WHERE action_type = 'add_to_cart' AND entity_id IS NOT NULL
       GROUP BY entity_id, entity_name
       ORDER BY cart_adds DESC
       LIMIT 10
-    `;
+    `,
+          ]),
+        'activity:stats'
+      );
 
     res.json({
       success: true,

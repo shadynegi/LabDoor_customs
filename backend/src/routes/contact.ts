@@ -2,7 +2,7 @@
 import { logger } from '../lib/logger';
 import { respond500 } from '../lib/safeError';
 import { Router, Request, Response } from 'express';
-import sql from '../lib/db';
+import sql, { query as dbQuery } from '../lib/db';
 import { emailService } from '../lib/email';
 import { verifyAdmin } from './admin';
 import { sanitizeContactForm } from '../utils/sanitize';
@@ -104,7 +104,7 @@ router.post('/', async (req: Request, res: Response) => {
       message: message.trim(),
     };
 
-    const result = await sql`
+    const result = await dbQuery(() => sql`
       INSERT INTO contact_messages (name, email, subject, message, status)
       VALUES (
         ${contactData.name}, 
@@ -114,7 +114,7 @@ router.post('/', async (req: Request, res: Response) => {
         'new'
       )
       RETURNING *
-    `;
+    `, 'contact:q1');
 
     // Send auto-reply (don't await - send in background)
     emailService.sendContactFormReply(
@@ -152,20 +152,20 @@ router.get('/', verifyAdmin, async (req: Request, res: Response) => {
 
     if (status) {
       const statusStr = String(status);
-      messages = await sql`
+      messages = await dbQuery(() => sql`
         SELECT * FROM contact_messages 
         WHERE status = ${statusStr}
         ORDER BY created_at DESC
         LIMIT ${limit} OFFSET ${offset}
-      `;
-      countResult = await sql`SELECT COUNT(*) as count FROM contact_messages WHERE status = ${statusStr}`;
+      `, 'contact:q2');
+      countResult = await dbQuery(() => sql`SELECT COUNT(*) as count FROM contact_messages WHERE status = ${statusStr}`, 'contact:q3');
     } else {
-      messages = await sql`
+      messages = await dbQuery(() => sql`
         SELECT * FROM contact_messages 
         ORDER BY created_at DESC
         LIMIT ${limit} OFFSET ${offset}
-      `;
-      countResult = await sql`SELECT COUNT(*) as count FROM contact_messages`;
+      `, 'contact:q4');
+      countResult = await dbQuery(() => sql`SELECT COUNT(*) as count FROM contact_messages`, 'contact:q5');
     }
 
     const totalCount = Number(countResult[0].count);
@@ -185,10 +185,10 @@ router.get('/', verifyAdmin, async (req: Request, res: Response) => {
 // GET contact statistics (Admin dashboard) — must be before /:id
 router.get('/stats/summary', verifyAdmin, async (req: Request, res: Response) => {
   try {
-    const messages = await sql`
+    const messages = await dbQuery(() => sql`
       SELECT status, created_at 
       FROM contact_messages
-    `;
+    `, 'contact:q6');
 
     const stats = {
       total: messages?.length || 0,
@@ -213,11 +213,11 @@ router.get('/:id', verifyAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    const message = await sql`
+    const message = await dbQuery(() => sql`
       SELECT * FROM contact_messages 
       WHERE id = ${id}
       LIMIT 1
-    `;
+    `, 'contact:q7');
 
     if (!message || message.length === 0) {
       return res.status(404).json({
@@ -230,11 +230,11 @@ router.get('/:id', verifyAdmin, async (req: Request, res: Response) => {
 
     // Auto-mark as read when viewed
     if (data.status === 'new') {
-      await sql`
+      await dbQuery(() => sql`
         UPDATE contact_messages 
         SET status = 'read', updated_at = NOW()
         WHERE id = ${id}
-      `;
+      `, 'contact:q8');
       data.status = 'read';
     }
 
@@ -269,12 +269,12 @@ router.patch('/:id/status', verifyAdmin, async (req: Request, res: Response) => 
       });
     }
 
-    const result = await sql`
+    const result = await dbQuery(() => sql`
       UPDATE contact_messages 
       SET status = ${status}, updated_at = NOW()
       WHERE id = ${id}
       RETURNING *
-    `;
+    `, 'contact:q9');
 
     if (!result || result.length === 0) {
       return res.status(404).json({
@@ -299,11 +299,11 @@ router.delete('/:id', verifyAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    const result = await sql`
+    const result = await dbQuery(() => sql`
       DELETE FROM contact_messages 
       WHERE id = ${id}
       RETURNING id
-    `;
+    `, 'contact:q10');
 
     if (!result || result.length === 0) {
       return res.status(404).json({

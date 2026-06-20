@@ -28,7 +28,7 @@ Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_
 - No PayPal dispute/chargeback webhook handlers
 - Sentry release/source maps not wired in CI
 - Frontend security headers depend on static host configuration
-- E2E coverage is smoke-level only
+- E2E coverage includes smoke + deep mocked flows (`deep-flows-ui.spec.ts`); live PayPal still manual
 - OpenAPI specification not generated
 
 ## Deferred by design

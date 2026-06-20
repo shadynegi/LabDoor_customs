@@ -1,7 +1,7 @@
 // backend/src/routes/admin.ts - Admin authentication and management
 import { logger } from '../lib/logger';
 import { Router, Request, Response, NextFunction } from 'express';
-import sql, { runInChunks, withRetry } from '../lib/db';
+import sql, { runInChunks, withRetry, query as dbQuery } from '../lib/db';
 import { invalidateProductCaches } from '../lib/cacheKeys';
 import { parsePagination, paginationMeta } from '../lib/pagination';
 import crypto from 'crypto';
@@ -73,11 +73,11 @@ const verifyPassword = async (password: string, credentials: ReturnType<typeof g
 // Clean up expired admin sessions
 const cleanupExpiredSessions = async (): Promise<{ deleted: number }> => {
   try {
-    const result = await sql`
+    const result = await dbQuery(() => sql`
       DELETE FROM admin_sessions 
       WHERE expires_at < NOW()
       RETURNING id
-    `;
+    `, 'admin:q1');
     const deleted = result.length;
     if (deleted > 0) {
       logger.info(`🧹 Cleaned up ${deleted} expired admin session(s)`);
@@ -93,7 +93,7 @@ const cleanupExpiredSessions = async (): Promise<{ deleted: number }> => {
 const cleanupUserSessions = async (username: string, keepCount: number = 5): Promise<void> => {
   try {
     // Delete oldest sessions, keeping only the most recent ones
-    await sql`
+    await dbQuery(() => sql`
       DELETE FROM admin_sessions 
       WHERE username = ${username}
       AND id NOT IN (
@@ -102,7 +102,7 @@ const cleanupUserSessions = async (username: string, keepCount: number = 5): Pro
         ORDER BY created_at DESC 
         LIMIT ${keepCount}
       )
-    `;
+    `, 'admin:q2');
   } catch (error) {
     logger.error('User session cleanup error:', error);
   }
@@ -265,10 +265,14 @@ router.post('/login', async (req: Request, res: Response) => {
     
     if (username !== adminCreds.username || !isValidPassword) {
       // Log failed login attempt
-      await sql`
+      await dbQuery(
+        () =>
+          sql`
         INSERT INTO activity_logs (action_type, metadata, ip_address, user_agent)
         VALUES ('admin_login_failed', ${JSON.stringify({ username })}, ${ipAddress}, ${userAgent})
-      `.catch(() => {}); // Don't fail if logging fails
+      `,
+        'admin:loginFailed'
+      ).catch(() => {});
 
       return res.status(401).json({
         success: false,
@@ -287,16 +291,22 @@ router.post('/login', async (req: Request, res: Response) => {
 
     // Store session in database
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-    await sql`
+    await dbQuery(
+      () => sql`
       INSERT INTO admin_sessions (token, username, ip_address, user_agent, expires_at)
       VALUES (${tokenHash}, ${username}, ${ipAddress}, ${userAgent}, ${expiresAt})
-    `;
+    `,
+      'admin:storeSession'
+    );
 
     // Log successful login
-    await sql`
+    await dbQuery(
+      () => sql`
       INSERT INTO activity_logs (action_type, metadata, ip_address, user_agent)
       VALUES ('admin_login_success', ${JSON.stringify({ username })}, ${ipAddress}, ${userAgent})
-    `.catch(() => {});
+    `,
+      'admin:loginSuccess'
+    ).catch(() => {});
 
     res.cookie(ADMIN_SESSION_COOKIE, token, adminSessionCookieOptions);
 
@@ -358,7 +368,10 @@ router.post('/logout', verifyAdmin, async (req: Request, res: Response) => {
 
     if (token) {
       const tokenHash = hashAdminSessionToken(token);
-      await sql`DELETE FROM admin_sessions WHERE token = ${tokenHash}`.catch(() => {});
+      await dbQuery(
+        () => sql`DELETE FROM admin_sessions WHERE token = ${tokenHash}`,
+        'admin:logoutSession'
+      ).catch(() => {});
     }
 
     res.clearCookie(ADMIN_SESSION_COOKIE, {
@@ -422,21 +435,24 @@ router.post('/sessions/cleanup', verifyAdmin, async (_req: Request, res: Respons
 // GET /admin/sessions - Get active sessions info
 router.get('/sessions', verifyAdmin, async (req: Request, res: Response) => {
   try {
-    const sessions = await sql`
+    const sessions = await dbQuery(
+      () => sql`
       SELECT id, username, ip_address, user_agent, created_at, expires_at,
         CASE WHEN expires_at > NOW() THEN true ELSE false END as is_active
       FROM admin_sessions
       ORDER BY created_at DESC
       LIMIT 50
-    `;
+    `,
+      'admin:sessionsList'
+    );
 
-    const stats = await sql`
+    const stats = await dbQuery(() => sql`
       SELECT 
         COUNT(*) as total_sessions,
         COUNT(CASE WHEN expires_at > NOW() THEN 1 END) as active_sessions,
         COUNT(CASE WHEN expires_at <= NOW() THEN 1 END) as expired_sessions
       FROM admin_sessions
-    `;
+    `, 'admin:q5');
 
     res.json({
       success: true,
@@ -455,12 +471,12 @@ router.get('/sessions', verifyAdmin, async (req: Request, res: Response) => {
 router.post('/customers/:id/restore', verifyAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const result = await sql`
+    const result = await dbQuery(() => sql`
       UPDATE customers
       SET is_deleted = false, deleted_at = NULL, updated_at = NOW()
       WHERE id = ${id}::uuid
       RETURNING id, email, name, is_deleted
-    `;
+    `, 'admin:q6');
 
     if (!result.length) {
       return res.status(404).json({ success: false, error: 'Customer not found' });
@@ -478,17 +494,17 @@ router.delete('/customers/:id', verifyAdmin, async (req: Request, res: Response)
   try {
     const { id } = req.params;
 
-    const result = await sql`
+    const result = await dbQuery(() => sql`
       UPDATE customers
       SET is_deleted = TRUE, deleted_at = NOW(), updated_at = NOW()
       WHERE id = ${id}::uuid AND is_deleted = FALSE
       RETURNING id, email, is_deleted, deleted_at
-    `;
+    `, 'admin:q7');
 
     if (!result.length) {
-      const existing = await sql`
+      const existing = await dbQuery(() => sql`
         SELECT id, is_deleted FROM customers WHERE id = ${id}::uuid LIMIT 1
-      `;
+      `, 'admin:q8');
       if (!existing.length) {
         return res.status(404).json({ success: false, error: 'Customer not found' });
       }
@@ -560,21 +576,21 @@ router.get('/customers/:email', verifyAdmin, async (req: Request, res: Response)
   try {
     const { email } = req.params;
 
-    const customerRow = await sql`
+    const customerRow = await dbQuery(() => sql`
       SELECT id, email, name, is_deleted, deleted_at
       FROM customers
       WHERE email = ${email.toLowerCase()}
       LIMIT 1
-    `;
+    `, 'admin:q9');
 
-    const orders = await sql`
+    const orders = await dbQuery(() => sql`
       SELECT *
       FROM orders
       WHERE customer_email = ${email}
       ORDER BY created_at DESC
-    `;
+    `, 'admin:q10');
 
-    const summary = await sql`
+    const summary = await dbQuery(() => sql`
       SELECT 
         COUNT(*) as total_orders,
         COALESCE(SUM(total), 0) as total_spent,
@@ -582,7 +598,7 @@ router.get('/customers/:email', verifyAdmin, async (req: Request, res: Response)
         MIN(created_at) as first_order_date
       FROM orders
       WHERE customer_email = ${email}
-    `;
+    `, 'admin:q11');
 
     res.json({
       success: true,
@@ -647,8 +663,10 @@ router.post('/products/bulk-update', verifyAdmin, async (req: Request, res: Resp
     // Chunk large ID lists (10 per txn) — avoids oversized ANY() payloads on huge bulk jobs
     const BULK_CHUNK = 10;
     const chunkResults = await runInChunks(productIds, BULK_CHUNK, async (chunk) =>
-      sql.begin(async (txn) => {
-        const rows = await txn`
+      dbQuery(
+        () =>
+          sql.begin(async (txn) => {
+            const rows = await txn`
           UPDATE products SET
             is_out_of_stock = COALESCE(${isOutOfStock}, is_out_of_stock),
             stock = COALESCE(${stock}, stock),
@@ -656,8 +674,10 @@ router.post('/products/bulk-update', verifyAdmin, async (req: Request, res: Resp
           WHERE id = ANY(${chunk})
           RETURNING id
         `;
-        return rows;
-      })
+            return rows;
+          }),
+        'admin:bulkProductsTxn'
+      )
     );
 
     const updatedCount = chunkResults.reduce((sum, rows) => sum + rows.length, 0);
@@ -723,9 +743,9 @@ router.post('/orders/bulk-update', verifyAdmin, async (req: Request, res: Respon
         return res.status(400).json({ success: false, error: 'Invalid order status' });
       }
 
-      const currentOrders = await sql`
+      const currentOrders = await dbQuery(() => sql`
         SELECT id, status FROM orders WHERE id = ANY(${orderIds}::uuid[])
-      `;
+      `, 'admin:q12');
 
       for (const order of currentOrders) {
         const check = validateStatusTransition(
@@ -744,16 +764,20 @@ router.post('/orders/bulk-update', verifyAdmin, async (req: Request, res: Respon
 
     const BULK_CHUNK = 10;
     const chunkResults = await runInChunks(orderIds, BULK_CHUNK, async (chunk) =>
-      sql.begin(async (txn) => {
-        const rows = await txn`
+      dbQuery(
+        () =>
+          sql.begin(async (txn) => {
+            const rows = await txn`
           UPDATE orders SET
             status = COALESCE(${status}, status),
             updated_at = NOW()
           WHERE id = ANY(${chunk}::uuid[])
           RETURNING id
         `;
-        return rows;
-      })
+            return rows;
+          }),
+        'admin:bulkOrdersTxn'
+      )
     );
 
     const updatedCount = chunkResults.reduce((sum, rows) => sum + rows.length, 0);
@@ -792,16 +816,20 @@ router.post('/messages/bulk-update', verifyAdmin, async (req: Request, res: Resp
 
     const BULK_CHUNK = 10;
     const chunkResults = await runInChunks(messageIds, BULK_CHUNK, async (chunk) =>
-      sql.begin(async (txn) => {
-        const rows = await txn`
+      dbQuery(
+        () =>
+          sql.begin(async (txn) => {
+            const rows = await txn`
           UPDATE contact_messages SET
             status = COALESCE(${status}, status),
             updated_at = NOW()
           WHERE id = ANY(${chunk}::uuid[])
           RETURNING id
         `;
-        return rows;
-      })
+            return rows;
+          }),
+        'admin:bulkMessagesTxn'
+      )
     );
 
     const updatedCount = chunkResults.reduce((sum, rows) => sum + rows.length, 0);

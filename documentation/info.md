@@ -458,7 +458,8 @@ Redis connection failure in production prevents server startup.
 - Log level: `LOG_LEVEL` env or `info` (prod) / `debug` (dev).
 - Every request gets a child logger with `X-Request-Id` (UUID).
 - **Request lifecycle:** `Request started` (method, path, IP, timeout tier) and `Request finished` (status, duration). Slow requests log at `warn` when duration ≥ `REQUEST_LOG_SLOW_MS` (default 3s).
-- **DB:** `[withRetry]` logs include operation `label`, Postgres `code`, and pool stats on failure; queries ≥ `DB_SLOW_QUERY_LOG_MS` (default 2s) log as `[DB] slow query`.
+- **DB:** `[withRetry]` logs include operation `label`, Postgres `code`, and pool stats on failure; queries ≥ `DB_SLOW_QUERY_LOG_MS` (default 2s) log as `[DB] slow query`. Hot paths use `query()` (`dbQuery` in routes): products, activity, orders, coupons, reviews, contact, admin, and `cacheWarm.ts` on startup.
+- **Process errors:** `registerProcessErrorHandlers()` logs `unhandledRejection` and `uncaughtException` without exiting (dev warns; production logs + Sentry). Transient pool blips should not take down the API process.
 - **Timeouts:** `Request timeout` includes `elapsedMs`, path, and pool stats.
 
 ### Sentry
@@ -1014,10 +1015,10 @@ npm run links:check
 
 | Suite | Tool | Coverage |
 |-------|------|----------|
-| Backend unit/API | Vitest | Checkout validation + create-payment happy path, capture 409/refund mismatch, checkout-context API, checkout exchange, PayPal webhooks (COMPLETED + DENIED), admin mark-paid, coupon scope, `computeCheckoutPricingForCart`, payment idempotency, order tokens, RLS table list + grant revoke, email portal URL, activity batch/log, order lookup, reviews check |
-| Frontend E2E / UI | Playwright | Storefront smoke, products/cart/checkout/contact UI, navigation, cookie consent, payment-success/orders edge UI, checkout total mismatch, admin login/dashboard smoke, mobile viewport (28 tests; mocked API) |
+| Backend unit/API | Vitest | Checkout validation + create-payment happy path, capture 409/refund mismatch, checkout-context API, checkout exchange, PayPal webhooks (COMPLETED + DENIED), admin mark-paid, coupon scope, `computeCheckoutPricingForCart`, payment idempotency, order tokens, process error handlers, RLS table list + grant revoke, email portal URL, activity batch/log, order lookup, reviews check |
+| Frontend E2E / UI | Playwright | Storefront smoke + deep flows (search, policy gate, coupon, cart qty, create-payment, payment 409), checkout/contact/admin UI, mobile viewport |
 
-**Total automated tests:** 156 (82 backend unit + 45 API + 29 Playwright UI).
+**Total automated tests:** 167 (84 backend unit + 46 API + 37 Playwright UI).
 
 | Link check | Custom script | Documentation internal links |
 
