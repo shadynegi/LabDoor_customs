@@ -1,0 +1,43 @@
+﻿# Dependencies
+node_modules/
+
+# Environment (secrets — never commit)
+.env
+.env.*
+!.env.template
+!env.template
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Logs & debug
+logs/
+*.log
+npm-debug.log*
+
+# OS & editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Test / coverage
+coverage/
+.nyc_output/
+frontend/test-results/
+Tests/test-results/*
+!Tests/test-results/.gitignore
+!Tests/test-results/.gitkeep
+documentation/test-results/*
+!documentation/test-results/.gitkeep
+
+# Vite / tooling
+frontend/dist/
+*.local
+
+# Optional analyze output
+frontend/dist/stats.html

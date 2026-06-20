@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+
+Disallow: /admin/
+Disallow: /adminshivamdashboard
+Disallow: /checkout
+Disallow: /cart
+Disallow: /payment/
+
+Sitemap: http://127.0.0.1:4173/sitemap.xml

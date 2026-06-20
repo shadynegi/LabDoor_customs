@@ -1,0 +1,17 @@
+{
+  "name": "labdoor-customs-tests",
+  "private": true,
+  "scripts": {
+    "test": "node scripts/run-with-report.mjs all",
+    "test:all": "node scripts/run-with-report.mjs all",
+    "test:backend": "node scripts/run-with-report.mjs unit",
+    "test:api": "node scripts/run-with-report.mjs api",
+    "test:frontend": "node scripts/run-with-report.mjs frontend",
+    "test:ui": "node scripts/run-with-report.mjs frontend",
+    "test:frontend:raw": "playwright test",
+    "test:frontend:install": "playwright install chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0"
+  }
+}

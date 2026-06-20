@@ -1,0 +1,31 @@
+{
+  "name": "labdoor-customs",
+  "private": true,
+  "description": "Lab Door Customs monorepo — React storefront + Express API (single-server deploy)",
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "concurrently -n api,web -c blue,magenta \"npm run dev -w backend\" \"npm run dev -w frontend\"",
+    "build": "npm run build -w frontend && npm run build -w backend",
+    "build:frontend": "npm run build -w frontend",
+    "build:backend": "npm run build -w backend",
+    "start": "npm run start -w backend",
+    "test": "node Tests/scripts/run-with-report.mjs all",
+    "test:all": "node Tests/scripts/run-with-report.mjs all",
+    "test:backend": "node Tests/scripts/run-with-report.mjs unit",
+    "test:api": "node Tests/scripts/run-with-report.mjs api",
+    "test:vitest": "node Tests/scripts/run-with-report.mjs vitest",
+    "test:frontend": "node Tests/scripts/run-with-report.mjs frontend",
+    "test:ui": "node Tests/scripts/run-with-report.mjs frontend",
+    "validate-env": "npm run validate-env -w backend && npm run validate-env -w frontend",
+    "links:check": "node scripts/link-check.mjs"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

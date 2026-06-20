@@ -1,0 +1,21 @@
+﻿{
+  "version": 1,
+  "permissions": {
+    "allow": [
+      "Shell(**)",
+      "Shell(git)",
+      "Shell(git:*)",
+      "Shell(gh)",
+      "Shell(gh:*)",
+      "Mcp(**)",
+      "Fetch(**)",
+      "Read(**)",
+      "Write(**)",
+      "Delete(**)",
+      "Grep(**)",
+      "Glob(**)",
+      "Task(**)"
+    ],
+    "deny": []
+  }
+}
