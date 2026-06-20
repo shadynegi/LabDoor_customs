@@ -8,7 +8,7 @@ import type { Product } from '../hooks/useProducts';
 import { useCart, type SizeSystem } from './CartContext';
 import StarRating from '../components/StarRating';
 import ErrorMessage from '../components/ErrorMessage';
-import { generatePlaceholder360Images, get360VideoPath } from '../utils/product360Images';
+import { generatePlaceholder360Images } from '../utils/product360Images';
 import { resolveProductImage } from '../lib/productImageMaps';
 import { buildResponsiveProductImg, PRODUCT_IMAGE_SIZES } from '../lib/responsiveImage';
 import MetaTags from '../components/MetaTags';
@@ -122,8 +122,8 @@ const ProductDetailPage: React.FC = () => {
     return <ProductDetailSkeleton isMobile={isMobile} />;
   }
 
-  const productSlug = product?.name?.toLowerCase().replace(/\s+/g, '-') ?? '';
-  const hasReal360Assets = Boolean(get360VideoPath(productSlug));
+  const video360Url = product?.video_360?.trim() || null;
+  const has360Video = Boolean(video360Url);
 
   if (error || !product) {
     return (
@@ -299,7 +299,7 @@ const ProductDetailPage: React.FC = () => {
                 }}
               >
                 <RotateCcw size={16} />
-                {hasReal360Assets ? '360°' : 'Spin'}
+                {has360Video ? '360°' : 'Spin'}
               </motion.button>
             </div>
 
@@ -323,6 +323,7 @@ const ProductDetailPage: React.FC = () => {
                     <Product360Viewer
                       images={generatePlaceholder360Images(product.image, 8)}
                       productName={product.name}
+                      videoUrl={video360Url ?? undefined}
                       size={isMobile ? 'md' : 'lg'}
                       autoRotate={false}
                       showControls={true}

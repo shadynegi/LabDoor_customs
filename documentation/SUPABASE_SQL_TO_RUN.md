@@ -38,6 +38,7 @@ Located in `backend/src/database/`:
 - `migration-ldcoff10-coupon.sql` — optional seed for storefront promo code **LDCOFF10** (10% off; customer must apply at checkout)
 - `migration-performance-linter-fixes.sql` — FK indexes (lint 0001) + consolidate duplicate RLS policies (lint 0006). **Applied on production Supabase.** Run once on new DBs.
 - `migration-products-search-trgm.sql` — `pg_trgm` + GIN indexes on `products.name` / `products.description` for `POST /api/products/search`. **Applied on production Supabase.** Run once on new DBs.
+- `migration-products-video-360.sql` — optional `products.video_360` TEXT for admin-uploaded 360° MP4 URLs. Also applied at boot via `ensureProductVideo360Column()`.
 - `migration-payment-idempotency.sql` — idempotency table + indexes including partial index `idx_payment_idempotency_processing_created` for maintenance reaper
 
 ## Boot vs SQL editor
@@ -133,6 +134,7 @@ On a live store, these are often already applied via earlier SQL or backend boot
 | 2 | `migration-reviews.sql` | Tables `reviews`, `review_votes` |
 | 3 | `migration-activity-logs.sql` | `activity_logs` (if not in base schema) |
 | 4 | `migration-add-size-color.sql` | Columns `products.size`, `products.color` |
+| 4b | `migration-products-video-360.sql` | Column `products.video_360` (360° MP4; boot also adds IF NOT EXISTS) |
 | 5 | `migration-soft-delete-users.sql` | `customers.is_deleted`, `customers.deleted_at` |
 | 6 | `migration-order-access-exchange.sql` | Table `order_access_exchanges` |
 | 7 | `migration-order-checkout-exchange.sql` | Table `order_checkout_exchanges` |
@@ -194,6 +196,39 @@ SELECT tablename, policyname FROM pg_policies
 WHERE schemaname = 'public'
   AND policyname LIKE 'Service role manages%'
 ORDER BY tablename;
+
+-- DB-RLS-14: all 14 application tables present (expect 14 rows)
+SELECT tablename FROM pg_tables
+WHERE schemaname = 'public'
+  AND tablename IN (
+    'products', 'orders', 'contact_messages', 'reviews', 'review_votes',
+    'coupons', 'coupon_usage', 'payment_idempotency', 'processed_refund_events',
+    'order_checkout_exchanges', 'order_access_exchanges', 'customers',
+    'activity_logs', 'admin_sessions'
+  )
+ORDER BY tablename;
+
+-- DB-RLS-14: RLS enabled on all 14 (expect 14 rows)
+SELECT c.relname AS tablename
+FROM pg_class c
+JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE n.nspname = 'public'
+  AND c.relkind = 'r'
+  AND c.relrowsecurity
+  AND c.relname IN (
+    'products', 'orders', 'contact_messages', 'reviews', 'review_votes',
+    'coupons', 'coupon_usage', 'payment_idempotency', 'processed_refund_events',
+    'order_checkout_exchanges', 'order_access_exchanges', 'customers',
+    'activity_logs', 'admin_sessions'
+  )
+ORDER BY tablename;
+
+-- products.video_360 column (expect 1 row after migration or boot)
+SELECT column_name, data_type
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND table_name = 'products'
+  AND column_name = 'video_360';
 ```
 
 See also [PRE_LAUNCH_CHECKLIST.md](./PRE_LAUNCH_CHECKLIST.md) Phase 1.

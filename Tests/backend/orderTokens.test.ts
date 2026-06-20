@@ -26,18 +26,18 @@ describe('orderTokens', () => {
     expect(hashOrderAccessToken(token)).toBe(hashOrderAccessToken(token));
   });
 
-  it('reads access token from header or legacy aid query', () => {
+  it('reads access token from header only (query aid deprecated)', () => {
     const headerReq = {
       headers: { 'x-order-access-token': 'header-token' },
-      query: {},
+      query: { aid: 'query-token' },
     } as Parameters<typeof getOrderAccessTokenFromRequest>[0];
     expect(getOrderAccessTokenFromRequest(headerReq)).toBe('header-token');
 
-    const queryReq = {
+    const queryOnlyReq = {
       headers: {},
       query: { aid: 'query-token' },
     } as Parameters<typeof getOrderAccessTokenFromRequest>[0];
-    expect(getOrderAccessTokenFromRequest(queryReq)).toBe('query-token');
+    expect(getOrderAccessTokenFromRequest(queryOnlyReq)).toBeNull();
   });
 
   it('strips access token secrets from API payloads', () => {

@@ -45,10 +45,19 @@ describe('GET /api/paypal/checkout-context/:paypalOrderId', () => {
 
     const res = await request(app)
       .get('/api/paypal/checkout-context/PAYPAL-CTX-1')
-      .query({ aid: accessToken });
+      .set('X-Order-Access-Token', accessToken);
 
     expect(res.status).toBe(403);
     expect(res.body.error).toBe('Invalid order access token');
+  });
+
+  it('ignores deprecated aid query without header token', async () => {
+    const res = await request(app)
+      .get('/api/paypal/checkout-context/PAYPAL-CTX-1')
+      .query({ aid: 'b'.repeat(64) });
+
+    expect(res.status).toBe(401);
+    expect(res.body.error).toBe('Token required');
   });
 
   it('returns checkout context for valid token on pending order', async () => {

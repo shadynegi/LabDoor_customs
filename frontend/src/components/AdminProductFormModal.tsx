@@ -19,6 +19,7 @@ export interface AdminProduct {
   color?: string;
   stock: number;
   is_out_of_stock: boolean;
+  video_360?: string | null;
 }
 
 export interface ProductFormPayload {
@@ -32,6 +33,7 @@ export interface ProductFormPayload {
   color?: string;
   stock: number;
   is_out_of_stock?: boolean;
+  video_360?: string | null;
 }
 
 const CATEGORIES = ['Sneakers', 'Boots', 'Sandals', 'Loafers', 'Custom'];
@@ -42,6 +44,7 @@ const US_SIZES = [
 ];
 
 const MAX_IMAGE_BYTES = 512 * 1024;
+const MAX_VIDEO_BYTES = 15 * 1024 * 1024;
 
 const emptyForm = (): ProductFormPayload => ({
   name: '',
@@ -54,6 +57,7 @@ const emptyForm = (): ProductFormPayload => ({
   color: 'Black',
   stock: 0,
   is_out_of_stock: false,
+  video_360: '',
 });
 
 interface AdminProductFormModalProps {
@@ -106,6 +110,7 @@ export default function AdminProductFormModal({
         color: product.color || '',
         stock: product.stock,
         is_out_of_stock: product.is_out_of_stock,
+        video_360: product.video_360 || '',
       });
       setExtraSizes(new Set());
     } else {
@@ -130,6 +135,21 @@ export default function AdminProductFormModal({
     const reader = new FileReader();
     reader.onload = () => setField(field, reader.result as string);
     reader.onerror = () => toast.error('Failed to read image file');
+    reader.readAsDataURL(file);
+  };
+
+  const readVideoFile = (file: File) => {
+    if (!file.type.startsWith('video/') || file.type !== 'video/mp4') {
+      toast.error('Please select an MP4 video file');
+      return;
+    }
+    if (file.size > MAX_VIDEO_BYTES) {
+      toast.error('Video must be under 15 MB. Paste a hosted MP4 URL instead.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setField('video_360', reader.result as string);
+    reader.onerror = () => toast.error('Failed to read video file');
     reader.readAsDataURL(file);
   };
 
@@ -173,6 +193,7 @@ export default function AdminProductFormModal({
         size: form.size?.trim() || undefined,
         color: form.color?.trim() || undefined,
         is_out_of_stock: form.stock === 0 ? true : form.is_out_of_stock,
+        video_360: form.video_360?.trim() || undefined,
       };
 
       if (isEditing && product) {
@@ -379,6 +400,46 @@ export default function AdminProductFormModal({
                 style={{ marginTop: 10, width: '100%', maxHeight: 120, objectFit: 'cover', borderRadius: 8 }}
               />
             )}
+          </div>
+
+          <div style={{ gridColumn: '1 / -1' }}>
+            <label style={labelStyle}>360° spin video (MP4)</label>
+            <input
+              type="text"
+              value={form.video_360?.startsWith('data:') ? '(uploaded MP4)' : (form.video_360 || '')}
+              onChange={(e) => setField('video_360', e.target.value)}
+              placeholder="https://…/spin.mp4 or upload below"
+              style={{ ...inputStyle, marginBottom: 8 }}
+              disabled={Boolean(form.video_360?.startsWith('data:'))}
+            />
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#9c6649', cursor: 'pointer', fontWeight: 600 }}>
+                <Upload size={14} />
+                Upload MP4 (max 15 MB)
+                <input
+                  type="file"
+                  accept="video/mp4,.mp4"
+                  hidden
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) readVideoFile(file);
+                    e.target.value = '';
+                  }}
+                />
+              </label>
+              {form.video_360 && (
+                <button
+                  type="button"
+                  onClick={() => setField('video_360', '')}
+                  style={{ fontSize: 13, color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+                >
+                  Remove video
+                </button>
+              )}
+            </div>
+            <p style={{ margin: '8px 0 0', fontSize: 12, color: '#6b7280' }}>
+              Optional. Shown in the product 360° viewer when customers tap Spin/360°.
+            </p>
           </div>
 
           {!isEditing && (

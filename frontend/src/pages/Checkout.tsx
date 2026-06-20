@@ -18,7 +18,7 @@ import { getFriendlyError } from "../utils/errorMessages";
 import { logError } from "../lib/logger";
 import { useResponsive } from "../hooks/useResponsive";
 import MobileStickyCta from "../components/MobileStickyCta";
-import { setUserEmail, trackCheckoutStart, trackCheckoutComplete } from "../utils/activityTracker";
+import { setUserEmail, trackCheckoutStart } from "../utils/activityTracker";
 import {
   POLICY_CHECKOUT_LABEL,
   REPLACEMENT_POLICY_PATH,
@@ -262,6 +262,15 @@ export default function Checkout() {
         }),
       });
 
+      if (!response.ok) {
+        setCouponError(
+          response.status >= 500
+            ? 'Could not validate coupon — server error. Try again.'
+            : 'Could not validate coupon — please try again.'
+        );
+        return;
+      }
+
       const data = await response.json();
 
       if (data.success && data.valid) {
@@ -483,7 +492,6 @@ export default function Checkout() {
       )?.href;
 
       if (approvalUrl) {
-        trackCheckoutComplete(serverTotal ?? total, totalItemCount);
         sessionStorage.setItem('pendingOrder', JSON.stringify({
           total: serverTotal ?? total,
           serverOrderId: data.serverOrderId,
@@ -526,7 +534,13 @@ export default function Checkout() {
 
   return (
     <div
-      className={isMobile ? "has-mobile-sticky-cta" : undefined}
+      className={
+        isMobile
+          ? `has-mobile-sticky-cta${
+              cartValidationError || !policyAccepted ? ' has-sticky-hint' : ''
+            }`
+          : undefined
+      }
       style={{
         minHeight: "100vh",
         background: "linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)",

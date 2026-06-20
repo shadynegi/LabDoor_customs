@@ -101,8 +101,8 @@ Headers: `X-Idempotency-Key` (PayPal order ID or client key), `X-CSRF-Token`
 | GET | `/:id` | Public | Single product (cached) |
 | POST | `/search` | Public | Search products |
 | POST | `/validate-cart` | Public + CSRF | Validate cart lines — `{ items: [{ product_id, quantity, size_system?, size_value? }] }`; returns refreshed prices and stock errors |
-| POST | `/` | Admin | Create product (image/background URL or ≤512KB data URL) |
-| PUT | `/:id` | Admin | Update product (same image rules) |
+| POST | `/` | Admin | Create product (image/background URL or ≤512KB data URL; optional `video_360` MP4 URL or ≤15MB data URL) |
+| PUT | `/:id` | Admin | Update product (same image/video rules) |
 | DELETE | `/:id` | Admin | Delete product |
 
 ---
@@ -116,9 +116,9 @@ Headers: `X-Idempotency-Key` (PayPal order ID or client key), `X-CSRF-Token`
 | GET | `/access-exchange/:code` | Public | Redeem one-time email tracking link → `{ orderNumber, accessToken, serverOrderId }` |
 | GET | `/` | Admin | List orders — `?status=&payment_status=&page=&search=` (`search` matches order number, email, or name) |
 | GET | `/stats/summary` | Admin | Order/revenue statistics |
-| GET | `/number/:orderNumber` | Token or admin | Lookup by order number (`X-Order-Access-Token` header or legacy `?aid=` query) |
+| GET | `/number/:orderNumber` | Token or admin | Lookup by order number (`X-Order-Access-Token` header only) |
 | GET | `/customer/:email` | Admin | Customer order history |
-| GET | `/:id` | Token or admin | Single order |
+| GET | `/:id` | Token or admin | Single order (`X-Order-Access-Token` header only) |
 | PUT | `/:id` | Admin | Update fulfillment fields including `estimated_delivery` (not payment_status) |
 | PATCH | `/:id/status` | Admin | Update order status |
 | PATCH | `/:id/payment-status` | Admin | Mark paid: `admin_note` + `payment_id`; **PayPal capture verified** via API before update |

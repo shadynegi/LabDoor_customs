@@ -56,6 +56,17 @@ if (isProduction) {
     fail(`JWT_SECRET must contain: ${jwtIssues.join(', ')}`);
   }
 
+  for (const key of ['ORDER_TOKEN_ENCRYPTION_KEY', 'IP_SALT']) {
+    const value = process.env[key]?.trim() || '';
+    if (value.length < 32) {
+      fail(`${key} must be at least 32 characters in production`);
+    }
+  }
+
+  if (process.env.ALLOW_INSECURE_RLS === 'true') {
+    fail('ALLOW_INSECURE_RLS=true is forbidden in production');
+  }
+
   const mode = (process.env.PAYPAL_MODE || 'sandbox').toLowerCase();
   if (mode !== 'live' && process.env.REQUIRE_PAYPAL_LIVE !== 'false') {
     fail('PAYPAL_MODE must be "live" in production (set REQUIRE_PAYPAL_LIVE=false for CI sandbox)');

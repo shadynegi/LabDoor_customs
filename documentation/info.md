@@ -209,11 +209,12 @@ Payment success page redeems ?code= via GET /api/paypal/checkout-exchange/:code
 3. Claims **capture_payment** idempotency key; failed keys can be reclaimed while order is still pending.
 4. Calls PayPal capture with `PayPal-Request-Id` header.
 5. Handles `ORDER_ALREADY_CAPTURED` (422) by fetching existing capture details from PayPal.
-6. Compares captured amount to order total; mismatch triggers auto-refund and order rollback.
-7. `completeOrderPaymentCapture` sets `payment_status=completed`, `status=processing`, stores `paypal_capture_id`.
-8. Upserts customer aggregate stats (only after successful capture).
-9. Sends order confirmation email; caches idempotency response for safe retries.
-10. Returns **409** if PayPal capture succeeds but the order is not `payment_status=completed` in the database (prevents false-success UI). The payment success page shows a processing state, polls `GET /api/paypal/checkout-context/:paypalOrderId`, and does **not** clear the cart until reconciliation completes.
+6. Resolves captured amount from PayPal response or API fetch; **fails closed** if amount cannot be verified. Mismatch triggers auto-refund and order rollback.
+7. Requires a verified `paypal_capture_id` before `completeOrderPaymentCapture`.
+8. `completeOrderPaymentCapture` sets `payment_status=completed`, `status=processing`, stores `paypal_capture_id`.
+9. Upserts customer aggregate stats (only after successful capture).
+10. Sends order confirmation email; caches idempotency response for safe retries.
+11. Returns **409** if PayPal capture succeeds but the order is not `payment_status=completed` in the database (prevents false-success UI). The payment success page shows a processing state, polls `GET /api/paypal/checkout-context/:paypalOrderId`, and does **not** clear the cart until reconciliation completes.
 
 ### Checkout exchange (PayPal return)
 
@@ -221,7 +222,7 @@ Payment success page redeems ?code= via GET /api/paypal/checkout-exchange/:code
 
 ### Checkout context recovery
 
-`GET /api/paypal/checkout-context/:paypalOrderId` — restores checkout state when the exchange code is unavailable. Requires the order access token via header `X-Order-Access-Token` or query `?aid=`.
+`GET /api/paypal/checkout-context/:paypalOrderId` — restores checkout state when the exchange code is unavailable. Requires the order access token via header `X-Order-Access-Token` only (query `?aid=` deprecated).
 
 ### PayPal webhooks (`POST /api/paypal/webhook`)
 
@@ -632,7 +633,7 @@ A **correct** `DATABASE_URL` can still produce occasional maintenance warnings w
 
 | Table | Purpose |
 |-------|---------|
-| `products` | Catalog — price, stock, category, size, color, ratings |
+| `products` | Catalog — price, stock, category, size, color, ratings, optional `video_360` (MP4 URL for 360° viewer) |
 | `orders` | Orders — JSONB items/shipping, PayPal IDs, `refunded_amount`, `access_token_hash`, `access_token_encrypted` |
 | `customers` | Aggregated customer stats, soft delete |
 | `coupons` | Discount rules, scope, validity, usage limits |
@@ -675,7 +676,7 @@ A **correct** `DATABASE_URL` can still produce occasional maintenance warnings w
 | Public | No login required |
 | CSRF | State-changing methods require `X-CSRF-Token` header + `csrf_token` cookie (SPA uses `/api/csrf-token`) |
 | Admin | `admin_session` HttpOnly cookie or `Authorization: Bearer` |
-| Order token | Per-order access token via `X-Order-Access-Token` header or `?aid=` query (legacy `?token=` URLs stripped on `/orders`) |
+| Order token | Per-order access token via `X-Order-Access-Token` header only (legacy `?aid=` query ignored; legacy `?token=` URLs stripped on `/orders`) |
 | PayPal | Webhook signature verification (`PAYPAL_WEBHOOK_ID`) |
 
 Expanded request/response docs: [`API_DOCUMENTATION.md`](API_DOCUMENTATION.md)
@@ -1029,7 +1030,7 @@ npm run links:check
 | Backend unit/API | Vitest | Checkout validation + create-payment happy path, capture 409/refund mismatch, checkout-context API, checkout exchange, PayPal webhooks (COMPLETED + DENIED), admin mark-paid, coupon scope, `computeCheckoutPricingForCart`, payment idempotency, order tokens, process error handlers, RLS table list + grant revoke, email portal URL, activity batch/log, order lookup, reviews check |
 | Frontend E2E / UI | Playwright | Storefront smoke + deep flows (search, policy gate, coupon, cart qty, create-payment, payment 409), checkout/contact/admin UI, mobile viewport |
 
-**Total automated tests:** 167 (84 backend unit + 46 API + 37 Playwright UI).
+**Total automated tests:** 174 (90 backend unit + 47 API + 37 Playwright UI).
 
 | Link check | Custom script | Documentation internal links |
 

@@ -12,6 +12,7 @@ import {
   validateProductImageUrl,
   validateOptionalProductImageUrl,
 } from '../lib/productImage';
+import { validateOptionalProductVideo360Url } from '../lib/productVideo';
 import { validateCartItems } from '../lib/paypalCheckout';
 
 const router = Router();
@@ -33,6 +34,7 @@ interface Product {
   view_count?: number;
   cart_count?: number;
   is_out_of_stock?: boolean;
+  video_360?: string | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -320,9 +322,17 @@ router.post('/', verifyAdmin, async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: backgroundResult.error });
     }
 
+    const videoResult = validateOptionalProductVideo360Url(
+      productData.video_360,
+      '360° video'
+    );
+    if (!videoResult.ok) {
+      return res.status(400).json({ success: false, error: videoResult.error });
+    }
+
     const result = await dbQuery(
       () => sql`
-      INSERT INTO products (name, price, image, description, background, category, size, color, stock, rating, review_count)
+      INSERT INTO products (name, price, image, description, background, category, size, color, stock, rating, review_count, video_360)
       VALUES (
         ${productData.name},
         ${productData.price},
@@ -334,7 +344,8 @@ router.post('/', verifyAdmin, async (req: Request, res: Response) => {
         ${productData.color || null},
         ${productData.stock || 0},
         ${productData.rating || 0},
-        ${productData.review_count || 0}
+        ${productData.review_count || 0},
+        ${videoResult.value}
       )
       RETURNING *
     `,
@@ -381,6 +392,18 @@ router.put('/:id', verifyAdmin, async (req: Request, res: Response) => {
       backgroundValue = bgResult.value;
     }
 
+    let video360Value: string | null | undefined = undefined;
+    if (updates.video_360 !== undefined) {
+      const videoResult = validateOptionalProductVideo360Url(
+        updates.video_360,
+        '360° video'
+      );
+      if (!videoResult.ok) {
+        return res.status(400).json({ success: false, error: videoResult.error });
+      }
+      video360Value = videoResult.value;
+    }
+
     const result = await dbQuery(
       () => sql`
       UPDATE products SET
@@ -394,6 +417,7 @@ router.put('/:id', verifyAdmin, async (req: Request, res: Response) => {
         color = COALESCE(${updates.color || null}, color),
         stock = COALESCE(${updates.stock || null}, stock),
         is_out_of_stock = COALESCE(${isOutOfStock}, is_out_of_stock),
+        video_360 = COALESCE(${video360Value !== undefined ? video360Value : null}, video_360),
         updated_at = NOW()
       WHERE id = ${id}
       RETURNING *

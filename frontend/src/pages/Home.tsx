@@ -453,7 +453,9 @@ export default function Home() {
       {/* Hero / carousel section continues below */}
 
       {/* Main Content */}
-      <main
+      <div
+        role="region"
+        aria-label="Hero product showcase"
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}
         style={{
@@ -657,22 +659,25 @@ export default function Home() {
             }}
           >
             {products.map((p, i) => (
-              <motion.div
+              <button
                 key={p.id}
+                type="button"
+                aria-label={`Show product ${i + 1}: ${p.name}`}
+                aria-current={i === index ? 'true' : undefined}
                 onClick={() => setIndex([i, i > index ? 1 : -1])}
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
                 style={{
-                  // Larger touch target with smaller visible dot
                   width: isMobile ? 36 : 28,
                   height: isMobile ? 36 : 28,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: "pointer",
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  background: 'transparent',
+                  border: 'none',
+                  padding: 0,
                 }}
               >
-                <div style={{
+                <span style={{
                   width: i === index ? 12 : 8,
                   height: i === index ? 12 : 8,
                   borderRadius: "50%",
@@ -680,8 +685,9 @@ export default function Home() {
                   transition: "all 0.3s ease",
                   border: i === index ? "2px solid rgba(255,255,255,0.5)" : "none",
                   boxShadow: i === index ? "0 0 8px rgba(255,255,255,0.5)" : "none",
+                  display: 'block',
                 }} />
-              </motion.div>
+              </button>
             ))}
           </div>
 
@@ -779,7 +785,7 @@ export default function Home() {
           </motion.div>
         </AnimatePresence>
         </div>
-      </main>
+      </div>
 
       {/* Product Carousel */}
       <Suspense fallback={null}>
@@ -791,6 +797,7 @@ export default function Home() {
         isOpen={showSizeModal}
         onClose={handleCloseSizeModal}
         maxWidth={500}
+        ariaLabel="Select Size"
         contentStyle={{
           padding: isMobile ? 24 : 32,
         }}

@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import { getFriendlyError } from '../utils/errorMessages';
 import { logError } from '../lib/logger';
 import { useResponsive } from '../hooks/useResponsive';
-import { trackPurchaseComplete } from '../utils/activityTracker';
+import { trackPurchaseComplete, trackCheckoutComplete } from '../utils/activityTracker';
 
 // Payment progress steps
 type PaymentStep = 'verifying' | 'capturing' | 'saving' | 'complete' | 'error' | 'processing';
@@ -569,6 +569,16 @@ export default function PaymentSuccess() {
           completedDetails.total ?? pendingOrder.total ?? 0,
           itemCount
         );
+        const checkoutItemCount = Array.isArray(pendingItems)
+          ? pendingItems.reduce(
+              (sum: number, item: { quantity?: number }) => sum + (item.quantity ?? 1),
+              0
+            )
+          : itemCount;
+        trackCheckoutComplete(
+          completedDetails.total ?? pendingOrder.total ?? 0,
+          checkoutItemCount
+        );
         clearCart();
         sessionStorage.removeItem('pendingOrder');
         sessionStorage.removeItem('checkoutRecovery');
@@ -690,7 +700,7 @@ export default function PaymentSuccess() {
           padding: 20,
         }}
       >
-        <div style={{ background: 'white', borderRadius: 16, padding: 32, maxWidth: 480, textAlign: 'center' }}>
+        <div style={{ background: 'white', borderRadius: 16, padding: 32, maxWidth: 480, textAlign: 'center' }} role="alert" aria-live="assertive">
           <h2 style={{ margin: '0 0 12px', color: '#991b1b' }}>Payment could not be completed</h2>
           <p style={{ color: '#6b7280', marginBottom: 24 }}>{captureError}</p>
           <p style={{ fontSize: 14, color: '#9ca3af', marginBottom: 24 }}>

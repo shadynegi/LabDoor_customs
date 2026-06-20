@@ -43,7 +43,7 @@ export function mountRateLimits(app: Express): void {
       windowMs: 15 * 60 * 1000,
       max: 300,
       handler: rateLimit429('Too many requests, please try again later.'),
-      skip: (req) => req.path === '/api/health',
+      skip: (req) => req.path === '/api/health' || isPayPalWebhookRequest(req),
     })
   );
 

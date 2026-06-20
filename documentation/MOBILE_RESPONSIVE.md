@@ -42,7 +42,7 @@ Layouts are verified at these common viewport widths:
 - **Products:** `responsive-product-grid` uses `minmax(160px, 1fr)` on phones; two columns on very narrow (≤359px) screens. Out-of-stock products show an **Out of Stock** badge on cards.
 - **Product detail:** `Product360Viewer` uses CSS-based sizing (not Tailwind). Review stats and pros/cons stack on narrow screens. When out of stock, add-to-cart is disabled (inline button hidden on mobile when sticky CTA is shown; sticky CTA also disabled).
 - **Cart / checkout / product detail:** Sticky bottom bar (`MobileStickyCta`) shows total + primary action on phones. Cart uses **stacked** layout at 320px; **Continue Shopping** (desktop and mobile sticky) routes to `/products`. Product detail **omits** sticky bar when out of stock.
-- **Checkout keyboard:** `keyboardOffset` lifts the sticky PayPal CTA above the virtual keyboard (`translateY`).
+- **Checkout keyboard:** `keyboardOffset` lifts the sticky PayPal CTA above the virtual keyboard (`translateY`). Extra bottom padding when policy/validation hints show (`has-sticky-hint`).
 - **Cookie consent:** On cart, checkout, and product routes, the banner renders at the **top** on mobile so it does not cover purchase CTAs (`has-cookie-banner-top` body padding).
 - **Body scroll:** `html` and `body` use `overflow-y: auto`, `overscroll-behavior-y: contain`, and `-webkit-fill-available` min-height for stable mobile scrolling; horizontal overflow is clipped.
 - **Navigation (non-home):** Sticky header shows **Products**, **Orders**, and **Cart** links. On phones, icons only (44×44px touch targets); labels visible from tablet/desktop. Products link is active on `/products` and `/product/:id`. Logo scales to 36px height on very small phones (`isSmallMobile`), 40px on mobile, 50px on desktop.
@@ -51,7 +51,7 @@ Layouts are verified at these common viewport widths:
 
 ### Admin
 
-- **Dashboard:** Order cards in a single column on mobile. Product, customer, and coupon tables scroll horizontally inside `responsive-table-wrap`. Order and customer modals use single-column grids on phones.
+- **Dashboard:** Order cards in a single column on mobile. Product, customer, and coupon tables scroll horizontally inside `responsive-table-wrap` on desktop; **Products** and **Customers** use card layouts on phones. Order and customer modals use single-column grids on phones.
 - **Login:** Safe-area padding and reduced card padding on small screens.
 
 ## Touch targets

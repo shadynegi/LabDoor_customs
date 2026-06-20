@@ -5,7 +5,7 @@
 **Authoritative behavior:** [`info.md`](info.md)  
 **Full audit:** [`PROJECT_AUDIT.md`](PROJECT_AUDIT.md) (2026-06-08 initial + follow-up)
 
-**Test count marker (CI should match):** `<!-- tests: 167 -->` (84 unit + 46 API + 37 Playwright)
+**Test count marker (CI should match):** `<!-- tests: 174 -->` (90 unit + 47 API + 37 Playwright)
 
 ---
 
@@ -25,7 +25,7 @@
 | ID | Behavior | Implementation | Test(s) | Status |
 |----|----------|----------------|---------|--------|
 | PAY-CREATE | Atomic create-payment + stock reserve + exchange code | `server.ts`, `orderLifecycle.ts`, `orderCheckoutExchange.ts` | `checkout.test.ts`, `checkoutPricing.test.ts`, `createPaymentHappy.test.ts` | COVERED |
-| PAY-CAPTURE | Capture with token + amount validation | `server.ts` L925+ | `checkout.test.ts`, `captureRefundMismatch.test.ts` | PARTIAL |
+| PAY-CAPTURE | Capture with token + amount validation (fail closed if amount missing) | `server.ts`, `paymentReconciliation.ts` | `checkout.test.ts`, `captureRefundMismatch.test.ts`, `paymentCaptureVerify.test.ts` | COVERED |
 | PAY-409 | Capture 409 when PayPal OK but DB not completed; UI polls context | `server.ts`, `PaymentSuccess.tsx` | `captureReconciliation.test.ts`, `payment-success-ui.spec.ts` | COVERED |
 | PAY-EXCHANGE | Checkout exchange single-use redeem | `orderCheckoutExchange.ts` | `checkoutExchange.test.ts`, `orderCheckoutExchange.test.ts` | COVERED |
 | PAY-CONTEXT | Checkout-context recovery (`X-Order-Access-Token`) | `server.ts` L1280+ | `checkoutContext.test.ts` | COVERED |
@@ -99,7 +99,7 @@
 | ID | Behavior | Implementation | Test(s) | Status |
 |----|----------|----------------|---------|--------|
 | DB-CHECKOUT-EX | `order_checkout_exchanges` in SQL migrations | `schema.sql`, `migration-order-checkout-exchange.sql` | — | COVERED |
-| DB-RLS-14 | All 14 RLS tables in operator runbook | `schema.sql` + migrations | `rlsMigration.test.ts` | PARTIAL |
+| DB-RLS-14 | All 14 RLS tables in operator runbook + audit SQL | `rlsMigration.ts`, `SUPABASE_SQL_TO_RUN.md` | `rlsMigration.test.ts` | COVERED |
 | DOC-RLS-COUNT | 14 RLS tables in functional guides | various | `rlsMigration.test.ts` | COVERED |
 
 ---
@@ -110,7 +110,7 @@
 |----|----------|----------------|---------|--------|
 | CI-ENV | Production env validation in CI | `validate-env.mjs`, `ci.yml` | CI job | COVERED |
 | SEC-ORDER-SECRETS | `access_token_hash` + `access_token_encrypted` stripped from order JSON | `orderTokens.ts` `stripOrderSecrets` | `orderTokens.test.ts` | COVERED |
-| DOC-TESTS | Test count in `info.md` | `info.md` | `npm test` (167) | COVERED |
+| DOC-TESTS | Test count in `info.md` | `info.md` | `npm test` (174) | COVERED |
 
 ---
 

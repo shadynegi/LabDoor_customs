@@ -4,6 +4,9 @@ import { cancelPendingOrderAndRestoreStock } from './orderLifecycle';
 import { refundPayPalCapture } from './paypalRefund';
 import { upsertCustomerFromOrder } from './customers';
 import { amountsMatch } from './paypalCheckout';
+import { fetchPayPalCapturedAmount } from './paypalCaptureAmount';
+import { PAYPAL_API, getPayPalAccessToken, parseJson, paypalFetch } from './paypalClient';
+import { parseCaptureFromPayPalOrder } from './paypalWebhookUtils';
 import { WebhookProcessingError } from './webhookErrors';
 import { sendPostCaptureNotifications } from './postPaymentCapture';
 
@@ -28,6 +31,13 @@ export async function completeOrderPaymentCapture(
     }
 
     if (current.payment_status !== 'pending') {
+      return { updated: false, order: current };
+    }
+
+    if (!captureId || !String(captureId).trim()) {
+      logger.error(
+        `Refusing capture completion: missing paypal_capture_id for order ${serverOrderId}`
+      );
       return { updated: false, order: current };
     }
 
@@ -172,5 +182,62 @@ export async function syncWebhookPaymentCompleted(
   if (order) {
     await sendPostCaptureNotifications(order);
   }
+}
+
+export type VerifiedCaptureResult =
+  | { ok: true; captureId: string; amount: number }
+  | { ok: false; error: 'amount_missing' | 'amount_mismatch'; revertCaptureId: string | null };
+
+/** Fail closed: resolve amount from PayPal when missing and require a capture ID before completing. */
+export async function resolveVerifiedCaptureDetails(
+  paypalOrderId: string,
+  captureId: string | null,
+  expectedTotal: number,
+  capturedAmountFromResponse: number | null
+): Promise<VerifiedCaptureResult> {
+  const resolvedCaptureId =
+    captureId && String(captureId).trim() ? String(captureId).trim() : null;
+
+  let resolvedAmount = capturedAmountFromResponse;
+  if (resolvedAmount == null) {
+    resolvedAmount = await fetchPayPalCapturedAmount(
+      paypalOrderId,
+      resolvedCaptureId ?? undefined
+    );
+  }
+
+  if (resolvedAmount == null) {
+    return { ok: false, error: 'amount_missing', revertCaptureId: resolvedCaptureId };
+  }
+
+  if (!amountsMatch(expectedTotal, resolvedAmount)) {
+    return { ok: false, error: 'amount_mismatch', revertCaptureId: resolvedCaptureId };
+  }
+
+  let finalCaptureId = resolvedCaptureId;
+  if (!finalCaptureId) {
+    try {
+      const accessToken = await getPayPalAccessToken();
+      const orderRes = await paypalFetch(`${PAYPAL_API}/v2/checkout/orders/${paypalOrderId}`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      if (orderRes.ok) {
+        const orderData = await parseJson<Record<string, unknown>>(orderRes);
+        finalCaptureId = parseCaptureFromPayPalOrder(orderData).captureId;
+      }
+    } catch (error) {
+      logger.warn('Failed to resolve PayPal capture ID from order:', error);
+    }
+  }
+
+  if (!finalCaptureId) {
+    return { ok: false, error: 'amount_missing', revertCaptureId: null };
+  }
+
+  return { ok: true, captureId: finalCaptureId, amount: resolvedAmount };
 }
 

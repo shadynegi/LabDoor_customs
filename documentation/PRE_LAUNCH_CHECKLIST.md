@@ -20,6 +20,7 @@ Run in the **Supabase SQL Editor** (or psql on port 5432). Scripts live in `back
 - [ ] `migration-order-access-exchange.sql` — order email tracking links
 - [x] `migration-performance-linter-fixes.sql` (applied on production Supabase)
 - [x] `migration-products-search-trgm.sql` (applied on production Supabase)
+- [ ] `migration-products-video-360.sql` — `products.video_360` (also added at boot if missing)
 - [ ] Payment/checkout tables present **or** confirmed created on first backend boot (`order_checkout_exchanges`, `order_access_exchanges`, `payment_idempotency`, etc.)
 
 **After SQL:**

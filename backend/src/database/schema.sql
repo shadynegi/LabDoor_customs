@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS products (
   view_count INTEGER DEFAULT 0,
   cart_count INTEGER DEFAULT 0,
   is_out_of_stock BOOLEAN DEFAULT FALSE,
+  video_360 TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

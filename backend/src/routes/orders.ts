@@ -781,6 +781,35 @@ router.patch('/:id/payment-status', verifyAdmin, async (req: Request, res: Respo
       });
     }
 
+    if (
+      payment_status === 'completed' &&
+      currentOrder[0].payment_status !== 'pending'
+    ) {
+      if (currentOrder[0].payment_status === 'completed') {
+        const existing = await dbQuery(
+          () => sql`SELECT * FROM orders WHERE id = ${id} LIMIT 1`,
+          'orders:paymentStatusIdempotent'
+        );
+        const parsedExisting = parseOrderRow(existing[0] as Record<string, unknown>) as Order;
+        return res.json({
+          success: true,
+          data: parsedExisting,
+          message: 'Order is already marked paid',
+        });
+      }
+      return res.status(400).json({
+        success: false,
+        error: 'Only pending orders can be marked paid with PayPal verification',
+      });
+    }
+
+    if (payment_status === 'completed') {
+      return res.status(400).json({
+        success: false,
+        error: 'Only pending orders can be marked paid with PayPal verification',
+      });
+    }
+
     const captureIdForUpdate =
       payment_status === 'completed' && payment_id
         ? String(payment_id).trim()

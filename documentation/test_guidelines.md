@@ -46,7 +46,7 @@ If the user did not mention testing, **skip** `npm test`, `npm run test:all`, Pl
 | Frontend E2E / UI | Playwright | `Tests/frontend/` | 13 files, 37 tests | No (mocked `/api` + static preview) |
 | Link checker | Custom script | repo root | — | No |
 
-**Total:** 167 automated tests — 84 backend unit + 46 API + 37 Playwright UI (desktop + mobile projects).
+**Total:** 174 automated tests — 90 backend unit + 47 API + 37 Playwright UI (desktop + mobile projects).
 
 Backend unit tests include: payment idempotency, order tokens, checkout exchange hashing, order token encryption, webhook errors, product image validation, admin session hashing, PayPal webhook utils, refund idempotency, checkout pricing, coupon scope (`applies_to`), `computeCheckoutPricingForCart`, RLS table list + bootstrap contract, RLS grant revoke under `BOOTSTRAP_SKIP_DDL`, email portal URL (`buildOrderPortalUrl`), client IP, keep-alive.
 

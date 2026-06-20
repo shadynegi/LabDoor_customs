@@ -10,16 +10,11 @@ export function hashOrderAccessToken(token: string): string {
   return crypto.createHash('sha256').update(token).digest('hex');
 }
 
-/** Read order access token from header or legacy `?aid=` query (prefer header). */
+/** Read order access token from X-Order-Access-Token header only (query tokens deprecated). */
 export function getOrderAccessTokenFromRequest(req: Request): string | null {
   const headerToken = req.headers['x-order-access-token'];
   if (typeof headerToken === 'string' && headerToken.trim()) {
     return headerToken.trim();
-  }
-
-  const queryAid = req.query.aid;
-  if (typeof queryAid === 'string' && queryAid.trim()) {
-    return queryAid.trim();
   }
 
   return null;

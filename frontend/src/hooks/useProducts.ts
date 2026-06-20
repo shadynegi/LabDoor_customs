@@ -21,6 +21,7 @@ export interface Product {
   view_count?: number;
   cart_count?: number;
   is_out_of_stock?: boolean;
+  video_360?: string | null;
 }
 
 interface UseProductsResult {

@@ -15,7 +15,7 @@ Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API
 |------|----------------|
 | **Checkout** | Cart validation with retry; `policy_accepted` required; no-refund policy checkbox; PayPal `?code=` exchange; capture **409** shows processing UI (polls checkout-context; cart held); checkout email synced to activity on change/blur. |
 | **Orders** | Email links `GET /api/orders/access-exchange/:code`; legacy `?orderNumber=&token=` stripped; partial refresh keeps stale data + warning. |
-| **Admin** | Products paginated (load more); messages mark read on open; coupons support scope; reviews admin response; estimated delivery on orders; tab error/retry states. |
+| **Admin** | Products paginated (load more); optional **360° MP4** per product; messages mark read on open; coupons support scope; reviews admin response; estimated delivery on orders; tab error/retry states; **Customers** card layout on mobile. |
 | **Activity** | Consent-gated batch; `contact_submit` on contact success; IPs anonymized with `IP_SALT`. |
 | **Reviews** | `POST /api/reviews/check` on email blur; pending-moderation success copy; vote error toasts; admin `admin_response` editable. |
 | **Mobile** | Sticky CTAs with keyboard lift on checkout; cookie banner top on purchase routes; cart stacked CTA at 320px; OOS hides product sticky bar; admin product cards on phones. |
@@ -28,9 +28,9 @@ Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_
 
 - Product catalog with filters, pagination, and **server-side search** (`POST /api/products/search`, `pg_trgm` on Supabase); Home/Products suggestions debounced to same API
 - Optimized storefront assets: WebP variants + responsive `srcSet` for 5 shoe images, 5 backgrounds, and logos; build size budgets (`PERFORMANCE_BASELINE.md`)
-- Product detail pages with 360° viewer (real video assets or spin placeholder), reviews, and structured data
+- Product detail pages with 360° viewer (admin-uploaded MP4 or spin placeholder), reviews, and structured data
 - Shopping cart (localStorage) with server price validation on each change and **retry** on validation failure
-- PayPal checkout with server-side pricing and coupon validation
+- PayPal checkout with server-side pricing; capture **fail-closed** on missing amount; coupon validation
 - Payment success page: redeems checkout exchange `?code=`, captures payment; handles **409** reconciliation UI; surfaces expired exchange errors; strips sensitive params from URL on success
 - Customer order lookup at `/orders` via `POST /api/orders/lookup`
 - Contact form; legal pages including no-refund / manufacturing-defect replacement policy (`/returns-policy`, `/replacement-policy`); cookie consent; GA4 and activity tracking (consent-gated)
@@ -103,6 +103,6 @@ Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_
 
 ## Testing
 
-- 167 automated tests (84 backend unit + 46 API + 37 Playwright UI)
+- 174 automated tests (90 backend unit + 47 API + 37 Playwright UI)
 - Playwright storefront smoke tests (home, products, checkout, contact)
 - Documentation link checker in CI

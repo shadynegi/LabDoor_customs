@@ -256,9 +256,13 @@ export default function AdminDashboard() {
               is_out_of_stock: p.is_out_of_stock || false,
             }))
           );
+        } else {
+          setProductSearchResults([]);
+          toast.error(data.error || 'Product search failed');
         }
       } catch (error) {
         logError('Admin product search failed:', error);
+        toast.error('Product search failed');
       }
     }, 300);
     return () => window.clearTimeout(handle);
@@ -1331,9 +1335,41 @@ export default function AdminDashboard() {
         </label>
       </div>
 
-      {/* Customers Table */}
+      {/* Customers — cards on mobile, table on desktop */}
+      {isMobile ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {filteredCustomers.map((customer) => (
+            <div key={customer.email} style={{ background: 'white', borderRadius: 12, border: '1px solid #e5e7eb', padding: 16 }}>
+              <div style={{ fontWeight: 700, color: '#1f2937' }}>{customer.name || 'N/A'}</div>
+              <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4, wordBreak: 'break-all' }}>{customer.email}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12, fontSize: 13 }}>
+                <div><span style={{ color: '#6b7280' }}>Orders</span><br /><strong>{customer.total_orders}</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Spent</span><br /><strong style={{ color: '#10b981' }}>${customer.total_spent.toFixed(2)}</strong></div>
+                <div style={{ gridColumn: '1 / -1' }}><span style={{ color: '#6b7280' }}>Last order</span><br /><strong>{customer.last_order_date ? new Date(customer.last_order_date).toLocaleDateString() : 'N/A'}</strong></div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+                <button type="button" onClick={async () => { setSelectedCustomer(customer); await fetchCustomerHistory(customer.email); }}
+                  style={{ padding: '10px 14px', minHeight: 44, background: '#9c6649', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                  View History
+                </button>
+                {customer.is_deleted ? (
+                  <button type="button" onClick={() => handleRestoreCustomer(customer)}
+                    style={{ padding: '10px 14px', minHeight: 44, background: '#dcfce7', color: '#16a34a', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                    Restore
+                  </button>
+                ) : (
+                  <button type="button" onClick={() => setAdminDialog({ kind: 'deleteCustomer', customer })}
+                    style={{ padding: '10px 14px', minHeight: 44, background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                    Delete
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
       <div className="responsive-table-wrap" style={{ background: 'white', borderRadius: 12, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: isMobile ? 480 : 640 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 640 }}>
           <thead>
             <tr style={{ background: '#f9fafb' }}>
               <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#374151' }}>Customer</th>
@@ -1377,6 +1413,7 @@ export default function AdminDashboard() {
           </tbody>
         </table>
       </div>
+      )}
     </div>
   );
 

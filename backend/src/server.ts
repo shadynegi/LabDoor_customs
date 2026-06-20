@@ -52,6 +52,7 @@ import { connectRedis, isRedisEnabled, getRedisClient } from './lib/redis';
 import { mountRateLimits } from './middleware/rateLimits';
 import { startMaintenanceJobs } from './lib/maintenanceJobs';
 import { ensureActivityLogsTable } from './lib/activitySchema';
+import { ensureProductVideo360Column } from './lib/productSchema';
 import { registerGracefulShutdown } from './lib/gracefulShutdown';
 import { POLICY_ACCEPTANCE_REQUIRED_MESSAGE } from './lib/returnPolicy';
 import {
@@ -61,6 +62,7 @@ import {
 import {
   completeOrderPaymentCapture,
   revertCaptureAmountMismatch,
+  resolveVerifiedCaptureDetails,
 } from './lib/paymentReconciliation';
 import { sendPostCaptureNotifications } from './lib/postPaymentCapture';
 import { createPayPalWebhookHandler } from './lib/paypalWebhookHandler';
@@ -140,6 +142,20 @@ const validateEnvVars = () => {
     }
 
     assertJwtSecretForProduction();
+
+    if (process.env.ALLOW_INSECURE_RLS === 'true') {
+      logger.error('ALLOW_INSECURE_RLS=true is forbidden in production');
+      process.exit(1);
+    }
+
+    const minSecretLen = 32;
+    for (const key of ['ORDER_TOKEN_ENCRYPTION_KEY', 'IP_SALT'] as const) {
+      const value = process.env[key]?.trim() || '';
+      if (value.length < minSecretLen) {
+        logger.error(`${key} must be at least ${minSecretLen} characters in production`);
+        process.exit(1);
+      }
+    }
 
     const paypalMode = (process.env.PAYPAL_MODE || 'sandbox').toLowerCase();
     if (paypalMode !== 'live' && process.env.REQUIRE_PAYPAL_LIVE !== 'false') {
@@ -1107,22 +1123,36 @@ app.post("/api/paypal/capture-payment/:orderId", async (req: Request, res: Respo
       extractPayPalCaptureAmount(data as Record<string, any>);
     const expectedTotal = parseFloat(boundOrder.total?.toString() || '0');
 
-    if (capturedAmount != null && !amountsMatch(expectedTotal, capturedAmount)) {
-      logger.error("❌ PayPal capture amount mismatch:", {
-        expected: expectedTotal,
-        captured: capturedAmount,
-        serverOrderId,
-        paypalOrderId,
-      });
+    const preliminaryCaptureId =
+      resolvedAlreadyCaptured?.captureId ||
+      (data as any).purchase_units?.[0]?.payments?.captures?.[0]?.id ||
+      (data as any).id ||
+      null;
 
-      const mismatchCaptureId =
-        resolvedAlreadyCaptured?.captureId ||
-        (data as any).purchase_units?.[0]?.payments?.captures?.[0]?.id ||
-        (data as any).id ||
-        null;
+    const verification = await resolveVerifiedCaptureDetails(
+      paypalOrderId,
+      preliminaryCaptureId,
+      expectedTotal,
+      capturedAmount
+    );
 
-      if (mismatchCaptureId) {
-        await revertCaptureAmountMismatch(serverOrderId, mismatchCaptureId);
+    if (!verification.ok) {
+      if (verification.error === 'amount_mismatch') {
+        logger.error('❌ PayPal capture amount mismatch:', {
+          expected: expectedTotal,
+          serverOrderId,
+          paypalOrderId,
+        });
+      } else {
+        logger.error('❌ PayPal capture amount could not be verified:', {
+          expected: expectedTotal,
+          serverOrderId,
+          paypalOrderId,
+        });
+      }
+
+      if (verification.revertCaptureId) {
+        await revertCaptureAmountMismatch(serverOrderId, verification.revertCaptureId);
       } else {
         await cancelPendingOrderAndRestoreStock(serverOrderId).catch(() => {});
       }
@@ -1130,16 +1160,18 @@ app.post("/api/paypal/capture-payment/:orderId", async (req: Request, res: Respo
       await failIdempotencyKey(idempotencyKey, 'capture_payment').catch(() => {});
       return res.status(400).json({
         success: false,
-        error: "Payment amount mismatch",
-        message: "Payment was reversed because the captured amount did not match your order total",
+        error:
+          verification.error === 'amount_mismatch'
+            ? 'Payment amount mismatch'
+            : 'Payment verification failed',
+        message:
+          verification.error === 'amount_mismatch'
+            ? 'Payment was reversed because the captured amount did not match your order total'
+            : 'Payment could not be verified. Please contact support with your PayPal receipt.',
       });
     }
 
-    const captureId =
-      resolvedAlreadyCaptured?.captureId ||
-      (data as any).purchase_units?.[0]?.payments?.captures?.[0]?.id ||
-      (data as any).id ||
-      null;
+    const captureId = verification.captureId;
 
     const { updated, order: updatedOrder } = await completeOrderPaymentCapture(
       serverOrderId,
@@ -1542,6 +1574,7 @@ async function bootstrap(): Promise<void> {
   }
   await runBootstrapTask('payment_idempotency', ensureIdempotencyTable);
   await runBootstrapTask('activity_logs', ensureActivityLogsTable);
+  await runBootstrapTask('product_video_360', ensureProductVideo360Column);
   await runBootstrapTask('order_payment_schema', ensureOrderPaymentSchema);
   await runBootstrapTask('checkout_exchange', ensureCheckoutExchangeTable);
   await runBootstrapTask('order_access_exchange', ensureOrderAccessExchangeTable);

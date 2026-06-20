@@ -111,6 +111,12 @@ test.describe('Deep storefront flows', () => {
     await expect(page.getByText('Secure Checkout')).toBeVisible({ timeout: 15_000 });
     await fillCheckoutCustomerForm(page);
 
+    await page.waitForResponse(
+      (response) =>
+        response.url().includes('/products/validate-cart') && response.ok(),
+      { timeout: 20_000 },
+    );
+
     const policyCheckbox = page.getByRole('checkbox', { name: /all sales are final/i });
     await policyCheckbox.check();
     await expect(policyCheckbox).toBeChecked();
