@@ -3,6 +3,7 @@ import { logger } from './logger';
 import { cancelPendingOrderAndRestoreStock } from './orderLifecycle';
 import { refundPayPalCapture } from './paypalRefund';
 import { upsertCustomerFromOrder } from './customers';
+import { syncOrderLineItemsForOrder } from './orderLineItems';
 import { amountsMatch } from './paypalCheckout';
 import { fetchPayPalCapturedAmount } from './paypalCaptureAmount';
 import { PAYPAL_API, getPayPalAccessToken, parseJson, paypalFetch } from './paypalClient';
@@ -72,6 +73,11 @@ export async function completeOrderPaymentCapture(
     return { updated: true, order: updated[0] };
   }).then(async (result) => {
     if (result.updated && result.order) {
+      try {
+        await syncOrderLineItemsForOrder(result.order.id as string);
+      } catch (error) {
+        logger.error('order_line_items sync error after payment capture:', error);
+      }
       try {
         await upsertCustomerFromOrder(
           result.order.customer_email as string,

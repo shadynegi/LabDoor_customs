@@ -1,6 +1,7 @@
 import sql from './db';
 import { logger } from './logger';
 import { InsufficientStockError } from './inventory';
+import { applyStockDeltaInTx } from './inventoryMovements';
 import { generateOrderAccessToken } from './orderTokens';
 import { encryptOrderAccessToken } from './orderTokenEncryption';
 import { releaseCouponForOrder } from './couponReservation';
@@ -74,19 +75,15 @@ export async function createPendingPayPalOrderAtomic(input: PendingPayPalOrderIn
     }> = [];
 
     for (const item of input.lineItems) {
-      const updated = await tx`
-        UPDATE products
-        SET
-          stock = stock - ${item.quantity},
-          is_out_of_stock = (stock - ${item.quantity}) <= 0,
-          updated_at = NOW()
-        WHERE id = ${item.product_id}
-          AND stock >= ${item.quantity}
-          AND is_out_of_stock = FALSE
-        RETURNING id, name, stock
-      `;
+      const result = await applyStockDeltaInTx(tx, {
+        productId: item.product_id,
+        delta: -item.quantity,
+        reason: 'sale',
+        referenceType: 'order',
+        enforceAvailable: true,
+      });
 
-      if (updated.length === 0) {
+      if (!result.ok) {
         const rows = await tx`
           SELECT id, name, stock, is_out_of_stock
           FROM products
@@ -162,14 +159,13 @@ export async function cancelPendingOrderAndRestoreStock(serverOrderId: string): 
 
     const items = parseOrderItems(order.items);
     for (const item of items) {
-      await tx`
-        UPDATE products
-        SET
-          stock = stock + ${item.quantity},
-          is_out_of_stock = FALSE,
-          updated_at = NOW()
-        WHERE id = ${item.product_id}
-      `;
+      await applyStockDeltaInTx(tx, {
+        productId: item.product_id,
+        delta: item.quantity,
+        reason: 'cancel_restore',
+        referenceType: 'order',
+        referenceId: serverOrderId,
+      });
     }
 
     await tx`

@@ -24,13 +24,20 @@ Generate a production password hash locally with `node backend/scripts/generate-
 
 Displays:
 
-- Order counts and revenue (completed vs pending)
-- Product metrics (views, cart adds)
-- Customer statistics
-- Geographic breakdown from activity logs
+- Order counts and revenue (all time + last 30 days)
+- **Sales period filter** — day, week, month, year, or all (`?period=` on analytics API)
+- **Units sold**, revenue, average order value, and **revenue change vs prior period** for the selected range
+- **Top sellers** by units and revenue; **revenue by product** table with share %
+- **Best sales period** in range (highest-revenue bucket)
+- **Low-stock alert** — products at or below reorder point (`inventory.low_stock_products`)
+- Product engagement metrics (views, cart adds)
+- Customer statistics and geographic breakdown
+- **Export CSV** — `GET /api/admin/analytics/export?period=` (product sales for selected period)
 - GA4 and Google Search Console configuration status with external dashboard links
 
-Data source: `GET /api/admin/analytics`
+Data source: `GET /api/admin/analytics?period=day|week|month|year|all|custom&from=&to=`
+
+Response includes `sales` (period metrics) and `inventory` (low-stock summary). Cached 5–15 min per period (`ADMIN_ANALYTICS_CACHE_TTL_MS`).
 
 If the analytics API fails, the tab shows an error message with a **Retry** button.
 
@@ -43,10 +50,13 @@ If the analytics API fails, the tab shows an error message with a **Retry** butt
 - **Load more** — paginated list via `GET /api/products?limit=50&page=` when not searching
 - Error banner with **Retry** if the product list fails to load
 - **Coupons / Reviews** — product scope uses **server search** (`AdminProductSearchPicker` → `POST /api/products/search`), not a fixed 100-product list
-- Create new products (name, price, images, optional **360° MP4 video**, category, size, color, stock)
-- Edit existing products
+- Create new products (name, price, images, optional **360° MP4 video**, **SKU**, **reorder point**, optional **cost price**, category, size, color, stock)
+- Edit existing products (stock changes are logged to `inventory_movements`)
 - Delete products
-- Bulk update stock / out-of-stock flags via `POST /api/admin/products/bulk-update`
+- **Bulk stock** — set absolute stock or apply delta for selected products via `POST /api/admin/products/bulk-update` (`stock`, `stock_delta`, or `is_out_of_stock`)
+- **Low-stock filter** — highlight products below reorder point
+- **Stock history** — per-product movement log via `GET /api/admin/products/:id/inventory-movements`
+- Bulk mark in/out of stock via same bulk-update endpoint
 
 Product list API responses are cached (60s TTL); writes invalidate cache.
 
@@ -70,6 +80,8 @@ Click an order card to open fulfillment actions:
 - **Notify shipped** — `POST /api/orders/:id/notify-shipped` (requires tracking number)
 - **Status** — Mark processing, shipped, or delivered (valid transitions enforced)
 - **Mark paid** — prompts for a reason, then `PATCH /api/orders/:id/payment-status` with `completed`, `admin_note` (≥3 chars), and `payment_id` (external reference or capture ID, ≥5 chars); logged to `activity_logs` as `admin_mark_paid`
+- **Edit customer details** — `PATCH /api/orders/:id/customer-details` (name, email, shipping address, admin notes; does not change paid line totals)
+- **Edit pending items** — `PATCH /api/orders/:id/pending-items` (unpaid pending orders only; adjusts inventory)
 - **Cancel order** — prompts for optional reason; dismiss the prompt to abort. Uses `POST /api/orders/:id/cancel` (**unpaid pending orders only** — no customer refunds)
 
 ### Bulk updates
@@ -121,11 +133,14 @@ Contact form submissions from `contact_messages` table.
 
 Aggregated customer data from the `customers` table (updated on order capture).
 
-- View customer list with order count and total spent (table scrolls horizontally on mobile)
+- **Server-side search** and **pagination** (`GET /api/admin/customers?search=&page=&limit=`)
+- View customer list with order count, total spent, phone, first/last order dates (table on desktop, cards on mobile)
+- **Edit profile** — `PATCH /api/admin/customers/:id` (name, phone, admin notes; does not rewrite historical order snapshots)
 - **View History** — opens a modal with customer stats and order list; shows a loading state while fetching and a toast on failure
 - Soft delete customers (`is_deleted = true`) — **Delete** button in table
 - Restore deleted customers — enable **Show deleted customers**, then **Restore**
 - Toggle **Show deleted customers** to include soft-deleted rows
+- **Recompute aggregates** — `POST /api/admin/customers/recompute` (refresh totals from completed orders)
 
 ---
 
@@ -162,7 +177,12 @@ These are available via API but do not have dedicated dashboard tabs:
 
 | Endpoint | Purpose |
 |----------|---------|
-| `POST /api/admin/products/bulk-update` | Bulk product field updates |
+| `POST /api/admin/products/bulk-update` | Bulk product updates (`stock`, `stock_delta`, `is_out_of_stock`) |
+| `GET /api/admin/products/low-stock` | Products at or below reorder point |
+| `GET /api/admin/products/:id/inventory-movements` | Stock movement audit log |
+| `GET /api/admin/analytics/export` | CSV export of product sales for period |
+| `PATCH /api/admin/customers/:id` | Update customer CRM profile |
+| `POST /api/admin/customers/recompute` | Rebuild customer aggregates from orders |
 | `POST /api/admin/orders/bulk-update` | Bulk order status updates (not cancellation) |
 | `POST /api/admin/messages/bulk-update` | Bulk message status updates |
 

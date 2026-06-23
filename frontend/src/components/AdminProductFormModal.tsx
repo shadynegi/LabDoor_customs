@@ -20,6 +20,9 @@ export interface AdminProduct {
   stock: number;
   is_out_of_stock: boolean;
   video_360?: string | null;
+  sku?: string | null;
+  reorder_point?: number;
+  cost_price?: number | null;
 }
 
 export interface ProductFormPayload {
@@ -34,6 +37,9 @@ export interface ProductFormPayload {
   stock: number;
   is_out_of_stock?: boolean;
   video_360?: string | null;
+  sku?: string | null;
+  reorder_point?: number;
+  cost_price?: number | null;
 }
 
 const CATEGORIES = ['Sneakers', 'Boots', 'Sandals', 'Loafers', 'Custom'];
@@ -58,6 +64,9 @@ const emptyForm = (): ProductFormPayload => ({
   stock: 0,
   is_out_of_stock: false,
   video_360: '',
+  sku: '',
+  reorder_point: 5,
+  cost_price: null,
 });
 
 interface AdminProductFormModalProps {
@@ -111,6 +120,9 @@ export default function AdminProductFormModal({
         stock: product.stock,
         is_out_of_stock: product.is_out_of_stock,
         video_360: product.video_360 || '',
+        sku: product.sku || '',
+        reorder_point: product.reorder_point ?? 5,
+        cost_price: product.cost_price ?? null,
       });
       setExtraSizes(new Set());
     } else {
@@ -194,6 +206,9 @@ export default function AdminProductFormModal({
         color: form.color?.trim() || undefined,
         is_out_of_stock: form.stock === 0 ? true : form.is_out_of_stock,
         video_360: form.video_360?.trim() || undefined,
+        sku: form.sku?.trim() || undefined,
+        reorder_point: form.reorder_point ?? 5,
+        cost_price: form.cost_price != null && form.cost_price > 0 ? form.cost_price : undefined,
       };
 
       if (isEditing && product) {
@@ -282,6 +297,46 @@ export default function AdminProductFormModal({
               step={1}
               value={form.stock}
               onChange={(e) => setField('stock', parseInt(e.target.value, 10) || 0)}
+              style={inputStyle}
+            />
+          </div>
+
+          <div>
+            <label style={labelStyle}>SKU</label>
+            <input
+              type="text"
+              value={form.sku || ''}
+              onChange={(e) => setField('sku', e.target.value)}
+              placeholder="e.g. NIKE-BLU-US10"
+              style={inputStyle}
+              maxLength={64}
+            />
+          </div>
+
+          <div>
+            <label style={labelStyle}>Reorder point</label>
+            <input
+              type="number"
+              min={0}
+              step={1}
+              value={form.reorder_point ?? 5}
+              onChange={(e) => setField('reorder_point', parseInt(e.target.value, 10) || 0)}
+              style={inputStyle}
+            />
+          </div>
+
+          <div>
+            <label style={labelStyle}>Cost price (USD)</label>
+            <input
+              type="number"
+              min={0}
+              step={0.01}
+              value={form.cost_price ?? ''}
+              onChange={(e) => {
+                const v = e.target.value;
+                setField('cost_price', v === '' ? null : parseFloat(v) || 0);
+              }}
+              placeholder="Optional — for profit estimates"
               style={inputStyle}
             />
           </div>

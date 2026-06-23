@@ -15,7 +15,7 @@ Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API
 |------|----------------|
 | **Checkout** | Cart validation with retry; DB-backed coupon validate; server/client total compare; PayPal `?code=` exchange; capture **409** → processing UI + poll timeout; `checkout_complete` before redirect. |
 | **Orders** | Email links `GET /api/orders/access-exchange/:code`; legacy `?orderNumber=&token=` stripped; partial refresh keeps stale data + warning. |
-| **Admin** | Products paginated (load more); messages mark read on open; coupons scope UI; reviews admin response; estimated delivery; error/retry states. |
+| **Admin** | Products paginated (load more); inventory (SKU, reorder, movements, low-stock, bulk stock delta); analytics periods + CSV export; customer search/notes; order customer-details + pending-item edits; messages mark read on open; coupons scope UI; reviews admin response; estimated delivery; error/retry states. |
 | **Activity** | Consent-gated batch; `contact_submit` on contact success. |
 | **Reviews** | `POST /api/reviews/check` on email blur; pending-moderation copy; vote error toasts. |
 | **Mobile** | Sticky CTAs with keyboard lift on checkout; cookie banner top on purchase routes; cart stacked CTA at 320px; OOS hides product sticky bar; admin product cards on phones. |
@@ -41,18 +41,20 @@ If the user did not mention testing, **skip** `npm test`, `npm run test:all`, Pl
 
 | Suite | Tool | Location | Count | Needs live DB? |
 |-------|------|----------|-------|----------------|
-| Backend unit | Vitest | `Tests/backend/` | 23 files, 84 tests | No (mocked) |
-| API integration | Vitest + Supertest | `Tests/api/` | 18 files, 45 tests | No (mocked) |
+| Backend unit | Vitest | `Tests/backend/` | 26 files, 93 tests | No (mocked) |
+| API integration | Vitest + Supertest | `Tests/api/` | 19 files, 53 tests | No (mocked) |
 | Frontend E2E / UI | Playwright | `Tests/frontend/` | 13 files, 37 tests | No (mocked `/api` + static preview) |
 | Link checker | Custom script | repo root | — | No |
 
-**Total:** 174 automated tests — 90 backend unit + 47 API + 37 Playwright UI (desktop + mobile projects).
+**Total:** 183 automated tests — 93 backend unit + 53 API + 37 Playwright UI (desktop + mobile projects).
 
 Backend unit tests include: payment idempotency, order tokens, checkout exchange hashing, order token encryption, webhook errors, product image validation, admin session hashing, PayPal webhook utils, refund idempotency, checkout pricing, coupon scope (`applies_to`), `computeCheckoutPricingForCart`, RLS table list + bootstrap contract, RLS grant revoke under `BOOTSTRAP_SKIP_DDL`, email portal URL (`buildOrderPortalUrl`), client IP, keep-alive.
 
-API tests include: checkout (incl. client amount mismatch + policy acceptance), create-payment happy path (mocked PayPal + exchange), capture 409 reconciliation, capture refund mismatch, checkout-context recovery, checkout exchange, PayPal webhook COMPLETED/DENIED, admin mark-paid (validation + success), no-refund policy (admin refund/cancel 403), health, orders, security, activity batch/log, order lookup, reviews check.
+API tests include: checkout (incl. client amount mismatch + policy acceptance), create-payment happy path (mocked PayPal + exchange), capture 409 reconciliation, capture refund mismatch, checkout-context recovery, checkout exchange, PayPal webhook COMPLETED/DENIED, admin mark-paid (validation + success), **admin enhancements** (low-stock, inventory movements, customer PATCH, bulk stock delta, order customer-details, analytics period), **products search**, no-refund policy (admin refund/cancel 403), health, orders, security, activity batch/log, order lookup, reviews check.
 
-Playwright includes: payment-success missing-token UX, orders legacy URL deprecation + `?code=` email redeem, checkout server/client total mismatch block, checkout country pre-select (native `<select>`), admin login redirect + dashboard analytics smoke, **deep flows** (`deep-flows-ui.spec.ts`: catalog `?q=` server search, product trust badges + reviews, checkout policy gate + coupon + create-payment, cart quantity, payment-success 409 processing UI).
+Backend unit tests also cover: **sales analytics** period parsing + CSV export, **admin analytics cache** keys/TTL, inventory movement helpers (via integration paths), payment idempotency, order tokens, RLS, email portal URL, and related payment/order utilities.
+
+Playwright includes: payment-success missing-token UX, orders legacy URL deprecation + `?code=` email redeem, checkout server/client total mismatch block, checkout country pre-select (native `<select>`), admin login redirect + dashboard analytics smoke, **deep flows** (`deep-flows-ui.spec.ts`: catalog `?q=` server search, product trust badges + reviews, checkout policy gate + coupon + create-payment, cart quantity, payment-success 409 processing UI). Checkout PayPal tests use `clickPayPalAndWaitForCreatePayment()` in `Tests/frontend/helpers/checkout.ts` (registers response listener before click). Mismatch tests set `createPaymentTotal` via the storefront fixture (`Tests/frontend/fixtures/storefront.ts`).
 
 ---
 
@@ -103,9 +105,9 @@ npm run test:frontend:install   # first time only — downloads Chromium
 npm run test:frontend
 ```
 
-Playwright starts `vite preview` on `http://127.0.0.1:4173` automatically (see `playwright.config.ts`). The backend does **not** need to be running — UI tests mock `/api/*` via `page.route()` in `Tests/frontend/helpers/mock-api.ts`.
+Playwright starts `vite preview` on `http://127.0.0.1:4173` automatically (see `playwright.config.ts`). Preview sets `PLAYWRIGHT=true` so Vite **does not proxy** `/api` to a live backend — all API traffic is mocked in-browser via `page.route()`. The backend does **not** need to be running.
 
-**UI coverage:** products list/detail, cart, checkout shell, contact form, navigation, cookie consent, mobile viewport (`mobile-ui.spec.ts` runs in the `mobile-chrome` project).
+**UI coverage:** products list/detail, cart, checkout shell, contact form, navigation, cookie consent, mobile viewport (`mobile-ui.spec.ts` runs in the `mobile-chrome` project). Playwright uses `workers: 1` and `retries: 1` for stable checkout flows.
 
 ---
 
@@ -209,6 +211,8 @@ Production frontend builds run `optimize-assets` (WebP from source PNGs) and `bu
 | `orderTokens.test.ts` | Order access token generation and validation |
 | `paypalWebhookUtils.test.ts` | PayPal webhook payload parsing helpers |
 | `refundIdempotency.test.ts` | Refund request deduplication |
+| `adminAnalyticsCache.test.ts` | Admin analytics cache keys and TTL |
+| `salesAnalytics.test.ts` | Analytics period parsing and CSV export helpers |
 | `keepAlive.test.ts` | Supabase pooler keep-alive connection options |
 
 ### API tests (`Tests/api/`)
@@ -219,6 +223,9 @@ Production frontend builds run `optimize-assets` (WebP from source PNGs) and `bu
 | `security.test.ts` | CSRF protection, CORS, rate limiting |
 | `checkout.test.ts` | `POST /api/paypal/create-payment` validation and edge cases |
 | `orders.test.ts` | Order lookup routes, deprecated endpoints |
+| `adminEnhancements.test.ts` | Low-stock, inventory movements, customer PATCH, bulk stock, order edits, analytics period |
+| `adminAnalytics.test.ts` | Admin analytics API |
+| `productsSearch.test.ts` | Product search API |
 
 API tests use `Tests/helpers/http.ts` for CSRF token flow with Supertest.
 
@@ -244,7 +251,7 @@ Individual smoke cases:
 | Vitest include paths | `backend/vitest.config.ts` | `Tests/backend/**/*.test.ts`, `Tests/api/**/*.test.ts` |
 | Vitest setup / mocks | `Tests/setup.ts` | Mocks `../backend/src/lib/db`, Redis, idempotency |
 | Test env vars | `backend/vitest.config.ts` | Fake JWT, PayPal sandbox keys, admin credentials for tests |
-| Playwright | `Tests/playwright.config.ts` | `testDir: ./frontend`, preview on port **4173** |
+| Playwright | `Tests/playwright.config.ts` | `testDir: ./frontend`, preview on port **4173**, `PLAYWRIGHT=true` on webServer, `workers: 1`, `retries: 1` |
 | Frontend npm scripts | `frontend/package.json` | `test:e2e` → `npm run test:frontend --prefix ../Tests` |
 | Root npm scripts | `package.json` | `test`, `test:backend`, `test:api`, `test:frontend`, `test:all` |
 
@@ -316,12 +323,13 @@ Expect `success: true` with database and Redis status.
 ### Admin
 
 1. Login at `/admin/login`
-2. View analytics tab
-3. Create/edit a product
-4. View and update an order (status, tracking)
-5. Send shipping notification
-6. Cancel an **unpaid pending** test order (paid orders return 403 — no refund)
-7. Read and archive contact messages
+2. View analytics tab — change period, export CSV, confirm sales/inventory panels
+3. Create/edit a product (SKU, reorder point, cost price); view inventory movement history; use low-stock filter; bulk stock delta
+4. View and update an order (status, tracking, customer details on pending orders)
+5. Search customers, edit admin notes
+6. Send shipping notification
+7. Cancel an **unpaid pending** test order (paid orders return 403 — no refund)
+8. Read and archive contact messages
 
 ### PayPal webhooks
 
@@ -339,7 +347,10 @@ See [PAYPAL_TESTING_GUIDE.md](PAYPAL_TESTING_GUIDE.md).
 | Playwright browser download fails (SSL) | Run `npm run test:frontend:install` from `Tests/` on a network that can reach Playwright CDN; corporate proxies may need `NODE_TLS_REJECT_UNAUTHORIZED=0` for install only |
 | E2E fails immediately | Ensure `cd frontend && npm run build` completed; preview serves `dist/` |
 | Vitest import errors | Run tests from `backend/`; paths assume monorepo layout `LabDoor_customs/backend` + `LabDoor_customs/Tests` |
-| Port 4173 in use | Stop other preview servers or set `reuseExistingServer: true` (default locally) |
+| Port 4173 in use | Stop other preview servers or set `reuseExistingServer: true` (default locally when `CI` is unset) |
+| Corporate VPN / Zscaler blocks Supabase | `npm run dev` may show `ENOTFOUND` for `db.*.supabase.co`; health returns **503 DEGRADED**; DB routes fail until off VPN or allowlisted |
+| `npm run build` fails env validation locally | Set `VITE_API_BASE_URL`, `VITE_SITE_URL`, `VITE_SENTRY_DSN` in `frontend/.env`, or use `NODE_ENV=development` for a non-strict local build |
+| `build:budget` JS over limit | Admin dashboard bundle grew — see [`PERFORMANCE_BASELINE.md`](PERFORMANCE_BASELINE.md); budget is **1.4 MB** raw JS in `dist/assets` |
 
 ---
 

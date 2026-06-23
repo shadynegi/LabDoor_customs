@@ -39,6 +39,7 @@ Located in `backend/src/database/`:
 - `migration-performance-linter-fixes.sql` — FK indexes (lint 0001) + consolidate duplicate RLS policies (lint 0006). **Applied on production Supabase.** Run once on new DBs.
 - `migration-products-search-trgm.sql` — `pg_trgm` + GIN indexes on `products.name` / `products.description` for `POST /api/products/search`. **Applied on production Supabase.** Run once on new DBs.
 - `migration-products-video-360.sql` — optional `products.video_360` TEXT for admin-uploaded 360° MP4 URLs. Also applied at boot via `ensureProductVideo360Column()`.
+- `migration-admin-enhancements.sql` — SKU, reorder point, `inventory_movements`, `order_line_items`, customer/order admin notes. Also applied at boot via `ensureAdminEnhancementSchema()`.
 - `migration-payment-idempotency.sql` — idempotency table + indexes including partial index `idx_payment_idempotency_processing_created` for maintenance reaper
 
 ## Boot vs SQL editor

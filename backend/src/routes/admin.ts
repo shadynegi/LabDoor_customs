@@ -17,7 +17,8 @@ import { validateJwtSecretComplexity } from '../lib/jwtSecret';
 import { MAX_BULK_IDS, validateStatusTransition, type OrderStatus } from '../lib/orderStatus';
 import { stripOrderSecrets } from '../lib/orderTokens';
 import { respond500 } from '../lib/safeError';
-import { getAdminAnalytics } from '../lib/adminAnalytics';
+import { getAdminAnalytics, fetchSalesAnalytics, parseAnalyticsDateRange, salesAnalyticsToCsv } from '../lib/adminAnalytics';
+import { getProductInventoryMovements, getLowStockProducts, setProductStockAbsolute, applyStockDeltaInTx } from '../lib/inventoryMovements';
 
 const router = Router();
 
@@ -410,14 +411,32 @@ router.get('/verify', async (req: Request, res: Response) => {
   });
 });
 
-// GET /admin/analytics — dashboard summary
-router.get('/analytics', verifyAdmin, async (_req: Request, res: Response) => {
+// GET /admin/analytics — dashboard summary (+ sales period via ?period=&from=&to=)
+router.get('/analytics', verifyAdmin, async (req: Request, res: Response) => {
   try {
-    const data = await getAdminAnalytics();
+    const data = await getAdminAnalytics(req.query as Record<string, unknown>);
     res.json({ success: true, data });
   } catch (error: unknown) {
     logger.error('Analytics error:', error);
     respond500(res, error, 'Failed to fetch analytics');
+  }
+});
+
+// GET /admin/analytics/export — CSV product sales for period
+router.get('/analytics/export', verifyAdmin, async (req: Request, res: Response) => {
+  try {
+    const range = parseAnalyticsDateRange(req.query as Record<string, unknown>);
+    const sales = await fetchSalesAnalytics(range);
+    const csv = salesAnalyticsToCsv(sales);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="product-sales-${range.period}.csv"`
+    );
+    res.send(csv);
+  } catch (error: unknown) {
+    logger.error('Analytics export error:', error);
+    respond500(res, error, 'Failed to export analytics');
   }
 });
 
@@ -541,7 +560,8 @@ router.get('/customers', verifyAdmin, async (req: Request, res: Response) => {
     const [customers, countResult] = await Promise.all([
       sql`
         SELECT id, email, name, phone, total_orders, total_spent,
-               last_order_date, first_order_date, is_deleted, deleted_at, created_at
+               last_order_date, first_order_date, is_deleted, deleted_at, created_at,
+               admin_notes, addresses
         FROM customers
         WHERE ${showDeleted ? sql`TRUE` : sql`is_deleted = FALSE`}
         ${searchPattern ? sql`AND (email ILIKE ${searchPattern} OR name ILIKE ${searchPattern})` : sql``}
@@ -577,7 +597,7 @@ router.get('/customers/:email', verifyAdmin, async (req: Request, res: Response)
     const { email } = req.params;
 
     const customerRow = await dbQuery(() => sql`
-      SELECT id, email, name, is_deleted, deleted_at
+      SELECT id, email, name, phone, admin_notes, addresses, is_deleted, deleted_at
       FROM customers
       WHERE email = ${email.toLowerCase()}
       LIMIT 1
@@ -631,6 +651,114 @@ router.get('/customers/:email', verifyAdmin, async (req: Request, res: Response)
   }
 });
 
+// PATCH /admin/customers/:id — update CRM profile (does not rewrite historical orders)
+router.patch('/customers/:id', verifyAdmin, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { name, phone, admin_notes } = req.body as {
+      name?: string;
+      phone?: string;
+      admin_notes?: string;
+    };
+
+    const result = await dbQuery(() => sql`
+      UPDATE customers SET
+        name = COALESCE(${name ?? null}, name),
+        phone = COALESCE(${phone ?? null}, phone),
+        admin_notes = COALESCE(${admin_notes ?? null}, admin_notes),
+        updated_at = NOW()
+      WHERE id = ${id}::uuid AND is_deleted = FALSE
+      RETURNING id, email, name, phone, admin_notes, total_orders, total_spent,
+                last_order_date, first_order_date, created_at
+    `, 'admin:customerPatch');
+
+    if (!result.length) {
+      return res.status(404).json({ success: false, error: 'Customer not found' });
+    }
+
+    const adminUser = (req as { admin?: { username?: string } }).admin?.username ?? 'admin';
+    await dbQuery(() => sql`
+      INSERT INTO activity_logs (action_type, entity_type, entity_id, metadata)
+      VALUES (
+        'admin_customer_update',
+        'customer',
+        ${id},
+        ${JSON.stringify({ admin: adminUser, fields: Object.keys(req.body || {}) })}
+      )
+    `, 'admin:customerPatchLog').catch(() => {});
+
+    res.json({
+      success: true,
+      data: {
+        ...result[0],
+        total_spent: parseFloat(String(result[0].total_spent)),
+      },
+    });
+  } catch (error: unknown) {
+    logger.error('Customer patch error:', error);
+    respond500(res, error, 'Failed to update customer');
+  }
+});
+
+// POST /admin/customers/recompute — refresh aggregates from orders table
+router.post('/customers/recompute', verifyAdmin, async (_req: Request, res: Response) => {
+  try {
+    await dbQuery(() => sql`
+      UPDATE customers c SET
+        total_orders = agg.order_count,
+        total_spent = agg.total_spent,
+        last_order_date = agg.last_order_date,
+        first_order_date = agg.first_order_date,
+        updated_at = NOW()
+      FROM (
+        SELECT
+          LOWER(customer_email) AS email,
+          COUNT(*)::int AS order_count,
+          COALESCE(SUM(CASE WHEN payment_status = 'completed' THEN total ELSE 0 END), 0) AS total_spent,
+          MAX(created_at) AS last_order_date,
+          MIN(created_at) AS first_order_date
+        FROM orders
+        WHERE payment_status = 'completed'
+        GROUP BY LOWER(customer_email)
+      ) agg
+      WHERE LOWER(c.email) = agg.email
+    `, 'admin:customerRecompute');
+
+    res.json({ success: true, message: 'Customer aggregates recomputed from completed orders' });
+  } catch (error: unknown) {
+    logger.error('Customer recompute error:', error);
+    respond500(res, error, 'Failed to recompute customers');
+  }
+});
+
+// GET /admin/products/low-stock
+router.get('/products/low-stock', verifyAdmin, async (req: Request, res: Response) => {
+  try {
+    const limit = Math.min(parseInt(String(req.query.limit || '50'), 10) || 50, 200);
+    const data = await getLowStockProducts(limit);
+    res.json({ success: true, data });
+  } catch (error: unknown) {
+    logger.error('Low stock list error:', error);
+    respond500(res, error, 'Failed to fetch low stock products');
+  }
+});
+
+// GET /admin/products/:id/inventory-movements
+router.get('/products/:id/inventory-movements', verifyAdmin, async (req: Request, res: Response) => {
+  try {
+    const productId = parseInt(req.params.id, 10);
+    if (Number.isNaN(productId)) {
+      return res.status(400).json({ success: false, error: 'Invalid product id' });
+    }
+    const limit = Math.min(parseInt(String(req.query.limit || '50'), 10) || 50, 200);
+    const data = await getProductInventoryMovements(productId, limit);
+    res.json({ success: true, data });
+  } catch (error: unknown) {
+    logger.error('Inventory movements error:', error);
+    respond500(res, error, 'Failed to fetch inventory movements');
+  }
+});
+
 // POST /admin/products/bulk-update - Bulk update products (e.g., out of stock)
 router.post('/products/bulk-update', verifyAdmin, async (req: Request, res: Response) => {
   try {
@@ -658,15 +786,83 @@ router.post('/products/bulk-update', verifyAdmin, async (req: Request, res: Resp
     }
 
     const isOutOfStock = updates.is_out_of_stock !== undefined ? updates.is_out_of_stock : null;
-    const stock = updates.stock !== undefined ? updates.stock : null;
+    const stock = updates.stock !== undefined ? Number(updates.stock) : null;
+    const stockDelta = updates.stock_delta !== undefined ? Number(updates.stock_delta) : null;
+    const adminUser = (req as { admin?: { username?: string } }).admin?.username ?? 'admin';
 
-    // Chunk large ID lists (10 per txn) — avoids oversized ANY() payloads on huge bulk jobs
+    if (stock !== null && (Number.isNaN(stock) || stock < 0)) {
+      return res.status(400).json({ success: false, error: 'stock must be a non-negative number' });
+    }
+    if (stockDelta !== null && Number.isNaN(stockDelta)) {
+      return res.status(400).json({ success: false, error: 'stock_delta must be a number' });
+    }
+
     const BULK_CHUNK = 10;
-    const chunkResults = await runInChunks(productIds, BULK_CHUNK, async (chunk) =>
-      dbQuery(
-        () =>
-          sql.begin(async (txn) => {
-            const rows = await txn`
+    let updatedCount = 0;
+
+    if (stock !== null || stockDelta !== null) {
+      for (const rawId of productIds) {
+        const productId = Number(rawId);
+        if (Number.isNaN(productId)) continue;
+
+        const applied = await dbQuery(
+          () =>
+            sql.begin(async (txn) => {
+              if (stock !== null) {
+                return setProductStockAbsolute(txn, productId, stock, {
+                  reason: 'bulk_update',
+                  referenceType: 'admin',
+                  adminUsername: adminUser,
+                  note: 'Bulk set stock',
+                });
+              }
+              if (stockDelta !== null && stockDelta !== 0) {
+                const result = await applyStockDeltaInTx(txn, {
+                  productId,
+                  delta: stockDelta,
+                  reason: 'bulk_update',
+                  referenceType: 'admin',
+                  adminUsername: adminUser,
+                  note: 'Bulk stock delta',
+                });
+                return result.ok ? { previous: 0, current: result.quantityAfter } : null;
+              }
+              return null;
+            }),
+          'admin:bulkProductsStockTxn'
+        );
+
+        if (applied) updatedCount += 1;
+      }
+    }
+
+    if (isOutOfStock !== null) {
+      const chunkResults = await runInChunks(productIds, BULK_CHUNK, async (chunk) =>
+        dbQuery(
+          () =>
+            sql.begin(async (txn) => {
+              const rows = await txn`
+          UPDATE products SET
+            is_out_of_stock = COALESCE(${isOutOfStock}, is_out_of_stock),
+            updated_at = NOW()
+          WHERE id = ANY(${chunk})
+          RETURNING id
+        `;
+              return rows;
+            }),
+          'admin:bulkProductsTxn'
+        )
+      );
+      updatedCount = Math.max(
+        updatedCount,
+        chunkResults.reduce((sum, rows) => sum + rows.length, 0)
+      );
+    } else if (stock === null && stockDelta === null) {
+      const chunkResults = await runInChunks(productIds, BULK_CHUNK, async (chunk) =>
+        dbQuery(
+          () =>
+            sql.begin(async (txn) => {
+              const rows = await txn`
           UPDATE products SET
             is_out_of_stock = COALESCE(${isOutOfStock}, is_out_of_stock),
             stock = COALESCE(${stock}, stock),
@@ -674,13 +870,13 @@ router.post('/products/bulk-update', verifyAdmin, async (req: Request, res: Resp
           WHERE id = ANY(${chunk})
           RETURNING id
         `;
-            return rows;
-          }),
-        'admin:bulkProductsTxn'
-      )
-    );
-
-    const updatedCount = chunkResults.reduce((sum, rows) => sum + rows.length, 0);
+              return rows;
+            }),
+          'admin:bulkProductsTxn'
+        )
+      );
+      updatedCount = chunkResults.reduce((sum, rows) => sum + rows.length, 0);
+    }
     invalidateProductCaches();
 
     res.json({

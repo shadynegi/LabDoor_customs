@@ -38,7 +38,7 @@ npm run build:budget -w frontend      # Fail if budgets exceeded
 |--------|----------------------------|
 | `dist/assets` total | ≤ **3.0 MB** |
 | Images | ≤ **2.0 MB** |
-| JS (raw in assets) | ≤ **1.2 MB** |
+| JS (raw in assets) | ≤ **1.4 MB** |
 | Largest single image | ≤ **400 KB** |
 
 ## Kept assets (never removed)

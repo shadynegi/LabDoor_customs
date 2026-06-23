@@ -2,7 +2,7 @@
 
 Tick every item before pointing production traffic at Lab Door Customs.
 
-**References:** [`info.md`](info.md) · [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) · [SUPABASE_SQL_TO_RUN.md](./SUPABASE_SQL_TO_RUN.md) · [PAYPAL_SETUP_GUIDE.md](./PAYPAL_SETUP_GUIDE.md) · [SSL_DNS_CHECKLIST.md](./SSL_DNS_CHECKLIST.md)
+**References:** [`info.md`](info.md) · [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) · [LAUNCH_COST_STRATEGY.md](./LAUNCH_COST_STRATEGY.md) · [SUPABASE_SQL_TO_RUN.md](./SUPABASE_SQL_TO_RUN.md) · [PAYPAL_SETUP_GUIDE.md](./PAYPAL_SETUP_GUIDE.md) · [SSL_DNS_CHECKLIST.md](./SSL_DNS_CHECKLIST.md)
 
 ---
 

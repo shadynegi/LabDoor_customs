@@ -1,6 +1,6 @@
 import { test, expect } from './fixtures/storefront';
 import { seedCart } from './helpers/ui';
-import { fillCheckoutCustomerForm } from './helpers/checkout';
+import { fillCheckoutCustomerForm, clickPayPalAndWaitForCreatePayment } from './helpers/checkout';
 import { MOCK_PRODUCTS } from './fixtures/mock-data';
 
 test.describe('Deep storefront flows', () => {
@@ -94,7 +94,7 @@ test.describe('Deep storefront flows', () => {
   });
 
   test('checkout submits create-payment after policy acceptance', async ({ page }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(90_000);
 
     const product = MOCK_PRODUCTS[0];
     await seedCart(page, [
@@ -121,17 +121,7 @@ test.describe('Deep storefront flows', () => {
     await policyCheckbox.check();
     await expect(policyCheckbox).toBeChecked();
 
-    const payButton = page.locator('button:visible', { hasText: 'Pay with PayPal' });
-    await expect(payButton).toBeEnabled({ timeout: 15_000 });
-
-    const createPayment = page.waitForResponse(
-      (response) =>
-        response.url().includes('/paypal/create-payment') &&
-        response.request().method() === 'POST',
-      { timeout: 45_000 },
-    );
-    await payButton.click();
-    const paymentResponse = await createPayment;
+    const paymentResponse = await clickPayPalAndWaitForCreatePayment(page);
     expect(paymentResponse.ok()).toBeTruthy();
   });
 

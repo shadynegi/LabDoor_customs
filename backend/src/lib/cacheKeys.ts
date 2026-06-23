@@ -1,12 +1,14 @@
 import { invalidateCache, invalidateCachePrefix } from './cache';
 
+export { invalidateCachePrefix };
+
 /** Central cache key prefixes for invalidation on admin writes. */
 export const CACHE = {
   productsList: (page: number, limit: number) => `products:list:${page}:${limit}`,
   productSingle: (id: string | number) => `products:single:${id}`,
   couponValidate: (code: string, subtotal: number, email: string, itemCount = 0) =>
     `coupon:validate:${code.toUpperCase()}:${subtotal}:${email.toLowerCase()}:${itemCount}`,
-  adminAnalytics: 'admin:analytics',
+  adminAnalytics: (periodKey = 'default') => `admin:analytics:${periodKey}`,
   productsPrefix: 'products:',
   couponsValidatePrefix: 'coupon:validate:',
 } as const;

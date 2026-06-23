@@ -81,6 +81,7 @@
 | [DEPLOYMENT.md](./DEPLOYMENT.md) | Railway production deploy |
 | [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) | Extended deployment notes |
 | [PRE_LAUNCH_CHECKLIST.md](./PRE_LAUNCH_CHECKLIST.md) | **Go-live checklist** (env, SQL, smoke tests) |
+| [LAUNCH_COST_STRATEGY.md](./LAUNCH_COST_STRATEGY.md) | **Launch budget** — setup accounts, infra tiers, Instagram ads plan |
 | [CLOUDFLARE_RAILWAY.md](./CLOUDFLARE_RAILWAY.md) | Cloudflare + Railway setup |
 | [SSL_DNS_CHECKLIST.md](./SSL_DNS_CHECKLIST.md) | HTTPS and DNS |
 | [SEARCH_CONSOLE_SETUP.md](./SEARCH_CONSOLE_SETUP.md) | Google Search Console |

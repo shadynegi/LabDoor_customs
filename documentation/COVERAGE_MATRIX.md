@@ -5,7 +5,7 @@
 **Authoritative behavior:** [`info.md`](info.md)  
 **Full audit:** [`PROJECT_AUDIT.md`](PROJECT_AUDIT.md) (2026-06-08 initial + follow-up)
 
-**Test count marker (CI should match):** `<!-- tests: 174 -->` (90 unit + 47 API + 37 Playwright)
+**Test count marker (CI should match):** `<!-- tests: 183 -->` (93 unit + 53 API + 37 Playwright)
 
 ---
 
@@ -110,7 +110,19 @@
 |----|----------|----------------|---------|--------|
 | CI-ENV | Production env validation in CI | `validate-env.mjs`, `ci.yml` | CI job | COVERED |
 | SEC-ORDER-SECRETS | `access_token_hash` + `access_token_encrypted` stripped from order JSON | `orderTokens.ts` `stripOrderSecrets` | `orderTokens.test.ts` | COVERED |
-| DOC-TESTS | Test count in `info.md` | `info.md` | `npm test` (174) | COVERED |
+| DOC-TESTS | Test count in `info.md` | `info.md` | `npm test` (183) | COVERED |
+
+---
+
+## Admin inventory & analytics
+
+| ID | Behavior | Implementation | Test(s) | Status |
+|----|----------|----------------|---------|--------|
+| ADM-INV-MOVE | Stock changes logged to `inventory_movements` | `inventoryMovements.ts`, `inventory.ts` | `adminEnhancements.test.ts` | COVERED |
+| ADM-LOW-STOCK | Low-stock list + reorder point | `inventoryMovements.ts`, `admin.ts` | `adminEnhancements.test.ts` | COVERED |
+| ADM-CUST-NOTES | Customer admin notes + PATCH | `admin.ts` | `adminEnhancements.test.ts` | COVERED |
+| ADM-ORD-EDIT | Pending order customer-details + line items | `adminOrderEdits.ts`, `orders.ts` | `adminEnhancements.test.ts` | COVERED |
+| ADM-ANALYTICS | Period sales analytics + CSV export | `salesAnalytics.ts`, `adminAnalytics.ts` | `salesAnalytics.test.ts`, `adminEnhancements.test.ts`, `adminAnalytics.test.ts` | COVERED |
 
 ---
 

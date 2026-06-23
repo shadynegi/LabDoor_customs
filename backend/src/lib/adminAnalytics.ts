@@ -1,14 +1,49 @@
 import sql, { withRetry } from './db';
 import { cached } from './cache';
-import { CACHE, TTL } from './cacheKeys';
+import { CACHE, TTL, invalidateCachePrefix } from './cacheKeys';
+import { getLowStockProducts } from './inventoryMovements';
+import {
+  analyticsCacheKey,
+  fetchSalesAnalytics,
+  parseAnalyticsDateRange,
+} from './salesAnalytics';
 
 function analyticsQuery<T>(label: string, queryFn: () => Promise<T>): Promise<T> {
   return withRetry(queryFn, { retries: 2, baseMs: 500, label: `adminAnalytics:${label}` });
 }
 
+export function invalidateAdminAnalyticsCache(): void {
+  invalidateCachePrefix('admin:analytics:');
+}
+
 /** Cached admin analytics (Redis + in-memory; TTL 5–15 min). */
-export async function getAdminAnalytics() {
-  return cached(CACHE.adminAnalytics, TTL.adminAnalytics, fetchAdminAnalytics);
+export async function getAdminAnalytics(query: Record<string, unknown> = {}) {
+  const range = parseAnalyticsDateRange(query);
+  const key = analyticsCacheKey(range);
+
+  return cached(CACHE.adminAnalytics(key), TTL.adminAnalytics, async () => {
+    const [base, sales, lowStock, lowStockCountRows] = await Promise.all([
+      fetchAdminAnalytics(),
+      fetchSalesAnalytics(range),
+      getLowStockProducts(25),
+      analyticsQuery('low_stock_count', () => sql`
+        SELECT COUNT(*)::int AS c
+        FROM products
+        WHERE reorder_alert_enabled = TRUE
+          AND is_out_of_stock = FALSE
+          AND stock <= reorder_point
+      `),
+    ]);
+
+    return {
+      ...base,
+      sales,
+      inventory: {
+        low_stock_count: lowStockCountRows[0]?.c ?? 0,
+        low_stock_products: lowStock,
+      },
+    };
+  });
 }
 
 export async function fetchAdminAnalytics() {
@@ -51,6 +86,9 @@ export async function fetchAdminAnalytics() {
       SELECT
         COUNT(*)::int AS total_products,
         COUNT(*) FILTER (WHERE is_out_of_stock = true OR stock <= 0)::int AS out_of_stock_products,
+        COUNT(*) FILTER (
+          WHERE reorder_alert_enabled = TRUE AND is_out_of_stock = FALSE AND stock <= reorder_point
+        )::int AS low_stock_products,
         COALESCE(SUM(view_count), 0)::int AS total_views,
         COALESCE(SUM(cart_count), 0)::int AS total_cart_adds
       FROM products
@@ -122,6 +160,7 @@ export async function fetchAdminAnalytics() {
     products: {
       total_products: productStats[0]?.total_products ?? 0,
       out_of_stock_products: productStats[0]?.out_of_stock_products ?? 0,
+      low_stock_products: productStats[0]?.low_stock_products ?? 0,
       total_views: productStats[0]?.total_views ?? 0,
       total_cart_adds: productStats[0]?.total_cart_adds ?? 0,
     },
@@ -146,3 +185,5 @@ export async function fetchAdminAnalytics() {
     },
   };
 }
+
+export { fetchSalesAnalytics, parseAnalyticsDateRange, salesAnalyticsToCsv } from './salesAnalytics';

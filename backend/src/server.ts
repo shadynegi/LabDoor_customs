@@ -52,7 +52,7 @@ import { connectRedis, isRedisEnabled, getRedisClient } from './lib/redis';
 import { mountRateLimits } from './middleware/rateLimits';
 import { startMaintenanceJobs } from './lib/maintenanceJobs';
 import { ensureActivityLogsTable } from './lib/activitySchema';
-import { ensureProductVideo360Column } from './lib/productSchema';
+import { ensureProductVideo360Column, ensureAdminEnhancementSchema } from './lib/productSchema';
 import { registerGracefulShutdown } from './lib/gracefulShutdown';
 import { POLICY_ACCEPTANCE_REQUIRED_MESSAGE } from './lib/returnPolicy';
 import {
@@ -1575,6 +1575,11 @@ async function bootstrap(): Promise<void> {
   await runBootstrapTask('payment_idempotency', ensureIdempotencyTable);
   await runBootstrapTask('activity_logs', ensureActivityLogsTable);
   await runBootstrapTask('product_video_360', ensureProductVideo360Column);
+  await runBootstrapTask('admin_enhancements', ensureAdminEnhancementSchema);
+  await runBootstrapTask('order_line_items_backfill', async () => {
+    const { backfillOrderLineItems } = await import('./lib/orderLineItems');
+    await backfillOrderLineItems(200);
+  });
   await runBootstrapTask('order_payment_schema', ensureOrderPaymentSchema);
   await runBootstrapTask('checkout_exchange', ensureCheckoutExchangeTable);
   await runBootstrapTask('order_access_exchange', ensureOrderAccessExchangeTable);

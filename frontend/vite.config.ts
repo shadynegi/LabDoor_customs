@@ -3,6 +3,8 @@ import react from '@vitejs/plugin-react'
 
 // Bundle analyzer - run with: npm run build -- --analyze
 const analyzeBundle = process.env.ANALYZE === 'true';
+/** Playwright E2E mocks `/api/*` in-browser — skip preview proxy so stray calls fail fast. */
+const playwrightPreview = process.env.PLAYWRIGHT === 'true';
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -31,12 +33,16 @@ export default defineConfig({
   preview: {
     host: true,
     port: 5173,
-    proxy: {
-      '/api': {
-        target: process.env.VITE_DEV_PROXY_TARGET || 'http://127.0.0.1:5000',
-        changeOrigin: true,
-      },
-    },
+    ...(playwrightPreview
+      ? {}
+      : {
+          proxy: {
+            '/api': {
+              target: process.env.VITE_DEV_PROXY_TARGET || 'http://127.0.0.1:5000',
+              changeOrigin: true,
+            },
+          },
+        }),
   },
   // Build optimization for 1000+ concurrent users
   build: {

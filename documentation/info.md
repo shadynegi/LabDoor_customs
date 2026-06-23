@@ -140,12 +140,12 @@
 
 | Tab | Functions |
 |-----|-----------|
-| Analytics | Order/revenue stats, product metrics, customer counts, geo breakdown, GA4/GSC config status; error state with retry |
-| Products | Paginated list (50/page, load more, total count); error state with retry; list, create, edit, delete; bulk stock updates; image validation (URL or ≤512KB data URL) |
-| Orders | Paginated list (50/page), **server-side search**, filter by status, bulk status updates (not cancellation); order modal: tracking, carrier, tracking URL, **estimated delivery**, notify shipped, status transitions, **mark paid** (PayPal capture verified via API + `admin_note` + `payment_id`), **cancel unpaid pending orders only** (no customer refunds) |
+| Analytics | Period selector (`day` / `week` / `month` / `year` / `all` / custom range); order/revenue stats, **sales by product**, **inventory snapshot**, low-stock count; **CSV export**; GA4/GSC config status; error state with retry |
+| Products | Paginated list (50/page, load more); **low-stock filter**; SKU, reorder point, cost price on create/edit; **inventory movement history** per product; bulk **stock** / **stock_delta** updates; image validation (URL or ≤512KB data URL); optional **360° MP4** |
+| Orders | Paginated list (50/page), **server-side search**, filter by status, bulk status updates; order modal: tracking, carrier, tracking URL, **estimated delivery**, notify shipped, status transitions, **mark paid**, **edit customer/shipping** (`PATCH …/customer-details`), **edit line items on unpaid pending orders** (`PATCH …/pending-items`), cancel unpaid pending only |
 | Coupons | Preset percentage coupons (5/10/20/25/50%), custom codes with **scope** (`applies_to`: all / product / category + IDs), **server product search** for product scope, **edit** (description, max uses, expiry, active), activate/deactivate, delete |
 | Messages | Contact inbox — auto **mark read** on open; modal **Mark replied** / **Archive**; bulk updates; error state with retry |
-| Customers | Aggregated customer list, detail view, soft delete / restore, show deleted toggle |
+| Customers | **Server search + pagination**; **admin notes**; address history; detail view, soft delete / restore, show deleted toggle |
 | Reviews | List/create/edit/delete; **server product search** when creating reviews; **customer email visible only here**; edit modal includes **admin response** (shown on storefront); filter by status; quick approve/reject; pagination (50/page); self-loads (no parent tab skeleton flash) |
 
 **API-only admin features** (no dedicated UI tab): activity log export, PayPal test endpoint. Admin PayPal refunds are **disabled** (no-refund store policy).
@@ -729,6 +729,8 @@ Any unmatched `/api/*` path returns **404** JSON `{ error: "Route not found" }`.
 | PUT | `/api/orders/:id` | Admin + CSRF | Update order fields |
 | PATCH | `/api/orders/:id/status` | Admin + CSRF | Update fulfillment status |
 | PATCH | `/api/orders/:id/payment-status` | Admin + CSRF | Update payment status |
+| PATCH | `/api/orders/:id/customer-details` | Admin + CSRF | Edit contact/shipping on an order |
+| PATCH | `/api/orders/:id/pending-items` | Admin + CSRF | Edit line items on unpaid pending orders (inventory-aware) |
 | POST | `/api/orders/:id/cancel` | Admin + CSRF | Cancel order (+ inventory restore) |
 | DELETE | `/api/orders/:id` | Admin + CSRF | Delete order |
 | POST | `/api/orders/:id/notify-shipped` | Admin + CSRF | Send shipped notification email |
@@ -791,16 +793,23 @@ Any unmatched `/api/*` path returns **404** JSON `{ error: "Route not found" }`.
 | GET | `/api/admin/verify` | Public | Session probe — always **200** with `{ authenticated: true \| false }` (not 401 when logged out) |
 | GET | `/api/admin/sessions` | Admin | List active admin sessions |
 | POST | `/api/admin/sessions/cleanup` | Admin + CSRF | Purge expired sessions |
-| GET | `/api/admin/analytics` | Admin | Dashboard analytics payload |
-| GET | `/api/admin/customers` | Admin | Customer list |
+| GET | `/api/admin/analytics` | Admin | Dashboard analytics; `?period=day\|week\|month\|year\|all\|custom` (+ optional `from`/`to`); includes `sales` and `inventory` |
+| GET | `/api/admin/analytics/export` | Admin | CSV product sales export for period |
+| GET | `/api/admin/customers` | Admin | Customer list (`?search=&page=&limit=`) |
 | GET | `/api/admin/customers/:email` | Admin | Customer detail by email |
+| PATCH | `/api/admin/customers/:id` | Admin + CSRF | Update name, phone, admin notes |
+| POST | `/api/admin/customers/recompute` | Admin + CSRF | Rebuild customer aggregates from completed orders |
 | POST | `/api/admin/customers/:id/restore` | Admin + CSRF | Restore soft-deleted customer |
 | DELETE | `/api/admin/customers/:id` | Admin + CSRF | Soft-delete customer |
-| POST | `/api/admin/products/bulk-update` | Admin + CSRF | Bulk product field updates |
+| GET | `/api/admin/products/low-stock` | Admin | Products at/below reorder point |
+| GET | `/api/admin/products/:id/inventory-movements` | Admin | Stock movement audit log |
+| POST | `/api/admin/products/bulk-update` | Admin + CSRF | Bulk updates: `stock`, `stock_delta`, `is_out_of_stock` |
+| PATCH | `/api/orders/:id/customer-details` | Admin + CSRF | Edit order contact/shipping (not paid line totals) |
+| PATCH | `/api/orders/:id/pending-items` | Admin + CSRF | Edit line items on unpaid pending orders |
 | POST | `/api/admin/orders/bulk-update` | Admin + CSRF | Bulk order status updates |
 | POST | `/api/admin/messages/bulk-update` | Admin + CSRF | Bulk contact message status updates |
 
-**Endpoint count:** 72 routes (70 active + 2 deprecated **410** responses: `POST /api/orders`, `POST /api/coupons/use`).
+**Endpoint count:** 79 routes (77 active + 2 deprecated **410** responses: `POST /api/orders`, `POST /api/coupons/use`).
 
 ---
 
@@ -1030,7 +1039,7 @@ npm run links:check
 | Backend unit/API | Vitest | Checkout validation + create-payment happy path, capture 409/refund mismatch, checkout-context API, checkout exchange, PayPal webhooks (COMPLETED + DENIED), admin mark-paid, coupon scope, `computeCheckoutPricingForCart`, payment idempotency, order tokens, process error handlers, RLS table list + grant revoke, email portal URL, activity batch/log, order lookup, reviews check |
 | Frontend E2E / UI | Playwright | Storefront smoke + deep flows (search, policy gate, coupon, cart qty, create-payment, payment 409), checkout/contact/admin UI, mobile viewport |
 
-**Total automated tests:** 174 (90 backend unit + 47 API + 37 Playwright UI).
+**Total automated tests:** 183 (93 backend unit + 53 API + 37 Playwright UI).
 
 | Link check | Custom script | Documentation internal links |
 

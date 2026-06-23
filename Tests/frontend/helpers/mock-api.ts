@@ -45,6 +45,8 @@ function paginateProducts(products: MockProduct[], url: string) {
 
 export interface MockApiOptions {
   products?: MockProduct[];
+  /** When set, create-payment returns this total (for total-mismatch UI tests). */
+  createPaymentTotal?: number;
 }
 
 /** Intercept storefront `/api/*` calls so E2E runs without a live backend. */
@@ -53,13 +55,14 @@ export async function installStorefrontApiMocks(
   options: MockApiOptions = {},
 ): Promise<void> {
   const products = options.products ?? MOCK_PRODUCTS;
+  const createPaymentTotal = options.createPaymentTotal;
 
   await page.route('**/api/**', async (route) => {
     const path = apiPath(route.request().url());
     const method = route.request().method();
 
     if (path === '/csrf-token' && method === 'GET') {
-      return json(route, { success: true, token: 'playwright-csrf-token' });
+      return json(route, { success: true, csrfToken: 'playwright-csrf-token' });
     }
 
     if (path === '/products/filters' && method === 'GET') {
@@ -264,16 +267,19 @@ export async function installStorefrontApiMocks(
     }
 
     if (path === '/paypal/create-payment' && method === 'POST') {
+      const mismatch = createPaymentTotal != null;
       return json(route, {
         success: true,
-        total: 123,
-        orderId: 'PAYPAL-OK',
-        serverOrderId: '00000000-0000-0000-0000-00000000dd01',
-        orderNumber: 'GSS-CHECKOUT-TEST',
+        total: createPaymentTotal ?? 123,
+        orderId: mismatch ? 'PAYPAL-MISMATCH' : 'PAYPAL-OK',
+        serverOrderId: mismatch
+          ? '00000000-0000-0000-0000-00000000ff01'
+          : '00000000-0000-0000-0000-00000000dd01',
+        orderNumber: mismatch ? 'GSS-MISMATCH' : 'GSS-CHECKOUT-TEST',
         links: [
           {
             rel: 'approve',
-            href: 'https://www.sandbox.paypal.com/checkoutnow?token=PAYPAL-OK',
+            href: `https://www.sandbox.paypal.com/checkoutnow?token=${mismatch ? 'PAYPAL-MISMATCH' : 'PAYPAL-OK'}`,
           },
         ],
       });
@@ -345,31 +351,5 @@ export async function installStorefrontApiMocks(
 
     // Unhandled API — avoid hanging on proxy to offline backend
     return json(route, { success: true, data: null });
-  });
-}
-
-/** Override create-payment to return a server total that differs from the client cart total. */
-export async function installPaymentTotalMismatchMock(page: Page): Promise<void> {
-  await page.route('**/api/**', async (route) => {
-    const path = apiPath(route.request().url());
-    const method = route.request().method();
-
-    if (path === '/paypal/create-payment' && method === 'POST') {
-      return json(route, {
-        success: true,
-        total: 999.99,
-        orderId: 'PAYPAL-MISMATCH',
-        serverOrderId: '00000000-0000-0000-0000-00000000ff01',
-        orderNumber: 'GSS-MISMATCH',
-        links: [
-          {
-            rel: 'approve',
-            href: 'https://www.sandbox.paypal.com/checkoutnow?token=PAYPAL-MISMATCH',
-          },
-        ],
-      });
-    }
-
-    await route.fallback();
   });
 }

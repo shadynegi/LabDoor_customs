@@ -15,7 +15,7 @@ Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API
 |------|----------------|
 | **Checkout** | Cart validation with retry; `policy_accepted` required; no-refund policy checkbox; PayPal `?code=` exchange; capture **409** shows processing UI (polls checkout-context; cart held); checkout email synced to activity on change/blur. |
 | **Orders** | Email links `GET /api/orders/access-exchange/:code`; legacy `?orderNumber=&token=` stripped; partial refresh keeps stale data + warning. |
-| **Admin** | Products paginated (load more); optional **360° MP4** per product; messages mark read on open; coupons support scope; reviews admin response; estimated delivery on orders; tab error/retry states; **Customers** card layout on mobile. |
+| **Admin** | Products paginated (load more); optional **360° MP4** per product; messages mark read on open; coupons support scope; reviews admin response; estimated delivery on orders; tab error/retry states; **Customers** card layout on mobile; **inventory** (SKU, reorder point, cost, movement history, low-stock alerts, bulk stock delta); **customer admin notes** + server search/pagination; **sales analytics** by period (day/week/month/year/custom) with CSV export; **order customer-details** + pending-item edits. |
 | **Activity** | Consent-gated batch; `contact_submit` on contact success; IPs anonymized with `IP_SALT`. |
 | **Reviews** | `POST /api/reviews/check` on email blur; pending-moderation success copy; vote error toasts; admin `admin_response` editable. |
 | **Mobile** | Sticky CTAs with keyboard lift on checkout; cookie banner top on purchase routes; cart stacked CTA at 320px; OOS hides product sticky bar; admin product cards on phones. |
@@ -55,13 +55,13 @@ Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_
 ## Admin
 
 - Secure login with HttpOnly session cookie (SHA-256 hashed server-side)
-- Dashboard: analytics, products, orders, coupons, messages, customers, **reviews**
-- Orders: server-side search, pagination, fulfillment modal, bulk status (max 500 IDs, validated transitions), manual mark paid (`admin_note` + `payment_id`, logged to activity)
+- Dashboard: analytics (period selector, sales by product, inventory snapshot, CSV export), products, orders, coupons, messages, customers, **reviews**
+- Orders: server-side search, pagination, fulfillment modal, bulk status (max 500 IDs, validated transitions), manual mark paid (`admin_note` + `payment_id`, logged to activity); edit customer/shipping on pending orders; adjust line items on unpaid pending orders
 - Coupons: presets, custom create with **applies_to** scope, edit modal, activate/deactivate, delete
-- Products: paginated admin list (50/page, load more), error/retry UI
+- Products: paginated admin list (50/page, load more), error/retry UI; SKU, reorder point, cost price; inventory movement history; low-stock filter; bulk stock / stock-delta updates
 - Product CRUD and bulk stock updates
 - Contact message inbox (mark read on open, modal reply/archive actions)
-- Customer soft delete/restore and order history modal
+- Customer list with server search/pagination, admin notes, address history; soft delete/restore and order history modal; `PATCH /admin/customers/:id`
 - **Reviews tab**: moderation UI with customer email (admin-only), admin response field, quick approve/reject, pagination; storefront eligibility check + pending copy; public API strips email via `toPublicReview()`
 
 ---
@@ -103,6 +103,6 @@ Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_
 
 ## Testing
 
-- 174 automated tests (90 backend unit + 47 API + 37 Playwright UI)
+- 183 automated tests (93 backend unit + 53 API + 37 Playwright UI)
 - Playwright storefront smoke tests (home, products, checkout, contact)
 - Documentation link checker in CI

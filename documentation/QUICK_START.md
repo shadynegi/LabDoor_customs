@@ -95,6 +95,19 @@ Starts the API (port 5000) and Vite dev server (port 5173) together.
 - API health: http://localhost:5000/api/health (or http://localhost:5173/api/health via proxy)
 - Admin login: http://localhost:5173/admin/login
 
+**Corporate VPN / Zscaler:** If Supabase DNS is blocked, the API still starts but bootstrap and DB routes fail with `ENOTFOUND db.*.supabase.co`. Health returns **503** with `"status":"DEGRADED"`. CSRF and frontend pages still work; use an off-VPN network or allowlist `*.supabase.co` for full local testing.
+
+**Quick sanity (dev running):**
+
+```powershell
+# API up (503 DEGRADED is OK when DB unreachable)
+curl.exe -s http://127.0.0.1:5000/api/health
+
+# CSRF + frontend
+curl.exe -s http://127.0.0.1:5000/api/csrf-token
+curl.exe -s -o NUL -w "%{http_code}" http://127.0.0.1:5173/
+```
+
 **Normal dev logs:** `API ready — bootstrap continues in background`, `Bootstrap: database reachable`, `Core bootstrap complete`, then `Maintenance jobs scheduled`. After ~2 minutes, `Maintenance: initial run complete`. If the laptop sleeps later, a single `Maintenance: skipped (database unreachable)` is expected — your `DATABASE_URL` is still fine; cleanup resumes on the next interval. See [`info.md` — Maintenance warnings vs wrong DATABASE_URL](info.md#maintenance-warnings-vs-wrong-database_url).
 
 **Production-like single server** (optional):
@@ -111,8 +124,15 @@ cd backend && SERVE_FRONTEND=true npm start
 
 ```bash
 npm test
+```
+
+For a **production-like build** locally, set `frontend/.env` with `VITE_API_BASE_URL`, `VITE_SITE_URL`, and `VITE_SENTRY_DSN` (or run with `NODE_ENV=development` to skip strict env checks). Then:
+
+```bash
 npm run build
 ```
+
+Apply `backend/src/database/migration-admin-enhancements.sql` in Supabase (or rely on boot-time `ensureAdminEnhancementSchema()` on Railway) before using inventory, customer notes, and period analytics features.
 
 ---
 

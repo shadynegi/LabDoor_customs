@@ -101,8 +101,8 @@ Headers: `X-Idempotency-Key` (PayPal order ID or client key), `X-CSRF-Token`
 | GET | `/:id` | Public | Single product (cached) |
 | POST | `/search` | Public | Search products |
 | POST | `/validate-cart` | Public + CSRF | Validate cart lines — `{ items: [{ product_id, quantity, size_system?, size_value? }] }`; returns refreshed prices and stock errors |
-| POST | `/` | Admin | Create product (image/background URL or ≤512KB data URL; optional `video_360` MP4 URL or ≤15MB data URL) |
-| PUT | `/:id` | Admin | Update product (same image/video rules) |
+| POST | `/` | Admin | Create product (image/background URL or ≤512KB data URL; optional `video_360`; optional `sku`, `reorder_point`, `cost_price`) |
+| PUT | `/:id` | Admin | Update product (stock changes logged to `inventory_movements`) |
 | DELETE | `/:id` | Admin | Delete product |
 
 ---
@@ -120,6 +120,8 @@ Headers: `X-Idempotency-Key` (PayPal order ID or client key), `X-CSRF-Token`
 | GET | `/customer/:email` | Admin | Customer order history |
 | GET | `/:id` | Token or admin | Single order (`X-Order-Access-Token` header only) |
 | PUT | `/:id` | Admin | Update fulfillment fields including `estimated_delivery` (not payment_status) |
+| PATCH | `/:id/customer-details` | Admin + CSRF | Edit customer name, email, shipping address, admin notes |
+| PATCH | `/:id/pending-items` | Admin + CSRF | Edit line items on unpaid pending orders (inventory adjusted) |
 | PATCH | `/:id/status` | Admin | Update order status |
 | PATCH | `/:id/payment-status` | Admin | Mark paid: `admin_note` + `payment_id`; **PayPal capture verified** via API before update |
 | POST | `/:id/cancel` | Admin | Cancel **unpaid pending** orders only; paid orders return **403** |
@@ -229,12 +231,17 @@ Public list/submit/vote responses use `toPublicReview()` — **`customer_email`,
 | POST | `/generate-hash` | Public (dev only) | Generate bcrypt hash — **403 in production**; use `backend/scripts/generate-admin-hash.mjs` |
 | GET | `/sessions` | Admin | List active sessions |
 | POST | `/sessions/cleanup` | Admin | Remove expired sessions |
-| GET | `/analytics` | Admin | Dashboard analytics |
-| GET | `/customers` | Admin | Customer list |
+| GET | `/analytics` | Admin | Dashboard analytics; `?period=day\|week\|month\|year\|all\|custom` (+ optional `from`/`to`); includes `sales`, `inventory` |
+| GET | `/analytics/export` | Admin | CSV product sales for period |
+| GET | `/customers` | Admin | Customer list (`?search=&page=&limit=`) |
 | GET | `/customers/:email` | Admin | Customer detail |
+| PATCH | `/customers/:id` | Admin + CSRF | Update name, phone, admin notes |
+| POST | `/customers/recompute` | Admin + CSRF | Rebuild customer aggregates |
 | POST | `/customers/:id/restore` | Admin | Restore soft-deleted customer |
 | DELETE | `/customers/:id` | Admin | Soft delete customer |
-| POST | `/products/bulk-update` | Admin | Bulk product updates (max **500** IDs) |
+| GET | `/products/low-stock` | Admin | Products at/below reorder point |
+| GET | `/products/:id/inventory-movements` | Admin | Stock movement history |
+| POST | `/products/bulk-update` | Admin | Bulk updates: `stock`, `stock_delta`, `is_out_of_stock` (max **500** IDs) |
 | POST | `/orders/bulk-update` | Admin | Bulk order **status** only (max **500** IDs; validates transitions; `cancelled` and `payment_status` rejected) |
 | POST | `/messages/bulk-update` | Admin | Bulk message updates (max **500** IDs) |
 

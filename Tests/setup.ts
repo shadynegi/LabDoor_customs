@@ -1,6 +1,12 @@
 import { vi } from 'vitest';
 
-export const sqlMock = vi.fn(async () => [] as unknown[]);
+const sqlMockFn = vi.fn(async () => [] as unknown[]);
+
+export const sqlMock = Object.assign(sqlMockFn, {
+  begin: vi.fn(async (fn: (tx: typeof sqlMockFn) => Promise<unknown>) => fn(sqlMockFn)),
+}) as typeof sqlMockFn & {
+  begin: ReturnType<typeof vi.fn>;
+};
 
 vi.mock('../backend/src/lib/db', () => ({
   default: sqlMock,

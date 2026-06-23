@@ -14,6 +14,7 @@ import {
 } from '../lib/productImage';
 import { validateOptionalProductVideo360Url } from '../lib/productVideo';
 import { validateCartItems } from '../lib/paypalCheckout';
+import { setProductStockAbsolute } from '../lib/inventoryMovements';
 
 const router = Router();
 
@@ -35,6 +36,10 @@ interface Product {
   cart_count?: number;
   is_out_of_stock?: boolean;
   video_360?: string | null;
+  sku?: string | null;
+  reorder_point?: number;
+  reorder_alert_enabled?: boolean;
+  cost_price?: number | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -332,7 +337,7 @@ router.post('/', verifyAdmin, async (req: Request, res: Response) => {
 
     const result = await dbQuery(
       () => sql`
-      INSERT INTO products (name, price, image, description, background, category, size, color, stock, rating, review_count, video_360)
+      INSERT INTO products (name, price, image, description, background, category, size, color, stock, rating, review_count, video_360, sku, reorder_point, reorder_alert_enabled, cost_price)
       VALUES (
         ${productData.name},
         ${productData.price},
@@ -345,7 +350,11 @@ router.post('/', verifyAdmin, async (req: Request, res: Response) => {
         ${productData.stock || 0},
         ${productData.rating || 0},
         ${productData.review_count || 0},
-        ${videoResult.value}
+        ${videoResult.value},
+        ${productData.sku?.trim() || null},
+        ${productData.reorder_point ?? 5},
+        ${productData.reorder_alert_enabled ?? true},
+        ${productData.cost_price ?? null}
       )
       RETURNING *
     `,
@@ -371,8 +380,13 @@ router.put('/:id', verifyAdmin, async (req: Request, res: Response) => {
     const { id } = req.params;
     const updates: Partial<Product> = req.body;
 
-    // Handle is_out_of_stock separately since it's a boolean
     const isOutOfStock = updates.is_out_of_stock !== undefined ? updates.is_out_of_stock : null;
+    const stockUpdate = updates.stock !== undefined ? Number(updates.stock) : null;
+    const adminUser = (req as { admin?: { username?: string } }).admin?.username ?? 'admin';
+
+    if (stockUpdate !== null && (Number.isNaN(stockUpdate) || stockUpdate < 0)) {
+      return res.status(400).json({ success: false, error: 'Stock cannot be negative' });
+    }
 
     let imageValue: string | null = null;
     if (updates.image !== undefined) {
@@ -404,6 +418,24 @@ router.put('/:id', verifyAdmin, async (req: Request, res: Response) => {
       video360Value = videoResult.value;
     }
 
+    if (stockUpdate !== null) {
+      const stockResult = await dbQuery(
+        () =>
+          sql.begin(async (txn) =>
+            setProductStockAbsolute(txn, parseInt(id, 10), stockUpdate, {
+              reason: 'admin_adjust',
+              referenceType: 'product',
+              referenceId: id,
+              adminUsername: adminUser,
+            })
+          ),
+        'products:stockAdjust'
+      );
+      if (!stockResult) {
+        return res.status(404).json({ success: false, error: 'Product not found' });
+      }
+    }
+
     const result = await dbQuery(
       () => sql`
       UPDATE products SET
@@ -415,9 +447,12 @@ router.put('/:id', verifyAdmin, async (req: Request, res: Response) => {
         category = COALESCE(${updates.category || null}, category),
         size = COALESCE(${updates.size || null}, size),
         color = COALESCE(${updates.color || null}, color),
-        stock = COALESCE(${updates.stock || null}, stock),
         is_out_of_stock = COALESCE(${isOutOfStock}, is_out_of_stock),
         video_360 = COALESCE(${video360Value !== undefined ? video360Value : null}, video_360),
+        sku = COALESCE(${updates.sku !== undefined ? (updates.sku?.trim() || null) : null}, sku),
+        reorder_point = COALESCE(${updates.reorder_point ?? null}, reorder_point),
+        reorder_alert_enabled = COALESCE(${updates.reorder_alert_enabled ?? null}, reorder_alert_enabled),
+        cost_price = COALESCE(${updates.cost_price ?? null}, cost_price),
         updated_at = NOW()
       WHERE id = ${id}
       RETURNING *

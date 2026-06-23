@@ -27,8 +27,10 @@ import {
   Ban,
   Send,
   Star,
+  Download,
+  History,
 } from 'lucide-react';
-import { apiFetch, catalogFetch, slowApiFetch } from '../config';
+import { apiFetch, catalogFetch, slowApiFetch, config, getApiHeaders, ensureCsrfToken } from '../config';
 import { useResponsive } from '../hooks/useResponsive';
 import { toast } from 'sonner';
 import LiquidModal from '../components/LiquidModal';
@@ -61,6 +63,7 @@ interface Order {
   tracking_url?: string;
   carrier?: string;
   estimated_delivery?: string;
+  admin_notes?: string;
   created_at: string;
   updated_at: string;
 }
@@ -86,11 +89,28 @@ interface Customer {
   id: string;
   email: string;
   name: string;
+  phone?: string;
+  admin_notes?: string;
   total_orders: number;
   total_spent: number;
   last_order_date: string;
   first_order_date: string;
   is_deleted?: boolean;
+}
+
+type AnalyticsPeriod = 'day' | 'week' | 'month' | 'year' | 'all';
+
+interface InventoryMovement {
+  id: number;
+  product_id: number;
+  delta: number;
+  quantity_after: number;
+  reason: string;
+  reference_type?: string;
+  reference_id?: string;
+  admin_username?: string;
+  note?: string;
+  created_at: string;
 }
 
 interface Analytics {
@@ -104,6 +124,24 @@ interface Analytics {
   dailyTrend: any[];
   messages: any;
   customers: any;
+  sales?: {
+    range: { period: string; from: string; to: string; bucket: string };
+    summary: {
+      total_units_sold: number;
+      total_revenue: number;
+      order_count: number;
+      average_order_value: number;
+      estimated_gross_profit: number | null;
+    };
+    compare?: { revenue_change_pct: number | null };
+    top_sellers_by_units: Array<{ product_id: number | null; product_name: string; units_sold: number }>;
+    top_sellers_by_revenue: Array<{ product_id: number | null; product_name: string; revenue: number }>;
+    best_period: { period_start: string; revenue: number; orders: number } | null;
+  };
+  inventory?: {
+    low_stock_count: number;
+    low_stock_products: Array<{ id: number; name: string; sku: string | null; stock: number; reorder_point: number }>;
+  };
   integrations?: {
     ga4?: { configured: boolean; measurementId: string | null; consoleUrl: string };
     searchConsole?: { configured: boolean; siteUrl: string | null; consoleUrl: string };
@@ -145,6 +183,8 @@ export default function AdminDashboard() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
+  const [analyticsPeriod, setAnalyticsPeriod] = useState<AnalyticsPeriod>('month');
+  const [analyticsExporting, setAnalyticsExporting] = useState(false);
   const [productsError, setProductsError] = useState<string | null>(null);
   const [messagesError, setMessagesError] = useState<string | null>(null);
   const [productsPage, setProductsPage] = useState(1);
@@ -177,6 +217,34 @@ export default function AdminDashboard() {
   const [ordersError, setOrdersError] = useState<string | null>(null);
   const [messageStatusFilter, setMessageStatusFilter] = useState('all');
   const [customerSearch, setCustomerSearch] = useState('');
+  const [customersPage, setCustomersPage] = useState(1);
+  const [customersTotalPages, setCustomersTotalPages] = useState(1);
+  const [customersTotal, setCustomersTotal] = useState(0);
+  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [customerEditForm, setCustomerEditForm] = useState({ name: '', phone: '', admin_notes: '' });
+  const [customerSaveLoading, setCustomerSaveLoading] = useState(false);
+
+  const [showLowStockOnly, setShowLowStockOnly] = useState(false);
+  const [lowStockProducts, setLowStockProducts] = useState<Product[]>([]);
+  const [lowStockLoading, setLowStockLoading] = useState(false);
+  const [bulkStockModalOpen, setBulkStockModalOpen] = useState(false);
+  const [bulkStockMode, setBulkStockMode] = useState<'set' | 'delta'>('set');
+  const [bulkStockValue, setBulkStockValue] = useState(0);
+  const [inventoryProduct, setInventoryProduct] = useState<Product | null>(null);
+  const [inventoryMovements, setInventoryMovements] = useState<InventoryMovement[]>([]);
+  const [inventoryLoading, setInventoryLoading] = useState(false);
+
+  const [orderCustomerEdit, setOrderCustomerEdit] = useState(false);
+  const [orderCustomerForm, setOrderCustomerForm] = useState({
+    customer_name: '',
+    customer_email: '',
+    address: '',
+    city: '',
+    state: '',
+    zipCode: '',
+    country: '',
+    admin_notes: '',
+  });
   
   // Bulk selection states
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
@@ -268,10 +336,10 @@ export default function AdminDashboard() {
     return () => window.clearTimeout(handle);
   }, [productSearch]);
 
-  const fetchAnalytics = async () => {
+  const fetchAnalytics = async (period: AnalyticsPeriod = analyticsPeriod) => {
     setAnalyticsError(null);
     try {
-      const response = await slowApiFetch('/admin/analytics', {
+      const response = await slowApiFetch(`/admin/analytics?period=${period}`, {
         retry: { count: 1, on: [502, 503, 504] },
       });
       const data = await response.json();
@@ -287,6 +355,33 @@ export default function AdminDashboard() {
       setAnalytics(null);
       setAnalyticsError('Unable to load analytics. Check your connection and try again.');
       toast.error('Failed to load analytics');
+    }
+  };
+
+  const handleAnalyticsExport = async () => {
+    setAnalyticsExporting(true);
+    try {
+      await ensureCsrfToken();
+      const response = await fetch(`${config.apiBaseUrl}/admin/analytics/export?period=${analyticsPeriod}`, {
+        credentials: 'include',
+        headers: getApiHeaders(),
+      });
+      if (!response.ok) {
+        throw new Error('Export failed');
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `product-sales-${analyticsPeriod}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success('Sales report downloaded');
+    } catch (error) {
+      logError('Analytics export error:', error);
+      toast.error('Failed to export analytics');
+    } finally {
+      setAnalyticsExporting(false);
     }
   };
 
@@ -379,17 +474,138 @@ export default function AdminDashboard() {
     }
   };
 
-  const fetchCustomers = async () => {
+  const fetchCustomers = async (page = customersPage, search = customerSearch) => {
     try {
       const deletedQuery = showDeletedCustomers ? '&include_deleted=true' : '';
-      const response = await apiFetch(`/admin/customers?limit=100${deletedQuery}`);
+      const searchQuery = search.trim() ? `&search=${encodeURIComponent(search.trim())}` : '';
+      const response = await apiFetch(`/admin/customers?limit=50&page=${page}${deletedQuery}${searchQuery}`);
       const data = await response.json();
       if (data.success) {
         setCustomers(data.data || []);
+        setCustomersTotal(data.pagination?.total ?? (data.data?.length ?? 0));
+        setCustomersTotalPages(data.pagination?.totalPages ?? 1);
+        setCustomersPage(data.pagination?.page ?? page);
       }
     } catch (error) {
       logError('Error fetching customers:', error);
       toast.error('Failed to load customers');
+    }
+  };
+
+  const fetchLowStockProducts = async () => {
+    setLowStockLoading(true);
+    try {
+      const response = await apiFetch('/admin/products/low-stock?limit=200');
+      const data = await response.json();
+      if (data.success) {
+        setLowStockProducts(
+          (data.data || []).map((p: { id: number; name: string; sku?: string | null; stock: number; reorder_point: number }) => ({
+            ...p,
+            price: 0,
+            image: '',
+            is_out_of_stock: false,
+          }))
+        );
+      } else {
+        toast.error(data.error || 'Failed to load low stock products');
+        setLowStockProducts([]);
+      }
+    } catch (error) {
+      logError('Error fetching low stock:', error);
+      toast.error('Failed to load low stock products');
+      setLowStockProducts([]);
+    } finally {
+      setLowStockLoading(false);
+    }
+  };
+
+  const openInventoryHistory = async (product: Product) => {
+    setInventoryProduct(product);
+    setInventoryMovements([]);
+    setInventoryLoading(true);
+    try {
+      const response = await apiFetch(`/admin/products/${product.id}/inventory-movements`);
+      const data = await response.json();
+      if (data.success) {
+        setInventoryMovements(data.data || []);
+      } else {
+        toast.error(data.error || 'Failed to load stock history');
+      }
+    } catch (error) {
+      logError('Inventory movements error:', error);
+      toast.error('Failed to load stock history');
+    } finally {
+      setInventoryLoading(false);
+    }
+  };
+
+  const openEditCustomer = (customer: Customer) => {
+    setEditingCustomer(customer);
+    setCustomerEditForm({
+      name: customer.name || '',
+      phone: customer.phone || '',
+      admin_notes: customer.admin_notes || '',
+    });
+  };
+
+  const handleSaveCustomer = async () => {
+    if (!editingCustomer) return;
+    setCustomerSaveLoading(true);
+    try {
+      const response = await apiFetch(`/admin/customers/${editingCustomer.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          name: customerEditForm.name.trim(),
+          phone: customerEditForm.phone.trim() || undefined,
+          admin_notes: customerEditForm.admin_notes.trim() || undefined,
+        }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        toast.success('Customer updated');
+        setEditingCustomer(null);
+        fetchCustomers(customersPage, customerSearch);
+      } else {
+        toast.error(data.error || 'Update failed');
+      }
+    } catch {
+      toast.error('Update failed');
+    } finally {
+      setCustomerSaveLoading(false);
+    }
+  };
+
+  const handleSaveOrderCustomerDetails = async (orderId: string) => {
+    setOrderActionLoading(true);
+    try {
+      const response = await apiFetch(`/orders/${orderId}/customer-details`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          customer_name: orderCustomerForm.customer_name.trim(),
+          customer_email: orderCustomerForm.customer_email.trim(),
+          shipping_address: {
+            address: orderCustomerForm.address.trim(),
+            city: orderCustomerForm.city.trim(),
+            state: orderCustomerForm.state.trim(),
+            zipCode: orderCustomerForm.zipCode.trim(),
+            country: orderCustomerForm.country.trim(),
+          },
+          admin_notes: orderCustomerForm.admin_notes.trim() || undefined,
+        }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        toast.success('Customer details updated');
+        setOrderCustomerEdit(false);
+        await refreshSelectedOrder(orderId);
+        fetchOrders(ordersPage);
+      } else {
+        toast.error(data.error || 'Update failed');
+      }
+    } catch {
+      toast.error('Update failed');
+    } finally {
+      setOrderActionLoading(false);
     }
   };
 
@@ -401,6 +617,18 @@ export default function AdminDashboard() {
       setOrderEstimatedDelivery(
         selectedOrder.estimated_delivery ? selectedOrder.estimated_delivery.slice(0, 10) : ''
       );
+      const addr = selectedOrder.shipping_address || {};
+      setOrderCustomerForm({
+        customer_name: selectedOrder.customer_name || '',
+        customer_email: selectedOrder.customer_email || '',
+        address: addr.address || '',
+        city: addr.city || '',
+        state: addr.state || '',
+        zipCode: addr.zipCode || '',
+        country: addr.country || '',
+        admin_notes: selectedOrder.admin_notes || '',
+      });
+      setOrderCustomerEdit(false);
     }
   }, [selectedOrder?.id]);
 
@@ -410,6 +638,42 @@ export default function AdminDashboard() {
       void loadTabData('customers', { force: true });
     }
   }, [showDeletedCustomers]);
+
+  const skipAnalyticsPeriodDebounce = useRef(true);
+  useEffect(() => {
+    if (activeTab !== 'analytics') {
+      skipAnalyticsPeriodDebounce.current = true;
+      return;
+    }
+    if (skipAnalyticsPeriodDebounce.current) {
+      skipAnalyticsPeriodDebounce.current = false;
+      return;
+    }
+    void fetchAnalytics(analyticsPeriod);
+  }, [analyticsPeriod, activeTab]);
+
+  useEffect(() => {
+    if (activeTab === 'products' && showLowStockOnly) {
+      void fetchLowStockProducts();
+    }
+  }, [showLowStockOnly, activeTab]);
+
+  const skipCustomerSearchDebounce = useRef(true);
+  useEffect(() => {
+    if (activeTab !== 'customers') {
+      skipCustomerSearchDebounce.current = true;
+      return;
+    }
+    if (skipCustomerSearchDebounce.current) {
+      skipCustomerSearchDebounce.current = false;
+      return;
+    }
+    const timer = setTimeout(() => {
+      setCustomersPage(1);
+      fetchCustomers(1, customerSearch);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [customerSearch, activeTab]);
 
   const skipOrderSearchDebounce = useRef(true);
   useEffect(() => {
@@ -626,7 +890,7 @@ export default function AdminDashboard() {
   };
 
   // Bulk actions
-  const handleBulkProductUpdate = async (updates: { is_out_of_stock?: boolean }) => {
+  const handleBulkProductUpdate = async (updates: { is_out_of_stock?: boolean; stock?: number; stock_delta?: number }) => {
     if (selectedProducts.size === 0) {
       toast.error('No products selected');
       return;
@@ -641,13 +905,26 @@ export default function AdminDashboard() {
         clearProductCatalogCache();
         toast.success(`Updated ${data.updatedCount} products`);
         setSelectedProducts(new Set());
+        setBulkStockModalOpen(false);
         fetchProducts();
+        if (showLowStockOnly) fetchLowStockProducts();
       } else {
         toast.error(data.error || 'Update failed');
       }
     } catch (error) {
       toast.error('Update failed');
     }
+  };
+
+  const handleBulkStockSubmit = () => {
+    if (bulkStockMode === 'set' && bulkStockValue < 0) {
+      toast.error('Stock cannot be negative');
+      return;
+    }
+    const updates = bulkStockMode === 'set'
+      ? { stock: bulkStockValue }
+      : { stock_delta: bulkStockValue };
+    void handleBulkProductUpdate(updates);
   };
 
   const handleBulkOrderUpdate = async (updates: { status?: string }) => {
@@ -772,19 +1049,23 @@ export default function AdminDashboard() {
   // Filter functions
   const filteredOrders = orders;
 
-  const filteredProducts = productSearchResults ?? products.filter((p) => {
-    return !productSearch || p.name.toLowerCase().includes(productSearch.toLowerCase());
-  });
+  const filteredProducts = showLowStockOnly
+    ? lowStockProducts
+    : (productSearchResults ?? products.filter((p) => {
+        return !productSearch || p.name.toLowerCase().includes(productSearch.toLowerCase());
+      }));
 
   const filteredMessages = messages.filter(m => {
     return messageStatusFilter === 'all' || m.status === messageStatusFilter;
   });
 
-  const filteredCustomers = customers.filter(c => {
-    return !customerSearch || 
-      c.email.toLowerCase().includes(customerSearch.toLowerCase()) ||
-      c.name?.toLowerCase().includes(customerSearch.toLowerCase());
-  });
+  const analyticsPeriods: { id: AnalyticsPeriod; label: string }[] = [
+    { id: 'day', label: 'Today' },
+    { id: 'week', label: 'Week' },
+    { id: 'month', label: 'Month' },
+    { id: 'year', label: 'Year' },
+    { id: 'all', label: 'All time' },
+  ];
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
@@ -844,6 +1125,154 @@ export default function AdminDashboard() {
 
     return (
       <div>
+        {/* Period selector + export */}
+        <div style={{ background: 'white', borderRadius: 12, padding: 16, marginBottom: 24, border: '1px solid #e5e7eb', display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
+          <span style={{ fontSize: 14, fontWeight: 600, color: '#374151' }}>Sales period:</span>
+          {analyticsPeriods.map(({ id, label }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setAnalyticsPeriod(id)}
+              style={{
+                padding: '8px 14px',
+                borderRadius: 8,
+                border: `1px solid ${analyticsPeriod === id ? '#9c6649' : '#e5e7eb'}`,
+                background: analyticsPeriod === id ? '#fdf4ef' : 'white',
+                color: analyticsPeriod === id ? '#9c6649' : '#374151',
+                fontWeight: analyticsPeriod === id ? 700 : 500,
+                fontSize: 13,
+                cursor: 'pointer',
+              }}
+            >
+              {label}
+            </button>
+          ))}
+          <button
+            type="button"
+            disabled={analyticsExporting}
+            onClick={() => void handleAnalyticsExport()}
+            style={{
+              marginLeft: 'auto',
+              padding: '10px 16px',
+              background: '#9c6649',
+              color: 'white',
+              border: 'none',
+              borderRadius: 8,
+              cursor: analyticsExporting ? 'not-allowed' : 'pointer',
+              fontWeight: 600,
+              fontSize: 14,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              opacity: analyticsExporting ? 0.7 : 1,
+            }}
+          >
+            <Download size={16} /> Export CSV
+          </button>
+        </div>
+
+        {/* Period sales summary */}
+        {analytics.sales && (
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
+              <StatCard
+                icon={ShoppingBag}
+                title="Units sold"
+                value={analytics.sales.summary.total_units_sold}
+                color="#9c6649"
+                subtitle={analytics.sales.range.period}
+              />
+              <StatCard
+                icon={DollarSign}
+                title="Revenue"
+                value={`$${analytics.sales.summary.total_revenue.toFixed(2)}`}
+                color="#10b981"
+                subtitle={
+                  analytics.sales.compare?.revenue_change_pct != null
+                    ? `${analytics.sales.compare.revenue_change_pct >= 0 ? '+' : ''}${analytics.sales.compare.revenue_change_pct}% vs prior period`
+                    : undefined
+                }
+              />
+              <StatCard
+                icon={TrendingUp}
+                title="Avg order value"
+                value={`$${analytics.sales.summary.average_order_value.toFixed(2)}`}
+                color="#f59e0b"
+                subtitle={`${analytics.sales.summary.order_count} orders`}
+              />
+              {analytics.sales.best_period && (
+                <StatCard
+                  icon={BarChart3}
+                  title="Best period"
+                  value={`$${analytics.sales.best_period.revenue.toFixed(2)}`}
+                  color="#8b5cf6"
+                  subtitle={`${new Date(analytics.sales.best_period.period_start).toLocaleDateString()} · ${analytics.sales.best_period.orders} orders`}
+                />
+              )}
+            </div>
+
+            {analytics.inventory && analytics.inventory.low_stock_count > 0 && (
+              <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 12, padding: 16, marginBottom: 24, display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
+                <AlertTriangle size={20} color="#d97706" />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 700, color: '#92400e' }}>
+                    {analytics.inventory.low_stock_count} product{analytics.inventory.low_stock_count !== 1 ? 's' : ''} at or below reorder point
+                  </div>
+                  <div style={{ fontSize: 13, color: '#b45309', marginTop: 4 }}>
+                    {analytics.inventory.low_stock_products.slice(0, 3).map((p) => p.name).join(', ')}
+                    {analytics.inventory.low_stock_products.length > 3 ? '…' : ''}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setActiveTab('products'); setShowLowStockOnly(true); }}
+                  style={{ padding: '8px 14px', background: '#f59e0b', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 13 }}
+                >
+                  View low stock
+                </button>
+              </div>
+            )}
+
+            <div style={{ background: 'white', borderRadius: 16, padding: 24, border: '1px solid #e5e7eb', marginBottom: 32 }}>
+              <h3 style={{ margin: 0, marginBottom: 16, fontSize: 18, fontWeight: 700 }}>Top sellers</h3>
+              {isMobile ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {analytics.sales.top_sellers_by_units.slice(0, 10).map((p, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: 12, background: '#f9fafb', borderRadius: 8 }}>
+                      <span style={{ fontWeight: 500 }}>{p.product_name}</span>
+                      <span style={{ color: '#6b7280', fontSize: 13 }}>{p.units_sold} sold</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
+                      <th style={{ padding: '10px 0', textAlign: 'left', fontSize: 13, color: '#6b7280' }}>Product</th>
+                      <th style={{ padding: '10px 0', textAlign: 'right', fontSize: 13, color: '#6b7280' }}>Units</th>
+                      <th style={{ padding: '10px 0', textAlign: 'right', fontSize: 13, color: '#6b7280' }}>Revenue</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {analytics.sales.top_sellers_by_units.slice(0, 10).map((p, i) => {
+                      const rev = analytics.sales!.top_sellers_by_revenue.find((r) => r.product_id === p.product_id && r.product_name === p.product_name);
+                      return (
+                        <tr key={i} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                          <td style={{ padding: '12px 0', fontWeight: 500 }}>{p.product_name}</td>
+                          <td style={{ padding: '12px 0', textAlign: 'right', color: '#374151' }}>{p.units_sold}</td>
+                          <td style={{ padding: '12px 0', textAlign: 'right', color: '#10b981', fontWeight: 600 }}>
+                            ${(rev?.revenue ?? 0).toFixed(2)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </>
+        )}
+
         {/* Stats Grid */}
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)', gap: 16, marginBottom: 32 }}>
           <StatCard icon={Package} title="Total Orders" value={analytics.orders.total_orders} color="#9c6649" subtitle="All time" />
@@ -959,8 +1388,16 @@ export default function AdminDashboard() {
       {/* Toolbar */}
       <div style={{ background: 'white', borderRadius: 12, padding: 16, marginBottom: 16, border: '1px solid #e5e7eb', display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
         <span style={{ fontSize: 13, color: '#6b7280' }}>
-          Showing {products.length} of {productsTotal} products
+          Showing {filteredProducts.length}{showLowStockOnly ? ' low-stock' : ` of ${productsTotal}`} products
         </span>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#374151', cursor: 'pointer', fontWeight: 500 }}>
+          <input
+            type="checkbox"
+            checked={showLowStockOnly}
+            onChange={(e) => setShowLowStockOnly(e.target.checked)}
+          />
+          Low stock only
+        </label>
         <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
           <Search size={18} color="#9ca3af" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
           <input
@@ -976,6 +1413,9 @@ export default function AdminDashboard() {
         </button>
         {selectedProducts.size > 0 && (
           <>
+            <button onClick={() => setBulkStockModalOpen(true)} style={{ padding: '10px 16px', background: '#9c6649', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14, fontWeight: 600 }}>
+              Adjust stock ({selectedProducts.size})
+            </button>
             <button onClick={() => handleBulkProductUpdate({ is_out_of_stock: true })} style={{ padding: '10px 16px', background: '#ef4444', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14, fontWeight: 600 }}>
               Mark Out of Stock ({selectedProducts.size})
             </button>
@@ -993,7 +1433,9 @@ export default function AdminDashboard() {
       </div>
 
       {/* Products — cards on mobile, table on desktop */}
-      {isMobile ? (
+      {showLowStockOnly && lowStockLoading ? (
+        <p style={{ textAlign: 'center', color: '#6b7280', padding: 32 }}>Loading low stock products…</p>
+      ) : isMobile ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {filteredProducts.map((product) => (
             <div key={product.id} style={{ background: 'white', borderRadius: 12, border: '1px solid #e5e7eb', padding: 16 }}>
@@ -1024,6 +1466,9 @@ export default function AdminDashboard() {
                       style={{ padding: '8px 12px', minHeight: 44, borderRadius: 8, border: 'none', cursor: 'pointer', background: product.is_out_of_stock ? '#fee2e2' : '#dcfce7', color: product.is_out_of_stock ? '#dc2626' : '#16a34a', fontWeight: 600, fontSize: 13 }}
                     >
                       {product.is_out_of_stock ? 'Out of Stock' : 'In Stock'}
+                    </button>
+                    <button type="button" aria-label="Stock history" onClick={() => void openInventoryHistory(product)} style={{ padding: 8, minHeight: 44, minWidth: 44, background: '#eff6ff', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
+                      <History size={16} color="#2563eb" aria-hidden="true" />
                     </button>
                     <button type="button" aria-label="Edit product" onClick={() => openEditProduct(product)} style={{ padding: 8, minHeight: 44, minWidth: 44, background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
                       <Pencil size={16} color="#374151" aria-hidden="true" />
@@ -1108,6 +1553,15 @@ export default function AdminDashboard() {
                 </td>
                 <td style={{ padding: 16, textAlign: 'center' }}>
                   <div style={{ display: 'flex', justifyContent: 'center', gap: 8 }}>
+                    <button
+                      type="button"
+                      onClick={() => void openInventoryHistory(product)}
+                      title="Stock history"
+                      aria-label="Stock history"
+                      style={{ padding: 8, background: '#eff6ff', border: 'none', borderRadius: 8, cursor: 'pointer' }}
+                    >
+                      <History size={16} color="#2563eb" aria-hidden="true" />
+                    </button>
                     <button
                       type="button"
                       onClick={() => openEditProduct(product)}
@@ -1333,21 +1787,46 @@ export default function AdminDashboard() {
           />
           Show deleted customers
         </label>
+        <span style={{ fontSize: 13, color: '#6b7280' }}>
+          {customersTotal} customers · page {customersPage} of {customersTotalPages}
+        </span>
+        <button
+          type="button"
+          disabled={customersPage <= 1}
+          onClick={() => fetchCustomers(customersPage - 1)}
+          style={{ padding: '10px 16px', background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: customersPage <= 1 ? 'not-allowed' : 'pointer', opacity: customersPage <= 1 ? 0.5 : 1 }}
+        >
+          Previous
+        </button>
+        <button
+          type="button"
+          disabled={customersPage >= customersTotalPages}
+          onClick={() => fetchCustomers(customersPage + 1)}
+          style={{ padding: '10px 16px', background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: customersPage >= customersTotalPages ? 'not-allowed' : 'pointer', opacity: customersPage >= customersTotalPages ? 0.5 : 1 }}
+        >
+          Next
+        </button>
       </div>
 
       {/* Customers — cards on mobile, table on desktop */}
       {isMobile ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {filteredCustomers.map((customer) => (
-            <div key={customer.email} style={{ background: 'white', borderRadius: 12, border: '1px solid #e5e7eb', padding: 16 }}>
+          {customers.map((customer) => (
+            <div key={customer.id} style={{ background: 'white', borderRadius: 12, border: '1px solid #e5e7eb', padding: 16 }}>
               <div style={{ fontWeight: 700, color: '#1f2937' }}>{customer.name || 'N/A'}</div>
               <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4, wordBreak: 'break-all' }}>{customer.email}</div>
+              {customer.phone && <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>{customer.phone}</div>}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12, fontSize: 13 }}>
                 <div><span style={{ color: '#6b7280' }}>Orders</span><br /><strong>{customer.total_orders}</strong></div>
                 <div><span style={{ color: '#6b7280' }}>Spent</span><br /><strong style={{ color: '#10b981' }}>${customer.total_spent.toFixed(2)}</strong></div>
-                <div style={{ gridColumn: '1 / -1' }}><span style={{ color: '#6b7280' }}>Last order</span><br /><strong>{customer.last_order_date ? new Date(customer.last_order_date).toLocaleDateString() : 'N/A'}</strong></div>
+                <div><span style={{ color: '#6b7280' }}>First order</span><br /><strong>{customer.first_order_date ? new Date(customer.first_order_date).toLocaleDateString() : 'N/A'}</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Last order</span><br /><strong>{customer.last_order_date ? new Date(customer.last_order_date).toLocaleDateString() : 'N/A'}</strong></div>
               </div>
               <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+                <button type="button" onClick={() => openEditCustomer(customer)}
+                  style={{ padding: '10px 14px', minHeight: 44, background: '#f3f4f6', color: '#374151', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Pencil size={14} /> Edit
+                </button>
                 <button type="button" onClick={async () => { setSelectedCustomer(customer); await fetchCustomerHistory(customer.email); }}
                   style={{ padding: '10px 14px', minHeight: 44, background: '#9c6649', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
                   View History
@@ -1373,24 +1852,32 @@ export default function AdminDashboard() {
           <thead>
             <tr style={{ background: '#f9fafb' }}>
               <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#374151' }}>Customer</th>
+              <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#374151' }}>Phone</th>
               <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#374151' }}>Orders</th>
               <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#374151' }}>Total Spent</th>
+              <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#374151' }}>First Order</th>
               <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#374151' }}>Last Order</th>
               <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#374151' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {filteredCustomers.map((customer) => (
-              <tr key={customer.email} style={{ borderTop: '1px solid #e5e7eb' }}>
+            {customers.map((customer) => (
+              <tr key={customer.id} style={{ borderTop: '1px solid #e5e7eb' }}>
                 <td style={{ padding: 16 }}>
                   <div style={{ fontWeight: 600, color: '#1f2937' }}>{customer.name || 'N/A'}</div>
                   <div style={{ fontSize: 13, color: '#6b7280' }}>{customer.email}</div>
                 </td>
+                <td style={{ padding: 16, color: '#6b7280', fontSize: 13 }}>{customer.phone || '—'}</td>
                 <td style={{ padding: 16, fontWeight: 600 }}>{customer.total_orders}</td>
                 <td style={{ padding: 16, fontWeight: 600, color: '#10b981' }}>${customer.total_spent.toFixed(2)}</td>
+                <td style={{ padding: 16, color: '#6b7280' }}>{customer.first_order_date ? new Date(customer.first_order_date).toLocaleDateString() : 'N/A'}</td>
                 <td style={{ padding: 16, color: '#6b7280' }}>{customer.last_order_date ? new Date(customer.last_order_date).toLocaleDateString() : 'N/A'}</td>
                 <td style={{ padding: 16 }}>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <button type="button" onClick={() => openEditCustomer(customer)}
+                      style={{ padding: '8px 12px', background: '#f3f4f6', color: '#374151', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                      Edit
+                    </button>
                     <button onClick={async () => { setSelectedCustomer(customer); await fetchCustomerHistory(customer.email); }}
                       style={{ padding: '8px 16px', background: '#9c6649', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
                       View History
@@ -1517,16 +2004,87 @@ export default function AdminDashboard() {
               <span style={{ padding: '6px 16px', borderRadius: 20, fontSize: 13, fontWeight: 600, background: `${getStatusColor(selectedOrder.payment_status)}15`, color: getStatusColor(selectedOrder.payment_status) }}>{selectedOrder.payment_status}</span>
             </div>
             <div style={{ background: '#f9fafb', borderRadius: 12, padding: 20, marginBottom: 20 }}>
-              <h3 style={{ margin: 0, marginBottom: 16, fontWeight: 700 }}>Customer</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16 }}>
-                <div><span style={{ color: '#6b7280', fontSize: 12 }}>Name</span><p style={{ margin: 0, fontWeight: 600 }}>{selectedOrder.customer_name}</p></div>
-                <div><span style={{ color: '#6b7280', fontSize: 12 }}>Email</span><p style={{ margin: 0, fontWeight: 600 }}>{selectedOrder.customer_email}</p></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <h3 style={{ margin: 0, fontWeight: 700 }}>Customer</h3>
+                {selectedOrder.status !== 'cancelled' && (
+                  <button
+                    type="button"
+                    onClick={() => setOrderCustomerEdit((v) => !v)}
+                    style={{ padding: '6px 12px', background: orderCustomerEdit ? '#e5e7eb' : '#9c6649', color: orderCustomerEdit ? '#374151' : 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}
+                  >
+                    <Pencil size={14} /> {orderCustomerEdit ? 'Cancel edit' : 'Edit details'}
+                  </button>
+                )}
               </div>
-              {selectedOrder.shipping_address && (
-                <div style={{ marginTop: 16 }}>
-                  <span style={{ color: '#6b7280', fontSize: 12 }}>Shipping Address</span>
-                  <p style={{ margin: 0, fontWeight: 600 }}>{selectedOrder.shipping_address.address}, {selectedOrder.shipping_address.city}, {selectedOrder.shipping_address.state} {selectedOrder.shipping_address.zipCode}, {selectedOrder.shipping_address.country}</p>
+              {orderCustomerEdit && selectedOrder.status !== 'cancelled' ? (
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12 }}>
+                  <label style={{ fontSize: 13, color: '#374151' }}>
+                    Name
+                    <input value={orderCustomerForm.customer_name} onChange={(e) => setOrderCustomerForm((f) => ({ ...f, customer_name: e.target.value }))}
+                      style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, boxSizing: 'border-box' }} />
+                  </label>
+                  <label style={{ fontSize: 13, color: '#374151' }}>
+                    Email
+                    <input type="email" value={orderCustomerForm.customer_email} onChange={(e) => setOrderCustomerForm((f) => ({ ...f, customer_email: e.target.value }))}
+                      style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, boxSizing: 'border-box' }} />
+                  </label>
+                  <label style={{ fontSize: 13, color: '#374151', gridColumn: isMobile ? 'auto' : '1 / -1' }}>
+                    Street address
+                    <input value={orderCustomerForm.address} onChange={(e) => setOrderCustomerForm((f) => ({ ...f, address: e.target.value }))}
+                      style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, boxSizing: 'border-box' }} />
+                  </label>
+                  <label style={{ fontSize: 13, color: '#374151' }}>
+                    City
+                    <input value={orderCustomerForm.city} onChange={(e) => setOrderCustomerForm((f) => ({ ...f, city: e.target.value }))}
+                      style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, boxSizing: 'border-box' }} />
+                  </label>
+                  <label style={{ fontSize: 13, color: '#374151' }}>
+                    State
+                    <input value={orderCustomerForm.state} onChange={(e) => setOrderCustomerForm((f) => ({ ...f, state: e.target.value }))}
+                      style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, boxSizing: 'border-box' }} />
+                  </label>
+                  <label style={{ fontSize: 13, color: '#374151' }}>
+                    ZIP
+                    <input value={orderCustomerForm.zipCode} onChange={(e) => setOrderCustomerForm((f) => ({ ...f, zipCode: e.target.value }))}
+                      style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, boxSizing: 'border-box' }} />
+                  </label>
+                  <label style={{ fontSize: 13, color: '#374151' }}>
+                    Country
+                    <input value={orderCustomerForm.country} onChange={(e) => setOrderCustomerForm((f) => ({ ...f, country: e.target.value }))}
+                      style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, boxSizing: 'border-box' }} />
+                  </label>
+                  <label style={{ fontSize: 13, color: '#374151', gridColumn: isMobile ? 'auto' : '1 / -1' }}>
+                    Admin notes
+                    <textarea value={orderCustomerForm.admin_notes} onChange={(e) => setOrderCustomerForm((f) => ({ ...f, admin_notes: e.target.value }))}
+                      rows={2}
+                      style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, boxSizing: 'border-box', fontFamily: 'inherit', resize: 'vertical' }} />
+                  </label>
+                  <div style={{ gridColumn: isMobile ? 'auto' : '1 / -1' }}>
+                    <button type="button" disabled={orderActionLoading} onClick={() => void handleSaveOrderCustomerDetails(selectedOrder.id)}
+                      style={{ padding: '10px 16px', background: '#9c6649', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
+                      Save customer details
+                    </button>
+                  </div>
                 </div>
+              ) : (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16 }}>
+                    <div><span style={{ color: '#6b7280', fontSize: 12 }}>Name</span><p style={{ margin: 0, fontWeight: 600 }}>{selectedOrder.customer_name}</p></div>
+                    <div><span style={{ color: '#6b7280', fontSize: 12 }}>Email</span><p style={{ margin: 0, fontWeight: 600 }}>{selectedOrder.customer_email}</p></div>
+                  </div>
+                  {selectedOrder.shipping_address && (
+                    <div style={{ marginTop: 16 }}>
+                      <span style={{ color: '#6b7280', fontSize: 12 }}>Shipping Address</span>
+                      <p style={{ margin: 0, fontWeight: 600 }}>{selectedOrder.shipping_address.address}, {selectedOrder.shipping_address.city}, {selectedOrder.shipping_address.state} {selectedOrder.shipping_address.zipCode}, {selectedOrder.shipping_address.country}</p>
+                    </div>
+                  )}
+                  {selectedOrder.admin_notes && (
+                    <div style={{ marginTop: 16, padding: 12, background: '#fffbeb', borderRadius: 8, border: '1px solid #fcd34d' }}>
+                      <span style={{ color: '#92400e', fontSize: 12, fontWeight: 600 }}>Admin notes</span>
+                      <p style={{ margin: '6px 0 0', fontSize: 14, color: '#78350f', whiteSpace: 'pre-wrap' }}>{selectedOrder.admin_notes}</p>
+                    </div>
+                  )}
+                </>
               )}
             </div>
             <div style={{ marginBottom: 20 }}>
@@ -1672,6 +2230,138 @@ export default function AdminDashboard() {
         }}
         onSaved={() => fetchProducts(1, false)}
       />
+
+      {/* Bulk stock modal */}
+      {bulkStockModalOpen && (
+        <LiquidModal isOpen onClose={() => setBulkStockModalOpen(false)} maxWidth={420} ariaLabel="Bulk stock update">
+          <div style={{ padding: 24 }}>
+            <h2 style={{ margin: '0 0 8px', fontSize: 20, fontWeight: 800 }}>Adjust stock</h2>
+            <p style={{ margin: '0 0 20px', fontSize: 14, color: '#6b7280' }}>
+              Update stock for {selectedProducts.size} selected product{selectedProducts.size !== 1 ? 's' : ''}.
+            </p>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+              <button type="button" onClick={() => setBulkStockMode('set')}
+                style={{ flex: 1, padding: '10px 12px', borderRadius: 8, border: `1px solid ${bulkStockMode === 'set' ? '#9c6649' : '#e5e7eb'}`, background: bulkStockMode === 'set' ? '#fdf4ef' : 'white', fontWeight: 600, cursor: 'pointer' }}>
+                Set to value
+              </button>
+              <button type="button" onClick={() => setBulkStockMode('delta')}
+                style={{ flex: 1, padding: '10px 12px', borderRadius: 8, border: `1px solid ${bulkStockMode === 'delta' ? '#9c6649' : '#e5e7eb'}`, background: bulkStockMode === 'delta' ? '#fdf4ef' : 'white', fontWeight: 600, cursor: 'pointer' }}>
+                Add / subtract
+              </button>
+            </div>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+              {bulkStockMode === 'set' ? 'New stock level' : 'Stock change (+/-)'}
+            </label>
+            <input
+              type="number"
+              value={bulkStockValue}
+              onChange={(e) => setBulkStockValue(parseInt(e.target.value, 10) || 0)}
+              style={{ width: '100%', padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14, boxSizing: 'border-box', marginBottom: 20 }}
+            />
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+              <button type="button" onClick={() => setBulkStockModalOpen(false)}
+                style={{ padding: '10px 16px', background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
+                Cancel
+              </button>
+              <button type="button" onClick={handleBulkStockSubmit}
+                style={{ padding: '10px 16px', background: '#9c6649', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
+                Apply
+              </button>
+            </div>
+          </div>
+        </LiquidModal>
+      )}
+
+      {/* Inventory history modal */}
+      {inventoryProduct && (
+        <LiquidModal isOpen onClose={() => { setInventoryProduct(null); setInventoryMovements([]); }} maxWidth={640} ariaLabel="Stock history">
+          <div style={{ padding: 24 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800 }}>Stock history</h2>
+                <p style={{ margin: '6px 0 0', fontSize: 14, color: '#6b7280' }}>{inventoryProduct.name}</p>
+              </div>
+              <button type="button" aria-label="Close" onClick={() => { setInventoryProduct(null); setInventoryMovements([]); }}
+                style={{ background: '#f3f4f6', border: 'none', borderRadius: 8, padding: 8, cursor: 'pointer' }}>
+                <X size={20} />
+              </button>
+            </div>
+            {inventoryLoading ? (
+              <p style={{ textAlign: 'center', color: '#6b7280', padding: 24 }}>Loading movements…</p>
+            ) : inventoryMovements.length === 0 ? (
+              <p style={{ textAlign: 'center', color: '#6b7280', padding: 24 }}>No inventory movements recorded.</p>
+            ) : isMobile ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 400, overflowY: 'auto' }}>
+                {inventoryMovements.map((m) => (
+                  <div key={m.id} style={{ padding: 12, background: '#f9fafb', borderRadius: 8 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600 }}>
+                      <span style={{ color: m.delta >= 0 ? '#16a34a' : '#dc2626' }}>{m.delta >= 0 ? '+' : ''}{m.delta}</span>
+                      <span style={{ color: '#6b7280', fontSize: 13 }}>→ {m.quantity_after}</span>
+                    </div>
+                    <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>{m.reason} · {new Date(m.created_at).toLocaleString()}</div>
+                    {m.admin_username && <div style={{ fontSize: 12, color: '#9ca3af' }}>by {m.admin_username}</div>}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="responsive-table-wrap" style={{ maxHeight: 400, overflowY: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 480 }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
+                      <th style={{ padding: '10px 8px', textAlign: 'left', fontSize: 12, color: '#6b7280' }}>Date</th>
+                      <th style={{ padding: '10px 8px', textAlign: 'right', fontSize: 12, color: '#6b7280' }}>Change</th>
+                      <th style={{ padding: '10px 8px', textAlign: 'right', fontSize: 12, color: '#6b7280' }}>After</th>
+                      <th style={{ padding: '10px 8px', textAlign: 'left', fontSize: 12, color: '#6b7280' }}>Reason</th>
+                      <th style={{ padding: '10px 8px', textAlign: 'left', fontSize: 12, color: '#6b7280' }}>Admin</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {inventoryMovements.map((m) => (
+                      <tr key={m.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                        <td style={{ padding: '10px 8px', fontSize: 13 }}>{new Date(m.created_at).toLocaleString()}</td>
+                        <td style={{ padding: '10px 8px', textAlign: 'right', fontWeight: 600, color: m.delta >= 0 ? '#16a34a' : '#dc2626' }}>{m.delta >= 0 ? '+' : ''}{m.delta}</td>
+                        <td style={{ padding: '10px 8px', textAlign: 'right' }}>{m.quantity_after}</td>
+                        <td style={{ padding: '10px 8px', fontSize: 13, color: '#6b7280' }}>{m.reason}</td>
+                        <td style={{ padding: '10px 8px', fontSize: 13, color: '#9ca3af' }}>{m.admin_username || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </LiquidModal>
+      )}
+
+      {/* Edit customer modal */}
+      {editingCustomer && (
+        <LiquidModal isOpen onClose={() => setEditingCustomer(null)} maxWidth={480} ariaLabel="Edit customer">
+          <div style={{ padding: 24 }}>
+            <h2 style={{ margin: '0 0 4px', fontSize: 20, fontWeight: 800 }}>Edit customer</h2>
+            <p style={{ margin: '0 0 20px', fontSize: 14, color: '#6b7280' }}>{editingCustomer.email}</p>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Name</label>
+            <input value={customerEditForm.name} onChange={(e) => setCustomerEditForm((f) => ({ ...f, name: e.target.value }))}
+              style={{ width: '100%', padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14, boxSizing: 'border-box', marginBottom: 16 }} />
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Phone</label>
+            <input value={customerEditForm.phone} onChange={(e) => setCustomerEditForm((f) => ({ ...f, phone: e.target.value }))}
+              style={{ width: '100%', padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14, boxSizing: 'border-box', marginBottom: 16 }} />
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Admin notes</label>
+            <textarea value={customerEditForm.admin_notes} onChange={(e) => setCustomerEditForm((f) => ({ ...f, admin_notes: e.target.value }))}
+              rows={3}
+              style={{ width: '100%', padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14, boxSizing: 'border-box', fontFamily: 'inherit', resize: 'vertical', marginBottom: 20 }} />
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+              <button type="button" onClick={() => setEditingCustomer(null)}
+                style={{ padding: '10px 16px', background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
+                Cancel
+              </button>
+              <button type="button" disabled={customerSaveLoading} onClick={() => void handleSaveCustomer()}
+                style={{ padding: '10px 16px', background: '#9c6649', color: 'white', border: 'none', borderRadius: 8, cursor: customerSaveLoading ? 'not-allowed' : 'pointer', fontWeight: 600, opacity: customerSaveLoading ? 0.7 : 1 }}>
+                Save
+              </button>
+            </div>
+          </div>
+        </LiquidModal>
+      )}
 
       {/* Customer History Modal */}
       {selectedCustomer && (

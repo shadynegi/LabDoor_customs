@@ -18,6 +18,8 @@ import { PAID_ORDER_CANCEL_DISABLED_MESSAGE } from '../lib/returnPolicy';
 import { getClientIp } from '../lib/clientIp';
 import { validateStatusTransition, type OrderStatus } from '../lib/orderStatus';
 import { verifyPayPalCaptureForOrder } from '../lib/paypalCaptureVerify';
+import { patchOrderCustomerDetails, patchPendingOrderItems } from '../lib/adminOrderEdits';
+import type { ValidatedLineItem } from '../lib/orderLifecycle';
 import { redeemOrderAccessExchangeCode } from '../lib/orderAccessExchange';
 import { completeOrderPaymentCapture } from '../lib/paymentReconciliation';
 import { sendPostCaptureNotifications } from '../lib/postPaymentCapture';
@@ -1024,6 +1026,45 @@ router.post('/:id/notify-shipped', verifyAdmin, async (req: Request, res: Respon
   } catch (error: unknown) {
     logger.error('Error sending shipping notification:', error);
     respond500(res, error, 'Request failed');
+  }
+});
+
+// PATCH update customer/shipping on order (Admin — does not change paid line totals)
+router.patch('/:id/customer-details', verifyAdmin, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const adminUser = (req as { admin?: { username?: string } }).admin?.username ?? 'admin';
+    const result = await patchOrderCustomerDetails(id, req.body, adminUser);
+
+    if (!result.ok) {
+      return res.status(result.status).json({ success: false, error: result.error });
+    }
+
+    const parsed = parseOrderRow(result.order);
+    res.json({ success: true, data: stripOrderSecrets(parsed), message: 'Order customer details updated' });
+  } catch (error: unknown) {
+    logger.error('Error patching order customer details:', error);
+    respond500(res, error, 'Failed to update order');
+  }
+});
+
+// PATCH line items on pending unpaid orders only (Admin)
+router.patch('/:id/pending-items', verifyAdmin, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { items } = req.body as { items?: ValidatedLineItem[] };
+    const adminUser = (req as { admin?: { username?: string } }).admin?.username ?? 'admin';
+    const result = await patchPendingOrderItems(id, items || [], adminUser);
+
+    if (!result.ok) {
+      return res.status(result.status).json({ success: false, error: result.error });
+    }
+
+    const parsed = parseOrderRow(result.order);
+    res.json({ success: true, data: stripOrderSecrets(parsed), message: 'Pending order items updated' });
+  } catch (error: unknown) {
+    logger.error('Error patching pending order items:', error);
+    respond500(res, error, 'Failed to update order items');
   }
 });
 

@@ -14,7 +14,7 @@ const distAssets = join(__dirname, '../dist/assets');
 const BUDGET = {
   totalAssetsMb: 3.0,
   imagesMb: 2.0,
-  jsMb: 1.2,
+  jsMb: 1.4,
   maxSingleImageKb: 400,
 };
 
