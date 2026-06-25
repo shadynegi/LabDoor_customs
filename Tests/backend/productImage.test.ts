@@ -11,7 +11,7 @@ describe('productImage validation', () => {
     if (result.ok) expect(result.value).toContain('https://');
   });
 
-  it('accepts data URLs longer than 2048 chars when under 512KB', () => {
+  it('accepts data URLs longer than 2048 chars when under 1MB', () => {
     const base64 = 'A'.repeat(10_000);
     const dataUrl = `data:image/png;base64,${base64}`;
     expect(dataUrl.length).toBeGreaterThan(2048);
@@ -20,11 +20,11 @@ describe('productImage validation', () => {
   });
 
   it('rejects oversized data URLs', () => {
-    const huge = 'data:image/png;base64,' + 'A'.repeat(700_000);
+    const huge = 'data:image/png;base64,' + 'A'.repeat(1_500_000);
     const result = validateProductImageUrl(huge, 'Image');
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.error).toContain('512KB');
+      expect(result.error).toContain('1MB');
     }
   });
 

@@ -51,7 +51,7 @@ If the analytics API fails, the tab shows an error message with a **Retry** butt
 - **Load more** — paginated list via `GET /api/products?limit=50&page=` when not searching
 - Error banner with **Retry** if the product list fails to load
 - **Coupons / Reviews** — product scope uses **server search** (`AdminProductSearchPicker` → `POST /api/products/search`), not a fixed product list
-- Create new products (name, price, images, optional **360° MP4 video**, **SKU**, **reorder point**, optional **cost price**, category, size, color, stock)
+- Create new products (name, price, images via **file upload** (Multer, max 20 MB) or URL, optional **360° MP4 video**, **SKU**, **reorder point**, optional **cost price**, category, size, color, stock)
 - Edit existing products (stock changes are logged to `inventory_movements`)
 - Delete products
 - **Bulk stock** — set absolute stock or apply delta for selected products via `POST /api/admin/products/bulk-update` (`stock`, `stock_delta`, or `is_out_of_stock`)

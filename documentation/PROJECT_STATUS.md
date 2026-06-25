@@ -58,7 +58,7 @@ Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_
 - Dashboard: analytics (period selector, sales by product, inventory snapshot, CSV export), products, orders, coupons (**10/page**), customers, **reviews**
 - Orders: server-side search, pagination, fulfillment modal, bulk status (max 500 IDs, validated transitions), manual mark paid (`admin_note` + `payment_id`, logged to activity); edit customer/shipping on pending orders; adjust line items on unpaid pending orders
 - Coupons: presets, custom create with **applies_to** scope, edit modal, activate/deactivate, delete; **paginated list (10/page)**
-- Products: paginated admin list (50/page, load more), error/retry UI; SKU, reorder point, cost price; inventory movement history; low-stock filter; bulk stock / stock-delta updates
+- Products: paginated admin list (50/page, load more), error/retry UI; **Multer file upload** (20 MB images, 15 MB MP4 via `POST /api/admin/uploads/product-media`) or hosted URL; SKU, reorder point, cost price; inventory movement history; low-stock filter; bulk stock / stock-delta updates
 - Product CRUD and bulk stock updates
 - Customer list with server search/pagination, admin notes, address history; soft delete/restore and **order history modal (10 orders/page)**; `PATCH /admin/customers/:id`
 - **Reviews tab**: moderation UI with customer email (admin-only), admin response field, quick approve/reject, pagination; storefront eligibility check + pending copy; public API strips email via `toPublicReview()`
@@ -81,7 +81,9 @@ Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_
 ## Security
 
 - CSRF double-submit with frontend retry on 403
-- Rate limiting (Redis-backed in production)
+- Rate limiting (Redis-backed in production) via **express-rate-limit**
+- Response **compression** (gzip, > 1 KB)
+- HTTP access logging via **Pino** (`requestLogMiddleware`) — not Morgan
 - Cloudflare proxy enforcement in production
 - Helmet CSP/HSTS, CORS whitelist, request timeouts
 - Order access tokens (hashed at rest); checkout exchange for PayPal redirect

@@ -61,6 +61,7 @@ Set on the **Railway service** (repository root). The server **exits on boot** i
 - [ ] `SUPABASE_URL` + `SUPABASE_KEY` (service_role) if used by tooling
 - [ ] `DB_SSL_CA_PATH` if your host requires explicit CA bundle
 - [ ] `LOG_LEVEL=info`
+- [ ] **`UPLOAD_DIR`** — mount a **Railway persistent volume** for admin product uploads (default `./uploads` is ephemeral; Multer files are lost on redeploy without a volume)
 
 ### Validate locally before deploy
 

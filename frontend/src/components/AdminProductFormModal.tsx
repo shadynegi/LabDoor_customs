@@ -3,6 +3,7 @@ import { X, Upload, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import LiquidModal from './LiquidModal';
 import { apiFetch } from '../config';
+import { apiUpload } from '../lib/apiUpload';
 import { logError } from '../lib/logger';
 import { clearProductCatalogCache } from '../lib/productCatalogCache';
 import { useResponsive } from '../hooks/useResponsive';
@@ -49,7 +50,7 @@ const US_SIZES = [
   'US 10', 'US 10.5', 'US 11', 'US 11.5', 'US 12', 'US 12.5', 'US 13',
 ];
 
-const MAX_IMAGE_BYTES = 512 * 1024;
+const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 const MAX_VIDEO_BYTES = 15 * 1024 * 1024;
 
 const emptyForm = (): ProductFormPayload => ({
@@ -104,6 +105,32 @@ export default function AdminProductFormModal({
   const [form, setForm] = useState<ProductFormPayload>(emptyForm());
   const [extraSizes, setExtraSizes] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [backgroundFile, setBackgroundFile] = useState<File | null>(null);
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  const [backgroundPreviewUrl, setBackgroundPreviewUrl] = useState<string | null>(null);
+
+  const clearBlobPreview = (url: string | null) => {
+    if (url?.startsWith('blob:')) URL.revokeObjectURL(url);
+  };
+
+  const resetPendingFiles = () => {
+    clearBlobPreview(imagePreviewUrl);
+    clearBlobPreview(backgroundPreviewUrl);
+    setImageFile(null);
+    setBackgroundFile(null);
+    setVideoFile(null);
+    setImagePreviewUrl(null);
+    setBackgroundPreviewUrl(null);
+  };
+
+  useEffect(() => {
+    return () => {
+      clearBlobPreview(imagePreviewUrl);
+      clearBlobPreview(backgroundPreviewUrl);
+    };
+  }, [imagePreviewUrl, backgroundPreviewUrl]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -129,28 +156,36 @@ export default function AdminProductFormModal({
       setForm(emptyForm());
       setExtraSizes(new Set());
     }
+    resetPendingFiles();
   }, [isOpen, product]);
 
   const setField = <K extends keyof ProductFormPayload>(key: K, value: ProductFormPayload[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
-  const readImageFile = (file: File, field: 'image' | 'background') => {
+  const pickImageFile = (file: File, field: 'image' | 'background') => {
     if (!file.type.startsWith('image/')) {
       toast.error('Please select an image file');
       return;
     }
     if (file.size > MAX_IMAGE_BYTES) {
-      toast.error('Image must be under 512 KB. Paste a hosted URL instead.');
+      toast.error('Image must be under 20 MB. Paste a hosted URL instead.');
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => setField(field, reader.result as string);
-    reader.onerror = () => toast.error('Failed to read image file');
-    reader.readAsDataURL(file);
+    if (field === 'image') {
+      clearBlobPreview(imagePreviewUrl);
+      setImageFile(file);
+      setImagePreviewUrl(URL.createObjectURL(file));
+      setField('image', '');
+    } else {
+      clearBlobPreview(backgroundPreviewUrl);
+      setBackgroundFile(file);
+      setBackgroundPreviewUrl(URL.createObjectURL(file));
+      setField('background', '');
+    }
   };
 
-  const readVideoFile = (file: File) => {
+  const pickVideoFile = (file: File) => {
     if (!file.type.startsWith('video/') || file.type !== 'video/mp4') {
       toast.error('Please select an MP4 video file');
       return;
@@ -159,16 +194,30 @@ export default function AdminProductFormModal({
       toast.error('Video must be under 15 MB. Paste a hosted MP4 URL instead.');
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => setField('video_360', reader.result as string);
-    reader.onerror = () => toast.error('Failed to read video file');
-    reader.readAsDataURL(file);
+    setVideoFile(file);
+    setField('video_360', '');
+  };
+
+  const uploadPendingMedia = async (): Promise<Partial<Record<'image' | 'background' | 'video_360', string>>> => {
+    if (!imageFile && !backgroundFile && !videoFile) return {};
+
+    const formData = new FormData();
+    if (imageFile) formData.append('image', imageFile);
+    if (backgroundFile) formData.append('background', backgroundFile);
+    if (videoFile) formData.append('video_360', videoFile);
+
+    const response = await apiUpload('/admin/uploads/product-media', formData);
+    const data = await response.json();
+    if (!response.ok || !data.success) {
+      throw new Error(data.error || data.message || 'File upload failed');
+    }
+    return data.data ?? {};
   };
 
   const validate = (): string | null => {
     if (!form.name.trim()) return 'Product name is required';
     if (form.price <= 0) return 'Price must be greater than zero';
-    if (!form.image.trim()) return 'Product image is required (URL or upload)';
+    if (!form.image.trim() && !imageFile) return 'Product image is required (URL or upload)';
     if (form.stock < 0) return 'Stock cannot be negative';
     return null;
   };
@@ -195,17 +244,18 @@ export default function AdminProductFormModal({
 
     setSaving(true);
     try {
+      const uploaded = await uploadPendingMedia();
       const payload: ProductFormPayload = {
         ...form,
         name: form.name.trim(),
-        image: form.image.trim(),
-        background: form.background?.trim() || undefined,
+        image: (uploaded.image ?? form.image.trim()),
+        background: (uploaded.background ?? form.background?.trim()) || undefined,
         description: form.description?.trim() || undefined,
         category: form.category?.trim() || undefined,
         size: form.size?.trim() || undefined,
         color: form.color?.trim() || undefined,
         is_out_of_stock: form.stock === 0 ? true : form.is_out_of_stock,
-        video_360: form.video_360?.trim() || undefined,
+        video_360: (uploaded.video_360 ?? form.video_360?.trim()) || undefined,
         sku: form.sku?.trim() || undefined,
         reorder_point: form.reorder_point ?? 5,
         cost_price: form.cost_price != null && form.cost_price > 0 ? form.cost_price : undefined,
@@ -244,6 +294,24 @@ export default function AdminProductFormModal({
     if (src.startsWith('data:') || src.startsWith('http') || src.startsWith('/')) return src;
     return src;
   };
+
+  const imageDisplayValue = imageFile
+    ? imageFile.name
+    : form.image.startsWith('data:')
+      ? '(legacy embedded image)'
+      : form.image;
+
+  const backgroundDisplayValue = backgroundFile
+    ? backgroundFile.name
+    : form.background?.startsWith('data:')
+      ? '(legacy embedded image)'
+      : (form.background || '');
+
+  const videoDisplayValue = videoFile
+    ? videoFile.name
+    : form.video_360?.startsWith('data:')
+      ? '(legacy embedded MP4)'
+      : (form.video_360 || '');
 
   return (
     <LiquidModal isOpen={isOpen} onClose={onClose} maxWidth={720}>
@@ -395,29 +463,29 @@ export default function AdminProductFormModal({
             <label style={labelStyle}>Product image *</label>
             <input
               type="text"
-              value={form.image.startsWith('data:') ? '(uploaded image)' : form.image}
+              value={imageDisplayValue}
               onChange={(e) => setField('image', e.target.value)}
               placeholder="/assets/blue-nike.png or https://..."
               style={{ ...inputStyle, marginBottom: 8 }}
-              disabled={form.image.startsWith('data:')}
+              disabled={Boolean(imageFile || form.image.startsWith('data:'))}
             />
             <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#9c6649', cursor: 'pointer', fontWeight: 600 }}>
               <Upload size={14} />
-              Upload image (max 512 KB)
+              Upload image (max 20 MB)
               <input
                 type="file"
                 accept="image/*"
                 hidden
                 onChange={(e) => {
                   const file = e.target.files?.[0];
-                  if (file) readImageFile(file, 'image');
+                  if (file) pickImageFile(file, 'image');
                   e.target.value = '';
                 }}
               />
             </label>
-            {form.image && (
+            {(imagePreviewUrl || form.image) && (
               <img
-                src={previewSrc(form.image)}
+                src={imagePreviewUrl || previewSrc(form.image)}
                 alt="Preview"
                 style={{ marginTop: 10, width: '100%', maxHeight: 120, objectFit: 'contain', borderRadius: 8, background: '#f3f4f6' }}
               />
@@ -428,29 +496,29 @@ export default function AdminProductFormModal({
             <label style={labelStyle}>Background image</label>
             <input
               type="text"
-              value={form.background?.startsWith('data:') ? '(uploaded image)' : (form.background || '')}
+              value={backgroundDisplayValue}
               onChange={(e) => setField('background', e.target.value)}
               placeholder="/assets/blue-bg.png or https://..."
               style={{ ...inputStyle, marginBottom: 8 }}
-              disabled={Boolean(form.background?.startsWith('data:'))}
+              disabled={Boolean(backgroundFile || form.background?.startsWith('data:'))}
             />
             <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#9c6649', cursor: 'pointer', fontWeight: 600 }}>
               <Upload size={14} />
-              Upload background
+              Upload background (max 20 MB)
               <input
                 type="file"
                 accept="image/*"
                 hidden
                 onChange={(e) => {
                   const file = e.target.files?.[0];
-                  if (file) readImageFile(file, 'background');
+                  if (file) pickImageFile(file, 'background');
                   e.target.value = '';
                 }}
               />
             </label>
-            {form.background && (
+            {(backgroundPreviewUrl || form.background) && (
               <img
-                src={previewSrc(form.background)}
+                src={backgroundPreviewUrl || previewSrc(form.background || '')}
                 alt="Background preview"
                 style={{ marginTop: 10, width: '100%', maxHeight: 120, objectFit: 'cover', borderRadius: 8 }}
               />
@@ -461,11 +529,11 @@ export default function AdminProductFormModal({
             <label style={labelStyle}>360° spin video (MP4)</label>
             <input
               type="text"
-              value={form.video_360?.startsWith('data:') ? '(uploaded MP4)' : (form.video_360 || '')}
+              value={videoDisplayValue}
               onChange={(e) => setField('video_360', e.target.value)}
               placeholder="https://…/spin.mp4 or upload below"
               style={{ ...inputStyle, marginBottom: 8 }}
-              disabled={Boolean(form.video_360?.startsWith('data:'))}
+              disabled={Boolean(videoFile || form.video_360?.startsWith('data:'))}
             />
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
               <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#9c6649', cursor: 'pointer', fontWeight: 600 }}>
@@ -477,15 +545,18 @@ export default function AdminProductFormModal({
                   hidden
                   onChange={(e) => {
                     const file = e.target.files?.[0];
-                    if (file) readVideoFile(file);
+                    if (file) pickVideoFile(file);
                     e.target.value = '';
                   }}
                 />
               </label>
-              {form.video_360 && (
+              {(form.video_360 || videoFile) && (
                 <button
                   type="button"
-                  onClick={() => setField('video_360', '')}
+                  onClick={() => {
+                    setVideoFile(null);
+                    setField('video_360', '');
+                  }}
                   style={{ fontSize: 13, color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
                 >
                   Remove video

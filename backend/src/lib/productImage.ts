@@ -1,5 +1,7 @@
+/** Legacy JSON base64 uploads — matches express.json 1MB body limit. Use Multer for larger files. */
+export const DATA_URL_MAX_BYTES = 1 * 1024 * 1024;
+
 const MAX_IMAGE_URL_LENGTH = 2048;
-const DATA_URL_MAX_BYTES = 512 * 1024;
 
 export function validateProductImageUrl(
   value: string | null | undefined,
@@ -20,7 +22,7 @@ export function validateProductImageUrl(
     if (approxBytes > DATA_URL_MAX_BYTES) {
       return {
         ok: false,
-        error: `${fieldName} upload exceeds 512KB — use a hosted image URL instead`,
+        error: `${fieldName} data URL exceeds 1MB — use file upload or a hosted image URL instead`,
       };
     }
     return { ok: true, value: trimmed };

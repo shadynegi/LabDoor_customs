@@ -32,6 +32,9 @@ import { toast } from 'sonner';
 import { OrdersListSkeleton } from '../components/Skeletons';
 import { logError } from '../lib/logger';
 
+/** Dedupe legacy ?orderNumber=&token= deprecation toast (StrictMode / effect re-runs). */
+const legacyLinkToastShown = new Set<string>();
+
 interface Order {
   id: string;
   order_number: string;
@@ -572,11 +575,16 @@ export default function MyOrders() {
       if (await redeemEmailLink()) return;
 
       if (urlOrderNumber && urlToken) {
+        const legacyKey = `${urlOrderNumber}:${urlToken}`;
         window.history.replaceState({}, '', '/orders');
-        toast.warning('Legacy tracking link detected', {
-          description: 'Token links in the URL are deprecated. Enter your order number and access token below, or use the link from your latest confirmation email.',
-          duration: 10000,
-        });
+        if (!legacyLinkToastShown.has(legacyKey)) {
+          legacyLinkToastShown.add(legacyKey);
+          toast.warning('Legacy tracking link detected', {
+            description:
+              'Token links in the URL are deprecated. Enter your order number and access token below, or use the link from your latest confirmation email.',
+            duration: 10000,
+          });
+        }
         setOrderNumber(urlOrderNumber);
         setAccessToken(urlToken);
       } else if (trackedOrdersRef.current.length > 0) {

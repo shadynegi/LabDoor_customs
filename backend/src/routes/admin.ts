@@ -19,6 +19,7 @@ import { stripOrderSecrets } from '../lib/orderTokens';
 import { respond500 } from '../lib/safeError';
 import { getAdminAnalytics, fetchSalesAnalytics, parseAnalyticsDateRange, salesAnalyticsToCsv } from '../lib/adminAnalytics';
 import { getProductInventoryMovements, getLowStockProducts, setProductStockAbsolute, applyStockDeltaInTx } from '../lib/inventoryMovements';
+import { buildUploadedMediaUrls, handleProductMediaUpload } from '../lib/productUpload';
 
 const router = Router();
 
@@ -1053,5 +1054,25 @@ router.post('/messages/bulk-update', verifyAdmin, async (req: Request, res: Resp
     respond500(res, error, "Request failed");
   }
 });
+
+// POST /admin/uploads/product-media — multipart image/video upload (Multer)
+router.post(
+  '/uploads/product-media',
+  verifyAdmin,
+  handleProductMediaUpload,
+  async (req: Request, res: Response) => {
+    try {
+      const files = req.files as Record<string, Express.Multer.File[]> | undefined;
+      const result = buildUploadedMediaUrls(files);
+      if (!result.ok) {
+        return res.status(400).json({ success: false, error: result.error });
+      }
+      res.json({ success: true, data: result.urls });
+    } catch (error: unknown) {
+      logger.error('Product media upload error:', error);
+      respond500(res, error, 'Upload failed');
+    }
+  }
+);
 
 export default router;

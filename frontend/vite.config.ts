@@ -28,6 +28,10 @@ export default defineConfig({
         target: process.env.VITE_DEV_PROXY_TARGET || 'http://127.0.0.1:5000',
         changeOrigin: true,
       },
+      '/uploads': {
+        target: process.env.VITE_DEV_PROXY_TARGET || 'http://127.0.0.1:5000',
+        changeOrigin: true,
+      },
     },
   },
   preview: {
@@ -38,6 +42,10 @@ export default defineConfig({
       : {
           proxy: {
             '/api': {
+              target: process.env.VITE_DEV_PROXY_TARGET || 'http://127.0.0.1:5000',
+              changeOrigin: true,
+            },
+            '/uploads': {
               target: process.env.VITE_DEV_PROXY_TARGET || 'http://127.0.0.1:5000',
               changeOrigin: true,
             },

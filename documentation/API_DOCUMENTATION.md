@@ -101,7 +101,7 @@ Headers: `X-Idempotency-Key` (PayPal order ID or client key), `X-CSRF-Token`
 | GET | `/:id` | Public | Single product (cached) |
 | POST | `/search` | Public | Search products |
 | POST | `/validate-cart` | Public + CSRF | Validate cart lines — `{ items: [{ product_id, quantity, size_system?, size_value? }] }`; returns refreshed prices and stock errors |
-| POST | `/` | Admin | Create product (image/background URL or ≤512KB data URL; optional `video_360`; optional `sku`, `reorder_point`, `cost_price`) |
+| POST | `/` | Admin | Create product (image/background URL or Multer-uploaded path; optional `video_360`; optional `sku`, `reorder_point`, `cost_price`) |
 | PUT | `/:id` | Admin | Update product (stock changes logged to `inventory_movements`) |
 | DELETE | `/:id` | Admin | Delete product |
 
@@ -242,6 +242,7 @@ Public list/submit/vote responses use `toPublicReview()` — **`customer_email`,
 | GET | `/products/low-stock` | Admin | Products at/below reorder point |
 | GET | `/products/:id/inventory-movements` | Admin | Stock movement history |
 | POST | `/products/bulk-update` | Admin | Bulk updates: `stock`, `stock_delta`, `is_out_of_stock` (max **500** IDs) |
+| POST | `/uploads/product-media` | Admin + CSRF | Multipart upload — fields `image`, `background`, `video_360` (images ≤20MB, MP4 ≤15MB); returns `{ image?, background?, video_360? }` URL paths |
 | POST | `/orders/bulk-update` | Admin | Bulk order **status** only (max **500** IDs; validates transitions; `cancelled` and `payment_status` rejected) |
 | POST | `/messages/bulk-update` | Admin | Bulk message updates (max **500** IDs) |
 
@@ -275,7 +276,7 @@ How the React SPA uses these APIs (see also [`info.md`](info.md)):
 | Orders | `GET /orders/access-exchange/:code` for email links; `POST /orders/lookup` for manual entry; legacy `?orderNumber=&token=` stripped |
 | Reviews | `POST /reviews/check` on email blur; submit shows pending-moderation copy; vote errors via toast |
 | Contact | `POST /contact` + `contact_submit` activity when consented |
-| Admin | Products 50/page load-more; messages mark read on open (`PATCH /contact/:id/status`); coupons `applies_to` on create **and edit**; product image upload max **512 KB**; `admin_response` on review edit; `estimated_delivery` on order PUT |
+| Admin | Products 50/page load-more; **Multer** media upload (`POST /admin/uploads/product-media`, max **20 MB** images); coupons `applies_to` on create **and edit**; `admin_response` on review edit; `estimated_delivery` on order PUT |
 
 ---
 

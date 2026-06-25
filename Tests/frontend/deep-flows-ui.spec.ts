@@ -107,17 +107,27 @@ test.describe('Deep storefront flows', () => {
       },
     ]);
 
+    await page.goto('/cart');
+    await expect(page.getByRole('button', { name: 'Proceed to Checkout' })).toBeVisible({
+      timeout: 20_000,
+    });
+
+    const cartValidated = page.waitForResponse(
+      (response) =>
+        response.url().includes('/products/validate-cart') &&
+        response.request().method() === 'POST' &&
+        response.ok(),
+      { timeout: 30_000 },
+    );
     await page.goto('/checkout');
+    await cartValidated;
     await expect(page.getByText('Secure Checkout')).toBeVisible({ timeout: 15_000 });
     await fillCheckoutCustomerForm(page);
 
-    await page.waitForResponse(
-      (response) =>
-        response.url().includes('/products/validate-cart') && response.ok(),
-      { timeout: 20_000 },
-    );
-
-    const policyCheckbox = page.getByRole('checkbox', { name: /all sales are final/i });
+    const policyCheckbox = page
+      .getByRole('checkbox', { name: /understand that all sales are final/i })
+      .first();
+    await policyCheckbox.scrollIntoViewIfNeeded();
     await policyCheckbox.check();
     await expect(policyCheckbox).toBeChecked();
 

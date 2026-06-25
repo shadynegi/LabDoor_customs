@@ -265,7 +265,8 @@ function ensureFrontendBuild() {
   delete env.CI;
   env.VITE_API_BASE_URL = env.VITE_API_BASE_URL || '/api';
   env.VITE_SITE_URL = env.VITE_SITE_URL || 'http://127.0.0.1:4173';
-  env.VITE_SENTRY_DSN = env.VITE_SENTRY_DSN || 'https://example@sentry.io/0';
+  // Omit Sentry for Playwright preview — a placeholder DSN bloats the JS bundle past build:budget.
+  delete env.VITE_SENTRY_DSN;
   return runCommand('Frontend build (Playwright preview)', 'npm', ['run', 'build', '-w', 'frontend'], {
     cwd: repoRoot,
     env,

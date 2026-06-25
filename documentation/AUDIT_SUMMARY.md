@@ -66,7 +66,7 @@ Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_
 - Webhook/refund errors sanitized (no internal messages to clients)
 - Parameterized SQL via postgres.js
 - Admin routes require session middleware
-- Product image uploads capped at 512KB for data URLs
+- Product image uploads via Multer (`POST /api/admin/uploads/product-media`); stored files served at `/uploads/products/*`
 - Supabase RLS: service role for writes; applied at backend startup
 
 ## Production gates

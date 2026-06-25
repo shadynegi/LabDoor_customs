@@ -123,9 +123,17 @@ async function refreshCsrfToken(): Promise<void> {
   csrfInitialized = true;
 }
 
-/**
- * API fetch with CSRF, 60s default timeout, optional gateway retry, and CSRF 403 refresh.
- */
+async function isAdminSessionUnauthorized(response: Response): Promise<boolean> {
+  if (response.status !== 401) return false;
+  try {
+    const data = await response.clone().json();
+    const err = String(data.error || '').toLowerCase();
+    return err.includes('not authenticated') || err.includes('invalid or expired token');
+  } catch {
+    return false;
+  }
+}
+
 export const apiFetch = async (
   endpoint: string,
   options: ApiFetchOptions = {}
@@ -169,7 +177,7 @@ export const apiFetch = async (
 
       const isAdminSessionProbe =
         endpoint.includes('/admin/verify') || endpoint.includes('/admin/login');
-      if (response.status === 401 && endpoint.includes('/admin') && !isAdminSessionProbe) {
+      if (!isAdminSessionProbe && (await isAdminSessionUnauthorized(response))) {
         unauthorizedHandler?.();
       }
 

@@ -142,7 +142,7 @@
 | Tab | Functions |
 |-----|-----------|
 | Analytics | Period selector (`day` / `week` / `month` / `year` / `all` / custom range); order/revenue stats, **sales by product**, **inventory snapshot**, low-stock count; **CSV export**; GA4/GSC config status; error state with retry |
-| Products | Paginated list (50/page, load more); **low-stock filter**; SKU, reorder point, cost price on create/edit; **inventory movement history** per product; bulk **stock** / **stock_delta** updates; image validation (URL or ≤512KB data URL); optional **360° MP4** |
+| Products | Paginated list (50/page, load more); **low-stock filter**; SKU, reorder point, cost price on create/edit; **inventory movement history** per product; bulk **stock** / **stock_delta** updates; image via **Multer** upload (≤20MB) or URL; optional **360° MP4** |
 | Orders | Paginated list (50/page), **server-side search**, filter by status, bulk status updates; order modal: tracking, carrier, tracking URL, **estimated delivery**, notify shipped, status transitions, **mark paid**, **edit customer/shipping** (`PATCH …/customer-details`), **edit line items on unpaid pending orders** (`PATCH …/pending-items`), cancel unpaid pending only |
 | Coupons | Preset percentage coupons (5/10/20/25/50%), custom codes with **scope** (`applies_to`: all / product / category + IDs), **server product search** for product scope, **edit** (description, max uses, expiry, active), activate/deactivate, delete; list **paginated (10/page)** |
 | Customers | **Server search + pagination**; **admin notes**; address history; **View History** modal (orders paginated, 10/page); detail view, soft delete / restore, show deleted toggle |
@@ -418,9 +418,30 @@ At create-payment, a row in `coupon_usage` reserves the coupon for the pending o
 | **Cloudflare** | `TRUST_CLOUDFLARE=true` required in production; blocks direct origin access; uses `CF-Connecting-IP` |
 | **CORS** | Whitelist `FRONTEND_URL` + localhost dev origins; **non-production:** private LAN IPs (any port) and localhost on ports 5173–5175, 3000, 4173 (Vite fallback when 5173 is busy); no-origin allowed in prod only for `/api/health` and webhook |
 | **Helmet** | CSP (PayPal domains allowed), HSTS in production, frameguard deny, noSniff, XSS filter |
+| **compression** | `compression` middleware — gzip/deflate responses **> 1 KB**; honors `x-no-compression`; level 6 |
+| **JSON body limit** | `express.json({ limit: '1mb' })` — large admin images use **Multer** multipart, not JSON |
 | **HTTPS** | Production redirect via `x-forwarded-proto`; optional direct SSL via cert env paths |
 | **Request timeout** | 60s default (`REQUEST_TIMEOUT_MS`); slow routes use 180s (`SLOW_REQUEST_TIMEOUT_MS`): `/api/products*`, `/api/admin/analytics`, `/api/activity/*` |
 | **Trust proxy** | Enabled for Railway/load balancers |
+
+### Express middleware stack (order)
+
+Registered in `backend/src/server.ts` (simplified):
+
+1. `requestIdMiddleware` — UUID per request → `X-Request-Id`, child Pino logger on `req.log`
+2. HTTPS redirect (production), Cloudflare proxy check
+3. **Helmet** — security headers + CSP
+4. CORS
+5. PayPal webhook raw body parser (before JSON)
+6. `express.json` / `urlencoded`
+7. **compression**
+8. Per-request timeout handler
+9. CSRF (`csrfTokenSetter`, `csrfProtection`)
+10. **express-rate-limit** — `mountRateLimits()` in `middleware/rateLimits.ts` (global `/api/` + per-route)
+11. `requestLogMiddleware` — **HTTP access logging via Pino** (`Request started` / `Request finished`); **not Morgan**
+12. API routes + static `/uploads` + SPA fallback
+
+**Morgan:** not used — structured Pino logs replace Apache-style access lines and integrate with Sentry/request IDs.
 
 ### Input and data protection
 
@@ -430,7 +451,7 @@ At create-payment, a row in `coupon_usage` reserves the coupon for the pending o
 - Review PII stripped from public API responses (`toPublicReview` — no `customer_email` on storefront).
 - DB TLS verification in production (`DB_SSL_CA_PATH`; `rejectUnauthorized` defaults true).
 - PayPal order/capture IDs have partial unique indexes to prevent duplicate binding.
-- Product images validated on admin create/update: HTTPS/relative URLs (max 2048 chars) or `data:image/*` uploads ≤512KB decoded (`lib/productImage.ts`).
+- Product images: admin uploads via **`POST /api/admin/uploads/product-media`** (Multer multipart, images ≤20MB, MP4 ≤15MB) → stored under `uploads/products/` and served at `/uploads/products/*`. Create/update accepts HTTPS/relative URLs (max 2048 chars) or legacy JSON `data:image/*` ≤1MB (`lib/productImage.ts`, aligned with `express.json` 1MB limit). Optional **`UPLOAD_DIR`** env overrides storage path.
 - Supabase RLS at startup (`ensureRlsPolicies()`): all **14** application tables (including `order_access_exchanges`) use **service_role-only** policies; `anon` and `authenticated` grants are revoked — no public product read via PostgREST/GraphQL; all data access goes through Express. Boot is **non-destructive** when policies already exist (skips DROP/CREATE that caused pooler lock hangs). Production Supabase has `migration-performance-linter-fixes.sql` applied (lint 0006 policy consolidation + FK indexes).
 
 ### Production environment gates
@@ -804,6 +825,7 @@ Any unmatched `/api/*` path returns **404** JSON `{ error: "Route not found" }`.
 | GET | `/api/admin/products/low-stock` | Admin | Products at/below reorder point |
 | GET | `/api/admin/products/:id/inventory-movements` | Admin | Stock movement audit log |
 | POST | `/api/admin/products/bulk-update` | Admin + CSRF | Bulk updates: `stock`, `stock_delta`, `is_out_of_stock` |
+| POST | `/api/admin/uploads/product-media` | Admin + CSRF | Multipart upload — fields `image`, `background`, `video_360` (images ≤20MB, MP4 ≤15MB); returns URL paths under `/uploads/products/*` |
 | PATCH | `/api/orders/:id/customer-details` | Admin + CSRF | Edit order contact/shipping (not paid line totals) |
 | PATCH | `/api/orders/:id/pending-items` | Admin + CSRF | Edit line items on unpaid pending orders |
 | POST | `/api/admin/orders/bulk-update` | Admin + CSRF | Bulk order status updates |
@@ -919,6 +941,7 @@ Templates: `backend/env.template`, `frontend/env.template`
 | `VITE_API_TIMEOUT_MS` | 60000 | Frontend default `apiFetch` timeout |
 | `VITE_EXTENDED_API_TIMEOUT_MS` | 180000 | Frontend `slowApiFetch` (catalog, analytics, activity) |
 | `LOG_LEVEL` | info/debug | Pino log level |
+| `UPLOAD_DIR` | `./uploads` | Admin Multer product media storage root (use a **persistent volume** on Railway) |
 | `REQUEST_LOG_SLOW_MS` | 3000 | Warn when a request exceeds this duration |
 | `DB_SLOW_QUERY_LOG_MS` | 2000 | Log slow database queries at warn |
 | `RESEND_API_KEY` | — | Email sender (required in production) |
@@ -1039,7 +1062,7 @@ npm run links:check
 | Backend unit/API | Vitest | Checkout validation + create-payment happy path, capture 409/refund mismatch, checkout-context API, checkout exchange, PayPal webhooks (COMPLETED + DENIED), admin mark-paid, coupon scope, `computeCheckoutPricingForCart`, payment idempotency, order tokens, process error handlers, RLS table list + grant revoke, email portal URL, activity batch/log, order lookup, reviews check |
 | Frontend E2E / UI | Playwright | Storefront smoke + deep flows (search, policy gate, coupon, cart qty, create-payment, payment 409), checkout/contact/admin UI, mobile viewport |
 
-**Total automated tests:** 188 (95 backend unit + 54 API + 39 Playwright UI).
+**Total automated tests:** 194 (99 backend unit + 56 API + 39 Playwright UI).
 
 | Link check | Custom script | Documentation internal links |
 
