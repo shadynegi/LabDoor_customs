@@ -232,7 +232,7 @@ Public list/submit/vote responses use `toPublicReview()` — **`customer_email`,
 | GET | `/sessions` | Admin | List active sessions |
 | POST | `/sessions/cleanup` | Admin | Remove expired sessions |
 | GET | `/analytics` | Admin | Dashboard analytics; `?period=day\|week\|month\|year\|all\|custom` (+ optional `from`/`to`); includes `sales`, `inventory` |
-| GET | `/analytics/export` | Admin | CSV product sales for period |
+| GET | `/analytics/export` | Admin | CSV product sales; `?period=` (+ `from`/`to` for `custom`); attachment `product-sales-{period}.csv` or `product-sales-{from}_{to}.csv` |
 | GET | `/customers` | Admin | Customer list (`?search=&page=&limit=`) |
 | GET | `/customers/:email` | Admin | Customer detail + paginated orders (`?page=&limit=`) |
 | PATCH | `/customers/:id` | Admin + CSRF | Update name, phone, admin notes |

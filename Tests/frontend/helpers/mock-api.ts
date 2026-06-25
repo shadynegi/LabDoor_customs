@@ -267,10 +267,17 @@ export async function installStorefrontApiMocks(
     }
 
     if (path === '/paypal/create-payment' && method === 'POST') {
+      let body: { amount?: string } = {};
+      try {
+        body = route.request().postDataJSON() as typeof body;
+      } catch {
+        body = {};
+      }
+      const parsedAmount = parseFloat(body.amount ?? '');
       const mismatch = createPaymentTotal != null;
       return json(route, {
         success: true,
-        total: createPaymentTotal ?? 123,
+        total: createPaymentTotal ?? (Number.isFinite(parsedAmount) ? parsedAmount : 123),
         orderId: mismatch ? 'PAYPAL-MISMATCH' : 'PAYPAL-OK',
         serverOrderId: mismatch
           ? '00000000-0000-0000-0000-00000000ff01'

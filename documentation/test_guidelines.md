@@ -46,7 +46,7 @@ If the user did not mention testing, **skip** `npm test`, `npm run test:all`, Pl
 | Frontend E2E / UI | Playwright | `Tests/frontend/` | 13 files, 39 tests | No (mocked `/api` + static preview) |
 | Link checker | Custom script | repo root | — | No |
 
-**Total:** 194 automated tests — 99 backend unit + 56 API + 39 Playwright UI (desktop + mobile projects).
+**Total:** 195 automated tests — 100 backend unit + 56 API + 39 Playwright UI (desktop + mobile projects).
 
 Backend unit tests include: payment idempotency, order tokens, checkout exchange hashing, order token encryption, webhook errors, product image validation, admin session hashing, PayPal webhook utils, refund idempotency, checkout pricing, coupon scope (`applies_to`), `computeCheckoutPricingForCart`, RLS table list + bootstrap contract, RLS grant revoke under `BOOTSTRAP_SKIP_DDL`, email portal URL (`buildOrderPortalUrl`), client IP, keep-alive.
 
@@ -54,7 +54,7 @@ API tests include: checkout (incl. client amount mismatch + policy acceptance), 
 
 Backend unit tests also cover: **sales analytics** period parsing + CSV export, **admin analytics cache** keys/TTL, inventory movement helpers (via integration paths), payment idempotency, order tokens, RLS, email portal URL, and related payment/order utilities.
 
-Playwright includes: payment-success missing-token UX, orders legacy URL deprecation + `?code=` email redeem, checkout server/client total mismatch block, checkout country pre-select (native `<select>`), admin login redirect + dashboard analytics smoke, **deep flows** (`deep-flows-ui.spec.ts`: catalog `?q=` server search, product trust badges + reviews, checkout policy gate + coupon + create-payment, cart quantity, payment-success 409 processing UI). Checkout PayPal tests use `clickPayPalAndWaitForCreatePayment()` in `Tests/frontend/helpers/checkout.ts` (registers response listener before click). Mismatch tests set `createPaymentTotal` via the storefront fixture (`Tests/frontend/fixtures/storefront.ts`).
+Playwright includes: payment-success missing-token UX, orders legacy URL deprecation + `?code=` email redeem, checkout server/client total mismatch block, checkout country pre-select (native `<select>`), admin login redirect + dashboard analytics smoke, **deep flows** (`deep-flows-ui.spec.ts`: catalog `?q=` server search, product trust badges + reviews, checkout policy gate + coupon + create-payment, cart quantity, payment-success 409 processing UI). Checkout PayPal tests use `clickPayPalAndWaitForCreatePayment()` in `Tests/frontend/helpers/checkout.ts` (visible PayPal button, polls until enabled, registers response listener before click). The storefront fixture warms `/api/csrf-token` on load to avoid first-test payment timeouts. Mismatch tests set `createPaymentTotal` via the storefront fixture (`Tests/frontend/fixtures/storefront.ts`).
 
 ---
 
@@ -212,7 +212,7 @@ Production frontend builds run `optimize-assets` (WebP from source PNGs) and `bu
 | `paypalWebhookUtils.test.ts` | PayPal webhook payload parsing helpers |
 | `refundIdempotency.test.ts` | Refund request deduplication |
 | `adminAnalyticsCache.test.ts` | Admin analytics cache keys and TTL |
-| `salesAnalytics.test.ts` | Analytics period parsing and CSV export helpers |
+| `salesAnalytics.test.ts` | Analytics period parsing (incl. custom `from`/`to`) and CSV export helpers |
 | `keepAlive.test.ts` | Supabase pooler keep-alive connection options |
 
 ### API tests (`Tests/api/`)

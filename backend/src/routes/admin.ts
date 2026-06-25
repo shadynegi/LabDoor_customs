@@ -430,9 +430,13 @@ router.get('/analytics/export', verifyAdmin, async (req: Request, res: Response)
     const sales = await fetchSalesAnalytics(range);
     const csv = salesAnalyticsToCsv(sales);
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    const exportLabel =
+      range.period === 'custom'
+        ? `${range.from.toISOString().slice(0, 10)}_${range.to.toISOString().slice(0, 10)}`
+        : range.period;
     res.setHeader(
       'Content-Disposition',
-      `attachment; filename="product-sales-${range.period}.csv"`
+      `attachment; filename="product-sales-${exportLabel}.csv"`
     );
     res.send(csv);
   } catch (error: unknown) {

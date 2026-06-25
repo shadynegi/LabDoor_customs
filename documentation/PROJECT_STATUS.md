@@ -15,7 +15,7 @@ Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API
 |------|----------------|
 | **Checkout** | Cart validation with retry; `policy_accepted` required; no-refund policy checkbox; PayPal `?code=` exchange; capture **409** shows processing UI (polls checkout-context; cart held); checkout email synced to activity on change/blur. |
 | **Orders** | Email links `GET /api/orders/access-exchange/:code`; legacy `?orderNumber=&token=` stripped; partial refresh keeps stale data + warning. |
-| **Admin** | `/admin` entry redirect; LAN dev CORS (private IP + Vite fallback ports); products paginated (load more); optional **360° MP4**; coupons **10/page**; reviews admin response; estimated delivery on orders; tab error/retry states; **Customers** card layout on mobile; **inventory** (SKU, reorder point, cost, movement history, low-stock alerts, bulk stock delta); **customer admin notes** + server search/pagination; **customer history modal** (orders 10/page); **sales analytics** by period with CSV export; **order customer-details** + pending-item edits. **No Messages tab** (contact API/storage unchanged). |
+| **Admin** | `/admin` entry redirect; LAN dev CORS (private IP + Vite fallback ports); products paginated (load more); optional **360° MP4**; coupons **10/page**; reviews admin response; estimated delivery on orders; tab error/retry states; **Customers** card layout on mobile; **inventory** (SKU, reorder point, cost, movement history, low-stock alerts, bulk stock delta); **customer admin notes** + server search/pagination; **customer history modal** (orders 10/page); **sales analytics** by period with **custom calendar date range** + CSV export; **order customer-details** + pending-item edits. **No Messages tab** (contact API/storage unchanged). |
 | **Activity** | Consent-gated batch; `contact_submit` on contact success; IPs anonymized with `IP_SALT`. |
 | **Reviews** | `POST /api/reviews/check` on email blur; pending-moderation success copy; vote error toasts; admin `admin_response` editable. |
 | **Mobile** | Sticky CTAs with keyboard lift on checkout; cookie banner top on purchase routes; cart stacked CTA at 320px; OOS hides product sticky bar; admin product cards on phones. |
@@ -55,7 +55,7 @@ Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_
 ## Admin
 
 - Secure login with HttpOnly session cookie (SHA-256 hashed server-side); **`/admin`** redirects to login or dashboard
-- Dashboard: analytics (period selector, sales by product, inventory snapshot, CSV export), products, orders, coupons (**10/page**), customers, **reviews**
+- Dashboard: analytics (period selector incl. **custom calendar range**, sales by product, inventory snapshot, CSV export), products, orders, coupons (**10/page**), customers, **reviews**
 - Orders: server-side search, pagination, fulfillment modal, bulk status (max 500 IDs, validated transitions), manual mark paid (`admin_note` + `payment_id`, logged to activity); edit customer/shipping on pending orders; adjust line items on unpaid pending orders
 - Coupons: presets, custom create with **applies_to** scope, edit modal, activate/deactivate, delete; **paginated list (10/page)**
 - Products: paginated admin list (50/page, load more), error/retry UI; **Multer file upload** (20 MB images, 15 MB MP4 via `POST /api/admin/uploads/product-media`) or hosted URL; SKU, reorder point, cost price; inventory movement history; low-stock filter; bulk stock / stock-delta updates

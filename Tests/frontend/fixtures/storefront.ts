@@ -13,6 +13,11 @@ export const test = base.extend<StorefrontFixtures>({
   page: async ({ page, createPaymentTotal }, use) => {
     await installStorefrontApiMocks(page, { createPaymentTotal });
     await preAcceptCookies(page);
+    // Warm API mocks before checkout cold paths (avoids first-test payment timeout).
+    await page.goto('/');
+    await page.evaluate(async () => {
+      await fetch('/api/csrf-token', { credentials: 'include' });
+    });
     await use(page);
   },
 });

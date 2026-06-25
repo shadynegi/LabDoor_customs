@@ -141,7 +141,7 @@
 
 | Tab | Functions |
 |-----|-----------|
-| Analytics | Period selector (`day` / `week` / `month` / `year` / `all` / custom range); order/revenue stats, **sales by product**, **inventory snapshot**, low-stock count; **CSV export**; GA4/GSC config status; error state with retry |
+| Analytics | Period selector (`day` / `week` / `month` / `year` / `all` / **Custom** with calendar **From**/**To** + **Apply range**); order/revenue stats, **sales by product**, **inventory snapshot**, low-stock count; **CSV export** (custom ranges use `product-sales-YYYY-MM-DD_YYYY-MM-DD.csv`); GA4/GSC config status; error state with retry |
 | Products | Paginated list (50/page, load more); **low-stock filter**; SKU, reorder point, cost price on create/edit; **inventory movement history** per product; bulk **stock** / **stock_delta** updates; image via **Multer** upload (≤20MB) or URL; optional **360° MP4** |
 | Orders | Paginated list (50/page), **server-side search**, filter by status, bulk status updates; order modal: tracking, carrier, tracking URL, **estimated delivery**, notify shipped, status transitions, **mark paid**, **edit customer/shipping** (`PATCH …/customer-details`), **edit line items on unpaid pending orders** (`PATCH …/pending-items`), cancel unpaid pending only |
 | Coupons | Preset percentage coupons (5/10/20/25/50%), custom codes with **scope** (`applies_to`: all / product / category + IDs), **server product search** for product scope, **edit** (description, max uses, expiry, active), activate/deactivate, delete; list **paginated (10/page)** |
@@ -815,7 +815,7 @@ Any unmatched `/api/*` path returns **404** JSON `{ error: "Route not found" }`.
 | GET | `/api/admin/sessions` | Admin | List active admin sessions |
 | POST | `/api/admin/sessions/cleanup` | Admin + CSRF | Purge expired sessions |
 | GET | `/api/admin/analytics` | Admin | Dashboard analytics; `?period=day\|week\|month\|year\|all\|custom` (+ optional `from`/`to`); includes `sales` and `inventory` |
-| GET | `/api/admin/analytics/export` | Admin | CSV product sales export for period |
+| GET | `/api/admin/analytics/export` | Admin | CSV product sales export; `?period=` (+ `from`/`to` ISO datetimes for `custom`); filename `product-sales-{period}.csv` or `product-sales-{from}_{to}.csv` for custom |
 | GET | `/api/admin/customers` | Admin | Customer list (`?search=&page=&limit=`) |
 | GET | `/api/admin/customers/:email` | Admin | Customer detail + order history (`?page=&limit=`; default 20, max 100) |
 | PATCH | `/api/admin/customers/:id` | Admin + CSRF | Update name, phone, admin notes |
@@ -1062,7 +1062,7 @@ npm run links:check
 | Backend unit/API | Vitest | Checkout validation + create-payment happy path, capture 409/refund mismatch, checkout-context API, checkout exchange, PayPal webhooks (COMPLETED + DENIED), admin mark-paid, coupon scope, `computeCheckoutPricingForCart`, payment idempotency, order tokens, process error handlers, RLS table list + grant revoke, email portal URL, activity batch/log, order lookup, reviews check |
 | Frontend E2E / UI | Playwright | Storefront smoke + deep flows (search, policy gate, coupon, cart qty, create-payment, payment 409), checkout/contact/admin UI, mobile viewport |
 
-**Total automated tests:** 194 (99 backend unit + 56 API + 39 Playwright UI).
+**Total automated tests:** 195 (100 backend unit + 56 API + 39 Playwright UI).
 
 | Link check | Custom script | Documentation internal links |
 

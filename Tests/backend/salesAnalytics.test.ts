@@ -14,6 +14,17 @@ describe('salesAnalytics', () => {
     expect(range.bucket).toBe('day');
   });
 
+  it('parseAnalyticsDateRange supports custom from/to', () => {
+    const range = parseAnalyticsDateRange({
+      period: 'custom',
+      from: '2026-01-01T00:00:00.000Z',
+      to: '2026-01-31T23:59:59.999Z',
+    });
+    expect(range.period).toBe('custom');
+    expect(range.from.toISOString()).toBe('2026-01-01T00:00:00.000Z');
+    expect(range.to.toISOString()).toBe('2026-01-31T23:59:59.999Z');
+  });
+
   it('salesAnalyticsToCsv formats product rows', () => {
     const csv = salesAnalyticsToCsv({
       range: { period: 'month', from: '', to: '', bucket: 'day' },

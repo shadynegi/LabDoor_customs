@@ -1,24 +1,30 @@
 import type { Page, Response } from '@playwright/test';
 import { expect } from '@playwright/test';
 
+function visiblePayPalButton(page: Page) {
+  return page.locator('button:visible', { hasText: /pay with paypal/i }).first();
+}
+
 /** Wait until cart validation finishes and the PayPal button is clickable. */
 export async function waitForCheckoutPayReady(page: Page): Promise<void> {
-  const payButton = page.getByRole('button', { name: /pay with paypal/i }).first();
+  const payButton = visiblePayPalButton(page);
 
   // Cart validation can re-run after REFRESH_PRICES — drain a few cycles.
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 5; i++) {
     await page
       .waitForResponse(
         (response) =>
           response.url().includes('/products/validate-cart') &&
           response.request().method() === 'POST' &&
           response.ok(),
-        { timeout: 15_000 },
+        { timeout: 20_000 },
       )
       .catch(() => undefined);
   }
 
-  await expect(payButton).toBeEnabled({ timeout: 45_000 });
+  await expect
+    .poll(async () => payButton.isEnabled(), { timeout: 45_000, intervals: [200, 500, 1000] })
+    .toBe(true);
 }
 
 /** Fill minimal checkout customer fields for PayPal redirect tests. */
@@ -45,16 +51,17 @@ export async function fillCheckoutCustomerForm(page: Page): Promise<void> {
 export async function clickPayPalAndWaitForCreatePayment(page: Page): Promise<Response> {
   await waitForCheckoutPayReady(page);
 
-  const payButton = page.getByRole('button', { name: /pay with paypal/i }).first();
-  const [response] = await Promise.all([
+  const payButton = visiblePayPalButton(page);
+  await payButton.scrollIntoViewIfNeeded();
+
+  const waitForCreatePayment = () =>
     page.waitForResponse(
       (res) =>
         res.url().includes('/paypal/create-payment') &&
         res.request().method() === 'POST',
       { timeout: 60_000 },
-    ),
-    payButton.click(),
-  ]);
+    );
 
+  const [response] = await Promise.all([waitForCreatePayment(), payButton.click()]);
   return response;
 }

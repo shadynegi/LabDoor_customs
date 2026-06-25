@@ -27,6 +27,7 @@ import {
   Star,
   Download,
   History,
+  CalendarDays,
 } from 'lucide-react';
 import { apiFetch, catalogFetch, slowApiFetch, config, getApiHeaders, ensureCsrfToken } from '../config';
 import { useResponsive } from '../hooks/useResponsive';
@@ -86,7 +87,43 @@ interface Customer {
   is_deleted?: boolean;
 }
 
-type AnalyticsPeriod = 'day' | 'week' | 'month' | 'year' | 'all';
+type AnalyticsPeriod = 'day' | 'week' | 'month' | 'year' | 'all' | 'custom';
+
+function formatAnalyticsDateInput(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+function defaultAnalyticsCustomFrom(): string {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() - 30);
+  return formatAnalyticsDateInput(d);
+}
+
+function defaultAnalyticsCustomTo(): string {
+  return formatAnalyticsDateInput(new Date());
+}
+
+function buildAnalyticsQueryParams(
+  period: AnalyticsPeriod,
+  customFrom: string,
+  customTo: string,
+): string {
+  const params = new URLSearchParams({ period });
+  if (period === 'custom') {
+    params.set('from', `${customFrom}T00:00:00.000Z`);
+    params.set('to', `${customTo}T23:59:59.999Z`);
+  }
+  return params.toString();
+}
+
+function analyticsExportFilename(
+  period: AnalyticsPeriod,
+  customFrom: string,
+  customTo: string,
+): string {
+  if (period === 'custom') return `product-sales-${customFrom}_${customTo}.csv`;
+  return `product-sales-${period}.csv`;
+}
 
 interface InventoryMovement {
   id: number;
@@ -172,6 +209,8 @@ export default function AdminDashboard() {
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
   const [analyticsPeriod, setAnalyticsPeriod] = useState<AnalyticsPeriod>('month');
+  const [analyticsCustomFrom, setAnalyticsCustomFrom] = useState(defaultAnalyticsCustomFrom);
+  const [analyticsCustomTo, setAnalyticsCustomTo] = useState(defaultAnalyticsCustomTo);
   const [analyticsExporting, setAnalyticsExporting] = useState(false);
   const [productsError, setProductsError] = useState<string | null>(null);
   const [productsPage, setProductsPage] = useState(1);
@@ -319,10 +358,19 @@ export default function AdminDashboard() {
     return () => window.clearTimeout(handle);
   }, [productSearch]);
 
-  const fetchAnalytics = async (period: AnalyticsPeriod = analyticsPeriod) => {
+  const fetchAnalytics = async (
+    period: AnalyticsPeriod = analyticsPeriod,
+    customFrom: string = analyticsCustomFrom,
+    customTo: string = analyticsCustomTo,
+  ) => {
+    if (period === 'custom' && customFrom > customTo) {
+      toast.error('Start date must be on or before end date');
+      return;
+    }
     setAnalyticsError(null);
     try {
-      const response = await slowApiFetch(`/admin/analytics?period=${period}`, {
+      const query = buildAnalyticsQueryParams(period, customFrom, customTo);
+      const response = await slowApiFetch(`/admin/analytics?${query}`, {
         retry: { count: 1, on: [502, 503, 504] },
       });
       const data = await response.json();
@@ -342,10 +390,15 @@ export default function AdminDashboard() {
   };
 
   const handleAnalyticsExport = async () => {
+    if (analyticsPeriod === 'custom' && analyticsCustomFrom > analyticsCustomTo) {
+      toast.error('Start date must be on or before end date');
+      return;
+    }
     setAnalyticsExporting(true);
     try {
       await ensureCsrfToken();
-      const response = await fetch(`${config.apiBaseUrl}/admin/analytics/export?period=${analyticsPeriod}`, {
+      const query = buildAnalyticsQueryParams(analyticsPeriod, analyticsCustomFrom, analyticsCustomTo);
+      const response = await fetch(`${config.apiBaseUrl}/admin/analytics/export?${query}`, {
         credentials: 'include',
         headers: getApiHeaders(),
       });
@@ -356,7 +409,7 @@ export default function AdminDashboard() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `product-sales-${analyticsPeriod}.csv`;
+      a.download = analyticsExportFilename(analyticsPeriod, analyticsCustomFrom, analyticsCustomTo);
       a.click();
       URL.revokeObjectURL(url);
       toast.success('Sales report downloaded');
@@ -609,6 +662,7 @@ export default function AdminDashboard() {
       skipAnalyticsPeriodDebounce.current = false;
       return;
     }
+    if (analyticsPeriod === 'custom') return;
     void fetchAnalytics(analyticsPeriod);
   }, [analyticsPeriod, activeTab]);
 
@@ -988,7 +1042,10 @@ export default function AdminDashboard() {
     { id: 'month', label: 'Month' },
     { id: 'year', label: 'Year' },
     { id: 'all', label: 'All time' },
+    { id: 'custom', label: 'Custom' },
   ];
+
+  const analyticsToday = defaultAnalyticsCustomTo();
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
@@ -1048,49 +1105,118 @@ export default function AdminDashboard() {
     return (
       <div>
         {/* Period selector + export */}
-        <div style={{ background: 'white', borderRadius: 12, padding: 16, marginBottom: 24, border: '1px solid #e5e7eb', display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
-          <span style={{ fontSize: 14, fontWeight: 600, color: '#374151' }}>Sales period:</span>
-          {analyticsPeriods.map(({ id, label }) => (
+        <div style={{ background: 'white', borderRadius: 12, padding: 16, marginBottom: 24, border: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', width: '100%' }}>
+            <span style={{ fontSize: 14, fontWeight: 600, color: '#374151' }}>Sales period:</span>
+            {analyticsPeriods.map(({ id, label }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setAnalyticsPeriod(id)}
+                style={{
+                  padding: '8px 14px',
+                  borderRadius: 8,
+                  border: `1px solid ${analyticsPeriod === id ? '#9c6649' : '#e5e7eb'}`,
+                  background: analyticsPeriod === id ? '#fdf4ef' : 'white',
+                  color: analyticsPeriod === id ? '#9c6649' : '#374151',
+                  fontWeight: analyticsPeriod === id ? 700 : 500,
+                  fontSize: 13,
+                  cursor: 'pointer',
+                }}
+              >
+                {label}
+              </button>
+            ))}
             <button
-              key={id}
               type="button"
-              onClick={() => setAnalyticsPeriod(id)}
+              disabled={analyticsExporting}
+              onClick={() => void handleAnalyticsExport()}
               style={{
-                padding: '8px 14px',
+                marginLeft: isMobile ? 0 : 'auto',
+                padding: '10px 16px',
+                background: '#9c6649',
+                color: 'white',
+                border: 'none',
                 borderRadius: 8,
-                border: `1px solid ${analyticsPeriod === id ? '#9c6649' : '#e5e7eb'}`,
-                background: analyticsPeriod === id ? '#fdf4ef' : 'white',
-                color: analyticsPeriod === id ? '#9c6649' : '#374151',
-                fontWeight: analyticsPeriod === id ? 700 : 500,
-                fontSize: 13,
-                cursor: 'pointer',
+                cursor: analyticsExporting ? 'not-allowed' : 'pointer',
+                fontWeight: 600,
+                fontSize: 14,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                opacity: analyticsExporting ? 0.7 : 1,
               }}
             >
-              {label}
+              <Download size={16} /> Export CSV
             </button>
-          ))}
-          <button
-            type="button"
-            disabled={analyticsExporting}
-            onClick={() => void handleAnalyticsExport()}
-            style={{
-              marginLeft: 'auto',
-              padding: '10px 16px',
-              background: '#9c6649',
-              color: 'white',
-              border: 'none',
-              borderRadius: 8,
-              cursor: analyticsExporting ? 'not-allowed' : 'pointer',
-              fontWeight: 600,
-              fontSize: 14,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              opacity: analyticsExporting ? 0.7 : 1,
-            }}
-          >
-            <Download size={16} /> Export CSV
-          </button>
+          </div>
+          {analyticsPeriod === 'custom' && (
+            <div
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 12,
+                alignItems: 'flex-end',
+                width: '100%',
+                borderTop: '1px solid #e5e7eb',
+                paddingTop: 12,
+              }}
+            >
+              <CalendarDays size={18} color="#9c6649" aria-hidden style={{ marginBottom: 10 }} />
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: '#6b7280', fontWeight: 600 }}>
+                From
+                <input
+                  type="date"
+                  value={analyticsCustomFrom}
+                  max={analyticsCustomTo}
+                  onChange={(e) => setAnalyticsCustomFrom(e.target.value)}
+                  style={{
+                    padding: '8px 10px',
+                    borderRadius: 8,
+                    border: '1px solid #e5e7eb',
+                    fontSize: 14,
+                    color: '#374151',
+                    minWidth: isMobile ? '100%' : 160,
+                  }}
+                />
+              </label>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: '#6b7280', fontWeight: 600 }}>
+                To
+                <input
+                  type="date"
+                  value={analyticsCustomTo}
+                  min={analyticsCustomFrom}
+                  max={analyticsToday}
+                  onChange={(e) => setAnalyticsCustomTo(e.target.value)}
+                  style={{
+                    padding: '8px 10px',
+                    borderRadius: 8,
+                    border: '1px solid #e5e7eb',
+                    fontSize: 14,
+                    color: '#374151',
+                    minWidth: isMobile ? '100%' : 160,
+                  }}
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => void fetchAnalytics('custom', analyticsCustomFrom, analyticsCustomTo)}
+                style={{
+                  padding: '10px 16px',
+                  background: '#fdf4ef',
+                  color: '#9c6649',
+                  border: '1px solid #9c6649',
+                  borderRadius: 8,
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  fontSize: 14,
+                  minWidth: isMobile ? '100%' : undefined,
+                }}
+              >
+                Apply range
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Period sales summary */}
