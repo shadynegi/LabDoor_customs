@@ -11,10 +11,30 @@ describe('productImage validation', () => {
     if (result.ok) expect(result.value).toContain('https://');
   });
 
+  it('accepts data URLs longer than 2048 chars when under 512KB', () => {
+    const base64 = 'A'.repeat(10_000);
+    const dataUrl = `data:image/png;base64,${base64}`;
+    expect(dataUrl.length).toBeGreaterThan(2048);
+    const result = validateProductImageUrl(dataUrl, 'Product image');
+    expect(result.ok).toBe(true);
+  });
+
   it('rejects oversized data URLs', () => {
     const huge = 'data:image/png;base64,' + 'A'.repeat(700_000);
     const result = validateProductImageUrl(huge, 'Image');
     expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toContain('512KB');
+    }
+  });
+
+  it('rejects http URLs longer than 2048 chars', () => {
+    const long = 'https://cdn.example.com/' + 'a'.repeat(2048);
+    const result = validateProductImageUrl(long, 'Product image');
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toContain('too long');
+    }
   });
 
   it('allows empty optional background', () => {

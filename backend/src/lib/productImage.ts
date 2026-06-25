@@ -11,10 +11,6 @@ export function validateProductImageUrl(
 
   const trimmed = value.trim();
 
-  if (trimmed.length > MAX_IMAGE_URL_LENGTH) {
-    return { ok: false, error: `${fieldName} URL is too long` };
-  }
-
   if (trimmed.startsWith('data:')) {
     if (!trimmed.startsWith('data:image/')) {
       return { ok: false, error: `${fieldName} must be an image data URL` };
@@ -28,6 +24,10 @@ export function validateProductImageUrl(
       };
     }
     return { ok: true, value: trimmed };
+  }
+
+  if (trimmed.length > MAX_IMAGE_URL_LENGTH) {
+    return { ok: false, error: `${fieldName} URL is too long` };
   }
 
   if (trimmed.startsWith('/')) {

@@ -5,7 +5,7 @@
 **Authoritative behavior:** [`info.md`](info.md)  
 **Full audit:** [`PROJECT_AUDIT.md`](PROJECT_AUDIT.md) (2026-06-08 initial + follow-up)
 
-**Test count marker (CI should match):** `<!-- tests: 186 -->` (93 unit + 54 API + 39 Playwright)
+**Test count marker (CI should match):** `<!-- tests: 188 -->` (95 unit + 54 API + 39 Playwright)
 
 ---
 
@@ -110,7 +110,7 @@
 |----|----------|----------------|---------|--------|
 | CI-ENV | Production env validation in CI | `validate-env.mjs`, `ci.yml` | CI job | COVERED |
 | SEC-ORDER-SECRETS | `access_token_hash` + `access_token_encrypted` stripped from order JSON | `orderTokens.ts` `stripOrderSecrets` | `orderTokens.test.ts` | COVERED |
-| DOC-TESTS | Test count in `info.md` | `info.md` | `npm test` (186) | COVERED |
+| DOC-TESTS | Test count in `info.md` | `info.md` | `npm test` (188) | COVERED |
 
 ---
 

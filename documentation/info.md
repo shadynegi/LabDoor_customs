@@ -430,7 +430,7 @@ At create-payment, a row in `coupon_usage` reserves the coupon for the pending o
 - Review PII stripped from public API responses (`toPublicReview` — no `customer_email` on storefront).
 - DB TLS verification in production (`DB_SSL_CA_PATH`; `rejectUnauthorized` defaults true).
 - PayPal order/capture IDs have partial unique indexes to prevent duplicate binding.
-- Product images validated on admin create/update: HTTPS/relative URLs or data URLs ≤512KB (`lib/productImage.ts`).
+- Product images validated on admin create/update: HTTPS/relative URLs (max 2048 chars) or `data:image/*` uploads ≤512KB decoded (`lib/productImage.ts`).
 - Supabase RLS at startup (`ensureRlsPolicies()`): all **14** application tables (including `order_access_exchanges`) use **service_role-only** policies; `anon` and `authenticated` grants are revoked — no public product read via PostgREST/GraphQL; all data access goes through Express. Boot is **non-destructive** when policies already exist (skips DROP/CREATE that caused pooler lock hangs). Production Supabase has `migration-performance-linter-fixes.sql` applied (lint 0006 policy consolidation + FK indexes).
 
 ### Production environment gates
@@ -1039,7 +1039,7 @@ npm run links:check
 | Backend unit/API | Vitest | Checkout validation + create-payment happy path, capture 409/refund mismatch, checkout-context API, checkout exchange, PayPal webhooks (COMPLETED + DENIED), admin mark-paid, coupon scope, `computeCheckoutPricingForCart`, payment idempotency, order tokens, process error handlers, RLS table list + grant revoke, email portal URL, activity batch/log, order lookup, reviews check |
 | Frontend E2E / UI | Playwright | Storefront smoke + deep flows (search, policy gate, coupon, cart qty, create-payment, payment 409), checkout/contact/admin UI, mobile viewport |
 
-**Total automated tests:** 186 (93 backend unit + 54 API + 39 Playwright UI).
+**Total automated tests:** 188 (95 backend unit + 54 API + 39 Playwright UI).
 
 | Link check | Custom script | Documentation internal links |
 
