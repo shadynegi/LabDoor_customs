@@ -5,7 +5,7 @@
 **Authoritative behavior:** [`info.md`](info.md)  
 **Full audit:** [`PROJECT_AUDIT.md`](PROJECT_AUDIT.md) (2026-06-08 initial + follow-up)
 
-**Test count marker (CI should match):** `<!-- tests: 183 -->` (93 unit + 53 API + 37 Playwright)
+**Test count marker (CI should match):** `<!-- tests: 186 -->` (93 unit + 54 API + 39 Playwright)
 
 ---
 
@@ -87,7 +87,7 @@
 | UI-PAY-409 | Payment success missing token error UX | `PaymentSuccess.tsx` | `payment-success-ui.spec.ts` | COVERED |
 | UI-PAY-TOKEN | Missing PayPal `token` error UX | `PaymentSuccess.tsx` | `payment-success-ui.spec.ts` | COVERED |
 | UI-ORDERS | Orders legacy `?token=` strip + `?code=` email redeem | `MyOrders.tsx` | `orders-ui.spec.ts` | COVERED |
-| UI-ADMIN | Admin login redirect + dashboard analytics smoke | `AdminLogin.tsx`, `AdminDashboard.tsx` | `admin-ui.spec.ts` | COVERED |
+| UI-ADMIN | Admin `/admin` redirect, login, dashboard analytics smoke | `AdminLogin.tsx`, `AdminDashboard.tsx`, `App.tsx` | `admin-ui.spec.ts` | COVERED |
 | UI-CHECKOUT-COUNTRY | Checkout country pre-selected (`country-list` US value) | `Checkout.tsx`, `constants/checkoutForm.ts` | `checkout-ui.spec.ts` | COVERED |
 | UI-PRODUCT-POLICY | Product detail trust badges match no-refund policy | `ProductDetailPage.tsx`, `constants/returnPolicy.ts` | `deep-flows-ui.spec.ts` | COVERED |
 | UI-DEEP-FLOWS | Search, policy gate, coupon, create-payment, 409 processing | `deep-flows-ui.spec.ts`, `mock-api.ts` | `deep-flows-ui.spec.ts` | COVERED |
@@ -110,7 +110,7 @@
 |----|----------|----------------|---------|--------|
 | CI-ENV | Production env validation in CI | `validate-env.mjs`, `ci.yml` | CI job | COVERED |
 | SEC-ORDER-SECRETS | `access_token_hash` + `access_token_encrypted` stripped from order JSON | `orderTokens.ts` `stripOrderSecrets` | `orderTokens.test.ts` | COVERED |
-| DOC-TESTS | Test count in `info.md` | `info.md` | `npm test` (183) | COVERED |
+| DOC-TESTS | Test count in `info.md` | `info.md` | `npm test` (186) | COVERED |
 
 ---
 

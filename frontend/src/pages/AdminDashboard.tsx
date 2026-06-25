@@ -6,14 +6,12 @@ import {
   DollarSign,
   TrendingUp,
   Search,
-  Mail,
   Truck,
   Eye,
   RefreshCw,
   LogOut,
   BarChart3,
   ShoppingBag,
-  MessageSquare,
   Users,
   Globe,
   AlertTriangle,
@@ -75,16 +73,6 @@ type Product = AdminProduct & {
   cart_count?: number;
 };
 
-interface ContactMessage {
-  id: string;
-  name: string;
-  email: string;
-  subject: string;
-  message: string;
-  status: 'new' | 'read' | 'replied' | 'archived';
-  created_at: string;
-}
-
 interface Customer {
   id: string;
   email: string;
@@ -122,7 +110,6 @@ interface Analytics {
   countrySummary: any[];
   recentOrders: any[];
   dailyTrend: any[];
-  messages: any;
   customers: any;
   sales?: {
     range: { period: string; from: string; to: string; bucket: string };
@@ -148,7 +135,9 @@ interface Analytics {
   };
 }
 
-type Tab = 'analytics' | 'products' | 'orders' | 'messages' | 'customers' | 'coupons' | 'reviews';
+type Tab = 'analytics' | 'products' | 'orders' | 'customers' | 'coupons' | 'reviews';
+
+const CUSTOMER_HISTORY_PAGE_SIZE = 10;
 
 type AdminDialog =
   | { kind: 'markPaid'; orderId: string }
@@ -179,14 +168,12 @@ export default function AdminDashboard() {
   // Data states
   const [orders, setOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [messages, setMessages] = useState<ContactMessage[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
   const [analyticsPeriod, setAnalyticsPeriod] = useState<AnalyticsPeriod>('month');
   const [analyticsExporting, setAnalyticsExporting] = useState(false);
   const [productsError, setProductsError] = useState<string | null>(null);
-  const [messagesError, setMessagesError] = useState<string | null>(null);
   const [productsPage, setProductsPage] = useState(1);
   const [productsTotalPages, setProductsTotalPages] = useState(1);
   const [productsTotal, setProductsTotal] = useState(0);
@@ -204,9 +191,10 @@ export default function AdminDashboard() {
   const [orderEstimatedDelivery, setOrderEstimatedDelivery] = useState('');
   const [showDeletedCustomers, setShowDeletedCustomers] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [selectedMessage, setSelectedMessage] = useState<ContactMessage | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [customerOrders, setCustomerOrders] = useState<Order[]>([]);
+  const [customerHistoryPage, setCustomerHistoryPage] = useState(1);
+  const [customerHistoryTotalPages, setCustomerHistoryTotalPages] = useState(1);
   const [customerHistoryLoading, setCustomerHistoryLoading] = useState(false);
   
   // Filter states
@@ -215,7 +203,6 @@ export default function AdminDashboard() {
   const [productSearch, setProductSearch] = useState('');
   const [productSearchResults, setProductSearchResults] = useState<typeof products | null>(null);
   const [ordersError, setOrdersError] = useState<string | null>(null);
-  const [messageStatusFilter, setMessageStatusFilter] = useState('all');
   const [customerSearch, setCustomerSearch] = useState('');
   const [customersPage, setCustomersPage] = useState(1);
   const [customersTotalPages, setCustomersTotalPages] = useState(1);
@@ -249,7 +236,6 @@ export default function AdminDashboard() {
   // Bulk selection states
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
   const [selectedProducts, setSelectedProducts] = useState<Set<number>>(new Set());
-  const [selectedMessages, setSelectedMessages] = useState<Set<string>>(new Set());
   const [productFormOpen, setProductFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [adminDialog, setAdminDialog] = useState<AdminDialog>(null);
@@ -282,9 +268,6 @@ export default function AdminDashboard() {
           break;
         case 'products':
           await fetchProducts(1, false);
-          break;
-        case 'messages':
-          await fetchMessages();
           break;
         case 'customers':
           await fetchCustomers();
@@ -448,29 +431,6 @@ export default function AdminDashboard() {
       toast.error(err);
     } finally {
       setProductsLoadingMore(false);
-    }
-  };
-
-  const fetchMessages = async () => {
-    setMessagesError(null);
-    try {
-      const response = await apiFetch('/contact', {
-      });
-      const data = await response.json();
-      if (data.success) {
-        setMessages(data.data || []);
-      } else {
-        const err = data.error || 'Failed to load messages';
-        setMessagesError(err);
-        setMessages([]);
-        toast.error(err);
-      }
-    } catch (error) {
-      logError('Error fetching messages:', error);
-      const err = 'Unable to load messages. Check your connection and try again.';
-      setMessagesError(err);
-      setMessages([]);
-      toast.error(err);
     }
   };
 
@@ -858,25 +818,45 @@ export default function AdminDashboard() {
     }
   };
 
-  const fetchCustomerHistory = async (email: string) => {
+  const fetchCustomerHistory = async (email: string, page = 1) => {
     setCustomerHistoryLoading(true);
     try {
-      const response = await apiFetch(`/admin/customers/${encodeURIComponent(email)}`, {
-      });
+      const response = await apiFetch(
+        `/admin/customers/${encodeURIComponent(email)}?limit=${CUSTOMER_HISTORY_PAGE_SIZE}&page=${page}`
+      );
       const data = await response.json();
       if (data.success) {
         setCustomerOrders(data.data.orders || []);
+        setCustomerHistoryPage(data.pagination?.page ?? page);
+        setCustomerHistoryTotalPages(data.pagination?.totalPages ?? 1);
       } else {
         toast.error(data.error || 'Failed to load customer history');
         setCustomerOrders([]);
+        setCustomerHistoryPage(1);
+        setCustomerHistoryTotalPages(1);
       }
     } catch (error) {
       logError('Error fetching customer history:', error);
       toast.error('Failed to load customer history');
       setCustomerOrders([]);
+      setCustomerHistoryPage(1);
+      setCustomerHistoryTotalPages(1);
     } finally {
       setCustomerHistoryLoading(false);
     }
+  };
+
+  const openCustomerHistory = async (customer: Customer) => {
+    setSelectedCustomer(customer);
+    setCustomerHistoryPage(1);
+    await fetchCustomerHistory(customer.email, 1);
+  };
+
+  const closeCustomerHistory = () => {
+    setSelectedCustomer(null);
+    setCustomerOrders([]);
+    setCustomerHistoryPage(1);
+    setCustomerHistoryTotalPages(1);
   };
 
   const handleLogout = async () => {
@@ -950,59 +930,6 @@ export default function AdminDashboard() {
     }
   };
 
-  const updateMessageStatus = async (messageId: string, status: ContactMessage['status']) => {
-    try {
-      const response = await apiFetch(`/contact/${messageId}/status`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status }),
-      });
-      const data = await response.json();
-      if (data.success) {
-        setMessages((prev) =>
-          prev.map((m) => (m.id === messageId ? { ...m, status } : m))
-        );
-        setSelectedMessage((prev) =>
-          prev && prev.id === messageId ? { ...prev, status } : prev
-        );
-        toast.success(`Message marked ${status}`);
-      } else {
-        toast.error(data.error || 'Update failed');
-      }
-    } catch {
-      toast.error('Update failed');
-    }
-  };
-
-  const openMessage = async (msg: ContactMessage) => {
-    setSelectedMessage(msg);
-    if (msg.status === 'new') {
-      await updateMessageStatus(msg.id, 'read');
-    }
-  };
-
-  const handleBulkMessageUpdate = async (status: string) => {
-    if (selectedMessages.size === 0) {
-      toast.error('No messages selected');
-      return;
-    }
-    try {
-      const response = await apiFetch('/admin/messages/bulk-update', {
-        method: 'POST',
-        body: JSON.stringify({ messageIds: Array.from(selectedMessages), updates: { status } }),
-      });
-      const data = await response.json();
-      if (data.success) {
-        toast.success(`Updated ${data.updatedCount} messages`);
-        setSelectedMessages(new Set());
-        fetchMessages();
-      } else {
-        toast.error(data.error || 'Update failed');
-      }
-    } catch (error) {
-      toast.error('Update failed');
-    }
-  };
-
   const toggleProductStock = async (productId: number, currentStatus: boolean) => {
     try {
       const response = await apiFetch(`/products/${productId}`, {
@@ -1055,10 +982,6 @@ export default function AdminDashboard() {
         return !productSearch || p.name.toLowerCase().includes(productSearch.toLowerCase());
       }));
 
-  const filteredMessages = messages.filter(m => {
-    return messageStatusFilter === 'all' || m.status === messageStatusFilter;
-  });
-
   const analyticsPeriods: { id: AnalyticsPeriod; label: string }[] = [
     { id: 'day', label: 'Today' },
     { id: 'week', label: 'Week' },
@@ -1071,8 +994,7 @@ export default function AdminDashboard() {
     const colors: Record<string, string> = {
       pending: '#f59e0b', processing: '#9c6649', shipped: '#9c6649',
       delivered: '#10b981', cancelled: '#ef4444', completed: '#10b981',
-      failed: '#ef4444', refunded: '#6b7280', new: '#9c6649',
-      read: '#f59e0b', replied: '#10b981', archived: '#6b7280',
+      failed: '#ef4444', refunded: '#6b7280',
     };
     return colors[status] || '#6b7280';
   };
@@ -1710,66 +1632,6 @@ export default function AdminDashboard() {
     </div>
   );
 
-  const renderMessages = () => (
-    <div>
-      {messagesError && (
-        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 12, padding: 16, marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <span style={{ color: '#991b1b', fontSize: 14 }}>{messagesError}</span>
-          <button type="button" onClick={() => void loadTabData('messages', { force: true })} style={{ padding: '8px 14px', background: '#9c6649', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
-            Retry
-          </button>
-        </div>
-      )}
-      {/* Toolbar */}
-      <div style={{ background: 'white', borderRadius: 12, padding: 16, marginBottom: 16, border: '1px solid #e5e7eb', display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
-        <select value={messageStatusFilter} onChange={(e) => setMessageStatusFilter(e.target.value)}
-          style={{ padding: '10px 16px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14 }}>
-          <option value="all">All Messages</option>
-          <option value="new">New</option>
-          <option value="read">Read</option>
-          <option value="replied">Replied</option>
-          <option value="archived">Archived</option>
-        </select>
-        <button onClick={() => setSelectedMessages(new Set(filteredMessages.map(m => m.id)))} style={{ padding: '10px 16px', background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: 'pointer' }}>Select All</button>
-        <button onClick={() => setSelectedMessages(new Set())} style={{ padding: '10px 16px', background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: 'pointer' }}>Clear</button>
-        {selectedMessages.size > 0 && (
-          <>
-            <button onClick={() => handleBulkMessageUpdate('read')} style={{ padding: '10px 16px', background: '#f59e0b', color: 'white', border: 'none', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}>Mark Read</button>
-            <button onClick={() => handleBulkMessageUpdate('replied')} style={{ padding: '10px 16px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}>Mark Replied</button>
-            <button onClick={() => handleBulkMessageUpdate('archived')} style={{ padding: '10px 16px', background: '#6b7280', color: 'white', border: 'none', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}>Archive</button>
-          </>
-        )}
-      </div>
-
-      {/* Messages List */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {filteredMessages.map((msg) => (
-          <div key={msg.id} style={{ background: 'white', borderRadius: 12, padding: 16, border: `2px solid ${selectedMessages.has(msg.id) ? '#9c6649' : '#e5e7eb'}`, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-            <input type="checkbox" checked={selectedMessages.has(msg.id)} onChange={(e) => {
-              const newSet = new Set(selectedMessages);
-              e.target.checked ? newSet.add(msg.id) : newSet.delete(msg.id);
-              setSelectedMessages(newSet);
-            }} style={{ marginTop: 4 }} />
-            <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => void openMessage(msg)}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-                <div>
-                  <div style={{ fontWeight: 600, color: '#1f2937' }}>{msg.name}</div>
-                  <div style={{ fontSize: 13, color: '#6b7280' }}>{msg.email}</div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ padding: '4px 12px', borderRadius: 12, fontSize: 12, fontWeight: 600, background: `${getStatusColor(msg.status)}15`, color: getStatusColor(msg.status) }}>{msg.status}</span>
-                  <span style={{ fontSize: 12, color: '#9ca3af' }}>{new Date(msg.created_at).toLocaleDateString()}</span>
-                </div>
-              </div>
-              <div style={{ fontWeight: 600, marginBottom: 4 }}>{msg.subject}</div>
-              <div style={{ fontSize: 14, color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{msg.message}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-
   const renderCustomers = () => (
     <div>
       {/* Search */}
@@ -1827,7 +1689,7 @@ export default function AdminDashboard() {
                   style={{ padding: '10px 14px', minHeight: 44, background: '#f3f4f6', color: '#374151', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
                   <Pencil size={14} /> Edit
                 </button>
-                <button type="button" onClick={async () => { setSelectedCustomer(customer); await fetchCustomerHistory(customer.email); }}
+                <button type="button" onClick={() => void openCustomerHistory(customer)}
                   style={{ padding: '10px 14px', minHeight: 44, background: '#9c6649', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
                   View History
                 </button>
@@ -1878,7 +1740,7 @@ export default function AdminDashboard() {
                       style={{ padding: '8px 12px', background: '#f3f4f6', color: '#374151', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
                       Edit
                     </button>
-                    <button onClick={async () => { setSelectedCustomer(customer); await fetchCustomerHistory(customer.email); }}
+                    <button onClick={() => void openCustomerHistory(customer)}
                       style={{ padding: '8px 16px', background: '#9c6649', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
                       View History
                     </button>
@@ -1910,7 +1772,6 @@ export default function AdminDashboard() {
     { id: 'orders', label: 'Orders', icon: Package },
     { id: 'coupons', label: 'Coupons', icon: Tag },
     { id: 'reviews', label: 'Reviews', icon: Star },
-    { id: 'messages', label: 'Messages', icon: MessageSquare },
     { id: 'customers', label: 'Customers', icon: Users },
   ];
 
@@ -1982,7 +1843,6 @@ export default function AdminDashboard() {
             {activeTab === 'orders' && renderOrders()}
             {activeTab === 'coupons' && <AdminCouponsTab />}
             {activeTab === 'reviews' && <AdminReviewsTab />}
-            {activeTab === 'messages' && renderMessages()}
             {activeTab === 'customers' && renderCustomers()}
           </div>
         )}
@@ -2180,47 +2040,6 @@ export default function AdminDashboard() {
         </LiquidModal>
       )}
 
-      {/* Message Detail Modal */}
-      {selectedMessage && (
-        <LiquidModal isOpen={!!selectedMessage} onClose={() => setSelectedMessage(null)} maxWidth={600} ariaLabel="Message details">
-          <div style={{ padding: 24 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
-              <div>
-                <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>{selectedMessage.subject}</h2>
-                <p style={{ margin: 0, fontSize: 14, color: '#6b7280', marginTop: 4 }}>From: {selectedMessage.name} ({selectedMessage.email})</p>
-              </div>
-              <button type="button" aria-label="Close" onClick={() => setSelectedMessage(null)} style={{ background: '#f3f4f6', border: 'none', borderRadius: 8, padding: 8, cursor: 'pointer' }}><X size={20} aria-hidden="true" /></button>
-            </div>
-            <div style={{ background: '#f9fafb', borderRadius: 12, padding: 20, marginBottom: 20 }}>
-              <p style={{ margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>{selectedMessage.message}</p>
-            </div>
-            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-              <a href={`mailto:${selectedMessage.email}?subject=Re: ${selectedMessage.subject}`} style={{ flex: 1, minWidth: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 14, background: '#9c6649', color: 'white', textDecoration: 'none', borderRadius: 8, fontWeight: 600 }}>
-                <Mail size={18} /> Reply via Email
-              </a>
-              {selectedMessage.status !== 'replied' && (
-                <button
-                  type="button"
-                  onClick={() => void updateMessageStatus(selectedMessage.id, 'replied')}
-                  style={{ flex: 1, minWidth: 140, padding: 14, background: '#10b981', color: 'white', border: 'none', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}
-                >
-                  Mark replied
-                </button>
-              )}
-              {selectedMessage.status !== 'archived' && (
-                <button
-                  type="button"
-                  onClick={() => void updateMessageStatus(selectedMessage.id, 'archived')}
-                  style={{ flex: 1, minWidth: 140, padding: 14, background: '#6b7280', color: 'white', border: 'none', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}
-                >
-                  Archive
-                </button>
-              )}
-            </div>
-          </div>
-        </LiquidModal>
-      )}
-
       <AdminProductFormModal
         isOpen={productFormOpen}
         product={editingProduct}
@@ -2365,14 +2184,14 @@ export default function AdminDashboard() {
 
       {/* Customer History Modal */}
       {selectedCustomer && (
-        <LiquidModal isOpen={!!selectedCustomer} onClose={() => { setSelectedCustomer(null); setCustomerOrders([]); }} maxWidth={800} ariaLabel="Customer history">
+        <LiquidModal isOpen={!!selectedCustomer} onClose={closeCustomerHistory} maxWidth={800} ariaLabel="Customer history">
           <div style={{ padding: 24 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
               <div>
                 <h2 style={{ margin: 0, fontSize: 24, fontWeight: 800 }}>{selectedCustomer.name || 'Customer'}</h2>
                 <p style={{ margin: 0, fontSize: 14, color: '#6b7280', marginTop: 4 }}>{selectedCustomer.email}</p>
               </div>
-              <button type="button" aria-label="Close" onClick={() => { setSelectedCustomer(null); setCustomerOrders([]); }} style={{ background: '#f3f4f6', border: 'none', borderRadius: 8, padding: 8, cursor: 'pointer' }}><X size={20} aria-hidden="true" /></button>
+              <button type="button" aria-label="Close" onClick={closeCustomerHistory} style={{ background: '#f3f4f6', border: 'none', borderRadius: 8, padding: 8, cursor: 'pointer' }}><X size={20} aria-hidden="true" /></button>
             </div>
             <div className="admin-stats-row" style={{ marginBottom: 24 }}>
               <div style={{ background: '#f9fafb', padding: 16, borderRadius: 12, textAlign: 'center' }}>
@@ -2389,6 +2208,31 @@ export default function AdminDashboard() {
               </div>
             </div>
             <h3 style={{ margin: 0, marginBottom: 16, fontWeight: 700 }}>Order History</h3>
+            {customerHistoryTotalPages > 1 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+                <span style={{ fontSize: 13, color: '#6b7280' }}>
+                  Page {customerHistoryPage} of {customerHistoryTotalPages}
+                </span>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    type="button"
+                    disabled={customerHistoryPage <= 1 || customerHistoryLoading}
+                    onClick={() => void fetchCustomerHistory(selectedCustomer.email, customerHistoryPage - 1)}
+                    style={{ padding: '8px 14px', background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: customerHistoryPage <= 1 ? 'not-allowed' : 'pointer', opacity: customerHistoryPage <= 1 ? 0.5 : 1, fontSize: 13, fontWeight: 600 }}
+                  >
+                    Previous
+                  </button>
+                  <button
+                    type="button"
+                    disabled={customerHistoryPage >= customerHistoryTotalPages || customerHistoryLoading}
+                    onClick={() => void fetchCustomerHistory(selectedCustomer.email, customerHistoryPage + 1)}
+                    style={{ padding: '8px 14px', background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: customerHistoryPage >= customerHistoryTotalPages ? 'not-allowed' : 'pointer', opacity: customerHistoryPage >= customerHistoryTotalPages ? 0.5 : 1, fontSize: 13, fontWeight: 600 }}
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
             <div style={{ maxHeight: 400, overflowY: 'auto' }}>
               {customerHistoryLoading ? (
                 <p style={{ padding: 16, color: '#6b7280', textAlign: 'center' }}>Loading order history…</p>

@@ -591,10 +591,15 @@ router.get('/customers', verifyAdmin, async (req: Request, res: Response) => {
   }
 });
 
-// GET /admin/customers/:email - Get customer order history
+// GET /admin/customers/:email - Get customer order history (paginated orders; full summary)
 router.get('/customers/:email', verifyAdmin, async (req: Request, res: Response) => {
   try {
     const { email } = req.params;
+    const parsed = parsePagination(req.query);
+    if (!parsed.ok) {
+      return res.status(parsed.status).json({ success: false, error: parsed.error });
+    }
+    const { limit, offset } = parsed.params;
 
     const customerRow = await dbQuery(() => sql`
       SELECT id, email, name, phone, admin_notes, addresses, is_deleted, deleted_at
@@ -603,22 +608,29 @@ router.get('/customers/:email', verifyAdmin, async (req: Request, res: Response)
       LIMIT 1
     `, 'admin:q9');
 
-    const orders = await dbQuery(() => sql`
-      SELECT *
-      FROM orders
-      WHERE customer_email = ${email}
-      ORDER BY created_at DESC
-    `, 'admin:q10');
+    const [orders, countResult, summary] = await Promise.all([
+      dbQuery(() => sql`
+        SELECT *
+        FROM orders
+        WHERE customer_email = ${email}
+        ORDER BY created_at DESC
+        LIMIT ${limit} OFFSET ${offset}
+      `, 'admin:q10'),
+      dbQuery(() => sql`
+        SELECT COUNT(*) as total FROM orders WHERE customer_email = ${email}
+      `, 'admin:q10count'),
+      dbQuery(() => sql`
+        SELECT 
+          COUNT(*) as total_orders,
+          COALESCE(SUM(total), 0) as total_spent,
+          MAX(created_at) as last_order_date,
+          MIN(created_at) as first_order_date
+        FROM orders
+        WHERE customer_email = ${email}
+      `, 'admin:q11'),
+    ]);
 
-    const summary = await dbQuery(() => sql`
-      SELECT 
-        COUNT(*) as total_orders,
-        COALESCE(SUM(total), 0) as total_spent,
-        MAX(created_at) as last_order_date,
-        MIN(created_at) as first_order_date
-      FROM orders
-      WHERE customer_email = ${email}
-    `, 'admin:q11');
+    const total = parseInt(countResult[0]?.total || '0', 10);
 
     res.json({
       success: true,
@@ -644,6 +656,7 @@ router.get('/customers/:email', verifyAdmin, async (req: Request, res: Response)
           })
         ),
       },
+      pagination: paginationMeta(total, parsed.params),
     });
   } catch (error: any) {
     logger.error('Customer history error:', error);

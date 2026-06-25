@@ -7,7 +7,7 @@ import { apiFetch } from '../config';
 import { toast } from 'sonner';
 import LiquidButton from '../components/LiquidButton';
 import { useResponsive } from '../hooks/useResponsive';
-import { useAdminAuth } from '../contexts/AdminAuthContext';
+import { useAdminAuth, ADMIN_DASHBOARD_PATH } from '../contexts/AdminAuthContext';
 
 const adminInputStyle: CSSProperties = {
   width: '100%',
@@ -36,7 +36,7 @@ export default function AdminLogin() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      navigate('/adminshivamdashboard');
+      navigate(ADMIN_DASHBOARD_PATH);
     }
   }, [isAuthenticated, navigate]);
 
@@ -57,7 +57,7 @@ export default function AdminLogin() {
         setAuthenticated(true);
         await verify();
         toast.success('Login successful!');
-        navigate('/adminshivamdashboard');
+        navigate(ADMIN_DASHBOARD_PATH);
       } else {
         setError(data.error || 'Login failed');
         toast.error(data.error || 'Login failed');

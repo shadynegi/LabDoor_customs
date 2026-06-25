@@ -234,7 +234,7 @@ Public list/submit/vote responses use `toPublicReview()` — **`customer_email`,
 | GET | `/analytics` | Admin | Dashboard analytics; `?period=day\|week\|month\|year\|all\|custom` (+ optional `from`/`to`); includes `sales`, `inventory` |
 | GET | `/analytics/export` | Admin | CSV product sales for period |
 | GET | `/customers` | Admin | Customer list (`?search=&page=&limit=`) |
-| GET | `/customers/:email` | Admin | Customer detail |
+| GET | `/customers/:email` | Admin | Customer detail + paginated orders (`?page=&limit=`) |
 | PATCH | `/customers/:id` | Admin + CSRF | Update name, phone, admin notes |
 | POST | `/customers/recompute` | Admin + CSRF | Rebuild customer aggregates |
 | POST | `/customers/:id/restore` | Admin | Restore soft-deleted customer |

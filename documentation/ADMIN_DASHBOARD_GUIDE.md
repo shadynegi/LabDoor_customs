@@ -10,6 +10,7 @@ How to use the Lab Door Customs admin dashboard.
 
 | Item | Value |
 |------|-------|
+| Entry URL | `/admin` — redirects to login or dashboard based on session |
 | Login URL | `/admin/login` |
 | Dashboard URL | `/adminshivamdashboard` |
 | Session | HttpOnly cookie, 24 hours |
@@ -49,7 +50,7 @@ If the analytics API fails, the tab shows an error message with a **Retry** butt
 - **Search** — debounced server-side query via `POST /api/products/search` (searches full catalog, not only loaded pages)
 - **Load more** — paginated list via `GET /api/products?limit=50&page=` when not searching
 - Error banner with **Retry** if the product list fails to load
-- **Coupons / Reviews** — product scope uses **server search** (`AdminProductSearchPicker` → `POST /api/products/search`), not a fixed 100-product list
+- **Coupons / Reviews** — product scope uses **server search** (`AdminProductSearchPicker` → `POST /api/products/search`), not a fixed product list
 - Create new products (name, price, images, optional **360° MP4 video**, **SKU**, **reorder point**, optional **cost price**, category, size, color, stock)
 - Edit existing products (stock changes are logged to `inventory_movements`)
 - Delete products
@@ -111,21 +112,11 @@ Manage discount codes used at checkout (server-side billing via `resolveCouponDi
 - **Edit** — pencil icon opens a modal to update description, max uses, valid-until date, **applies_to scope** (all / product / category IDs), and active status (`PUT /api/coupons/:id`)
 - **Activate / deactivate** — toggle `is_active` without deleting
 - **Delete** — remove unused coupons
+- **Pagination** — 10 coupons per page (Previous/Next)
 
 On narrow screens, the coupons table scrolls horizontally.
 
 API: `GET/POST/PUT/DELETE /api/coupons`
-
----
-
-## Messages tab
-
-Contact form submissions from `contact_messages` table.
-
-- Error banner with **Retry** if the inbox fails to load
-- Click a message to open the detail modal — **new** messages are automatically marked **read** via `PATCH /api/contact/:id/status`
-- Modal actions: **Reply via Email** (mailto), **Mark replied**, **Archive**
-- Bulk status updates via `POST /api/admin/messages/bulk-update`
 
 ---
 
@@ -136,7 +127,7 @@ Aggregated customer data from the `customers` table (updated on order capture).
 - **Server-side search** and **pagination** (`GET /api/admin/customers?search=&page=&limit=`)
 - View customer list with order count, total spent, phone, first/last order dates (table on desktop, cards on mobile)
 - **Edit profile** — `PATCH /api/admin/customers/:id` (name, phone, admin notes; does not rewrite historical order snapshots)
-- **View History** — opens a modal with customer stats and order list; shows a loading state while fetching and a toast on failure
+- **View History** — opens a modal with customer stats and **paginated order list** (10 orders per page, Previous/Next); summary totals reflect all orders; loading state and toast on failure
 - Soft delete customers (`is_deleted = true`) — **Delete** button in table
 - Restore deleted customers — enable **Show deleted customers**, then **Restore**
 - Toggle **Show deleted customers** to include soft-deleted rows
@@ -184,7 +175,7 @@ These are available via API but do not have dedicated dashboard tabs:
 | `PATCH /api/admin/customers/:id` | Update customer CRM profile |
 | `POST /api/admin/customers/recompute` | Rebuild customer aggregates from orders |
 | `POST /api/admin/orders/bulk-update` | Bulk order status updates (not cancellation) |
-| `POST /api/admin/messages/bulk-update` | Bulk message status updates |
+| `POST /api/admin/messages/bulk-update` | Bulk contact message status updates (API-only; no inbox tab) |
 
 Use the dedicated cancel endpoint for unpaid pending orders — not bulk update.
 

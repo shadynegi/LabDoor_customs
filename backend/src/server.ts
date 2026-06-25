@@ -297,13 +297,17 @@ const isDevLanOrigin = (origin: string): boolean => {
   if (isProduction) return false;
   try {
     const { hostname, port } = new URL(origin);
-    const devPorts = new Set(['5173', '3000', '4173', '']);
+    const isPrivateLan =
+      /^192\.168\.\d{1,3}\.\d{1,3}$/.test(hostname) ||
+      /^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname) ||
+      /^172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}$/.test(hostname);
+
+    // LAN devices — any port (Vite uses 5174+ when 5173 is busy).
+    if (isPrivateLan) return true;
+
+    const devPorts = new Set(['5173', '5174', '5175', '3000', '4173', '']);
     if (!devPorts.has(port)) return false;
-    if (hostname === 'localhost' || hostname === '127.0.0.1') return true;
-    if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(hostname)) return true;
-    if (/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname)) return true;
-    if (/^172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}$/.test(hostname)) return true;
-    return false;
+    return hostname === 'localhost' || hostname === '127.0.0.1';
   } catch {
     return false;
   }

@@ -42,15 +42,15 @@ If the user did not mention testing, **skip** `npm test`, `npm run test:all`, Pl
 | Suite | Tool | Location | Count | Needs live DB? |
 |-------|------|----------|-------|----------------|
 | Backend unit | Vitest | `Tests/backend/` | 26 files, 93 tests | No (mocked) |
-| API integration | Vitest + Supertest | `Tests/api/` | 19 files, 53 tests | No (mocked) |
-| Frontend E2E / UI | Playwright | `Tests/frontend/` | 13 files, 37 tests | No (mocked `/api` + static preview) |
+| API integration | Vitest + Supertest | `Tests/api/` | 19 files, 54 tests | No (mocked) |
+| Frontend E2E / UI | Playwright | `Tests/frontend/` | 13 files, 39 tests | No (mocked `/api` + static preview) |
 | Link checker | Custom script | repo root | — | No |
 
-**Total:** 183 automated tests — 93 backend unit + 53 API + 37 Playwright UI (desktop + mobile projects).
+**Total:** 186 automated tests — 93 backend unit + 54 API + 39 Playwright UI (desktop + mobile projects).
 
 Backend unit tests include: payment idempotency, order tokens, checkout exchange hashing, order token encryption, webhook errors, product image validation, admin session hashing, PayPal webhook utils, refund idempotency, checkout pricing, coupon scope (`applies_to`), `computeCheckoutPricingForCart`, RLS table list + bootstrap contract, RLS grant revoke under `BOOTSTRAP_SKIP_DDL`, email portal URL (`buildOrderPortalUrl`), client IP, keep-alive.
 
-API tests include: checkout (incl. client amount mismatch + policy acceptance), create-payment happy path (mocked PayPal + exchange), capture 409 reconciliation, capture refund mismatch, checkout-context recovery, checkout exchange, PayPal webhook COMPLETED/DENIED, admin mark-paid (validation + success), **admin enhancements** (low-stock, inventory movements, customer PATCH, bulk stock delta, order customer-details, analytics period), **products search**, no-refund policy (admin refund/cancel 403), health, orders, security, activity batch/log, order lookup, reviews check.
+API tests include: checkout (incl. client amount mismatch + policy acceptance), create-payment happy path (mocked PayPal + exchange), capture 409 reconciliation, capture refund mismatch, checkout-context recovery, checkout exchange, PayPal webhook COMPLETED/DENIED, admin mark-paid (validation + success), **admin enhancements** (low-stock, inventory movements, customer PATCH, bulk stock delta, order customer-details, analytics period), **products search**, no-refund policy (admin refund/cancel 403), health, orders, security (incl. LAN dev CORS on alternate Vite ports), activity batch/log, order lookup, reviews check.
 
 Backend unit tests also cover: **sales analytics** period parsing + CSV export, **admin analytics cache** keys/TTL, inventory movement helpers (via integration paths), payment idempotency, order tokens, RLS, email portal URL, and related payment/order utilities.
 
@@ -322,14 +322,13 @@ Expect `success: true` with database and Redis status.
 
 ### Admin
 
-1. Login at `/admin/login`
+1. Login at `/admin/login` (or visit `/admin` — redirects based on session)
 2. View analytics tab — change period, export CSV, confirm sales/inventory panels
 3. Create/edit a product (SKU, reorder point, cost price); view inventory movement history; use low-stock filter; bulk stock delta
 4. View and update an order (status, tracking, customer details on pending orders)
-5. Search customers, edit admin notes
+5. Search customers, edit admin notes; open **View History** and paginate orders (10/page)
 6. Send shipping notification
 7. Cancel an **unpaid pending** test order (paid orders return 403 — no refund)
-8. Read and archive contact messages
 
 ### PayPal webhooks
 

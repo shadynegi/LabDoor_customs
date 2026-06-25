@@ -71,7 +71,7 @@ async function fetchProductPaths() {
     let totalPages = 1;
 
     while (page <= totalPages) {
-      const res = await fetch(`${API_BASE}/products?limit=100&page=${page}`, {
+      const res = await fetch(`${API_BASE}/products?limit=10&page=${page}`, {
         signal: AbortSignal.timeout(60000),
       });
       if (!res.ok) break;

@@ -4,6 +4,16 @@ import { app } from '../../backend/src/server';
 import { createCsrfAgent, withCsrf } from '../helpers/http';
 
 describe('security hardening', () => {
+  it('allows LAN dev origins on alternate Vite ports (e.g. 5174)', async () => {
+    const res = await request(app)
+      .options('/api/admin/login')
+      .set('Origin', 'http://192.168.1.7:5174')
+      .set('Access-Control-Request-Method', 'POST');
+
+    expect(res.status).toBe(204);
+    expect(res.headers['access-control-allow-origin']).toBe('http://192.168.1.7:5174');
+  });
+
   it('requires admin auth for PayPal refunds', async () => {
     const { agent, csrfToken } = await createCsrfAgent();
     const res = await withCsrf(

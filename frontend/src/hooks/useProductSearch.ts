@@ -166,7 +166,7 @@ export const useProductSearch = (debounceMs: number = 300): UseProductSearchResu
         const nextResults = await searchProductsApi({
           query: debouncedQuery,
           filters,
-          limit: 100,
+          limit: 10,
         });
         if (!cancelled) {
           setResults(nextResults);

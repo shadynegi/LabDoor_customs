@@ -24,11 +24,14 @@ interface Coupon {
 }
 
 const PRESET_DISCOUNTS = [5, 10, 20, 25, 50] as const;
+const PAGE_SIZE = 10;
 
 export default function AdminCouponsTab() {
   const { isMobile } = useResponsive();
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [customCode, setCustomCode] = useState('');
   const [customPercent, setCustomPercent] = useState(10);
   const [customAppliesTo, setCustomAppliesTo] = useState<'all' | 'category' | 'product'>('all');
@@ -46,7 +49,7 @@ export default function AdminCouponsTab() {
   const fetchCoupons = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await apiFetch('/coupons?limit=100');
+      const response = await apiFetch(`/coupons?limit=${PAGE_SIZE}&page=${page}`);
       const data = await response.json();
       if (data.success) {
         setCoupons(
@@ -55,6 +58,7 @@ export default function AdminCouponsTab() {
             discount_value: parseFloat(String(c.discount_value)),
           }))
         );
+        setTotalPages(data.pagination?.totalPages ?? 1);
       } else {
         toast.error(data.error || 'Failed to load coupons');
       }
@@ -64,10 +68,10 @@ export default function AdminCouponsTab() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page]);
 
   useEffect(() => {
-    fetchCoupons();
+    void fetchCoupons();
   }, [fetchCoupons]);
 
   const parseAppliesToIds = (): number[] | null => {
@@ -439,6 +443,30 @@ export default function AdminCouponsTab() {
           </table>
         )}
       </div>
+
+      {totalPages > 1 && (
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginTop: 24 }}>
+          <button
+            type="button"
+            disabled={page <= 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #e5e7eb', background: 'white', cursor: page <= 1 ? 'not-allowed' : 'pointer', opacity: page <= 1 ? 0.5 : 1 }}
+          >
+            Previous
+          </button>
+          <span style={{ alignSelf: 'center', fontSize: 14, color: '#6b7280' }}>
+            Page {page} of {totalPages}
+          </span>
+          <button
+            type="button"
+            disabled={page >= totalPages}
+            onClick={() => setPage((p) => p + 1)}
+            style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #e5e7eb', background: 'white', cursor: page >= totalPages ? 'not-allowed' : 'pointer', opacity: page >= totalPages ? 0.5 : 1 }}
+          >
+            Next
+          </button>
+        </div>
+      )}
 
       {editingCoupon && (
         <div

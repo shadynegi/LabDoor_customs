@@ -2,11 +2,17 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { useLocation, useNavigate } from 'react-router-dom';
 import { apiFetch, setUnauthorizedHandler } from '../config';
 
-const ADMIN_DASHBOARD_PATH = '/adminshivamdashboard';
-const ADMIN_LOGIN_PATH = '/admin/login';
+export const ADMIN_DASHBOARD_PATH = '/adminshivamdashboard';
+export const ADMIN_LOGIN_PATH = '/admin/login';
+export const ADMIN_ENTRY_PATH = '/admin';
 
 function isAdminRoute(pathname: string): boolean {
-  return pathname === ADMIN_LOGIN_PATH || pathname === ADMIN_DASHBOARD_PATH;
+  return (
+    pathname === ADMIN_ENTRY_PATH ||
+    pathname === `${ADMIN_ENTRY_PATH}/` ||
+    pathname === ADMIN_LOGIN_PATH ||
+    pathname === ADMIN_DASHBOARD_PATH
+  );
 }
 
 interface AdminAuthContextValue {
@@ -58,7 +64,7 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
       setIsAuthenticated(false);
       // Only leave the admin dashboard on session expiry — never hijack the storefront.
       if (window.location.pathname === ADMIN_DASHBOARD_PATH) {
-        navigate('/admin/login', { replace: true });
+        navigate(ADMIN_LOGIN_PATH, { replace: true });
       }
     });
     return () => setUnauthorizedHandler(null);

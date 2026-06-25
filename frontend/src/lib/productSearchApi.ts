@@ -28,7 +28,7 @@ export async function searchProductsApi({
   query = '',
   filters = {},
   page = 1,
-  limit = 100,
+  limit = 10,
 }: ProductSearchRequest): Promise<Product[]> {
   const hasQuery = query.trim().length > 0;
   const hasFilters =

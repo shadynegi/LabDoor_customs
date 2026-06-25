@@ -93,7 +93,7 @@ Starts the API (port 5000) and Vite dev server (port 5173) together.
 
 - Storefront: http://localhost:5173
 - API health: http://localhost:5000/api/health (or http://localhost:5173/api/health via proxy)
-- Admin login: http://localhost:5173/admin/login
+- Admin login: http://localhost:5173/admin/login (or `/admin` — redirects based on session). If port 5173 is busy, Vite may use **5174**; LAN devices on the same Wi‑Fi can use your machine’s IP (dev CORS allows private LAN origins).
 
 **Corporate VPN / Zscaler:** If Supabase DNS is blocked, the API still starts but bootstrap and DB routes fail with `ENOTFOUND db.*.supabase.co`. Health returns **503** with `"status":"DEGRADED"`. CSRF and frontend pages still work; use an off-VPN network or allowlist `*.supabase.co` for full local testing.
 

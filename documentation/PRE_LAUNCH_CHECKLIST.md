@@ -169,8 +169,9 @@ CI does **not** run a live PayPal payment. Complete these on **desktop and a rea
 - [ ] Link opens `/orders` and shows the order without re-entering token
 - [ ] Manual lookup still works: order number + access token at `/orders`
 
-### Admin (`/adminshivamdashboard`)
+### Admin (`/admin` or `/adminshivamdashboard`)
 
+- [ ] `/admin` redirects to login when logged out, dashboard when logged in
 - [ ] Login with `ADMIN_USERNAME` + password (hash verified server-side)
 - [ ] Orders tab shows new order; payment status `completed`
 - [ ] Update order status (e.g. processing → shipped) if applicable
@@ -178,7 +179,7 @@ CI does **not** run a live PayPal payment. Complete these on **desktop and a rea
 
 ### Reviews and contact (optional but recommended)
 
-- [ ] Submit contact form; message appears in admin Messages tab
+- [ ] Submit contact form; confirm submission succeeds (stored in `contact_messages`; no admin inbox tab — check Supabase or email notifications if configured)
 - [ ] Submit product review (pending); approve in Reviews tab; visible on storefront **without** customer email
 
 ### PayPal webhook

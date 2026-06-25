@@ -4,7 +4,7 @@ import { lazy, Suspense, useEffect } from "react";
 import { CartProvider, useCart } from "./pages/CartContext";
 import ErrorBoundary from "./components/ErrorBoundary";
 import RouteErrorBoundary from "./components/RouteErrorBoundary";
-import { AdminAuthProvider, useAdminAuth } from "./contexts/AdminAuthContext";
+import { AdminAuthProvider, useAdminAuth, ADMIN_DASHBOARD_PATH, ADMIN_LOGIN_PATH } from "./contexts/AdminAuthContext";
 import { Toaster } from "sonner";
 import { trackPageView } from "./utils/activityTracker";
 import CookieConsent, { openCookiePreferences } from "./components/CookieConsent";
@@ -81,10 +81,36 @@ function ProtectedAdminRoute({ children }: { children: React.ReactNode }) {
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/admin/login" replace />;
+    return <Navigate to={ADMIN_LOGIN_PATH} replace />;
   }
 
   return <>{children}</>;
+}
+
+/** `/admin` — send to login or dashboard based on session. */
+function AdminEntryRedirect() {
+  const { isAuthenticated } = useAdminAuth();
+
+  if (isAuthenticated === null) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'linear-gradient(135deg, #361906 0%, #9c6649 100%)',
+      }}>
+        <div style={{ color: 'white', fontSize: 18 }}>Verifying authentication...</div>
+      </div>
+    );
+  }
+
+  return (
+    <Navigate
+      to={isAuthenticated ? ADMIN_DASHBOARD_PATH : ADMIN_LOGIN_PATH}
+      replace
+    />
+  );
 }
 
 // Page view tracker component
@@ -365,6 +391,7 @@ function AppShell() {
             <Route path="/shipping-policy" element={<RouteErrorBoundary title="Shipping policy error"><ShippingPolicy /></RouteErrorBoundary>} />
             <Route path="/orders" element={<RouteErrorBoundary title="Orders page error"><MyOrders /></RouteErrorBoundary>} />
             <Route path="/admin/login" element={<RouteErrorBoundary title="Admin login error"><AdminLogin /></RouteErrorBoundary>} />
+            <Route path="/admin" element={<AdminEntryRedirect />} />
             <Route path="/adminshivamdashboard" element={
               <ProtectedAdminRoute>
                 <RouteErrorBoundary title="Admin dashboard error">

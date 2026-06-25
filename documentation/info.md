@@ -112,13 +112,14 @@
 | `/contact` | Contact form with CSRF-protected POST |
 | `/about`, `/help` | Static content |
 | `/privacy-policy`, `/terms-of-service`, `/returns-policy`, `/replacement-policy`, `/shipping-policy` | Legal pages (no-refund / manufacturing-defect replacement policy) |
+| `/admin` | Redirect — `/admin/login` if unauthenticated, `/adminshivamdashboard` if session valid |
 | `/admin/login` | Admin authentication |
 | `/adminshivamdashboard` | Protected admin dashboard |
 
 ### Search and catalog
 
 - **Server:** paginated product list, filters, single-product fetch, sitemap URL export — cached in Redis when available.
-- **Client:** Search and filters call `POST /api/products/search` (debounced); suggestions on Home use the same endpoint with `limit=10`. No full-catalog client download.
+- **Client:** Search and filters call `POST /api/products/search` (debounced, **10 results** per request); suggestions on Home use the same endpoint with `limit=10`. No full-catalog client download.
 
 ### Cart and pricing display
 
@@ -143,9 +144,8 @@
 | Analytics | Period selector (`day` / `week` / `month` / `year` / `all` / custom range); order/revenue stats, **sales by product**, **inventory snapshot**, low-stock count; **CSV export**; GA4/GSC config status; error state with retry |
 | Products | Paginated list (50/page, load more); **low-stock filter**; SKU, reorder point, cost price on create/edit; **inventory movement history** per product; bulk **stock** / **stock_delta** updates; image validation (URL or ≤512KB data URL); optional **360° MP4** |
 | Orders | Paginated list (50/page), **server-side search**, filter by status, bulk status updates; order modal: tracking, carrier, tracking URL, **estimated delivery**, notify shipped, status transitions, **mark paid**, **edit customer/shipping** (`PATCH …/customer-details`), **edit line items on unpaid pending orders** (`PATCH …/pending-items`), cancel unpaid pending only |
-| Coupons | Preset percentage coupons (5/10/20/25/50%), custom codes with **scope** (`applies_to`: all / product / category + IDs), **server product search** for product scope, **edit** (description, max uses, expiry, active), activate/deactivate, delete |
-| Messages | Contact inbox — auto **mark read** on open; modal **Mark replied** / **Archive**; bulk updates; error state with retry |
-| Customers | **Server search + pagination**; **admin notes**; address history; detail view, soft delete / restore, show deleted toggle |
+| Coupons | Preset percentage coupons (5/10/20/25/50%), custom codes with **scope** (`applies_to`: all / product / category + IDs), **server product search** for product scope, **edit** (description, max uses, expiry, active), activate/deactivate, delete; list **paginated (10/page)** |
+| Customers | **Server search + pagination**; **admin notes**; address history; **View History** modal (orders paginated, 10/page); detail view, soft delete / restore, show deleted toggle |
 | Reviews | List/create/edit/delete; **server product search** when creating reviews; **customer email visible only here**; edit modal includes **admin response** (shown on storefront); filter by status; quick approve/reject; pagination (50/page); self-loads (no parent tab skeleton flash) |
 
 **API-only admin features** (no dedicated UI tab): activity log export, PayPal test endpoint. Admin PayPal refunds are **disabled** (no-refund store policy).
@@ -416,7 +416,7 @@ At create-payment, a row in `coupon_usage` reserves the coupon for the pending o
 | Control | Detail |
 |---------|--------|
 | **Cloudflare** | `TRUST_CLOUDFLARE=true` required in production; blocks direct origin access; uses `CF-Connecting-IP` |
-| **CORS** | Whitelist `FRONTEND_URL` + localhost dev origins; no-origin allowed in prod only for `/api/health` and webhook |
+| **CORS** | Whitelist `FRONTEND_URL` + localhost dev origins; **non-production:** private LAN IPs (any port) and localhost on ports 5173–5175, 3000, 4173 (Vite fallback when 5173 is busy); no-origin allowed in prod only for `/api/health` and webhook |
 | **Helmet** | CSP (PayPal domains allowed), HSTS in production, frameguard deny, noSniff, XSS filter |
 | **HTTPS** | Production redirect via `x-forwarded-proto`; optional direct SSL via cert env paths |
 | **Request timeout** | 60s default (`REQUEST_TIMEOUT_MS`); slow routes use 180s (`SLOW_REQUEST_TIMEOUT_MS`): `/api/products*`, `/api/admin/analytics`, `/api/activity/*` |
@@ -796,7 +796,7 @@ Any unmatched `/api/*` path returns **404** JSON `{ error: "Route not found" }`.
 | GET | `/api/admin/analytics` | Admin | Dashboard analytics; `?period=day\|week\|month\|year\|all\|custom` (+ optional `from`/`to`); includes `sales` and `inventory` |
 | GET | `/api/admin/analytics/export` | Admin | CSV product sales export for period |
 | GET | `/api/admin/customers` | Admin | Customer list (`?search=&page=&limit=`) |
-| GET | `/api/admin/customers/:email` | Admin | Customer detail by email |
+| GET | `/api/admin/customers/:email` | Admin | Customer detail + order history (`?page=&limit=`; default 20, max 100) |
 | PATCH | `/api/admin/customers/:id` | Admin + CSRF | Update name, phone, admin notes |
 | POST | `/api/admin/customers/recompute` | Admin + CSRF | Rebuild customer aggregates from completed orders |
 | POST | `/api/admin/customers/:id/restore` | Admin + CSRF | Restore soft-deleted customer |
@@ -807,7 +807,7 @@ Any unmatched `/api/*` path returns **404** JSON `{ error: "Route not found" }`.
 | PATCH | `/api/orders/:id/customer-details` | Admin + CSRF | Edit order contact/shipping (not paid line totals) |
 | PATCH | `/api/orders/:id/pending-items` | Admin + CSRF | Edit line items on unpaid pending orders |
 | POST | `/api/admin/orders/bulk-update` | Admin + CSRF | Bulk order status updates |
-| POST | `/api/admin/messages/bulk-update` | Admin + CSRF | Bulk contact message status updates |
+| POST | `/api/admin/messages/bulk-update` | Admin + CSRF | Bulk contact message status updates (**API-only** — no admin inbox tab; contact form still writes `contact_messages`) |
 
 **Endpoint count:** 79 routes (77 active + 2 deprecated **410** responses: `POST /api/orders`, `POST /api/coupons/use`).
 
@@ -845,7 +845,7 @@ Any unmatched `/api/*` path returns **404** JSON `{ error: "Route not found" }`.
 | `/admin/login` | `AdminLogin` | Admin sign-in |
 | `/adminshivamdashboard` | `AdminDashboard` | Protected; redirects to `/admin/login` if unauthenticated |
 
-**Admin dashboard sections** (same URL, in-app tabs — not separate routes): Analytics, Products, Orders, Coupons, Messages, Customers.
+**Admin dashboard sections** (same URL, in-app tabs — not separate routes): Analytics, Products, Orders, Coupons, Customers, Reviews.
 
 ### Fallback
 
@@ -1039,7 +1039,7 @@ npm run links:check
 | Backend unit/API | Vitest | Checkout validation + create-payment happy path, capture 409/refund mismatch, checkout-context API, checkout exchange, PayPal webhooks (COMPLETED + DENIED), admin mark-paid, coupon scope, `computeCheckoutPricingForCart`, payment idempotency, order tokens, process error handlers, RLS table list + grant revoke, email portal URL, activity batch/log, order lookup, reviews check |
 | Frontend E2E / UI | Playwright | Storefront smoke + deep flows (search, policy gate, coupon, cart qty, create-payment, payment 409), checkout/contact/admin UI, mobile viewport |
 
-**Total automated tests:** 183 (93 backend unit + 53 API + 37 Playwright UI).
+**Total automated tests:** 186 (93 backend unit + 54 API + 39 Playwright UI).
 
 | Link check | Custom script | Documentation internal links |
 
