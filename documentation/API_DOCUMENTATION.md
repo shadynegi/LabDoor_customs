@@ -231,8 +231,8 @@ Public list/submit/vote responses use `toPublicReview()` — **`customer_email`,
 | POST | `/generate-hash` | Public (dev only) | Generate bcrypt hash — **403 in production**; use `backend/scripts/generate-admin-hash.mjs` |
 | GET | `/sessions` | Admin | List active sessions |
 | POST | `/sessions/cleanup` | Admin | Remove expired sessions |
-| GET | `/analytics` | Admin | Dashboard analytics; `?period=day\|week\|month\|year\|all\|custom` (+ optional `from`/`to`); includes `sales`, `inventory` |
-| GET | `/analytics/export` | Admin | CSV product sales; `?period=` (+ `from`/`to` for `custom`); attachment `product-sales-{period}.csv` or `product-sales-{from}_{to}.csv` |
+| GET | `/analytics` | Admin | Dashboard analytics; `?period=day\|week\|month\|year\|all\|custom` (+ optional `from`/`to` ISO datetimes, **IST +05:30** for custom); preset boundaries use **Asia/Kolkata** |
+| GET | `/analytics/export` | Admin | CSV product sales; same query params; custom attachment `product-sales-{from}_{to}.csv` (IST calendar dates) |
 | GET | `/customers` | Admin | Customer list (`?search=&page=&limit=`) |
 | GET | `/customers/:email` | Admin | Customer detail + paginated orders (`?page=&limit=`) |
 | PATCH | `/customers/:id` | Admin + CSRF | Update name, phone, admin notes |

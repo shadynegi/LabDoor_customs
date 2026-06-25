@@ -14,15 +14,15 @@ describe('salesAnalytics', () => {
     expect(range.bucket).toBe('day');
   });
 
-  it('parseAnalyticsDateRange supports custom from/to', () => {
+  it('parseAnalyticsDateRange supports custom from/to in IST', () => {
     const range = parseAnalyticsDateRange({
       period: 'custom',
-      from: '2026-01-01T00:00:00.000Z',
-      to: '2026-01-31T23:59:59.999Z',
+      from: '2026-01-01T00:00:00.000+05:30',
+      to: '2026-01-31T23:59:59.999+05:30',
     });
     expect(range.period).toBe('custom');
-    expect(range.from.toISOString()).toBe('2026-01-01T00:00:00.000Z');
-    expect(range.to.toISOString()).toBe('2026-01-31T23:59:59.999Z');
+    expect(range.from.toISOString()).toBe('2025-12-31T18:30:00.000Z');
+    expect(range.to.toISOString()).toBe('2026-01-31T18:29:59.999Z');
   });
 
   it('salesAnalyticsToCsv formats product rows', () => {

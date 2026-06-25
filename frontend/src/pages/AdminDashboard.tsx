@@ -34,6 +34,14 @@ import { useResponsive } from '../hooks/useResponsive';
 import { toast } from 'sonner';
 import LiquidModal from '../components/LiquidModal';
 import AdminProductFormModal, { type AdminProduct } from '../components/AdminProductFormModal';
+import {
+  type AnalyticsPeriod,
+  analyticsExportFilename,
+  buildAnalyticsQueryParams,
+  defaultCustomFromYmd,
+  isCustomAnalyticsRangeApplied,
+  todayIstYmd,
+} from '../lib/adminAnalyticsDates';
 import AdminCouponsTab from '../components/AdminCouponsTab';
 import AdminReviewsTab from '../components/AdminReviewsTab';
 import AdminActionDialog from '../components/AdminActionDialog';
@@ -85,44 +93,6 @@ interface Customer {
   last_order_date: string;
   first_order_date: string;
   is_deleted?: boolean;
-}
-
-type AnalyticsPeriod = 'day' | 'week' | 'month' | 'year' | 'all' | 'custom';
-
-function formatAnalyticsDateInput(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
-
-function defaultAnalyticsCustomFrom(): string {
-  const d = new Date();
-  d.setUTCDate(d.getUTCDate() - 30);
-  return formatAnalyticsDateInput(d);
-}
-
-function defaultAnalyticsCustomTo(): string {
-  return formatAnalyticsDateInput(new Date());
-}
-
-function buildAnalyticsQueryParams(
-  period: AnalyticsPeriod,
-  customFrom: string,
-  customTo: string,
-): string {
-  const params = new URLSearchParams({ period });
-  if (period === 'custom') {
-    params.set('from', `${customFrom}T00:00:00.000Z`);
-    params.set('to', `${customTo}T23:59:59.999Z`);
-  }
-  return params.toString();
-}
-
-function analyticsExportFilename(
-  period: AnalyticsPeriod,
-  customFrom: string,
-  customTo: string,
-): string {
-  if (period === 'custom') return `product-sales-${customFrom}_${customTo}.csv`;
-  return `product-sales-${period}.csv`;
 }
 
 interface InventoryMovement {
@@ -209,8 +179,10 @@ export default function AdminDashboard() {
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
   const [analyticsPeriod, setAnalyticsPeriod] = useState<AnalyticsPeriod>('month');
-  const [analyticsCustomFrom, setAnalyticsCustomFrom] = useState(defaultAnalyticsCustomFrom);
-  const [analyticsCustomTo, setAnalyticsCustomTo] = useState(defaultAnalyticsCustomTo);
+  const [analyticsCustomFrom, setAnalyticsCustomFrom] = useState(defaultCustomFromYmd);
+  const [analyticsCustomTo, setAnalyticsCustomTo] = useState(todayIstYmd);
+  const [analyticsAppliedCustomFrom, setAnalyticsAppliedCustomFrom] = useState<string | null>(null);
+  const [analyticsAppliedCustomTo, setAnalyticsAppliedCustomTo] = useState<string | null>(null);
   const [analyticsExporting, setAnalyticsExporting] = useState(false);
   const [productsError, setProductsError] = useState<string | null>(null);
   const [productsPage, setProductsPage] = useState(1);
@@ -376,6 +348,10 @@ export default function AdminDashboard() {
       const data = await response.json();
       if (data.success) {
         setAnalytics(data.data);
+        if (period === 'custom') {
+          setAnalyticsAppliedCustomFrom(customFrom);
+          setAnalyticsAppliedCustomTo(customTo);
+        }
       } else {
         setAnalytics(null);
         setAnalyticsError(data.error || 'Failed to load analytics');
@@ -390,14 +366,28 @@ export default function AdminDashboard() {
   };
 
   const handleAnalyticsExport = async () => {
-    if (analyticsPeriod === 'custom' && analyticsCustomFrom > analyticsCustomTo) {
-      toast.error('Start date must be on or before end date');
-      return;
+    if (analyticsPeriod === 'custom') {
+      if (!isCustomAnalyticsRangeApplied(
+        analyticsCustomFrom,
+        analyticsCustomTo,
+        analyticsAppliedCustomFrom,
+        analyticsAppliedCustomTo,
+      )) {
+        toast.error('Apply the date range before exporting');
+        return;
+      }
+      if (analyticsCustomFrom > analyticsCustomTo) {
+        toast.error('Start date must be on or before end date');
+        return;
+      }
     }
     setAnalyticsExporting(true);
     try {
       await ensureCsrfToken();
-      const query = buildAnalyticsQueryParams(analyticsPeriod, analyticsCustomFrom, analyticsCustomTo);
+      const query =
+        analyticsPeriod === 'custom'
+          ? buildAnalyticsQueryParams('custom', analyticsAppliedCustomFrom!, analyticsAppliedCustomTo!)
+          : buildAnalyticsQueryParams(analyticsPeriod, '', '');
       const response = await fetch(`${config.apiBaseUrl}/admin/analytics/export?${query}`, {
         credentials: 'include',
         headers: getApiHeaders(),
@@ -409,7 +399,10 @@ export default function AdminDashboard() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = analyticsExportFilename(analyticsPeriod, analyticsCustomFrom, analyticsCustomTo);
+      a.download =
+        analyticsPeriod === 'custom'
+          ? analyticsExportFilename('custom', analyticsAppliedCustomFrom!, analyticsAppliedCustomTo!)
+          : analyticsExportFilename(analyticsPeriod, '', '');
       a.click();
       URL.revokeObjectURL(url);
       toast.success('Sales report downloaded');
@@ -1045,7 +1038,15 @@ export default function AdminDashboard() {
     { id: 'custom', label: 'Custom' },
   ];
 
-  const analyticsToday = defaultAnalyticsCustomTo();
+  const analyticsToday = todayIstYmd();
+  const customRangeApplied = isCustomAnalyticsRangeApplied(
+    analyticsCustomFrom,
+    analyticsCustomTo,
+    analyticsAppliedCustomFrom,
+    analyticsAppliedCustomTo,
+  );
+  const canExportAnalytics =
+    analyticsPeriod !== 'custom' || customRangeApplied;
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
@@ -1129,16 +1130,21 @@ export default function AdminDashboard() {
             ))}
             <button
               type="button"
-              disabled={analyticsExporting}
+              disabled={analyticsExporting || !canExportAnalytics}
+              title={
+                analyticsPeriod === 'custom' && !customRangeApplied
+                  ? 'Apply the date range before exporting'
+                  : undefined
+              }
               onClick={() => void handleAnalyticsExport()}
               style={{
                 marginLeft: isMobile ? 0 : 'auto',
                 padding: '10px 16px',
-                background: '#9c6649',
+                background: canExportAnalytics ? '#9c6649' : '#9ca3af',
                 color: 'white',
                 border: 'none',
                 borderRadius: 8,
-                cursor: analyticsExporting ? 'not-allowed' : 'pointer',
+                cursor: analyticsExporting || !canExportAnalytics ? 'not-allowed' : 'pointer',
                 fontWeight: 600,
                 fontSize: 14,
                 display: 'flex',
@@ -1215,6 +1221,11 @@ export default function AdminDashboard() {
               >
                 Apply range
               </button>
+              {!customRangeApplied && (
+                <p style={{ margin: 0, width: '100%', fontSize: 12, color: '#6b7280' }}>
+                  Apply the date range to refresh the dashboard and enable CSV export. Dates use IST (Asia/Kolkata).
+                </p>
+              )}
             </div>
           )}
         </div>

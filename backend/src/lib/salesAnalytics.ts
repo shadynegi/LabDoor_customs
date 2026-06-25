@@ -1,4 +1,11 @@
 import sql, { withRetry } from './db';
+import {
+  startOfIstDay,
+  startOfIstDayFromYmd,
+  startOfIstMonth,
+  startOfIstWeek,
+  startOfIstYear,
+} from './analyticsIst';
 
 export type AnalyticsPeriod = 'day' | 'week' | 'month' | 'year' | 'all' | 'custom';
 
@@ -13,26 +20,6 @@ export interface AnalyticsDateRange {
 
 const MS_DAY = 24 * 60 * 60 * 1000;
 
-function startOfUtcDay(d: Date): Date {
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-}
-
-function startOfUtcWeek(d: Date): Date {
-  const day = d.getUTCDay();
-  const diff = day === 0 ? 6 : day - 1;
-  const s = startOfUtcDay(d);
-  s.setUTCDate(s.getUTCDate() - diff);
-  return s;
-}
-
-function startOfUtcMonth(d: Date): Date {
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
-}
-
-function startOfUtcYear(d: Date): Date {
-  return new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-}
-
 export function parseAnalyticsDateRange(query: Record<string, unknown>): AnalyticsDateRange {
   const period = String(query.period || 'month').toLowerCase() as AnalyticsPeriod;
   const now = new Date();
@@ -42,7 +29,7 @@ export function parseAnalyticsDateRange(query: Record<string, unknown>): Analyti
 
   switch (period) {
     case 'day':
-      from = startOfUtcDay(to);
+      from = startOfIstDay(to);
       bucket = 'hour';
       break;
     case 'week':
@@ -50,11 +37,11 @@ export function parseAnalyticsDateRange(query: Record<string, unknown>): Analyti
       bucket = 'day';
       break;
     case 'year':
-      from = startOfUtcYear(to);
+      from = startOfIstYear(to);
       bucket = 'month';
       break;
     case 'all':
-      from = new Date(Date.UTC(2020, 0, 1));
+      from = startOfIstDayFromYmd('2020-01-01');
       bucket = 'month';
       break;
     case 'custom':
@@ -63,13 +50,13 @@ export function parseAnalyticsDateRange(query: Record<string, unknown>): Analyti
       break;
     case 'month':
     default:
-      from = startOfUtcMonth(to);
+      from = startOfIstMonth(to);
       bucket = 'day';
       break;
   }
 
   if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
-    from = startOfUtcMonth(now);
+    from = startOfIstMonth(now);
   }
 
   const spanMs = to.getTime() - from.getTime();
@@ -313,10 +300,10 @@ async function aggregateFromOrdersJson(
     const created = new Date(order.created_at as string | Date);
     const periodKey =
       bucket === 'month'
-        ? startOfUtcMonth(created).toISOString()
+        ? startOfIstMonth(created).toISOString()
         : bucket === 'week'
-          ? startOfUtcWeek(created).toISOString()
-          : startOfUtcDay(created).toISOString();
+          ? startOfIstWeek(created).toISOString()
+          : startOfIstDay(created).toISOString();
 
     const period = byPeriod.get(periodKey) ?? { orders: 0, revenue: 0, units_sold: 0 };
     period.orders += 1;

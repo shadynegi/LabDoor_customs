@@ -1,4 +1,3 @@
-//Home.tsx  
 import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { motion, AnimatePresence, type Variants } from "framer-motion";
 import { ChevronLeft, ChevronRight, ShoppingCart, Check, X, HelpCircle, AlertTriangle, Search } from "lucide-react";

@@ -26,14 +26,14 @@ Generate a production password hash locally with `node backend/scripts/generate-
 Displays:
 
 - Order counts and revenue (all time + last 30 days)
-- **Sales period filter** — day, week, month, year, all, or **Custom** with calendar **From** / **To** dates and **Apply range** (`?period=custom&from=&to=` on analytics API; defaults to last 30 days when Custom is first selected)
+- **Sales period filter** — day, week, month, year, all, or **Custom** with IST calendar **From** / **To** dates and **Apply range** (`?period=custom&from=&to=` with `+05:30` offsets; defaults to last 30 IST days when Custom is first selected)
 - **Units sold**, revenue, average order value, and **revenue change vs prior period** for the selected range
 - **Top sellers** by units and revenue; **revenue by product** table with share %
 - **Best sales period** in range (highest-revenue bucket)
 - **Low-stock alert** — products at or below reorder point (`inventory.low_stock_products`)
 - Product engagement metrics (views, cart adds)
 - Customer statistics and geographic breakdown
-- **Export CSV** — `GET /api/admin/analytics/export?period=` (+ `from`/`to` when `period=custom`); download name includes date range for custom periods
+- **Export CSV** — `GET /api/admin/analytics/export?period=` (+ `from`/`to` when `period=custom`); **disabled until Apply range** on Custom so export matches on-screen data; download name includes IST date range for custom periods
 - GA4 and Google Search Console configuration status with external dashboard links
 
 Data source: `GET /api/admin/analytics?period=day|week|month|year|all|custom&from=&to=`

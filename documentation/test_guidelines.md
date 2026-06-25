@@ -46,7 +46,7 @@ If the user did not mention testing, **skip** `npm test`, `npm run test:all`, Pl
 | Frontend E2E / UI | Playwright | `Tests/frontend/` | 13 files, 39 tests | No (mocked `/api` + static preview) |
 | Link checker | Custom script | repo root | — | No |
 
-**Total:** 195 automated tests — 100 backend unit + 56 API + 39 Playwright UI (desktop + mobile projects).
+**Total:** 198 automated tests — 103 backend unit + 56 API + 39 Playwright UI (desktop + mobile projects).
 
 Backend unit tests include: payment idempotency, order tokens, checkout exchange hashing, order token encryption, webhook errors, product image validation, admin session hashing, PayPal webhook utils, refund idempotency, checkout pricing, coupon scope (`applies_to`), `computeCheckoutPricingForCart`, RLS table list + bootstrap contract, RLS grant revoke under `BOOTSTRAP_SKIP_DDL`, email portal URL (`buildOrderPortalUrl`), client IP, keep-alive.
 
@@ -212,7 +212,8 @@ Production frontend builds run `optimize-assets` (WebP from source PNGs) and `bu
 | `paypalWebhookUtils.test.ts` | PayPal webhook payload parsing helpers |
 | `refundIdempotency.test.ts` | Refund request deduplication |
 | `adminAnalyticsCache.test.ts` | Admin analytics cache keys and TTL |
-| `salesAnalytics.test.ts` | Analytics period parsing (incl. custom `from`/`to`) and CSV export helpers |
+| `salesAnalytics.test.ts` | Analytics period parsing (incl. custom IST `from`/`to`) and CSV export helpers |
+| `analyticsIst.test.ts` | IST calendar boundaries for admin analytics |
 | `keepAlive.test.ts` | Supabase pooler keep-alive connection options |
 
 ### API tests (`Tests/api/`)

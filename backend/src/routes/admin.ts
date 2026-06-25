@@ -17,6 +17,7 @@ import { validateJwtSecretComplexity } from '../lib/jwtSecret';
 import { MAX_BULK_IDS, validateStatusTransition, type OrderStatus } from '../lib/orderStatus';
 import { stripOrderSecrets } from '../lib/orderTokens';
 import { respond500 } from '../lib/safeError';
+import { istYmd } from '../lib/analyticsIst';
 import { getAdminAnalytics, fetchSalesAnalytics, parseAnalyticsDateRange, salesAnalyticsToCsv } from '../lib/adminAnalytics';
 import { getProductInventoryMovements, getLowStockProducts, setProductStockAbsolute, applyStockDeltaInTx } from '../lib/inventoryMovements';
 import { buildUploadedMediaUrls, handleProductMediaUpload } from '../lib/productUpload';
@@ -432,7 +433,7 @@ router.get('/analytics/export', verifyAdmin, async (req: Request, res: Response)
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     const exportLabel =
       range.period === 'custom'
-        ? `${range.from.toISOString().slice(0, 10)}_${range.to.toISOString().slice(0, 10)}`
+        ? `${istYmd(range.from)}_${istYmd(range.to)}`
         : range.period;
     res.setHeader(
       'Content-Disposition',
