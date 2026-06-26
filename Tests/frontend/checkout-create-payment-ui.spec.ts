@@ -1,13 +1,12 @@
 import { test, expect } from './fixtures/storefront';
-import { clickPayPalAndWaitForCreatePayment, fillCheckoutCustomerForm } from './helpers/checkout';
 import { seedCart } from './helpers/ui';
+import { fillCheckoutCustomerForm, clickPayPalAndWaitForCreatePayment } from './helpers/checkout';
 import { MOCK_PRODUCTS } from './fixtures/mock-data';
 
-test.describe('Checkout total mismatch UI', () => {
-  test.use({ createPaymentTotal: 999.99 });
+test.describe('Checkout create-payment UI', () => {
   test.describe.configure({ mode: 'serial' });
 
-  test('blocks PayPal redirect when server total differs from client total', async ({ page }) => {
+  test('submits create-payment after policy acceptance', async ({ page }) => {
     test.setTimeout(120_000);
 
     const product = MOCK_PRODUCTS[0];
@@ -36,26 +35,16 @@ test.describe('Checkout total mismatch UI', () => {
     await page.goto('/checkout');
     await cartValidated;
     await expect(page.getByText('Secure Checkout')).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText('$123.00').first()).toBeVisible({ timeout: 15_000 });
     await fillCheckoutCustomerForm(page);
 
-    const policyCheckbox = page.getByRole('checkbox', {
-      name: /understand that all sales are final/i,
-    }).first();
+    const policyCheckbox = page
+      .getByRole('checkbox', { name: /understand that all sales are final/i })
+      .first();
     await policyCheckbox.scrollIntoViewIfNeeded();
     await policyCheckbox.check();
     await expect(policyCheckbox).toBeChecked();
 
     const paymentResponse = await clickPayPalAndWaitForCreatePayment(page);
     expect(paymentResponse.ok()).toBeTruthy();
-
-    await expect(
-      page.locator('[data-sonner-toast]').filter({ hasText: /Pricing was updated/i }),
-    ).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText(/\$999\.99/)).toBeVisible();
-    await expect(page).toHaveURL(/\/checkout/);
-    await expect(
-      page.evaluate(() => sessionStorage.getItem('pendingOrder')),
-    ).resolves.toBeNull();
   });
 });

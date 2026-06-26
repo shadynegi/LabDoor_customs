@@ -22,7 +22,7 @@ Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API
 
 Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_ENCRYPTION_KEY`, `IP_SALT`, `ADMIN_PASSWORD_HASH`.
 
-**Automated tests:** 153 (81 backend unit + 43 API + 29 Playwright) — see [`test_guidelines.md`](test_guidelines.md).
+**Automated tests:** 233 (113 backend unit + 75 API + 45 Playwright) — see [`test_guidelines.md`](test_guidelines.md).
 
 ---
 
@@ -83,6 +83,5 @@ Track in [`PROJECT_AUDIT.md`](PROJECT_AUDIT.md) and [`COVERAGE_MATRIX.md`](COVER
 
 | Priority | Gap |
 |----------|-----|
-| Low (tests) | Full create-payment happy path; email portal URL unit test |
-| Low | Admin dashboard Playwright smoke; RLS grant-revoke DB integration test |
-| Future | PayPal dispute webhooks, OpenAPI spec, Sentry release maps (see `CRITICAL_FIXES_TODO.md`) |
+| Low | RLS grant-revoke live DB integration test (unit mock coverage exists) |
+| Future | PayPal dispute webhooks, OpenAPI spec, Sentry release maps, true load testing (k6/Artillery) — see `CRITICAL_FIXES_TODO.md` |

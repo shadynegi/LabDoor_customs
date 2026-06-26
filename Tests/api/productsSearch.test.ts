@@ -62,4 +62,42 @@ describe('POST /api/products/search', () => {
     expect(res.body.success).toBe(true);
     expect(elapsedMs).toBeLessThan(3000);
   });
+
+  it('rejects invalid limit', async () => {
+    const { agent, csrfToken } = await createCsrfAgent();
+    const res = await withCsrf(agent.post('/api/products/search'), csrfToken).send({
+      query: 'nike',
+      limit: 0,
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error).toMatch(/invalid limit/i);
+  });
+
+  it('rejects limit above server maximum', async () => {
+    const { agent, csrfToken } = await createCsrfAgent();
+    const res = await withCsrf(agent.post('/api/products/search'), csrfToken).send({
+      query: 'nike',
+      limit: 9999,
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error).toMatch(/must not exceed 100/i);
+  });
+
+  it('allows blank query as unfiltered catalog browse', async () => {
+    sqlMock.mockResolvedValueOnce([]);
+
+    const { agent, csrfToken } = await createCsrfAgent();
+    const res = await withCsrf(agent.post('/api/products/search'), csrfToken).send({
+      query: '   ',
+      page: 1,
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(Array.isArray(res.body.data)).toBe(true);
+  });
 });

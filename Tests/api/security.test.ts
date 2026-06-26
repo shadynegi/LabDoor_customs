@@ -108,4 +108,25 @@ describe('security hardening', () => {
     expect(blocked.body.error).toMatch(/too many coupon attempts/i);
     expect(blocked.body.retryAfter).toBeDefined();
   });
+
+  it('requires admin auth for analytics dashboard', async () => {
+    const res = await request(app).get('/api/admin/analytics?period=month');
+    expect(res.status).toBe(401);
+    expect(res.body.success).toBe(false);
+  });
+
+  it('requires admin auth for analytics CSV export', async () => {
+    const res = await request(app).get('/api/admin/analytics/export?period=month');
+    expect(res.status).toBe(401);
+    expect(res.body.success).toBe(false);
+  });
+
+  it('rejects CSRF on admin state-changing routes without token', async () => {
+    const res = await request(app)
+      .post('/api/admin/logout')
+      .set('Cookie', 'admin_session=fake');
+
+    expect([401, 403]).toContain(res.status);
+    expect(res.body.success).toBe(false);
+  });
 });

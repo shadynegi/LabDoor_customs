@@ -17,6 +17,8 @@ The `useResponsive` hook (`frontend/src/hooks/useResponsive.ts`) exposes `isMobi
 
 Shared CSS utilities live in `frontend/src/styles/responsive.css` (imported from `index.css`).
 
+**Automated baseline:** Playwright `responsive-ui.spec.ts` (Pixel 5 / `mobile-chrome` project) covers mobile checkout form fields, cart sticky **Checkout** CTA, product-detail horizontal overflow, and admin login layout. See [`test_guidelines.md`](test_guidelines.md).
+
 ## QA device widths
 
 Layouts are verified at these common viewport widths:

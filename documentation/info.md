@@ -1059,10 +1059,10 @@ npm run links:check
 
 | Suite | Tool | Coverage |
 |-------|------|----------|
-| Backend unit/API | Vitest | Checkout validation + create-payment happy path, capture 409/refund mismatch, checkout-context API, checkout exchange, PayPal webhooks (COMPLETED + DENIED), admin mark-paid, coupon scope, `computeCheckoutPricingForCart`, payment idempotency, order tokens, process error handlers, RLS table list + grant revoke, email portal URL, activity batch/log, order lookup, reviews check |
-| Frontend E2E / UI | Playwright | Storefront smoke + deep flows (search, policy gate, coupon, cart qty, create-payment, payment 409), checkout/contact/admin UI, mobile viewport |
+| Backend unit/API | Vitest | Checkout validation + create-payment happy path, capture 409/refund mismatch, checkout-context API, checkout exchange, PayPal webhooks (COMPLETED + DENIED), admin mark-paid, **admin analytics** (401, IST custom range, CSV export), **validate-cart** (empty/invalid/OOS), **products search** edge cases, **stability/concurrency smoke**, coupon scope, `computeCheckoutPricingForCart`, payment idempotency, order tokens, process error handlers, RLS table list + grant revoke, email portal URL, activity batch/log, order lookup, reviews check, **IST date helpers**, **build performance budgets**, sales analytics invalid-date fallback |
+| Frontend E2E / UI | Playwright | Storefront smoke + deep flows (search, policy gate, coupon, cart qty, payment 409), **checkout create-payment + total mismatch** (serial `chromium-checkout-serial` project), **admin analytics custom range** (Apply-before-export), **responsive UI** (mobile cart sticky CTA, checkout, overflow), checkout/contact/admin UI, mobile viewport |
 
-**Total automated tests:** 198 (103 backend unit + 56 API + 39 Playwright UI).
+**Total automated tests:** 233 (113 backend unit + 75 API + 45 Playwright UI).
 
 | Link check | Custom script | Documentation internal links |
 

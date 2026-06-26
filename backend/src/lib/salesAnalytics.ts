@@ -23,7 +23,7 @@ const MS_DAY = 24 * 60 * 60 * 1000;
 export function parseAnalyticsDateRange(query: Record<string, unknown>): AnalyticsDateRange {
   const period = String(query.period || 'month').toLowerCase() as AnalyticsPeriod;
   const now = new Date();
-  const to = query.to ? new Date(String(query.to)) : now;
+  let to = query.to ? new Date(String(query.to)) : now;
   let from: Date;
   let bucket: AnalyticsDateRange['bucket'] = 'day';
 
@@ -56,6 +56,7 @@ export function parseAnalyticsDateRange(query: Record<string, unknown>): Analyti
   }
 
   if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
+    to = now;
     from = startOfIstMonth(now);
   }
 

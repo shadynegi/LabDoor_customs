@@ -5,7 +5,7 @@
 
 **Review method:** Read `info.md` + operational guides; parallel audit of `backend/src`, `frontend/src`, `Tests/`, CI, env templates; spot-verify critical findings in source.
 
-**Automated tests at audit time:** 99 passing (61 unit + 16 API + 22 Playwright). **After remediation (`3dbdef9`):** 105. **After follow-up (`c6de967`):** 111. **After test sprint (`8303997`):** 127. **After core-gap sprint:** 141. **After audit test gaps:** 149. **Current:** **150** (81 unit + 41 API + 28 Playwright).
+**Automated tests at audit time:** 99 passing (61 unit + 16 API + 22 Playwright). **After remediation (`3dbdef9`):** 105. **After follow-up (`c6de967`):** 111. **After test sprint (`8303997`):** 127. **After core-gap sprint:** 141. **After audit test gaps:** 149. **After no-refund policy sprint:** 150. **Current:** **233** (113 unit + 75 API + 45 Playwright).
 
 ---
 
@@ -195,7 +195,7 @@ The platform is **production-viable** for core storefront checkout, admin fulfil
 - Review PII stripping (`toPublicReview`), admin moderation UI, check endpoint anti-enumeration (product missing)
 - Storefront routes, cart validation + retry, client/server total compare, legacy order URL deprecation
 - Maintenance jobs with ping-first scheduling and transient-error handling (`dbErrors.ts`)
-- **149** automated tests (81 unit + 40 API + 28 Playwright)
+- **233** automated tests (113 unit + 75 API + 45 Playwright) — see [`test_guidelines.md`](test_guidelines.md)
 
 ---
 
@@ -315,6 +315,7 @@ Sprint 4 — Admin/storefront polish
 | 2026-06-10 | SEC-BOOTSTRAP | `rlsGrantRevoke.test.ts` — grant revoke runs when `BOOTSTRAP_SKIP_DDL` |
 | 2026-06-10 | UI-ADMIN | `admin-ui.spec.ts` — login redirect + dashboard analytics smoke (149 tests) |
 | 2026-06-10 | PAY-POLICY / POL-ADMIN | No-refund store policy — `policy_accepted`, admin refund/cancel 403, storefront policy pages (`1406729`; 150 tests) |
+| 2026-06-26 | TEST-EXPANSION | +35 tests — validate-cart API, admin analytics IST/UI, responsive mobile UI, performance budgets, stability smoke, checkout serial Playwright project (233 tests) |
 
 *Append a line when closing each Critical/High item.*
 

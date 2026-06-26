@@ -104,6 +104,7 @@ Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_
 
 ## Testing
 
-- 183 automated tests (93 backend unit + 53 API + 37 Playwright UI)
-- Playwright storefront smoke tests (home, products, checkout, contact)
-- Documentation link checker in CI
+- **233 automated tests** (113 backend unit + 75 API + 45 Playwright UI)
+- Playwright storefront smoke + deep flows, **admin analytics custom range**, **responsive mobile UI**, checkout payment flows (serial project), documentation link checker in CI
+
+See [`test_guidelines.md`](test_guidelines.md) for the full inventory and run commands.

@@ -25,6 +25,18 @@ describe('salesAnalytics', () => {
     expect(range.to.toISOString()).toBe('2026-01-31T18:29:59.999Z');
   });
 
+  it('parseAnalyticsDateRange falls back when custom dates are invalid', () => {
+    const range = parseAnalyticsDateRange({
+      period: 'custom',
+      from: 'not-a-date',
+      to: 'also-invalid',
+    });
+    expect(range.period).toBe('custom');
+    expect(Number.isNaN(range.from.getTime())).toBe(false);
+    expect(Number.isNaN(range.to.getTime())).toBe(false);
+    expect(range.from.getTime()).toBeLessThanOrEqual(range.to.getTime());
+  });
+
   it('salesAnalyticsToCsv formats product rows', () => {
     const csv = salesAnalyticsToCsv({
       range: { period: 'month', from: '', to: '', bucket: 'day' },

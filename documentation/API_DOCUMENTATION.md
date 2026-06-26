@@ -270,7 +270,7 @@ How the React SPA uses these APIs (see also [`info.md`](info.md)):
 
 | Flow | Frontend behavior |
 |------|-------------------|
-| Cart | `POST /products/validate-cart` on cart changes; **Retry validation** on network failure |
+| Cart | `POST /products/validate-cart` on cart changes; **Retry validation** on network failure — API tests: `Tests/api/validateCart.test.ts` |
 | Checkout | `setUserEmail` on email change/blur (consent-gated); `POST /paypal/create-payment` with idempotency key |
 | Payment success | Redeem `GET /paypal/checkout-exchange/:code`; capture with `serverOrderId` + `accessToken`; **409** → processing UI + poll `GET /paypal/checkout-context/:paypalOrderId` (cart not cleared) |
 | Orders | `GET /orders/access-exchange/:code` for email links; `POST /orders/lookup` for manual entry; legacy `?orderNumber=&token=` stripped |

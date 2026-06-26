@@ -5,7 +5,7 @@
 **Authoritative behavior:** [`info.md`](info.md)  
 **Full audit:** [`PROJECT_AUDIT.md`](PROJECT_AUDIT.md) (2026-06-08 initial + follow-up)
 
-**Test count marker (CI should match):** `<!-- tests: 188 -->` (95 unit + 54 API + 39 Playwright)
+**Test count marker (CI should match):** `<!-- tests: 233 -->` (113 unit + 75 API + 45 Playwright)
 
 ---
 
@@ -35,7 +35,8 @@
 | PAY-VOLUME | Volume discount 10%/20% in pricing | `paypalCheckout.ts` L23-35 | `checkoutPricing.test.ts`, `couponValidateVolume.test.ts` | COVERED |
 | PAY-SHIPPING | Free shipping threshold $200 | `paypalCheckout.ts`, `pricing.ts` | `checkoutPricing.test.ts` | COVERED |
 | PAY-FE-TOTAL | Client compares server total before PayPal redirect | `Checkout.tsx` | `checkout-total-mismatch-ui.spec.ts` | COVERED |
-| PAY-POLICY | `policy_accepted: true` required on create-payment | `server.ts`, `returnPolicy.ts`, `Checkout.tsx` | `checkout.test.ts`, `createPaymentHappy.test.ts` | COVERED |
+| PAY-POLICY | `policy_accepted: true` required on create-payment | `server.ts`, `returnPolicy.ts`, `Checkout.tsx` | `checkout.test.ts`, `createPaymentHappy.test.ts`, `checkout-create-payment-ui.spec.ts` | COVERED |
+| PAY-VALIDATE | Cart price/stock validation before checkout | `products.ts`, `CartContext.tsx` | `validateCart.test.ts` | COVERED |
 | POL-ADMIN | Admin refund + paid-order cancel return 403 | `server.ts`, `orders.ts`, `returnPolicy.ts`, `orderTokens.ts` | `orderPolicyAdmin.test.ts`, `security.test.ts` (unauth refund) | COVERED |
 
 ---
@@ -60,7 +61,7 @@
 |----|----------|----------------|---------|--------|
 | SEC-RLS | 14 tables service_role-only + grant revoke | `rlsMigration.ts` | `rlsMigration.test.ts`, `rlsGrantRevoke.test.ts` | COVERED |
 | SEC-BOOTSTRAP | `BOOTSTRAP_SKIP_DDL` must not skip grant revoke | `rlsMigration.ts` | `rlsMigration.test.ts`, `rlsGrantRevoke.test.ts` | COVERED |
-| SEC-CSRF | Double-submit + activity batch exempt | `csrf.ts`, `activity.ts` | `security.test.ts` | PARTIAL |
+| SEC-CSRF | Double-submit + activity batch exempt | `csrf.ts`, `activity.ts` | `security.test.ts` (incl. logout CSRF) | COVERED |
 | SEC-RATE | Redis fail-closed rate limits | `rateLimits.ts`, `rateLimitStore.ts` | `security.test.ts` | COVERED |
 
 ---
@@ -83,14 +84,17 @@
 
 | ID | Behavior | Implementation | Test(s) | Status |
 |----|----------|----------------|---------|--------|
-| UI-SMOKE | Home, products, cart, checkout shell, contact | `Tests/frontend/*.spec.ts` | 37 tests | COVERED |
+| UI-SMOKE | Home, products, cart, checkout shell, contact | `Tests/frontend/*.spec.ts` | 45 tests | COVERED |
 | UI-PAY-409 | Payment success missing token error UX | `PaymentSuccess.tsx` | `payment-success-ui.spec.ts` | COVERED |
 | UI-PAY-TOKEN | Missing PayPal `token` error UX | `PaymentSuccess.tsx` | `payment-success-ui.spec.ts` | COVERED |
 | UI-ORDERS | Orders legacy `?token=` strip + `?code=` email redeem | `MyOrders.tsx` | `orders-ui.spec.ts` | COVERED |
 | UI-ADMIN | Admin `/admin` redirect, login, dashboard analytics smoke | `AdminLogin.tsx`, `AdminDashboard.tsx`, `App.tsx` | `admin-ui.spec.ts` | COVERED |
+| UI-ADMIN-ANALYTICS | Custom IST range Apply-before-export + CSV enablement | `AdminDashboard.tsx`, `adminAnalyticsDates.ts` | `admin-analytics-ui.spec.ts` | COVERED |
 | UI-CHECKOUT-COUNTRY | Checkout country pre-selected (`country-list` US value) | `Checkout.tsx`, `constants/checkoutForm.ts` | `checkout-ui.spec.ts` | COVERED |
+| UI-CHECKOUT-PAY | Create-payment after policy + form fill | `Checkout.tsx`, `helpers/checkout.ts` | `checkout-create-payment-ui.spec.ts` | COVERED |
 | UI-PRODUCT-POLICY | Product detail trust badges match no-refund policy | `ProductDetailPage.tsx`, `constants/returnPolicy.ts` | `deep-flows-ui.spec.ts` | COVERED |
-| UI-DEEP-FLOWS | Search, policy gate, coupon, create-payment, 409 processing | `deep-flows-ui.spec.ts`, `mock-api.ts` | `deep-flows-ui.spec.ts` | COVERED |
+| UI-DEEP-FLOWS | Search, policy gate, coupon, cart qty, 409 processing | `deep-flows-ui.spec.ts`, `mock-api.ts` | `deep-flows-ui.spec.ts` | COVERED |
+| UI-RESPONSIVE | Mobile checkout/cart sticky CTA, overflow, admin login | `CartPage.tsx`, `MobileStickyCta.tsx`, `responsive.css` | `responsive-ui.spec.ts`, `mobile-ui.spec.ts` | COVERED |
 
 ---
 
@@ -110,7 +114,9 @@
 |----|----------|----------------|---------|--------|
 | CI-ENV | Production env validation in CI | `validate-env.mjs`, `ci.yml` | CI job | COVERED |
 | SEC-ORDER-SECRETS | `access_token_hash` + `access_token_encrypted` stripped from order JSON | `orderTokens.ts` `stripOrderSecrets` | `orderTokens.test.ts` | COVERED |
-| DOC-TESTS | Test count in `info.md` | `info.md` | `npm test` (188) | COVERED |
+| DOC-TESTS | Test count in `info.md` | `info.md` | `npm test` (233) | COVERED |
+| PERF-BUDGET | Frontend JS bundle budget contract | `frontend/scripts/build-budget.mjs` | `performanceBudgets.test.ts` | COVERED |
+| STAB-SMOKE | Parallel health + CSRF latency smoke | `server.ts`, `csrf.ts` | `stabilityConcurrency.test.ts` | COVERED |
 
 ---
 
@@ -123,6 +129,7 @@
 | ADM-CUST-NOTES | Customer admin notes + PATCH | `admin.ts` | `adminEnhancements.test.ts` | COVERED |
 | ADM-ORD-EDIT | Pending order customer-details + line items | `adminOrderEdits.ts`, `orders.ts` | `adminEnhancements.test.ts` | COVERED |
 | ADM-ANALYTICS | Period sales analytics + CSV export | `salesAnalytics.ts`, `adminAnalytics.ts` | `salesAnalytics.test.ts`, `adminEnhancements.test.ts`, `adminAnalytics.test.ts` | COVERED |
+| ADM-ANALYTICS-IST | IST calendar boundaries + invalid custom dates | `analyticsIst.ts`, `adminAnalyticsDates.ts`, `salesAnalytics.ts` | `analyticsIst.test.ts`, `adminAnalyticsDates.test.ts`, `salesAnalytics.test.ts`, `adminAnalytics.test.ts` | COVERED |
 
 ---
 

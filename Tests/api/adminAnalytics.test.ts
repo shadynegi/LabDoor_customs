@@ -38,17 +38,50 @@ const analyticsRow = {
   archived: 0,
 };
 
+function mockAdminAnalyticsDb() {
+  sqlMock.mockImplementation(async (strings: TemplateStringsArray) => {
+    const q = strings.join(' ');
+    if (q.includes('admin_sessions')) {
+      return [{ username: 'admin' }];
+    }
+    if (q.includes('order_line_items') && q.includes('COUNT')) {
+      return [{ c: 0 }];
+    }
+    if (q.includes('SELECT COUNT(*)::int AS c') && q.includes('reorder_alert_enabled')) {
+      return [{ c: 0 }];
+    }
+    if (q.includes('total_products')) {
+      return [
+        {
+          total_products: 10,
+          out_of_stock_products: 1,
+          low_stock_products: 0,
+          total_views: 100,
+          total_cart_adds: 20,
+        },
+      ];
+    }
+    if (q.includes('FROM products') && q.includes('reorder_point') && q.includes('stock <=')) {
+      return [];
+    }
+    if (q.includes('FROM orders') && q.includes('payment_status') && q.includes('created_at')) {
+      return [];
+    }
+    return [analyticsRow];
+  });
+}
+
 describe('GET /api/admin/analytics', () => {
   beforeEach(() => {
     sqlMock.mockReset();
     clearCache();
-    sqlMock.mockImplementation(async (strings: TemplateStringsArray) => {
-      const q = strings.join(' ');
-      if (q.includes('admin_sessions')) {
-        return [{ username: 'admin' }];
-      }
-      return [analyticsRow];
-    });
+    mockAdminAnalyticsDb();
+  });
+
+  it('returns 401 without admin session', async () => {
+    const res = await request(app).get('/api/admin/analytics');
+    expect(res.status).toBe(401);
+    expect(res.body.success).toBe(false);
   });
 
   it('returns dashboard analytics payload for authenticated admin', async () => {
@@ -61,5 +94,71 @@ describe('GET /api/admin/analytics', () => {
     expect(res.body.success).toBe(true);
     expect(res.body.data.orders.total_orders).toBe(12);
     expect(res.body.data.products.total_products).toBe(10);
+  });
+
+  it('accepts custom IST date range query params', async () => {
+    const token = createTestAdminToken();
+    const res = await request(app)
+      .get(
+        '/api/admin/analytics?period=custom&from=2026-01-01T00:00:00.000%2B05:30&to=2026-01-31T23:59:59.999%2B05:30',
+      )
+      .set('Cookie', adminSessionCookie(token));
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.sales?.range?.period).toBe('custom');
+    expect(res.body.data.sales?.range?.from).toContain('2025-12-31T18:30:00.000Z');
+    expect(res.body.data.sales?.range?.to).toContain('2026-01-31T18:29:59.999Z');
+  });
+
+  it('falls back safely for unknown period value', async () => {
+    const token = createTestAdminToken();
+    const res = await request(app)
+      .get('/api/admin/analytics?period=not-a-real-period')
+      .set('Cookie', adminSessionCookie(token));
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.sales?.range?.period).toBe('not-a-real-period');
+  });
+});
+
+describe('GET /api/admin/analytics/export', () => {
+  beforeEach(() => {
+    sqlMock.mockReset();
+    clearCache();
+    mockAdminAnalyticsDb();
+  });
+
+  it('returns 401 without admin session', async () => {
+    const res = await request(app).get('/api/admin/analytics/export?period=day');
+    expect(res.status).toBe(401);
+    expect(res.body.success).toBe(false);
+  });
+
+  it('returns CSV attachment for authenticated admin', async () => {
+    const token = createTestAdminToken();
+    const res = await request(app)
+      .get('/api/admin/analytics/export?period=day')
+      .set('Cookie', adminSessionCookie(token));
+
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toMatch(/text\/csv/);
+    expect(res.headers['content-disposition']).toMatch(/product-sales-day\.csv/);
+    expect(res.text).toContain('product_name,units_sold,revenue');
+  });
+
+  it('uses IST dates in custom export filename', async () => {
+    const token = createTestAdminToken();
+    const res = await request(app)
+      .get(
+        '/api/admin/analytics/export?period=custom&from=2026-01-01T00:00:00.000%2B05:30&to=2026-01-31T23:59:59.999%2B05:30',
+      )
+      .set('Cookie', adminSessionCookie(token));
+
+    expect(res.status).toBe(200);
+    expect(res.headers['content-disposition']).toMatch(
+      /product-sales-2026-01-01_2026-01-31\.csv/,
+    );
   });
 });

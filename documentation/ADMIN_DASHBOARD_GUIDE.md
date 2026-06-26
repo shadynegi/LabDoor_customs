@@ -42,6 +42,8 @@ Response includes `sales` (period metrics) and `inventory` (low-stock summary). 
 
 If the analytics API fails, the tab shows an error message with a **Retry** button.
 
+**Automated UI tests:** `Tests/frontend/admin-analytics-ui.spec.ts` verifies Custom range **Apply range** sends IST query params and **Export CSV** stays disabled until dates are applied (and re-disables when dates change). See [`test_guidelines.md`](test_guidelines.md).
+
 ---
 
 ## Products tab

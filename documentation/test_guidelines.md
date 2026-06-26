@@ -41,20 +41,20 @@ If the user did not mention testing, **skip** `npm test`, `npm run test:all`, Pl
 
 | Suite | Tool | Location | Count | Needs live DB? |
 |-------|------|----------|-------|----------------|
-| Backend unit | Vitest | `Tests/backend/` | 26 files, 95 tests | No (mocked) |
-| API integration | Vitest + Supertest | `Tests/api/` | 19 files, 54 tests | No (mocked) |
-| Frontend E2E / UI | Playwright | `Tests/frontend/` | 13 files, 39 tests | No (mocked `/api` + static preview) |
+| Backend unit | Vitest | `Tests/backend/` | 30 files, 113 tests | No (mocked) |
+| API integration | Vitest + Supertest | `Tests/api/` | 22 files, 75 tests | No (mocked) |
+| Frontend E2E / UI | Playwright | `Tests/frontend/` | 16 files, 45 tests | No (mocked `/api` + static preview) |
 | Link checker | Custom script | repo root | — | No |
 
-**Total:** 198 automated tests — 103 backend unit + 56 API + 39 Playwright UI (desktop + mobile projects).
+**Total:** 233 automated tests — 113 backend unit + 75 API + 45 Playwright UI (desktop + mobile projects).
 
-Backend unit tests include: payment idempotency, order tokens, checkout exchange hashing, order token encryption, webhook errors, product image validation, admin session hashing, PayPal webhook utils, refund idempotency, checkout pricing, coupon scope (`applies_to`), `computeCheckoutPricingForCart`, RLS table list + bootstrap contract, RLS grant revoke under `BOOTSTRAP_SKIP_DDL`, email portal URL (`buildOrderPortalUrl`), client IP, keep-alive.
+Backend unit tests include: payment idempotency, order tokens, checkout exchange hashing, order token encryption, webhook errors, product image validation, admin session hashing, PayPal webhook utils, refund idempotency, checkout pricing, coupon scope (`applies_to`), `computeCheckoutPricingForCart`, RLS table list + bootstrap contract, RLS grant revoke under `BOOTSTRAP_SKIP_DDL`, email portal URL (`buildOrderPortalUrl`), client IP, keep-alive, **admin analytics IST date helpers** (`adminAnalyticsDates.test.ts`), **build performance budgets** (`performanceBudgets.test.ts`), **sales analytics** invalid custom-date fallback.
 
-API tests include: checkout (incl. client amount mismatch + policy acceptance), create-payment happy path (mocked PayPal + exchange), capture 409 reconciliation, capture refund mismatch, checkout-context recovery, checkout exchange, PayPal webhook COMPLETED/DENIED, admin mark-paid (validation + success), **admin enhancements** (low-stock, inventory movements, customer PATCH, bulk stock delta, order customer-details, analytics period), **products search**, no-refund policy (admin refund/cancel 403), health, orders, security (incl. LAN dev CORS on alternate Vite ports), activity batch/log, order lookup, reviews check.
+API tests include: checkout (incl. client amount mismatch + policy acceptance), create-payment happy path (mocked PayPal + exchange), capture 409 reconciliation, capture refund mismatch, checkout-context recovery, checkout exchange, PayPal webhook COMPLETED/DENIED, admin mark-paid (validation + success), **admin analytics** (401, custom IST range, CSV export, unknown period), **admin enhancements** (low-stock, inventory movements, customer PATCH, bulk stock delta, order customer-details, analytics period), **products search** (invalid limit, blank query browse), **validate-cart** (empty, invalid item, OOS, happy path), **stability/concurrency smoke** (parallel health + CSRF), no-refund policy (admin refund/cancel 403), health, orders, security (incl. LAN dev CORS, analytics export 401, CSRF logout), activity batch/log, order lookup, reviews check.
 
 Backend unit tests also cover: **sales analytics** period parsing + CSV export, **admin analytics cache** keys/TTL, inventory movement helpers (via integration paths), payment idempotency, order tokens, RLS, email portal URL, and related payment/order utilities.
 
-Playwright includes: payment-success missing-token UX, orders legacy URL deprecation + `?code=` email redeem, checkout server/client total mismatch block, checkout country pre-select (native `<select>`), admin login redirect + dashboard analytics smoke, **deep flows** (`deep-flows-ui.spec.ts`: catalog `?q=` server search, product trust badges + reviews, checkout policy gate + coupon + create-payment, cart quantity, payment-success 409 processing UI). Checkout PayPal tests use `clickPayPalAndWaitForCreatePayment()` in `Tests/frontend/helpers/checkout.ts` (visible PayPal button, polls until enabled, registers response listener before click). The storefront fixture warms `/api/csrf-token` on load to avoid first-test payment timeouts. Mismatch tests set `createPaymentTotal` via the storefront fixture (`Tests/frontend/fixtures/storefront.ts`).
+Playwright includes: payment-success missing-token UX, orders legacy URL deprecation + `?code=` email redeem, **checkout create-payment** + **server/client total mismatch** (serial `chromium-checkout-serial` project), checkout country pre-select (native `<select>`), **admin analytics custom range** (Apply-before-export, IST query params), admin login redirect + dashboard analytics smoke, **responsive UI** (`responsive-ui.spec.ts`: mobile checkout/cart sticky CTA, product overflow, admin login), **deep flows** (`deep-flows-ui.spec.ts`: catalog `?q=` server search, product trust badges + reviews, checkout policy gate + coupon, cart quantity, payment-success 409 processing UI). Checkout PayPal tests use `clickPayPalAndWaitForCreatePayment()` in `Tests/frontend/helpers/checkout.ts` (visible PayPal button, waits for cart validation idle, registers response listener before click). The storefront fixture warms `/api/csrf-token` on load to avoid first-test payment timeouts. Mismatch tests set `createPaymentTotal` via the storefront fixture (`Tests/frontend/fixtures/storefront.ts`).
 
 ---
 
@@ -107,7 +107,7 @@ npm run test:frontend
 
 Playwright starts `vite preview` on `http://127.0.0.1:4173` automatically (see `playwright.config.ts`). Preview sets `PLAYWRIGHT=true` so Vite **does not proxy** `/api` to a live backend — all API traffic is mocked in-browser via `page.route()`. The backend does **not** need to be running.
 
-**UI coverage:** products list/detail, cart, checkout shell, contact form, navigation, cookie consent, mobile viewport (`mobile-ui.spec.ts` runs in the `mobile-chrome` project). Playwright uses `workers: 1` and `retries: 1` for stable checkout flows.
+**UI coverage:** products list/detail, cart, checkout shell, contact form, navigation, cookie consent, **admin analytics custom range**, **responsive mobile layouts** (`mobile-ui.spec.ts` + `responsive-ui.spec.ts` in the `mobile-chrome` project), checkout payment flows in **`chromium-checkout-serial`** (create-payment + total mismatch). Playwright uses `workers: 1` and `retries: 1` for stable checkout flows.
 
 ---
 
@@ -212,31 +212,48 @@ Production frontend builds run `optimize-assets` (WebP from source PNGs) and `bu
 | `paypalWebhookUtils.test.ts` | PayPal webhook payload parsing helpers |
 | `refundIdempotency.test.ts` | Refund request deduplication |
 | `adminAnalyticsCache.test.ts` | Admin analytics cache keys and TTL |
-| `salesAnalytics.test.ts` | Analytics period parsing (incl. custom IST `from`/`to`) and CSV export helpers |
+| `adminAnalyticsDates.test.ts` | Frontend IST date helpers (`adminAnalyticsDates.ts`) |
 | `analyticsIst.test.ts` | IST calendar boundaries for admin analytics |
+| `salesAnalytics.test.ts` | Analytics period parsing (incl. custom IST `from`/`to`, invalid-date fallback) and CSV export helpers |
+| `performanceBudgets.test.ts` | Frontend `build-budget.mjs` contract (JS bundle limits) |
 | `keepAlive.test.ts` | Supabase pooler keep-alive connection options |
+
+See `Tests/backend/` for the full list (30 files, 113 tests).
 
 ### API tests (`Tests/api/`)
 
 | File | What it covers |
 |------|----------------|
 | `health.test.ts` | `GET /api/health` — status and dependencies |
-| `security.test.ts` | CSRF protection, CORS, rate limiting |
+| `security.test.ts` | CSRF protection, CORS, rate limiting, analytics export 401, CSRF logout |
 | `checkout.test.ts` | `POST /api/paypal/create-payment` validation and edge cases |
 | `orders.test.ts` | Order lookup routes, deprecated endpoints |
+| `validateCart.test.ts` | `POST /api/products/validate-cart` — empty cart, invalid item, OOS, happy path |
+| `stabilityConcurrency.test.ts` | Parallel health + CSRF smoke (latency bounds) |
 | `adminEnhancements.test.ts` | Low-stock, inventory movements, customer PATCH, bulk stock, order edits, analytics period |
-| `adminAnalytics.test.ts` | Admin analytics API |
-| `productsSearch.test.ts` | Product search API |
+| `adminAnalytics.test.ts` | Admin analytics API — 401, IST custom range, CSV export, unknown period |
+| `productsSearch.test.ts` | Product search API — invalid limit, blank query browse, happy path |
+
+See `Tests/api/` for the full list (22 files, 75 tests).
 
 API tests use `Tests/helpers/http.ts` for CSRF token flow with Supertest.
 
-### Frontend E2E smoke (`Tests/frontend/`)
+### Frontend E2E / UI (`Tests/frontend/`)
 
 | File | What it covers |
 |------|----------------|
-| `storefront.spec.ts` | Home page, products page, checkout route, contact page render |
+| `storefront.spec.ts` | Home, products, checkout route, contact page render |
+| `checkout-create-payment-ui.spec.ts` | PayPal create-payment after policy + form (serial project) |
+| `checkout-total-mismatch-ui.spec.ts` | Server/client total mismatch blocks redirect (serial project) |
+| `admin-analytics-ui.spec.ts` | Custom IST range — Apply before export, CSV disabled until applied |
+| `responsive-ui.spec.ts` | Mobile checkout fields, cart sticky CTA, product overflow, admin login |
+| `deep-flows-ui.spec.ts` | Search, policy gate, coupon, cart qty, payment 409 processing |
+| `admin-ui.spec.ts` | Admin login redirect + dashboard analytics smoke |
+| `mobile-ui.spec.ts` | Home/products/cart nav on Pixel 5 viewport |
 
-Individual smoke cases:
+See `Tests/frontend/` for the full list (16 files, 45 tests).
+
+Individual smoke cases (`storefront.spec.ts`):
 
 1. **Home** — `#root` visible, title matches `/Lab Door/i`
 2. **Products** — `/products` loads
@@ -252,7 +269,7 @@ Individual smoke cases:
 | Vitest include paths | `backend/vitest.config.ts` | `Tests/backend/**/*.test.ts`, `Tests/api/**/*.test.ts` |
 | Vitest setup / mocks | `Tests/setup.ts` | Mocks `../backend/src/lib/db`, Redis, idempotency |
 | Test env vars | `backend/vitest.config.ts` | Fake JWT, PayPal sandbox keys, admin credentials for tests |
-| Playwright | `Tests/playwright.config.ts` | `testDir: ./frontend`, preview on port **4173**, `PLAYWRIGHT=true` on webServer, `workers: 1`, `retries: 1` |
+| Playwright | `Tests/playwright.config.ts` | `testDir: ./frontend`, preview on port **4173**, projects: `chromium`, `chromium-checkout-serial`, `mobile-chrome`; `workers: 1`, `retries: 1` |
 | Frontend npm scripts | `frontend/package.json` | `test:e2e` → `npm run test:frontend --prefix ../Tests` |
 | Root npm scripts | `package.json` | `test`, `test:backend`, `test:api`, `test:frontend`, `test:all` |
 

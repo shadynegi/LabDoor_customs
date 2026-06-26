@@ -25,19 +25,24 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      testIgnore: [/mobile-ui\.spec\.ts/, /checkout-total-mismatch-ui\.spec\.ts/],
+      testIgnore: [
+        /mobile-ui\.spec\.ts/,
+        /responsive-ui\.spec\.ts/,
+        /checkout-total-mismatch-ui\.spec\.ts/,
+        /checkout-create-payment-ui\.spec\.ts/,
+      ],
       use: { ...devices['Desktop Chrome'] },
     },
     {
-      name: 'chromium-checkout-mismatch',
-      testMatch: /checkout-total-mismatch-ui\.spec\.ts/,
+      name: 'chromium-checkout-serial',
+      testMatch: /checkout-total-mismatch-ui\.spec\.ts|checkout-create-payment-ui\.spec\.ts/,
       fullyParallel: false,
       workers: 1,
       use: { ...devices['Desktop Chrome'] },
     },
     {
       name: 'mobile-chrome',
-      testMatch: /mobile-ui\.spec\.ts/,
+      testMatch: /mobile-ui\.spec\.ts|responsive-ui\.spec\.ts/,
       use: { ...devices['Pixel 5'] },
     },
   ],
