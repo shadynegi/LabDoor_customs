@@ -132,7 +132,7 @@ For a **production-like build** locally, set `frontend/.env` with `VITE_API_BASE
 npm run build
 ```
 
-Apply `backend/src/database/migration-admin-enhancements.sql` in Supabase (or rely on boot-time `ensureAdminEnhancementSchema()` on Railway) before using inventory, customer notes, and period analytics features.
+**Production:** all required migrations are applied (June 2026). **Local/new Supabase:** run `schema.sql` and `migration-*.sql` files from `backend/src/database/`, or rely on boot-time schema helpers on first Railway deploy.
 
 ---
 

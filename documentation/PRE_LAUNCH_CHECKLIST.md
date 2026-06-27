@@ -8,20 +8,21 @@ Tick every item before pointing production traffic at Lab Door Customs.
 
 ## Phase 1 — Database (Supabase)
 
-Run in the **Supabase SQL Editor** (or psql on port 5432). Scripts live in `backend/src/database/`. **Production:** see [SUPABASE_SQL_TO_RUN.md](./SUPABASE_SQL_TO_RUN.md) → *Migration audit* — verify before re-running; performance + search migrations are already applied.
+Run in the **Supabase SQL Editor** (or psql on port 5432). Scripts live in `backend/src/database/`. **Production:** all required migrations are applied — see [SUPABASE_SQL_TO_RUN.md](./SUPABASE_SQL_TO_RUN.md).
 
-- [ ] Base schema applied (`schema.sql` on fresh DB, or already present from prior setup)
-- [ ] `migration-reviews.sql` (if reviews not yet enabled)
-- [ ] `migration-activity-logs.sql`
-- [ ] `migration-rls-tighten.sql`
-- [ ] `migration-rls-sensitive-tables.sql`
-- [ ] `migration-rls-drop-authenticated-policies.sql` (if applicable)
-- [ ] `migration-revoke-graphql-client-roles.sql`
-- [ ] `migration-order-access-exchange.sql` — order email tracking links
+- [x] Base schema applied (`schema.sql` on fresh DB, or already present from prior setup)
+- [x] `migration-reviews.sql` (if reviews not yet enabled)
+- [x] `migration-activity-logs.sql`
+- [x] `migration-rls-tighten.sql` (reference; policies active via boot + performance migration)
+- [x] `migration-rls-sensitive-tables.sql`
+- [x] `migration-rls-drop-authenticated-policies.sql` (if applicable)
+- [x] `migration-revoke-graphql-client-roles.sql`
+- [x] `migration-order-access-exchange.sql` — order email tracking links
 - [x] `migration-performance-linter-fixes.sql` (applied on production Supabase)
 - [x] `migration-products-search-trgm.sql` (applied on production Supabase)
-- [ ] `migration-products-video-360.sql` — `products.video_360` (also added at boot if missing)
-- [ ] Payment/checkout tables present **or** confirmed created on first backend boot (`order_checkout_exchanges`, `order_access_exchanges`, `payment_idempotency`, etc.)
+- [x] `migration-products-video-360.sql` — `products.video_360`
+- [x] `migration-admin-enhancements.sql` — inventory, SKU, order line items, admin notes
+- [x] Payment/checkout tables present (`order_checkout_exchanges`, `order_access_exchanges`, `payment_idempotency`, etc.)
 
 **After SQL:**
 

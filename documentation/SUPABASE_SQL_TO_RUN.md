@@ -8,14 +8,19 @@ SQL scripts to initialize and maintain the Lab Door Customs database.
 
 ## Production Supabase status
 
-Both manual performance migrations are **applied** on the Lab Door Customs Supabase project (operator-confirmed, June 2026):
+**All required database migrations are applied** on the Lab Door Customs Supabase project (operator-confirmed, June 2026). Set `BOOTSTRAP_SKIP_DDL=true` on Railway so boot skips redundant DDL.
 
-| Migration | Status |
-|-----------|--------|
+| Category | Status |
+|----------|--------|
+| Base schema + incremental migrations | Applied — see list in [Migration audit](#migration-audit-production-vs-new-databases) |
 | `migration-performance-linter-fixes.sql` | Applied — FK indexes + consolidated RLS policies (lint 0001 / 0006) |
-| `migration-products-search-trgm.sql` | Applied — `pg_trgm` + `idx_products_name_trgm` / `idx_products_description_trgm` |
+| `migration-products-search-trgm.sql` | Applied — `pg_trgm` + product search GIN indexes |
+| `migration-admin-enhancements.sql` | Applied — SKU, reorder point, `inventory_movements`, `order_line_items`, admin notes |
+| `migration-products-video-360.sql` | Applied — `products.video_360` |
+| RLS + grant revoke migrations | Applied |
+| Payment / exchange tables | Applied |
 
-Re-run either file is safe (`IF NOT EXISTS`). New environments (staging clones) must run them once; use the verification queries below to confirm.
+Re-running any migration file is safe (`IF NOT EXISTS`). Use the verification queries below only for **new environments** (staging clones) or periodic audits.
 
 ---
 
@@ -120,14 +125,21 @@ Use this when deciding what still needs the SQL editor on **production** (verify
 
 ### Applied on production Supabase (June 2026)
 
-| File | Do not re-run unless audit fails |
-|------|----------------------------------|
+All required migrations from `backend/src/database/` are applied on production. **Do not re-run** unless a verification query below fails.
+
+| File | Notes |
+|------|--------|
+| `schema.sql` + migrations 1–15 in the audit table | Core tables, RLS, payment/exchange, reviews, admin enhancements |
 | `migration-performance-linter-fixes.sql` | FK indexes + consolidated RLS (lint 0001 / 0006) |
 | `migration-products-search-trgm.sql` | `pg_trgm` + product search GIN indexes |
+| `migration-admin-enhancements.sql` | Inventory, SKU, order line items, admin notes |
+| `migration-products-video-360.sql` | `products.video_360` |
 
-### Verify in SQL editor — run file only if missing
+**Optional (not required for launch):** `migration-ldcoff10-coupon.sql`, `seed.sql`.
 
-On a live store, these are often already applied via earlier SQL or backend boot. Run the matching `.sql` file **only** when the audit query returns no rows.
+### Verify in SQL editor — new databases only
+
+On a **fresh** Supabase project, run files in order when the audit query returns no rows. Production is complete; skip this section unless cloning a new environment.
 
 | Order | File | What to check |
 |-------|------|----------------|
@@ -135,7 +147,8 @@ On a live store, these are often already applied via earlier SQL or backend boot
 | 2 | `migration-reviews.sql` | Tables `reviews`, `review_votes` |
 | 3 | `migration-activity-logs.sql` | `activity_logs` (if not in base schema) |
 | 4 | `migration-add-size-color.sql` | Columns `products.size`, `products.color` |
-| 4b | `migration-products-video-360.sql` | Column `products.video_360` (360° MP4; boot also adds IF NOT EXISTS) |
+| 4b | `migration-products-video-360.sql` | Column `products.video_360` (360° MP4) |
+| 4c | `migration-admin-enhancements.sql` | SKU, reorder point, `inventory_movements`, `order_line_items`, admin notes |
 | 5 | `migration-soft-delete-users.sql` | `customers.is_deleted`, `customers.deleted_at` |
 | 6 | `migration-order-access-exchange.sql` | Table `order_access_exchanges` |
 | 7 | `migration-order-checkout-exchange.sql` | Table `order_checkout_exchanges` |
@@ -150,9 +163,9 @@ On a live store, these are often already applied via earlier SQL or backend boot
 
 **Legacy (skip on current production):** `migration-order-access-token.sql` — superseded by exchange + encrypted token migrations.
 
-### Usually applied by backend boot (not SQL editor)
+### Usually applied by backend boot (production complete via SQL editor)
 
-If deploy logs show successful bootstrap and `GET /api/health` is OK, manual SQL for these is often unnecessary:
+Production has these objects from migrations; boot only patches gaps when `BOOTSTRAP_SKIP_DDL` is not set:
 
 - `payment_idempotency`, `processed_refund_events`
 - `order_checkout_exchanges`, `order_access_exchanges`

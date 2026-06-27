@@ -452,7 +452,7 @@ Registered in `backend/src/server.ts` (simplified):
 - DB TLS verification in production (`DB_SSL_CA_PATH`; `rejectUnauthorized` defaults true).
 - PayPal order/capture IDs have partial unique indexes to prevent duplicate binding.
 - Product images: admin uploads via **`POST /api/admin/uploads/product-media`** (Multer multipart, images ≤20MB, MP4 ≤15MB) → stored under `uploads/products/` and served at `/uploads/products/*`. Create/update accepts HTTPS/relative URLs (max 2048 chars) or legacy JSON `data:image/*` ≤1MB (`lib/productImage.ts`, aligned with `express.json` 1MB limit). Optional **`UPLOAD_DIR`** env overrides storage path.
-- Supabase RLS at startup (`ensureRlsPolicies()`): all **14** application tables (including `order_access_exchanges`) use **service_role-only** policies; `anon` and `authenticated` grants are revoked — no public product read via PostgREST/GraphQL; all data access goes through Express. Boot is **non-destructive** when policies already exist (skips DROP/CREATE that caused pooler lock hangs). Production Supabase has `migration-performance-linter-fixes.sql` applied (lint 0006 policy consolidation + FK indexes).
+- Supabase RLS at startup (`ensureRlsPolicies()`): all **14** application tables (including `order_access_exchanges`) use **service_role-only** policies; `anon` and `authenticated` grants are revoked — no public product read via PostgREST/GraphQL; all data access goes through Express. Boot is **non-destructive** when policies already exist (skips DROP/CREATE that caused pooler lock hangs). **Production Supabase:** all required SQL migrations applied (June 2026), including `migration-performance-linter-fixes.sql` (lint 0006 policy consolidation + FK indexes) and `migration-products-search-trgm.sql`.
 
 ### Production environment gates
 
@@ -678,8 +678,10 @@ A **correct** `DATABASE_URL` can still produce occasional maintenance warnings w
 - `backend/src/database/migration-*.sql` — incremental migrations (run in Supabase SQL editor), including `migration-order-checkout-exchange.sql` and `migration-order-access-token-encrypted.sql`
 - **Boot applies (skip-if-exists):** `ensureIdempotencyTable()`, `ensureOrderPaymentSchema()`, `ensureCheckoutExchangeTable()`, `ensureOrderAccessExchangeTable()`, `ensureRlsPolicies()`
 - `backend/src/database/migration-rls-tighten.sql` — reference SQL for RLS (mirrors boot logic)
-- `backend/src/database/migration-performance-linter-fixes.sql` — FK indexes (lint 0001) and consolidated RLS policies (lint 0006). **Applied on production Supabase** (June 2026). Not applied at boot; verify with SQL in [SUPABASE_SQL_TO_RUN.md](SUPABASE_SQL_TO_RUN.md).
+- `backend/src/database/migration-performance-linter-fixes.sql` — FK indexes (lint 0001) and consolidated RLS policies (lint 0006). **Applied on production Supabase** (June 2026).
 - `backend/src/database/migration-products-search-trgm.sql` — `pg_trgm` + GIN indexes on `products.name` / `products.description` for `POST /api/products/search`. **Applied on production Supabase** (June 2026).
+- `backend/src/database/migration-admin-enhancements.sql` — SKU, reorder point, inventory movements, order line items, admin notes. **Applied on production Supabase** (June 2026).
+- `backend/src/database/migration-products-video-360.sql` — `products.video_360` for admin 360° MP4 URLs. **Applied on production Supabase** (June 2026).
 - `backend/src/database/migration-payment-idempotency.sql` — includes partial index for reaper (`idx_payment_idempotency_processing_created`); boot also creates this index via `ensureIdempotencyIndexes()` when missing
 
 ---
@@ -933,7 +935,7 @@ Templates: `backend/env.template`, `frontend/env.template`
 | `BOOTSTRAP_BLOCK_UNTIL_RLS` | — | Dev only: set `true` to block API ready until RLS migration finishes (production always waits) |
 | `BOOTSTRAP_BLOCK_API` | — | Dev only: set `true` to return 503 until full bootstrap completes (default: API ready immediately in dev) |
 | `BOOTSTRAP_SKIP_DDL` | — | Skip boot-time CREATE TABLE/INDEX when schema already exists in Supabase |
-| `BOOTSTRAP_FORCE_RLS` | — | Drop legacy RLS policies on boot (default off; production already has `migration-performance-linter-fixes.sql` applied) |
+| `BOOTSTRAP_FORCE_RLS` | — | Drop legacy RLS policies on boot (default off; production migrations complete) |
 | `BOOTSTRAP_PING_TIMEOUT_MS` | 20000 | Fail fast if database is unreachable at bootstrap start |
 | `REQUEST_TIMEOUT_MS` | 60000 | HTTP request timeout |
 | `ADMIN_ANALYTICS_CACHE_TTL_MS` | 600000 (clamped 300000–900000) | Redis/in-memory TTL for `GET /api/admin/analytics` |
