@@ -16,7 +16,7 @@
     "validate-env": "node scripts/validate-env.mjs"
   },
   "dependencies": {
-    "@sentry/node": "^10.55.0",
+    "@sentry/node": "^10.62.0",
     "bcrypt": "^6.0.0",
     "compression": "^1.8.1",
     "cookie-parser": "^1.4.7",
