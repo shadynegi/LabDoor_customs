@@ -58,7 +58,6 @@ export async function fetchAdminAnalytics() {
     countrySummary,
     recentOrders,
     dailyTrend,
-    messageStats,
   ] = await Promise.all([
     analyticsQuery('order_stats', () => sql`
       SELECT
@@ -132,15 +131,6 @@ export async function fetchAdminAnalytics() {
       GROUP BY DATE(created_at)
       ORDER BY date DESC
     `),
-    analyticsQuery('message_stats', () => sql`
-      SELECT
-        COUNT(*)::int AS total,
-        COUNT(*) FILTER (WHERE status = 'new')::int AS new,
-        COUNT(*) FILTER (WHERE status = 'read')::int AS read,
-        COUNT(*) FILTER (WHERE status = 'replied')::int AS replied,
-        COUNT(*) FILTER (WHERE status = 'archived')::int AS archived
-      FROM contact_messages
-    `),
   ]);
 
   const ga4Id = process.env.VITE_GA4_MEASUREMENT_ID?.trim() || null;
@@ -170,7 +160,6 @@ export async function fetchAdminAnalytics() {
     customerLocations: countrySummary,
     recentOrders,
     dailyTrend,
-    messages: messageStats[0] ?? { total: 0, new: 0, read: 0, replied: 0, archived: 0 },
     integrations: {
       ga4: {
         configured: Boolean(ga4Id),

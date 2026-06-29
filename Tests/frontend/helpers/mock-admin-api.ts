@@ -38,7 +38,6 @@ const MOCK_ANALYTICS = {
   countrySummary: [],
   recentOrders: [],
   dailyTrend: [],
-  messages: { unread: 0, total: 0 },
   integrations: {
     ga4: { configured: false, measurementId: null, consoleUrl: 'https://analytics.google.com/' },
     searchConsole: { configured: false, siteUrl: null, consoleUrl: 'https://search.google.com/search-console' },
@@ -122,6 +121,54 @@ export async function installAdminApiMocks(
           'Content-Disposition': 'attachment; filename="product-sales-custom.csv"',
         },
         body: csv,
+      });
+    }
+
+    if (path === '/admin/sessions' && method === 'GET') {
+      if (!adminAuthenticated) {
+        return json(route, { success: false, error: 'Unauthorized' }, 401);
+      }
+      return json(route, {
+        success: true,
+        data: {
+          sessions: [
+            {
+              id: 'sess-1',
+              username: 'admin',
+              ip_address: '127.0.0.1',
+              created_at: '2026-06-10T10:00:00.000Z',
+              expires_at: '2026-06-11T10:00:00.000Z',
+              is_active: true,
+            },
+          ],
+          stats: { total_sessions: 1, active_sessions: 1, expired_sessions: 0 },
+        },
+      });
+    }
+
+    if (path === '/admin/sessions/cleanup' && method === 'POST') {
+      if (!adminAuthenticated) {
+        return json(route, { success: false, error: 'Unauthorized' }, 401);
+      }
+      return json(route, { success: true, data: { deleted: 0 }, message: 'Removed 0 expired session(s)' });
+    }
+
+    if (path === '/admin/customers/recompute' && method === 'POST') {
+      if (!adminAuthenticated) {
+        return json(route, { success: false, error: 'Unauthorized' }, 401);
+      }
+      return json(route, { success: true, message: 'Customer aggregates recomputed from completed orders' });
+    }
+
+    if (path === '/activity/export' && method === 'GET') {
+      if (!adminAuthenticated) {
+        return json(route, { success: false, error: 'Unauthorized' }, 401);
+      }
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/x-ndjson',
+        headers: { 'Content-Disposition': 'attachment; filename="activity-export.ndjson"' },
+        body: '{"id":1,"action_type":"page_view"}\n',
       });
     }
 

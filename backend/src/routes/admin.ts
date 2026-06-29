@@ -1008,58 +1008,6 @@ router.post('/orders/bulk-update', verifyAdmin, async (req: Request, res: Respon
   }
 });
 
-// POST /admin/messages/bulk-update - Bulk update messages
-router.post('/messages/bulk-update', verifyAdmin, async (req: Request, res: Response) => {
-  try {
-    const { messageIds, updates } = req.body;
-
-    if (!messageIds || !Array.isArray(messageIds) || messageIds.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'Message IDs array is required',
-      });
-    }
-
-    if (messageIds.length > MAX_BULK_IDS) {
-      return res.status(400).json({
-        success: false,
-        error: `Bulk update limited to ${MAX_BULK_IDS} items per request`,
-      });
-    }
-
-    const status = updates.status !== undefined ? updates.status : null;
-
-    const BULK_CHUNK = 10;
-    const chunkResults = await runInChunks(messageIds, BULK_CHUNK, async (chunk) =>
-      dbQuery(
-        () =>
-          sql.begin(async (txn) => {
-            const rows = await txn`
-          UPDATE contact_messages SET
-            status = COALESCE(${status}, status),
-            updated_at = NOW()
-          WHERE id = ANY(${chunk}::uuid[])
-          RETURNING id
-        `;
-            return rows;
-          }),
-        'admin:bulkMessagesTxn'
-      )
-    );
-
-    const updatedCount = chunkResults.reduce((sum, rows) => sum + rows.length, 0);
-
-    res.json({
-      success: true,
-      message: `${updatedCount} messages updated`,
-      updatedCount,
-    });
-  } catch (error: any) {
-    logger.error('Bulk update error:', error);
-    respond500(res, error, "Request failed");
-  }
-});
-
 // POST /admin/uploads/product-media — multipart image/video upload (Multer)
 router.post(
   '/uploads/product-media',

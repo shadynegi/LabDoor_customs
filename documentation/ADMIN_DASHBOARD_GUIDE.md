@@ -133,7 +133,16 @@ Aggregated customer data from the `customers` table (updated on order capture).
 - Soft delete customers (`is_deleted = true`) — **Delete** button in table
 - Restore deleted customers — enable **Show deleted customers**, then **Restore**
 - Toggle **Show deleted customers** to include soft-deleted rows
-- **Recompute aggregates** — `POST /api/admin/customers/recompute` (refresh totals from completed orders)
+
+---
+
+## Settings tab
+
+Operational tools without a dedicated data grid:
+
+- **Activity log export** — download all storefront activity as NDJSON via `GET /api/activity/export`; optional **From** / **To** date filters
+- **Admin sessions** — list recent sessions (`GET /api/admin/sessions`, last 50) with active/expired counts; **Clean up expired** calls `POST /api/admin/sessions/cleanup`
+- **Customer aggregates** — **Recompute customer aggregates** runs `POST /api/admin/customers/recompute` (refresh order counts and spend from completed orders)
 
 ---
 
@@ -160,7 +169,7 @@ These are available via API but do not have dedicated dashboard tabs:
 
 | Feature | Endpoints |
 |---------|-----------|
-| Activity logs | `GET /api/activity/logs`, `/export` |
+| Activity log query | `GET /api/activity/logs`, `GET /api/activity/stats` |
 | PayPal refunds | `POST /api/paypal/refund/:captureId` — **disabled** (403; no-refund policy) |
 | PayPal test | `GET /api/paypal/test` |
 
@@ -177,7 +186,6 @@ These are available via API but do not have dedicated dashboard tabs:
 | `PATCH /api/admin/customers/:id` | Update customer CRM profile |
 | `POST /api/admin/customers/recompute` | Rebuild customer aggregates from orders |
 | `POST /api/admin/orders/bulk-update` | Bulk order status updates (not cancellation) |
-| `POST /api/admin/messages/bulk-update` | Bulk contact message status updates (API-only; no inbox tab) |
 
 Use the dedicated cancel endpoint for unpaid pending orders — not bulk update.
 
@@ -185,7 +193,9 @@ Use the dedicated cancel endpoint for unpaid pending orders — not bulk update.
 
 ## Session management
 
-- `GET /api/admin/sessions` — list active admin sessions
+Managed from the **Settings** tab (and via API):
+
+- `GET /api/admin/sessions` — list recent admin sessions
 - `POST /api/admin/sessions/cleanup` — remove expired sessions
 - `POST /api/admin/logout` — end current session
 

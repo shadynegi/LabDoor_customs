@@ -200,12 +200,7 @@ Public list/submit/vote responses use `toPublicReview()` — **`customer_email`,
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/` | Public | Submit contact form |
-| GET | `/` | Admin | List messages |
-| GET | `/stats/summary` | Admin | Message statistics |
-| GET | `/:id` | Admin | Single message |
-| PATCH | `/:id/status` | Admin | Update status |
-| DELETE | `/:id` | Admin | Delete message |
+| POST | `/` | Public | Submit contact form (stored in `contact_messages`; no admin list API) |
 
 ---
 
@@ -244,7 +239,6 @@ Public list/submit/vote responses use `toPublicReview()` — **`customer_email`,
 | POST | `/products/bulk-update` | Admin | Bulk updates: `stock`, `stock_delta`, `is_out_of_stock` (max **500** IDs) |
 | POST | `/uploads/product-media` | Admin + CSRF | Multipart upload — fields `image`, `background`, `video_360` (images ≤20MB, MP4 ≤15MB); returns `{ image?, background?, video_360? }` URL paths |
 | POST | `/orders/bulk-update` | Admin | Bulk order **status** only (max **500** IDs; validates transitions; `cancelled` and `payment_status` rejected) |
-| POST | `/messages/bulk-update` | Admin | Bulk message updates (max **500** IDs) |
 
 ---
 
@@ -276,7 +270,7 @@ How the React SPA uses these APIs (see also [`info.md`](info.md)):
 | Orders | `GET /orders/access-exchange/:code` for email links; `POST /orders/lookup` for manual entry; legacy `?orderNumber=&token=` stripped |
 | Reviews | `POST /reviews/check` on email blur; submit shows pending-moderation copy; vote errors via toast |
 | Contact | `POST /contact` + `contact_submit` activity when consented |
-| Admin | Products 50/page load-more; **Multer** media upload (`POST /admin/uploads/product-media`, max **20 MB** images); coupons `applies_to` on create **and edit**; `admin_response` on review edit; `estimated_delivery` on order PUT |
+| Admin | Products 50/page load-more; **Multer** media upload (`POST /admin/uploads/product-media`, max **20 MB** images); coupons `applies_to` on create **and edit**; `admin_response` on review edit; `estimated_delivery` on order PUT; **Settings** tab: activity export, sessions, customer recompute |
 
 ---
 

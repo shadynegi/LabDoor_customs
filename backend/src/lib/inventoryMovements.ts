@@ -215,7 +215,7 @@ export async function getProductInventoryMovements(
   return [...rows];
 }
 
-/** Daily low-stock digest — logs count; email optional via Resend when configured. */
+/** Daily low-stock digest — logs count only (no email). */
 export async function runLowStockAlertDigest(): Promise<{ count: number; emailed: boolean }> {
   const lowStock = await getLowStockProducts(100);
   if (lowStock.length === 0) {

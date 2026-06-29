@@ -39,7 +39,7 @@ Production TLS: set `DB_SSL_CA_PATH` to Supabase CA bundle.
 | `customers` | Aggregated stats — total_orders, total_spent, soft delete |
 | `coupons` | Discount rules — type, limits, scope (`applies_to`) |
 | `coupon_usage` | Per-order coupon reservations |
-| `contact_messages` | Contact form inbox |
+| `contact_messages` | Contact form submissions (no admin API) |
 | `activity_logs` | Client activity (anonymized IP) |
 | `admin_sessions` | Admin session token hashes (SHA-256) |
 

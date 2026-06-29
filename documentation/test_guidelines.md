@@ -15,7 +15,7 @@ Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API
 |------|----------------|
 | **Checkout** | Cart validation with retry; DB-backed coupon validate; server/client total compare; PayPal `?code=` exchange; capture **409** → processing UI + poll timeout; `checkout_complete` before redirect. |
 | **Orders** | Email links `GET /api/orders/access-exchange/:code`; legacy `?orderNumber=&token=` stripped; partial refresh keeps stale data + warning. |
-| **Admin** | Products paginated (load more); inventory (SKU, reorder, movements, low-stock, bulk stock delta); analytics periods + CSV export; customer search/notes; order customer-details + pending-item edits; messages mark read on open; coupons scope UI; reviews admin response; estimated delivery; error/retry states. |
+| **Admin** | Products paginated (load more); inventory (SKU, reorder, movements, low-stock, bulk stock delta); analytics periods + CSV export; customer search/notes; order customer-details + pending-item edits; **Settings** tab (activity export, sessions, customer recompute); coupons scope UI; reviews admin response; estimated delivery; error/retry states. |
 | **Activity** | Consent-gated batch; `contact_submit` on contact success. |
 | **Reviews** | `POST /api/reviews/check` on email blur; pending-moderation copy; vote error toasts. |
 | **Mobile** | Sticky CTAs with keyboard lift on checkout; cookie banner top on purchase routes; cart stacked CTA at 320px; OOS hides product sticky bar; admin product cards on phones. |

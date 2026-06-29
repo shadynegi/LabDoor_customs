@@ -1,5 +1,5 @@
 // AdminDashboard.tsx - Enhanced Admin panel with analytics, bulk actions, and product management
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Package,
@@ -28,6 +28,7 @@ import {
   Download,
   History,
   CalendarDays,
+  Settings,
 } from 'lucide-react';
 import { apiFetch, catalogFetch, slowApiFetch, config, getApiHeaders, ensureCsrfToken } from '../config';
 import { useResponsive } from '../hooks/useResponsive';
@@ -108,6 +109,16 @@ interface InventoryMovement {
   created_at: string;
 }
 
+interface AdminSession {
+  id: string;
+  username: string;
+  ip_address?: string;
+  user_agent?: string;
+  created_at: string;
+  expires_at: string;
+  is_active: boolean;
+}
+
 interface Analytics {
   orders: any;
   products: any;
@@ -142,7 +153,7 @@ interface Analytics {
   };
 }
 
-type Tab = 'analytics' | 'products' | 'orders' | 'customers' | 'coupons' | 'reviews';
+type Tab = 'analytics' | 'products' | 'orders' | 'customers' | 'coupons' | 'reviews' | 'settings';
 
 const CUSTOMER_HISTORY_PAGE_SIZE = 10;
 
@@ -184,6 +195,18 @@ export default function AdminDashboard() {
   const [analyticsAppliedCustomFrom, setAnalyticsAppliedCustomFrom] = useState<string | null>(null);
   const [analyticsAppliedCustomTo, setAnalyticsAppliedCustomTo] = useState<string | null>(null);
   const [analyticsExporting, setAnalyticsExporting] = useState(false);
+  const [activityExporting, setActivityExporting] = useState(false);
+  const [activityExportStart, setActivityExportStart] = useState('');
+  const [activityExportEnd, setActivityExportEnd] = useState('');
+  const [adminSessions, setAdminSessions] = useState<AdminSession[]>([]);
+  const [sessionStats, setSessionStats] = useState<{
+    total_sessions: number;
+    active_sessions: number;
+    expired_sessions: number;
+  } | null>(null);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [sessionsCleaning, setSessionsCleaning] = useState(false);
+  const [recomputeLoading, setRecomputeLoading] = useState(false);
   const [productsError, setProductsError] = useState<string | null>(null);
   const [productsPage, setProductsPage] = useState(1);
   const [productsTotalPages, setProductsTotalPages] = useState(1);
@@ -282,6 +305,9 @@ export default function AdminDashboard() {
           break;
         case 'customers':
           await fetchCustomers();
+          break;
+        case 'settings':
+          await fetchAdminSessions();
           break;
       }
       tabLoadedRef.current.add(tab);
@@ -411,6 +437,101 @@ export default function AdminDashboard() {
       toast.error('Failed to export analytics');
     } finally {
       setAnalyticsExporting(false);
+    }
+  };
+
+  const fetchAdminSessions = async () => {
+    setSessionsLoading(true);
+    try {
+      const response = await apiFetch('/admin/sessions');
+      const data = await response.json();
+      if (data.success) {
+        setAdminSessions(data.data.sessions || []);
+        setSessionStats(data.data.stats || null);
+      } else {
+        toast.error(data.error || 'Failed to load admin sessions');
+      }
+    } catch (error) {
+      logError('Error fetching admin sessions:', error);
+      toast.error('Failed to load admin sessions');
+    } finally {
+      setSessionsLoading(false);
+    }
+  };
+
+  const handleActivityExport = async () => {
+    if (activityExportStart && activityExportEnd && activityExportStart > activityExportEnd) {
+      toast.error('Start date must be on or before end date');
+      return;
+    }
+    setActivityExporting(true);
+    try {
+      await ensureCsrfToken();
+      const params = new URLSearchParams();
+      if (activityExportStart) params.set('startDate', `${activityExportStart}T00:00:00.000Z`);
+      if (activityExportEnd) params.set('endDate', `${activityExportEnd}T23:59:59.999Z`);
+      const query = params.toString();
+      const response = await fetch(
+        `${config.apiBaseUrl}/activity/export${query ? `?${query}` : ''}`,
+        { credentials: 'include', headers: getApiHeaders() },
+      );
+      if (!response.ok) {
+        throw new Error('Export failed');
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'activity-export.ndjson';
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success('Activity log downloaded');
+    } catch (error) {
+      logError('Activity export error:', error);
+      toast.error('Failed to export activity log');
+    } finally {
+      setActivityExporting(false);
+    }
+  };
+
+  const handleSessionsCleanup = async () => {
+    setSessionsCleaning(true);
+    try {
+      const response = await apiFetch('/admin/sessions/cleanup', { method: 'POST' });
+      const data = await response.json();
+      if (data.success) {
+        toast.success(data.message || 'Expired sessions removed');
+        await fetchAdminSessions();
+      } else {
+        toast.error(data.error || 'Session cleanup failed');
+      }
+    } catch (error) {
+      logError('Session cleanup error:', error);
+      toast.error('Failed to clean up sessions');
+    } finally {
+      setSessionsCleaning(false);
+    }
+  };
+
+  const handleCustomerRecompute = async () => {
+    setRecomputeLoading(true);
+    try {
+      const response = await apiFetch('/admin/customers/recompute', { method: 'POST' });
+      const data = await response.json();
+      if (data.success) {
+        toast.success(data.message || 'Customer aggregates recomputed');
+        invalidateTab('customers');
+        if (activeTab === 'customers') {
+          void loadTabData('customers', { force: true });
+        }
+      } else {
+        toast.error(data.error || 'Recompute failed');
+      }
+    } catch (error) {
+      logError('Customer recompute error:', error);
+      toast.error('Failed to recompute customer aggregates');
+    } finally {
+      setRecomputeLoading(false);
     }
   };
 
@@ -1903,6 +2024,171 @@ export default function AdminDashboard() {
     </div>
   );
 
+  const settingsCardStyle: CSSProperties = {
+    background: 'white',
+    borderRadius: 12,
+    padding: 24,
+    marginBottom: 16,
+    border: '1px solid #e5e7eb',
+  };
+
+  const renderSettings = () => (
+    <div>
+      <div style={settingsCardStyle}>
+        <h3 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 700, color: '#1f2937' }}>Activity log export</h3>
+        <p style={{ margin: '0 0 16px', fontSize: 14, color: '#6b7280' }}>
+          Download all storefront activity as NDJSON. Optional date filters limit the export range.
+        </p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-end', marginBottom: 16 }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13, color: '#374151' }}>
+            From (optional)
+            <input
+              type="date"
+              value={activityExportStart}
+              onChange={(e) => setActivityExportStart(e.target.value)}
+              style={{ padding: '8px 12px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14 }}
+            />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13, color: '#374151' }}>
+            To (optional)
+            <input
+              type="date"
+              value={activityExportEnd}
+              onChange={(e) => setActivityExportEnd(e.target.value)}
+              style={{ padding: '8px 12px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14 }}
+            />
+          </label>
+          <button
+            type="button"
+            onClick={() => void handleActivityExport()}
+            disabled={activityExporting}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '10px 18px',
+              background: '#9c6649',
+              color: 'white',
+              border: 'none',
+              borderRadius: 8,
+              cursor: activityExporting ? 'not-allowed' : 'pointer',
+              fontWeight: 600,
+              opacity: activityExporting ? 0.7 : 1,
+            }}
+          >
+            <Download size={16} />
+            {activityExporting ? 'Exporting…' : 'Export activity log'}
+          </button>
+        </div>
+      </div>
+
+      <div style={settingsCardStyle}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
+          <div>
+            <h3 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 700, color: '#1f2937' }}>Admin sessions</h3>
+            <p style={{ margin: 0, fontSize: 14, color: '#6b7280' }}>
+              Recent admin login sessions (last 50). Remove expired sessions from the database.
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => void fetchAdminSessions()}
+              disabled={sessionsLoading}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 16px', background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 14 }}
+            >
+              <RefreshCw size={16} /> Refresh
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleSessionsCleanup()}
+              disabled={sessionsCleaning}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 16px', background: '#fef3c7', color: '#92400e', border: 'none', borderRadius: 8, cursor: sessionsCleaning ? 'not-allowed' : 'pointer', fontWeight: 600, fontSize: 14, opacity: sessionsCleaning ? 0.7 : 1 }}
+            >
+              <Trash2 size={16} /> {sessionsCleaning ? 'Cleaning…' : 'Clean up expired'}
+            </button>
+          </div>
+        </div>
+        {sessionStats && (
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 16, fontSize: 14, color: '#374151' }}>
+            <span><strong>{sessionStats.total_sessions}</strong> total</span>
+            <span><strong>{sessionStats.active_sessions}</strong> active</span>
+            <span><strong>{sessionStats.expired_sessions}</strong> expired</span>
+          </div>
+        )}
+        {sessionsLoading ? (
+          <p style={{ margin: 0, color: '#6b7280', fontSize: 14 }}>Loading sessions…</p>
+        ) : adminSessions.length === 0 ? (
+          <p style={{ margin: 0, color: '#6b7280', fontSize: 14 }}>No admin sessions found.</p>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid #e5e7eb', textAlign: 'left' }}>
+                  <th style={{ padding: '8px 12px', color: '#6b7280', fontWeight: 600 }}>User</th>
+                  <th style={{ padding: '8px 12px', color: '#6b7280', fontWeight: 600 }}>IP</th>
+                  <th style={{ padding: '8px 12px', color: '#6b7280', fontWeight: 600 }}>Created</th>
+                  <th style={{ padding: '8px 12px', color: '#6b7280', fontWeight: 600 }}>Expires</th>
+                  <th style={{ padding: '8px 12px', color: '#6b7280', fontWeight: 600 }}>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {adminSessions.map((session) => (
+                  <tr key={session.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                    <td style={{ padding: '10px 12px' }}>{session.username}</td>
+                    <td style={{ padding: '10px 12px', color: '#6b7280' }}>{session.ip_address || '—'}</td>
+                    <td style={{ padding: '10px 12px', color: '#6b7280' }}>{new Date(session.created_at).toLocaleString()}</td>
+                    <td style={{ padding: '10px 12px', color: '#6b7280' }}>{new Date(session.expires_at).toLocaleString()}</td>
+                    <td style={{ padding: '10px 12px' }}>
+                      <span style={{
+                        padding: '2px 10px',
+                        borderRadius: 20,
+                        fontSize: 12,
+                        fontWeight: 600,
+                        background: session.is_active ? '#d1fae5' : '#f3f4f6',
+                        color: session.is_active ? '#065f46' : '#6b7280',
+                      }}>
+                        {session.is_active ? 'Active' : 'Expired'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <div style={settingsCardStyle}>
+        <h3 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 700, color: '#1f2937' }}>Customer aggregates</h3>
+        <p style={{ margin: '0 0 16px', fontSize: 14, color: '#6b7280' }}>
+          Rebuild customer order counts and spend totals from completed orders. Use after bulk data fixes or imports.
+        </p>
+        <button
+          type="button"
+          onClick={() => void handleCustomerRecompute()}
+          disabled={recomputeLoading}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '10px 18px',
+            background: '#361906',
+            color: 'white',
+            border: 'none',
+            borderRadius: 8,
+            cursor: recomputeLoading ? 'not-allowed' : 'pointer',
+            fontWeight: 600,
+            opacity: recomputeLoading ? 0.7 : 1,
+          }}
+        >
+          <RefreshCw size={16} />
+          {recomputeLoading ? 'Recomputing…' : 'Recompute customer aggregates'}
+        </button>
+      </div>
+    </div>
+  );
+
   const tabs: { id: Tab; label: string; icon: any }[] = [
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
     { id: 'products', label: 'Products', icon: ShoppingBag },
@@ -1910,6 +2196,7 @@ export default function AdminDashboard() {
     { id: 'coupons', label: 'Coupons', icon: Tag },
     { id: 'reviews', label: 'Reviews', icon: Star },
     { id: 'customers', label: 'Customers', icon: Users },
+    { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
   return (
@@ -1981,6 +2268,7 @@ export default function AdminDashboard() {
             {activeTab === 'coupons' && <AdminCouponsTab />}
             {activeTab === 'reviews' && <AdminReviewsTab />}
             {activeTab === 'customers' && renderCustomers()}
+            {activeTab === 'settings' && renderSettings()}
           </div>
         )}
       </div>

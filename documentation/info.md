@@ -147,8 +147,9 @@
 | Coupons | Preset percentage coupons (5/10/20/25/50%), custom codes with **scope** (`applies_to`: all / product / category + IDs), **server product search** for product scope, **edit** (description, max uses, expiry, active), activate/deactivate, delete; list **paginated (10/page)** |
 | Customers | **Server search + pagination**; **admin notes**; address history; **View History** modal (orders paginated, 10/page); detail view, soft delete / restore, show deleted toggle |
 | Reviews | List/create/edit/delete; **server product search** when creating reviews; **customer email visible only here**; edit modal includes **admin response** (shown on storefront); filter by status; quick approve/reject; pagination (50/page); self-loads (no parent tab skeleton flash) |
+| Settings | **Activity log export** (NDJSON, optional date range); **admin sessions** list + expired-session cleanup; **customer aggregate recompute** |
 
-**API-only admin features** (no dedicated UI tab): activity log export, PayPal test endpoint. Admin PayPal refunds are **disabled** (no-refund store policy).
+**API-only admin features** (no dedicated UI tab): PayPal test endpoint. Admin PayPal refunds are **disabled** (no-refund store policy).
 
 **Store policy:** All sales final — no refunds. Replacements only for verified manufacturing defects within **30 days of delivery** (`/returns-policy`; `/replacement-policy` is an alias). Checkout requires `policy_accepted: true` on create-payment. Shared policy text lives in `backend/src/lib/returnPolicy.ts` and `frontend/src/constants/returnPolicy.ts`. Manufacturing-defect claims: `support@labdoorcustoms.com`.
 
@@ -360,9 +361,9 @@ At create-payment, a row in `coupon_usage` reserves the coupon for the pending o
 ### Contact form
 
 - `POST /api/contact` — rate-limited, CSRF-protected.
-- Stores message in `contact_messages`; sends auto-reply via Resend.
+- Stores message in `contact_messages` for audit; sends auto-reply via Resend.
 - Successful submit emits `contact_submit` activity event (consent-gated).
-- Admin inbox in dashboard with status workflow: new → read → replied → archived; opening a **new** message marks it read via `PATCH /api/contact/:id/status`.
+- **No admin inbox** — contact messages are not listed or managed in the dashboard or via admin API.
 
 ---
 
@@ -376,7 +377,7 @@ At create-payment, a row in `coupon_usage` reserves the coupon for the pending o
 - `POST /api/activity/batch` is **CSRF-exempt** (supports `sendBeacon`) and rate-limited separately; max **20** events per batch. Response includes `inserted` and `skipped` counts; unknown action types are skipped (not persisted). Returns **500** when every valid event in the batch fails to persist. `POST /api/activity/log` returns **500** on database insert failure.
 - IP addresses anonymized with daily-salted SHA-256 (`IP_SALT`); stored as `anon_{hash}`.
 - `product_view` and `add_to_cart` events can bump product metrics when `canBumpProductMetric()` allows (per-IP per-product rate limit).
-- Admin can query logs and export.
+- Admin can query logs via API; **export all activity** from the dashboard **Settings** tab (`GET /api/activity/export`).
 
 ### Storefront analytics
 
@@ -600,7 +601,7 @@ Started after core bootstrap completes (`maintenanceJobs.ts`). The **initial run
 | Job | Interval | Action |
 |-----|----------|--------|
 | **Initial run** | `MAINTENANCE_DEFER_MS` after boot (default 120s) | DB ping → expire stale orders → reap stuck idempotency keys |
-| Hourly bundle | 1 hour | Ping → idempotency cleanup → stale orders → checkout exchange cleanup → order access exchange cleanup |
+| Hourly bundle | 1 hour | Ping → idempotency cleanup → stale orders → **low-stock digest** (log count only; no email) → order line-items backfill → checkout exchange cleanup → order access exchange cleanup |
 | Stuck idempotency reaper | 15 min | Ping → mark long-running `processing` rows as `failed` (batched, `FOR UPDATE SKIP LOCKED`) |
 
 **Idempotency reaper:** uses partial index `idx_payment_idempotency_processing_created` (existence cached in memory after first check); batch size `IDEMPOTENCY_REAP_BATCH_SIZE` (default 50); max batches per run `IDEMPOTENCY_REAP_MAX_BATCHES` (default 10). On Supabase pooler, statements are capped at ~120s — batched reaper avoids statement timeouts. Healthy runs with nothing to reap stay silent (no periodic “no stuck keys” spam).
@@ -659,7 +660,7 @@ A **correct** `DATABASE_URL` can still produce occasional maintenance warnings w
 | `customers` | Aggregated customer stats, soft delete |
 | `coupons` | Discount rules, scope, validity, usage limits |
 | `coupon_usage` | Per-order coupon reservations |
-| `contact_messages` | Contact inbox |
+| `contact_messages` | Contact form submissions (audit storage; no admin API) |
 | `activity_logs` | Anonymized activity events |
 | `admin_sessions` | Admin session token hashes (SHA-256) |
 | `order_checkout_exchanges` | One-time PayPal return codes → order access tokens |
@@ -790,11 +791,6 @@ Any unmatched `/api/*` path returns **404** JSON `{ error: "Route not found" }`.
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | POST | `/api/contact` | Public + CSRF | Submit contact form |
-| GET | `/api/contact` | Admin | List contact messages |
-| GET | `/api/contact/stats/summary` | Admin | Inbox summary stats |
-| GET | `/api/contact/:id` | Admin | Single message |
-| PATCH | `/api/contact/:id/status` | Admin + CSRF | Update message status |
-| DELETE | `/api/contact/:id` | Admin + CSRF | Delete message |
 
 ### Activity (`/api/activity` — `backend/src/routes/activity.ts`)
 
@@ -831,9 +827,8 @@ Any unmatched `/api/*` path returns **404** JSON `{ error: "Route not found" }`.
 | PATCH | `/api/orders/:id/customer-details` | Admin + CSRF | Edit order contact/shipping (not paid line totals) |
 | PATCH | `/api/orders/:id/pending-items` | Admin + CSRF | Edit line items on unpaid pending orders |
 | POST | `/api/admin/orders/bulk-update` | Admin + CSRF | Bulk order status updates |
-| POST | `/api/admin/messages/bulk-update` | Admin + CSRF | Bulk contact message status updates (**API-only** — no admin inbox tab; contact form still writes `contact_messages`) |
 
-**Endpoint count:** 79 routes (77 active + 2 deprecated **410** responses: `POST /api/orders`, `POST /api/coupons/use`).
+**Endpoint count:** 73 routes (71 active + 2 deprecated **410** responses: `POST /api/orders`, `POST /api/coupons/use`).
 
 ---
 
