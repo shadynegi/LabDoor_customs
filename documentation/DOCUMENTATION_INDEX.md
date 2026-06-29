@@ -14,7 +14,7 @@
 |------|----------|
 | Monorepo | `frontend/` (React/Vite), `backend/` (Express), `Tests/` (Vitest + Playwright) |
 | Production | One Express process: `/api/*` + built SPA; Supabase PostgreSQL via service_role |
-| Checkout | Server-bound PayPal orders; `policy_accepted` required; no-refund / replacement-only policy; `?code=` exchange; capture **409** processing UI; email synced to activity on change/blur |
+| Checkout | Server-side place-order; `policy_accepted` required; no-refund / replacement-only policy; WhatsApp redirect with pre-filled message; email synced to activity on change/blur |
 | Cart | `POST /api/products/validate-cart` on item changes with retry; catalog search via `POST /api/products/search` (no full-catalog client cache) |
 | Orders | Email `?code=` access exchange; legacy URL tokens deprecated; partial refresh keeps stale data |
 | RLS | 14 tables service_role-only; no public PostgREST product read |
@@ -67,8 +67,7 @@
 
 | Document | Purpose |
 |----------|---------|
-| [PAYPAL_SETUP_GUIDE.md](./PAYPAL_SETUP_GUIDE.md) | PayPal app, credentials, webhooks |
-| [PAYPAL_TESTING_GUIDE.md](./PAYPAL_TESTING_GUIDE.md) | Sandbox checkout testing |
+| [WHATSAPP_CHECKOUT_GUIDE.md](./WHATSAPP_CHECKOUT_GUIDE.md) | WhatsApp checkout flow and admin payment confirmation |
 | [ORDER_MANAGEMENT_GUIDE.md](./ORDER_MANAGEMENT_GUIDE.md) | Admin order operations |
 | [ORDER_TRACKING_QUICKSTART.md](./ORDER_TRACKING_QUICKSTART.md) | Customer order lookup |
 
@@ -105,7 +104,7 @@
 
 | Document | Purpose |
 |----------|---------|
-| [PRE_LAUNCH_CHECKLIST.md](./PRE_LAUNCH_CHECKLIST.md) | Production go-live (env, DB, PayPal, smoke tests) |
+| [PRE_LAUNCH_CHECKLIST.md](./PRE_LAUNCH_CHECKLIST.md) | Production go-live (env, DB, WhatsApp checkout, smoke tests) |
 | [RESPONSIVE_QA_CHECKLIST.md](./RESPONSIVE_QA_CHECKLIST.md) | Responsive layout QA |
 | [FORMS_QA_CHECKLIST.md](./FORMS_QA_CHECKLIST.md) | Forms and CSRF QA |
 
@@ -125,5 +124,4 @@
 
 | Document | Purpose |
 |----------|---------|
-| [diagnose-paypal-issue.md](./diagnose-paypal-issue.md) | PayPal troubleshooting |
 | [DEBUG_FETCH_ERROR.md](./DEBUG_FETCH_ERROR.md) | API fetch / CORS issues |

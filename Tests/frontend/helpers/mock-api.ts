@@ -212,61 +212,7 @@ export async function installStorefrontApiMocks(
       });
     }
 
-    const checkoutExchangeMatch = path.match(/^\/paypal\/checkout-exchange\/([^/]+)$/);
-    if (checkoutExchangeMatch && method === 'GET') {
-      const code = decodeURIComponent(checkoutExchangeMatch[1]);
-      if (code === 'RECON-CODE' || code === 'CHECKOUT-OK') {
-        return json(route, {
-          success: true,
-          accessToken: 'b'.repeat(64),
-          serverOrderId: '00000000-0000-0000-0000-00000000cc01',
-          orderNumber: 'GSS-RECON-TEST',
-          total: 98,
-        });
-      }
-      return json(route, { success: false, error: 'Invalid or expired checkout code' }, 404);
-    }
-
-    const captureMatch = path.match(/^\/paypal\/capture-payment\/([^/]+)$/);
-    if (captureMatch && method === 'POST') {
-      const paypalOrderId = decodeURIComponent(captureMatch[1]);
-      if (paypalOrderId === 'PAYPAL-409') {
-        return json(
-          route,
-          {
-            success: false,
-            error: 'Payment received — order processing',
-            message:
-              'Payment received — your order is still being confirmed. This usually resolves within a minute.',
-          },
-          409,
-        );
-      }
-      if (paypalOrderId === 'PAYPAL-OK') {
-        return json(route, {
-          success: true,
-          order: {
-            order_number: 'GSS-PAID-TEST',
-            total: 98,
-            payment_status: 'completed',
-            status: 'processing',
-            shipping_address: {},
-          },
-        });
-      }
-    }
-
-    if (path.startsWith('/paypal/checkout-context/') && method === 'GET') {
-      return json(route, {
-        success: true,
-        alreadyCompleted: false,
-        serverOrderId: '00000000-0000-0000-0000-00000000cc01',
-        orderNumber: 'GSS-RECON-TEST',
-        total: 98,
-      });
-    }
-
-    if (path === '/paypal/create-payment' && method === 'POST') {
+    if (path === '/checkout/place-order' && method === 'POST') {
       let body: { amount?: string } = {};
       try {
         body = route.request().postDataJSON() as typeof body;
@@ -275,20 +221,15 @@ export async function installStorefrontApiMocks(
       }
       const parsedAmount = parseFloat(body.amount ?? '');
       const mismatch = createPaymentTotal != null;
+      const total = createPaymentTotal ?? (Number.isFinite(parsedAmount) ? parsedAmount : 123);
       return json(route, {
         success: true,
-        total: createPaymentTotal ?? (Number.isFinite(parsedAmount) ? parsedAmount : 123),
-        orderId: mismatch ? 'PAYPAL-MISMATCH' : 'PAYPAL-OK',
+        total,
         serverOrderId: mismatch
           ? '00000000-0000-0000-0000-00000000ff01'
           : '00000000-0000-0000-0000-00000000dd01',
         orderNumber: mismatch ? 'GSS-MISMATCH' : 'GSS-CHECKOUT-TEST',
-        links: [
-          {
-            rel: 'approve',
-            href: `https://www.sandbox.paypal.com/checkoutnow?token=${mismatch ? 'PAYPAL-MISMATCH' : 'PAYPAL-OK'}`,
-          },
-        ],
+        whatsappUrl: `https://wa.me/919888514572?text=${encodeURIComponent(`Order ${mismatch ? 'GSS-MISMATCH' : 'GSS-CHECKOUT-TEST'}`)}`,
       });
     }
 

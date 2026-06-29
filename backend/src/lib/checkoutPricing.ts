@@ -50,8 +50,8 @@ export interface ValidatedLineItem {
   size_value?: string;
 }
 
-export type { PendingPayPalOrderInput } from './orderLifecycle';
-export { createPendingPayPalOrderAtomic as createPendingPayPalOrder, cancelPendingOrderAndRestoreStock } from './orderLifecycle';
+export type { PendingOrderInput } from './orderLifecycle';
+export { createPendingOrderAtomic, cancelPendingOrderAndRestoreStock } from './orderLifecycle';
 
 export function calculateCheckoutPricing(
   subtotal: number,
@@ -89,7 +89,7 @@ export type ComputedCheckoutPricing = {
   couponDiscount: number;
 };
 
-/** Shared pricing path for create-payment and coupon validate (DB-backed cart). */
+/** Shared pricing path for checkout and coupon validate (DB-backed cart). */
 export async function computeCheckoutPricingForCart(
   items: CheckoutCartItemInput[],
   couponCode?: string,
@@ -331,14 +331,6 @@ export async function resolveCouponDiscount(
 }
 
 export { InsufficientStockError };
-
-export function extractPayPalCaptureAmount(captureData: Record<string, any>): number | null {
-  const unit = captureData?.purchase_units?.[0];
-  const capture = unit?.payments?.captures?.[0];
-  const value = capture?.amount?.value ?? captureData?.amount?.value;
-  if (value == null) return null;
-  return parseFloat(String(value));
-}
 
 export function amountsMatch(expected: number, actual: number, tolerance = 0.01): boolean {
   return Math.abs(expected - actual) <= tolerance;

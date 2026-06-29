@@ -13,7 +13,7 @@ Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API
 
 | Area | How it works |
 |------|----------------|
-| **Checkout** | Cart validation with retry; PayPal `?code=` exchange; capture **409** → processing UI; checkout email synced to activity on change/blur. |
+| **Checkout** | Cart validation with retry; **Place Order** → WhatsApp redirect; checkout email synced to activity on change/blur. |
 | **Orders** | Email links `GET /api/orders/access-exchange/:code`; legacy `?orderNumber=&token=` stripped; partial refresh keeps stale data + warning. 
 | **Admin** | Products paginated (load more); messages mark read on open; coupons scope UI; reviews admin response; estimated delivery; error/retry states. |
 | **Activity** | Consent-gated batch; `contact_submit` on contact success. |
@@ -43,13 +43,13 @@ One Express process serves `/api/*` and the React SPA (`frontend/dist`). Cloudfl
 - [ ] `FRONTEND_URL` — public site URL (`https://www.yourdomain.com`)
 - [ ] `ADMIN_USERNAME` — admin login username
 - [ ] `ADMIN_PASSWORD_HASH` — bcrypt hash (`node backend/scripts/generate-admin-hash.mjs "password"`)
-- [ ] `PAYPAL_*` — live credentials + `PAYPAL_WEBHOOK_ID`
+- [ ] `WHATSAPP_ORDER_PHONE` — optional; digits only (default `919888514572`)
 - [ ] `TRUST_CLOUDFLARE=true`
 - [ ] `REDIS_URL` — Redis instance
 - [ ] `SENTRY_DSN` — backend error tracking
 - [ ] `JWT_SECRET` — 32+ characters
 - [ ] `RESEND_API_KEY` — transactional email
-- [ ] `ORDER_TOKEN_ENCRYPTION_KEY` — checkout exchange token encryption
+- [ ] `ORDER_TOKEN_ENCRYPTION_KEY` — order access token encryption
 - [ ] `IP_SALT` — activity IP anonymization and review voter IDs
 - [ ] Healthcheck: `/api/health`
 

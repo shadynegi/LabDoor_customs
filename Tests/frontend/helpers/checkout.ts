@@ -1,8 +1,8 @@
 import type { Page, Response } from '@playwright/test';
 import { expect } from '@playwright/test';
 
-function visiblePayPalButton(page: Page) {
-  return page.locator('button:visible', { hasText: /pay with paypal/i }).first();
+function visiblePlaceOrderButton(page: Page) {
+  return page.locator('button:visible', { hasText: /place order/i }).first();
 }
 
 async function isCartValidationIdle(page: Page): Promise<boolean> {
@@ -22,11 +22,10 @@ async function isCartValidationIdle(page: Page): Promise<boolean> {
   return !cartError;
 }
 
-/** Wait until cart validation finishes and the PayPal button is stably clickable. */
+/** Wait until cart validation finishes and Place Order is stably clickable. */
 export async function waitForCheckoutPayReady(page: Page): Promise<void> {
-  const payButton = visiblePayPalButton(page);
+  const placeOrderButton = visiblePlaceOrderButton(page);
 
-  // Cart validation can re-run after REFRESH_PRICES — drain a few cycles.
   for (let i = 0; i < 10; i++) {
     await page
       .waitForResponse(
@@ -44,16 +43,16 @@ export async function waitForCheckoutPayReady(page: Page): Promise<void> {
     .poll(
       async () => {
         if (!(await isCartValidationIdle(page))) return false;
-        if (!(await payButton.isEnabled())) return false;
+        if (!(await placeOrderButton.isEnabled())) return false;
         await page.waitForTimeout(400);
-        return (await isCartValidationIdle(page)) && payButton.isEnabled();
+        return (await isCartValidationIdle(page)) && placeOrderButton.isEnabled();
       },
       { timeout: 90_000, intervals: [300, 500, 1000] },
     )
     .toBe(true);
 }
 
-/** Fill minimal checkout customer fields for PayPal redirect tests. */
+/** Fill minimal checkout customer fields for place-order tests. */
 export async function fillCheckoutCustomerForm(page: Page): Promise<void> {
   await page
     .waitForResponse(
@@ -82,32 +81,30 @@ export async function fillCheckoutCustomerForm(page: Page): Promise<void> {
 
   await expect(page.locator('#fullName')).toHaveValue('Playwright Buyer');
   await expect(page.locator('#email')).toHaveValue('buyer@example.com');
-  await expect(page.locator('#phone')).toHaveValue('5551234567');
-  await expect(page.locator('#address')).toHaveValue('123 Test Street Suite 100');
-  await expect(page.locator('#city')).toHaveValue('New York');
-  await expect(page.locator('#state')).toHaveValue('NY');
-  await expect(page.locator('#zipCode')).toHaveValue('10001');
 }
 
-/** Click PayPal and wait for create-payment — listener registered before click to avoid races. */
-export async function clickPayPalAndWaitForCreatePayment(page: Page): Promise<Response> {
+/** Click Place Order and wait for checkout API — listener registered before click. */
+export async function clickPlaceOrderAndWaitForResponse(page: Page): Promise<Response> {
   await page.evaluate(async () => {
     await fetch('/api/csrf-token', { credentials: 'include' });
   });
 
   await waitForCheckoutPayReady(page);
 
-  const payButton = visiblePayPalButton(page);
-  await payButton.scrollIntoViewIfNeeded();
+  const placeOrderButton = visiblePlaceOrderButton(page);
+  await placeOrderButton.scrollIntoViewIfNeeded();
 
-  const waitForCreatePayment = () =>
+  const waitForPlaceOrder = () =>
     page.waitForResponse(
       (res) =>
-        res.url().includes('/paypal/create-payment') &&
+        res.url().includes('/checkout/place-order') &&
         res.request().method() === 'POST',
       { timeout: 60_000 },
     );
 
-  const [response] = await Promise.all([waitForCreatePayment(), payButton.click()]);
+  const [response] = await Promise.all([waitForPlaceOrder(), placeOrderButton.click()]);
   return response;
 }
+
+/** @deprecated Use clickPlaceOrderAndWaitForResponse */
+export const clickPayPalAndWaitForCreatePayment = clickPlaceOrderAndWaitForResponse;

@@ -2,7 +2,7 @@
 
 Admin workflows for order fulfillment.
 
-**Full reference:** [`info.md`](info.md) | **Dashboard:** [ADMIN_DASHBOARD_GUIDE.md](./ADMIN_DASHBOARD_GUIDE.md)
+**Full reference:** [`info.md`](info.md) | **Dashboard:** [ADMIN_DASHBOARD_GUIDE.md](./ADMIN_DASHBOARD_GUIDE.md) | **Checkout:** [WHATSAPP_CHECKOUT_GUIDE.md](./WHATSAPP_CHECKOUT_GUIDE.md)
 
 ---
 
@@ -10,7 +10,7 @@ Admin workflows for order fulfillment.
 
 | payment_status | status | Meaning |
 |----------------|--------|---------|
-| pending | pending | Awaiting PayPal payment |
+| pending | pending | Awaiting payment confirmation (WhatsApp / manual) |
 | completed | processing | Paid, ready to fulfill |
 | completed | shipped | Shipped with tracking |
 | completed | delivered | Delivered |
@@ -21,13 +21,14 @@ Admin workflows for order fulfillment.
 
 ## Fulfillment workflow
 
-1. Order appears as **processing** after PayPal capture (or after admin **Mark paid** for offline payments).
-2. Open the order in the admin dashboard **Orders** tab → click order card.
-3. Enter tracking number, carrier, optional tracking URL, and optional **estimated delivery** date → **Save tracking** (`PUT /api/orders/:id` includes `estimated_delivery`).
-4. Click **Notify shipped** (`POST /api/orders/:id/notify-shipped`) — requires tracking number.
-5. Use **Mark shipped** / **Mark delivered** for status transitions.
+1. Customer places order via **Place Order** → order appears as **pending** in admin.
+2. After payment is confirmed on WhatsApp, admin opens the order and clicks **Mark paid** with a payment reference.
+3. Order moves to **processing**; confirmation email sends if Resend is configured.
+4. Enter tracking number, carrier, optional tracking URL, and optional **estimated delivery** date → **Save tracking** (`PUT /api/orders/:id` includes `estimated_delivery`).
+5. Click **Notify shipped** (`POST /api/orders/:id/notify-shipped`) — requires tracking number.
+6. Use **Mark shipped** / **Mark delivered** for status transitions.
 
-Orders are paginated (50 per page). Use the search box to find orders by order number, customer email, or name — search runs server-side across the full order list (`GET /api/orders?search=`).
+Orders are paginated (50 per page). Use the search box to find orders by order number, customer email, or name — search runs server-side across the full order list (`GET /api/orders?search=`). The WhatsApp message includes the **order number** for easy lookup.
 
 Use **Cancel order** in the modal for cancellations (not bulk update).
 
@@ -35,14 +36,14 @@ Use **Cancel order** in the modal for cancellations (not bulk update).
 
 ## Manual mark paid
 
-For offline or non-PayPal payments, use **Mark paid** in the order modal. The API requires a reason and a payment reference:
+After confirming payment (WhatsApp, UPI, bank transfer, etc.), use **Mark paid** in the order modal. The API requires a reason and a payment reference:
 
 ```json
 PATCH /api/orders/:id/payment-status
 {
   "payment_status": "completed",
   "admin_note": "your reason (min 3 characters)",
-  "payment_id": "CAPTURE_OR_EXTERNAL_REF_ID (min 5 characters)"
+  "payment_id": "EXTERNAL_PAYMENT_REF (min 5 characters)"
 }
 ```
 
@@ -77,4 +78,3 @@ Each manual mark is recorded in `activity_logs` as `admin_mark_paid`.
 | Cancel | `POST /api/orders/:id/cancel` |
 | Ship notify | `POST /api/orders/:id/notify-shipped` |
 | Mark paid (manual) | `PATCH /api/orders/:id/payment-status` — `{ "payment_status": "completed", "admin_note": "...", "payment_id": "..." }` |
-| Refund | `POST /api/paypal/refund/:captureId` — **disabled** (403; no-refund policy) |

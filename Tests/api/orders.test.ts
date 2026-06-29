@@ -34,13 +34,13 @@ const validOrderPayload = {
 };
 
 describe('POST /api/orders', () => {
-  it('returns 410 — direct order creation deprecated (use PayPal checkout)', async () => {
+  it('returns 410 — direct order creation deprecated (use checkout place-order)', async () => {
     const { agent, csrfToken } = await createCsrfAgent();
     const res = await withCsrf(agent.post('/api/orders'), csrfToken).send(validOrderPayload);
 
     expect(res.status).toBe(410);
     expect(res.body.success).toBe(false);
     expect(res.body.error).toMatch(/deprecated/i);
-    expect(res.body.message).toMatch(/PayPal checkout/i);
+    expect(res.body.message).toMatch(/checkout\/place-order/i);
   });
 });

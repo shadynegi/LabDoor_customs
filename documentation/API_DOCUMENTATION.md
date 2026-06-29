@@ -4,7 +4,7 @@
 
 Base URL: `{VITE_API_BASE_URL}` (default local: `http://localhost:5000/api`)
 
-Mutating requests require CSRF token (`X-CSRF-Token` header + cookie) except PayPal webhooks and `POST /activity/batch` (CSRF-exempt for `sendBeacon`; rate-limited).
+Mutating requests require CSRF token (`X-CSRF-Token` header + cookie) except `POST /activity/batch` (CSRF-exempt for `sendBeacon`; rate-limited).
 
 ---
 
@@ -13,7 +13,7 @@ Mutating requests require CSRF token (`X-CSRF-Token` header + cookie) except Pay
 | Actor | Method |
 |-------|--------|
 | Admin | HttpOnly `admin_session` cookie after `POST /api/admin/login` |
-| Customer orders | `X-Order-Access-Token` header; PayPal return uses one-time `?code=` exchanged via `/paypal/checkout-exchange/:code`; alternate recovery via `?aid=` |
+| Customer orders | `X-Order-Access-Token` header; email links use one-time `?code=` exchanged via `/orders/access-exchange/:code` |
 | Public | No auth (rate-limited) |
 
 ---
@@ -23,25 +23,18 @@ Mutating requests require CSRF token (`X-CSRF-Token` header + cookie) except Pay
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | GET | `/health` | Public | Redirects to `/api/health` |
-| GET | `/api/health` | Public | DB latency, pool stats, Redis status, PayPal mode, uptime. Returns **503** in production when Redis is required but disconnected. |
+| GET | `/api/health` | Public | DB latency, pool stats, Redis status, uptime. Returns **503** in production when Redis is required but disconnected. |
 | GET | `/csrf-token` | Public | Returns CSRF token for SPA init |
 
 ---
 
-## PayPal (server.ts)
+## Checkout (`/checkout`)
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/paypal/webhook` | PayPal signature | Webhook handler (raw JSON body) |
-| POST | `/paypal/create-payment` | Public + CSRF | Create pending order + PayPal checkout |
-| POST | `/paypal/capture-payment/:orderId` | Order token + CSRF | Capture approved payment; **409** if PayPal succeeds but order is not `payment_status=completed` (storefront shows processing UI, polls checkout-context, does not clear cart) |
-| GET | `/paypal/checkout-exchange/:code` | Public | Atomically redeem one-time checkout code → `accessToken` |
-| GET | `/paypal/checkout-context/:paypalOrderId` | Order token | Checkout recovery when exchange code is unavailable |
-| POST | `/paypal/refund/:captureId` | Admin | **403** — customer refunds disabled (no-refund store policy) |
-| GET | `/paypal/test` | Admin | PayPal connectivity test |
-| GET | `/paypal/order/:orderId` | Admin | Fetch PayPal order details |
+| POST | `/checkout/place-order` | Public + CSRF | Validate cart, create pending order, return `whatsappUrl` |
 
-### Create payment body
+### Place order body
 
 ```json
 {
@@ -57,36 +50,19 @@ Mutating requests require CSRF token (`X-CSRF-Token` header + cookie) except Pay
 
 Headers: `X-Idempotency-Key` (optional), `X-CSRF-Token`
 
-**Response:** PayPal approval links and `serverOrderId`. The order access token is **not** returned — the customer redeems a one-time checkout exchange code on the payment success page.
-
-**PayPal return URL:** `{FRONTEND_URL}/payment/success?code={exchangeCode}` — PayPal appends `&token={paypalOrderId}`.
-
-### Checkout exchange
-
-`GET /paypal/checkout-exchange/:code` redeems the `code` from the PayPal return URL. Each code is single-use, expires in 30 minutes, and is stored hashed in `order_checkout_exchanges`. The associated access token is encrypted at rest (AES-256-GCM). A successful redeem returns `accessToken`, `serverOrderId`, order totals, and coupon context.
-
-### Capture payment body
+**Response:**
 
 ```json
 {
+  "success": true,
   "serverOrderId": "uuid",
-  "accessToken": "64-char hex",
-  "couponId": "optional",
-  "discount_amount": 0
+  "orderNumber": "GSS-...",
+  "total": 123.45,
+  "whatsappUrl": "https://wa.me/919888514572?text=..."
 }
 ```
 
-Headers: `X-Idempotency-Key` (PayPal order ID or client key), `X-CSRF-Token`
-
-### PayPal webhooks
-
-`POST /paypal/webhook` uses a raw JSON body parser (registered before `express.json()`). Signatures are verified via PayPal API when `PAYPAL_WEBHOOK_ID` is set.
-
-| Event | Behavior |
-|-------|----------|
-| `PAYMENT.CAPTURE.COMPLETED` | Resolve capture amount from payload or PayPal API; complete order with amount validation; auto-refund on mismatch. Returns **500** when order binding or capture application fails (PayPal retries). |
-| `PAYMENT.CAPTURE.DENIED` | Cancel pending order, restore stock |
-| `PAYMENT.CAPTURE.REFUNDED` / `REVERSED` | Sync refund to DB with deduplication |
+The storefront redirects the browser to `whatsappUrl`. Order is created with `payment_status=pending`, `status=pending`, `payment_method=WhatsApp`. Admin confirms payment via **Mark paid**.
 
 ---
 
@@ -111,7 +87,7 @@ Headers: `X-Idempotency-Key` (PayPal order ID or client key), `X-CSRF-Token`
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/` | — | **410 Gone** — use PayPal checkout |
+| POST | `/` | — | **410 Gone** — use `POST /checkout/place-order` |
 | POST | `/lookup` | Public + CSRF | Lookup by `orderNumber` + `accessToken` in JSON body |
 | GET | `/access-exchange/:code` | Public | Redeem one-time email tracking link → `{ orderNumber, accessToken, serverOrderId }` |
 | GET | `/` | Admin | List orders — `?status=&payment_status=&page=&search=` (`search` matches order number, email, or name) |
@@ -123,7 +99,7 @@ Headers: `X-Idempotency-Key` (PayPal order ID or client key), `X-CSRF-Token`
 | PATCH | `/:id/customer-details` | Admin + CSRF | Edit customer name, email, shipping address, admin notes |
 | PATCH | `/:id/pending-items` | Admin + CSRF | Edit line items on unpaid pending orders (inventory adjusted) |
 | PATCH | `/:id/status` | Admin | Update order status |
-| PATCH | `/:id/payment-status` | Admin | Mark paid: `admin_note` + `payment_id`; **PayPal capture verified** via API before update |
+| PATCH | `/:id/payment-status` | Admin | Mark paid: `admin_note` + `payment_id` (external reference); logged to activity |
 | POST | `/:id/cancel` | Admin | Cancel **unpaid pending** orders only; paid orders return **403** |
 | DELETE | `/:id` | Admin | Delete order (blocked if paid) |
 | POST | `/:id/notify-shipped` | Admin | Send shipping email |
@@ -167,7 +143,7 @@ Paid orders return **403** (no-refund store policy).
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/validate` | Public | Validate coupon — `{ code, customer_email, items: [{ product_id, quantity }] }`; DB-backed pricing via `computeCheckoutPricingForCart`; returns `{ valid, coupon?, discount_amount?, pricing? }` (same rules as create-payment) |
+| POST | `/validate` | Public | Validate coupon — `{ code, customer_email, items: [{ product_id, quantity }] }`; DB-backed pricing via `computeCheckoutPricingForCart`; returns `{ valid, coupon?, discount_amount?, pricing? }` (same rules as place-order) |
 | POST | `/use` | — | **410 Gone** |
 | GET | `/` | Admin | List coupons |
 | GET | `/:id` | Admin | Single coupon |
@@ -265,8 +241,7 @@ How the React SPA uses these APIs (see also [`info.md`](info.md)):
 | Flow | Frontend behavior |
 |------|-------------------|
 | Cart | `POST /products/validate-cart` on cart changes; **Retry validation** on network failure — API tests: `Tests/api/validateCart.test.ts` |
-| Checkout | `setUserEmail` on email change/blur (consent-gated); `POST /paypal/create-payment` with idempotency key |
-| Payment success | Redeem `GET /paypal/checkout-exchange/:code`; capture with `serverOrderId` + `accessToken`; **409** → processing UI + poll `GET /paypal/checkout-context/:paypalOrderId` (cart not cleared) |
+| Checkout | `setUserEmail` on email change/blur (consent-gated); `POST /checkout/place-order`; redirect to `whatsappUrl`; optional `/payment/success` reads `lastPlacedOrder` from sessionStorage |
 | Orders | `GET /orders/access-exchange/:code` for email links; `POST /orders/lookup` for manual entry; legacy `?orderNumber=&token=` stripped |
 | Reviews | `POST /reviews/check` on email blur; submit shows pending-moderation copy; vote errors via toast |
 | Contact | `POST /contact` + `contact_submit` activity when consented |
@@ -280,8 +255,7 @@ Applied per IP. Uses Redis when `REDIS_URL` is set; in production, rate limiting
 
 - Admin login: 5 attempts / 15 minutes
 - Contact, reviews (submit/vote/admin), coupon validate: per-route limits
-- Payment endpoints: dedicated limiter (webhooks excluded)
-- Order lookup (`POST /orders/lookup`), product search (`POST /products/search`), checkout exchange redeem (`GET /paypal/checkout-exchange/:code`), review eligibility check
+- Checkout place-order, order lookup (`POST /orders/lookup`), product search (`POST /products/search`), review eligibility check
 
 ---
 

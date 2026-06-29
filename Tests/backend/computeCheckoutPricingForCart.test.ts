@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { computeCheckoutPricingForCart } from '../../backend/src/lib/paypalCheckout';
+import { computeCheckoutPricingForCart } from '../../backend/src/lib/checkoutPricing';
 import { sqlMock } from '../setup';
 
 describe('computeCheckoutPricingForCart', () => {

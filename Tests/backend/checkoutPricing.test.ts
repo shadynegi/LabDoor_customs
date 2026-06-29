@@ -4,11 +4,10 @@ import {
   calculatePricing,
   calculateVolumeDiscount,
   amountsMatch,
-  extractPayPalCaptureAmount,
   validateCartItems,
   FREE_SHIPPING_THRESHOLD,
   SHIPPING_COST,
-} from '../../backend/src/lib/paypalCheckout';
+} from '../../backend/src/lib/checkoutPricing';
 import { sqlMock } from '../setup';
 
 describe('checkoutPricing', () => {
@@ -112,19 +111,6 @@ describe('checkoutPricing', () => {
   it('compares amounts within tolerance', () => {
     expect(amountsMatch(10, 10.005)).toBe(true);
     expect(amountsMatch(10, 10.02)).toBe(false);
-  });
-
-  it('extracts capture amount from PayPal payload', () => {
-    const amount = extractPayPalCaptureAmount({
-      purchase_units: [
-        {
-          payments: {
-            captures: [{ amount: { value: '125.00' } }],
-          },
-        },
-      ],
-    });
-    expect(amount).toBe(125);
   });
 });
 

@@ -10,8 +10,7 @@ export default function Cancel() {
 
   useEffect(() => {
     sessionStorage.removeItem("pendingOrder");
-    sessionStorage.removeItem("paypalReturnCode");
-    sessionStorage.removeItem("checkoutRecovery");
+    sessionStorage.removeItem("lastPlacedOrder");
     localStorage.removeItem("pendingOrder");
   }, []);
 
@@ -77,8 +76,8 @@ export default function Cancel() {
             lineHeight: 1.6,
           }}
         >
-          Your payment was cancelled. Your cart items are still saved and waiting for you.
-          You can continue shopping or try checking out again.
+          You left checkout before completing your order. Your cart items are still saved.
+          You can continue shopping or return to checkout when you are ready.
         </p>
 
         <div

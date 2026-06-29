@@ -233,6 +233,19 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
 
 // BroadcastChannel for cross-tab sync
 const CART_CHANNEL_NAME = 'labdoor_cart_sync';
+const CART_VALIDATE_DEBOUNCE_MS = 400;
+
+function cartNeedsPriceRefresh(current: CartItem[], refreshed: CartItem[]): boolean {
+  if (current.length !== refreshed.length) return true;
+  const refreshedByKey = new Map(
+    refreshed.map((item) => [`${item.id}-${item.size?.system}-${item.size?.value}`, item]),
+  );
+  return current.some((item) => {
+    const next = refreshedByKey.get(`${item.id}-${item.size?.system}-${item.size?.value}`);
+    if (!next) return true;
+    return item.price !== next.price || item.name !== next.name || item.image !== next.image;
+  });
+}
 
 export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(cartReducer, { items: [], total: 0 }, loadCartFromStorage);
@@ -289,9 +302,12 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     .join('|');
 
   const [validationNonce, setValidationNonce] = useState(0);
+  const itemsRef = useRef(state.items);
+  itemsRef.current = state.items;
 
   const validateCartPrices = useCallback(async () => {
-    if (state.items.length === 0) {
+    const items = itemsRef.current;
+    if (items.length === 0) {
       setCartValidationError(null);
       setIsCartValidating(false);
       return;
@@ -302,7 +318,7 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const response = await apiFetch('/products/validate-cart', {
         method: 'POST',
         body: JSON.stringify({
-          items: state.items.map((item) => ({
+          items: items.map((item) => ({
             product_id: item.id,
             quantity: item.quantity,
             size_system: item.size?.system,
@@ -322,7 +338,7 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
 
       setCartValidationError(null);
-      if (Array.isArray(data.items)) {
+      if (Array.isArray(data.items) && cartNeedsPriceRefresh(items, data.items)) {
         userActionRef.current = true;
         dispatch({ type: 'REFRESH_PRICES', payload: data.items });
       }
@@ -332,15 +348,18 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } finally {
       setIsCartValidating(false);
     }
-  }, [state.items]);
+  }, []);
 
   const retryCartValidation = useCallback(() => {
     setValidationNonce((n) => n + 1);
   }, []);
 
-  // Revalidate cart prices from server when cart contents change
+  // Revalidate cart prices from server when cart contents change (debounced)
   useEffect(() => {
-    void validateCartPrices();
+    const timer = window.setTimeout(() => {
+      void validateCartPrices();
+    }, CART_VALIDATE_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
   }, [itemsSignature, validationNonce, validateCartPrices]);
 
   // Broadcast cart changes to other tabs (skip initial hydration)

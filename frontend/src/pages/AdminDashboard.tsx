@@ -2685,13 +2685,13 @@ export default function AdminDashboard() {
           open
           variant="prompt"
           title="Mark order as paid"
-          message="Enter the PayPal capture ID and a reason. The capture is verified against PayPal before the order is completed."
+          message="Enter a payment reference (UPI ID, WhatsApp confirmation, etc.) and a reason. The order moves to processing after you confirm."
           confirmLabel="Mark paid"
-          inputLabel="PayPal capture ID"
-          inputPlaceholder="e.g. 8AB12345CD678901E"
+          inputLabel="Payment reference"
+          inputPlaceholder="e.g. UPI ref or WhatsApp note"
           secondInputLabel="Reason for manual payment"
-          secondInputPlaceholder="e.g. PayPal dashboard capture confirmed"
-          minLength={5}
+          secondInputPlaceholder="e.g. Payment confirmed on WhatsApp"
+          minLength={3}
           secondaryMinLength={3}
           onCancel={() => setAdminDialog(null)}
           onConfirm={({ primary, secondary }) => {

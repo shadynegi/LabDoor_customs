@@ -5,7 +5,6 @@ import {
   cleanupExpiredIdempotencyKeys,
   reapStuckIdempotencyKeys,
 } from './paymentIdempotency';
-import { cleanupExpiredCheckoutExchanges } from './orderCheckoutExchange';
 import { cleanupExpiredOrderAccessExchanges } from './orderAccessExchange';
 import { runLowStockAlertDigest } from './inventoryMovements';
 import { backfillOrderLineItems } from './orderLineItems';
@@ -73,7 +72,6 @@ async function runHourlyMaintenance(): Promise<void> {
   await runWithMaintenanceRetry('expire_stale_orders', () => expireStalePendingOrders());
   await runWithMaintenanceRetry('low_stock_digest', runLowStockAlertDigest);
   await runWithMaintenanceRetry('order_line_items_backfill', () => backfillOrderLineItems(50));
-  await runWithMaintenanceRetry('checkout_exchange_cleanup', cleanupExpiredCheckoutExchanges);
   await runWithMaintenanceRetry(
     'order_access_exchange_cleanup',
     cleanupExpiredOrderAccessExchanges

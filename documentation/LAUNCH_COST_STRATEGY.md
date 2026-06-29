@@ -2,9 +2,9 @@
 
 Strategic plan for **total cost of going live** at `https://www.labdoorcustoms.com`: account setup, production infrastructure, and **Instagram sponsored ads** (Meta Ads).
 
-**Related:** [PRE_LAUNCH_CHECKLIST.md](./PRE_LAUNCH_CHECKLIST.md) · [DEPLOYMENT.md](./DEPLOYMENT.md) · [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) · [PAYPAL_SETUP_GUIDE.md](./PAYPAL_SETUP_GUIDE.md) · [info.md](./info.md)
+**Related:** [PRE_LAUNCH_CHECKLIST.md](./PRE_LAUNCH_CHECKLIST.md) · [DEPLOYMENT.md](./DEPLOYMENT.md) · [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) · [WHATSAPP_CHECKOUT_GUIDE.md](./WHATSAPP_CHECKOUT_GUIDE.md) · [info.md](./info.md)
 
-**Currency:** USD (approximate, mid-2026). PayPal and Meta rates vary by country and payment method — verify on official pricing pages before committing budget.
+**Currency:** USD (approximate, mid-2026). Meta ad rates vary by country — verify on official pricing pages before committing budget.
 
 ---
 
@@ -24,13 +24,13 @@ Strategic plan for **total cost of going live** at `https://www.labdoorcustoms.c
 - Setup: **~$11**
 - Infra (12 × ~$35): **~$420**
 - Instagram ads (3 × ~$225 avg): **~$675**
-- **≈ $1,100 fixed + variable PayPal fees per sale**
+- **≈ $1,100 fixed** (no payment-processor fees — customers pay via WhatsApp/UPI/bank; admin confirms manually)
 
 **Year 1 bootstrap total (minimum infra, no paid ads):**
 
 - Setup: **~$11**
 - Infra (12 × ~$5): **~$60**
-- **≈ $70 + PayPal fees per sale**
+- **≈ $70** (bootstrap; no payment-processor subscription)
 
 ---
 
@@ -42,11 +42,11 @@ Strategic plan for **total cost of going live** at `https://www.labdoorcustoms.c
 | **Canonical URL** | `https://www.labdoorcustoms.com` (matches `FRONTEND_URL` / `VITE_SITE_URL`) |
 | **Hosting** | Railway (monorepo root, single Express + SPA) |
 | **Database** | Existing Supabase project (migrations applied) |
-| **Payments** | PayPal Live |
+| **Payments** | WhatsApp checkout + manual admin confirmation |
 | **Primary paid channel** | Instagram sponsored ads via **Meta Ads Manager** (Instagram + optional Facebook placement) |
 | **Analytics** | GA4 (`VITE_GA4_MEASUREMENT_ID`, consent-gated) + Google Search Console |
 
-Adjust dollar amounts if you are outside the US (PayPal fees, ad CPMs, and domain pricing differ).
+Adjust dollar amounts if you are outside the US (ad CPMs and domain pricing differ).
 
 ---
 
@@ -62,7 +62,7 @@ Create these accounts before or during first Railway deploy. None require paid p
 | 4 | **Upstash** | Redis (required in prod) | **$0** | **$0** (Free tier) |
 | 5 | **Sentry** | Error tracking (required for prod build) | **$0** | **$0** (Developer) |
 | 6 | **Resend** | Order / transactional email | **$0** | **$0** (3k emails/mo) |
-| 7 | **PayPal Business** | Live checkout | **$0** | **$0** (per-transaction fees only) |
+| 7 | **WhatsApp Business** | Customer order messages | **$0** | **$0** |
 | 8 | **GitHub** | Source + CI | **$0** | **$0** |
 | 9 | **Meta Business** | Instagram ads + Meta Pixel | **$0** | Ad spend only |
 | 10 | **Google** | Search Console + GA4 | **$0** | **$0** |
@@ -74,7 +74,7 @@ Create these accounts before or during first Railway deploy. None require paid p
 - [ ] Create Upstash Redis database (same region as Supabase when possible)
 - [ ] Create Sentry projects (Express + React DSNs)
 - [ ] Create Resend account (domain verification after DNS is live)
-- [ ] Complete PayPal Business verification + Live REST app
+- [ ] Configure `WHATSAPP_ORDER_PHONE` on Railway (default `919888514572` if unset)
 - [ ] Create **Meta Business Portfolio** + connect Instagram professional account
 - [ ] Create GA4 property + Search Console property for `www.labdoorcustoms.com`
 
@@ -90,7 +90,7 @@ Create these accounts before or during first Railway deploy. None require paid p
 Customer → Cloudflare → Railway (Express + React)
                       → Supabase (PostgreSQL pooler :6543)
                       → Upstash Redis
-                      → PayPal Live
+                      → WhatsApp (customer messages)
                       → Resend
                       → Sentry
 ```
@@ -122,25 +122,9 @@ Upgrade before marketing spend or steady traffic:
 
 Hobby is **$5/mo subscription + usage**. The $5 credit often covers a single low-traffic service. Heavy admin analytics, large images, or traffic spikes may add **$3–10/mo** overage.
 
-### Variable cost: PayPal (per sale, not monthly)
+### Payment processing (WhatsApp checkout)
 
-No monthly PayPal subscription. Budget per completed order (US domestic, approximate):
-
-| Payment method | Typical fee |
-|----------------|-------------|
-| PayPal / Venmo checkout | **3.49% + $0.49** |
-| Card via PayPal checkout | **2.99% + $0.49** |
-| International | **+1.50%** on domestic rate |
-
-**Examples:**
-
-| Order value | Approx. PayPal fee | Net before COGS/shipping |
-|-------------|-------------------|---------------------------|
-| $50 | ~$2.24 | ~$47.76 |
-| $80 | ~$3.28 | ~$76.72 |
-| $100 | ~$3.98 | ~$96.02 |
-
-Include PayPal fees in product margin planning — they are **not** optional.
+No online payment processor fees. Customers pay via WhatsApp (UPI, bank transfer, etc.) and admin confirms with **Mark paid**. Budget **staff time** for order confirmation instead of per-transaction fees.
 
 ---
 
@@ -157,7 +141,7 @@ Complete before spending on Instagram ads.
 | GA4 after cookie consent | $0 | `VITE_GA4_MEASUREMENT_ID` |
 | Email on purchase | $0 | Resend via backend |
 
-**Gate for Phase D:** Live PayPal checkout works on mobile + desktop; product pages load fast; at least 3 strong creatives (static or Reels) ready for ads.
+**Gate for Phase D:** WhatsApp checkout works on mobile + desktop; product pages load fast; at least 3 strong creatives (static or Reels) ready for ads.
 
 ---
 
@@ -178,7 +162,7 @@ Instagram ads run through **Meta Ads Manager**. You pay Meta directly; there is 
 3. **Meta Pixel** on storefront — install on `www.labdoorcustoms.com` (via Meta Events Manager snippet or tag manager)
 4. **Conversions API (CAPI)** — optional later; improves attribution if browser blocks cookies
 5. Verify **domain** in Meta Business Settings (matches `FRONTEND_URL`)
-6. Link **PayPal** only on your site — Meta does not process payments; ads drive traffic to your checkout
+6. Checkout on your site — Meta does not process payments; ads drive traffic to **Place Order** → WhatsApp
 
 **Site-side tracking alignment:** Enable GA4 (`VITE_GA4_MEASUREMENT_ID`) for onsite analytics; use Meta Pixel separately for ad optimization and ROAS reporting in Ads Manager.
 
@@ -232,8 +216,7 @@ Fill in your real numbers before scaling ad spend.
 Average order value (AOV)           = $______
 Cost of goods + packaging (COGS)    = $______
 Shipping subsidy (if any)           = $______
-PayPal fee (≈ 3.49% × AOV + $0.49)  = $______
-Gross profit per order              = AOV − COGS − shipping − PayPal
+Gross profit per order              = AOV − COGS − shipping
 
 Target max cost per purchase (CPA)  = 25–30% × AOV  (starter rule)
 Required ROAS at scale              = Revenue ÷ Ad spend ≥ 2.0–3.0
@@ -253,7 +236,7 @@ you accept intentional loss-leader spend for brand awareness with a fixed cap.
 | Week | Actions | Spend |
 |------|---------|-------|
 | 1 | Buy domain; Railway deploy; Cloudflare DNS; env vars | **~$11** + **$5** Railway |
-| 2 | PayPal Live + webhook; Resend domain verify; smoke tests | **$5** Railway |
+| 2 | WhatsApp checkout smoke test; Resend domain verify; smoke tests | **$5** Railway |
 | 3 | Instagram organic content; GSC + GA4; Meta Pixel installed | **$5** Railway |
 | 4 | Fix checkout/mobile issues from real device testing | **$5** Railway |
 
@@ -301,7 +284,7 @@ you accept intentional loss-leader spend for brand awareness with a fixed cap.
 | **Growth** (Pro Supabase, 6 mo ads @ $250/mo avg) | ~$420 | ~$1,500 | $11 | **~$1,930** |
 | **Aggressive** (Pro Supabase, 12 mo ads @ $500/mo avg) | ~$420 | ~$6,000 | $11 | **~$6,430** |
 
-Add **PayPal fees on every sale** and **COGS/shipping** — not included above.
+Add **COGS/shipping** to margin planning — not included above.
 
 ---
 
@@ -337,7 +320,7 @@ Add **PayPal fees on every sale** and **COGS/shipping** — not included above.
 - [ ] Railway env complete ([PRE_LAUNCH_CHECKLIST.md](./PRE_LAUNCH_CHECKLIST.md) Phase 2–3)
 - [ ] `TRUST_CLOUDFLARE=true` after Cloudflare proxied
 - [ ] `/api/health` returns 200 on public domain
-- [ ] PayPal Live webhook delivering 200
+- [ ] WhatsApp checkout smoke test passed (place-order → message → mark paid)
 
 ### Marketing foundation
 
@@ -364,7 +347,7 @@ Add **PayPal fees on every sale** and **COGS/shipping** — not included above.
 | Deploy Railway + env | [DEPLOYMENT.md](./DEPLOYMENT.md) |
 | Go-live checklist | [PRE_LAUNCH_CHECKLIST.md](./PRE_LAUNCH_CHECKLIST.md) |
 | Cloudflare + DNS | [CLOUDFLARE_RAILWAY.md](./CLOUDFLARE_RAILWAY.md) |
-| PayPal Live + webhooks | [PAYPAL_SETUP_GUIDE.md](./PAYPAL_SETUP_GUIDE.md) |
+| WhatsApp checkout | [WHATSAPP_CHECKOUT_GUIDE.md](./WHATSAPP_CHECKOUT_GUIDE.md) |
 | Search Console | [SEARCH_CONSOLE_SETUP.md](./SEARCH_CONSOLE_SETUP.md) |
 | Media / 360° assets | [MEDIA_ASSET_GUIDE.md](./MEDIA_ASSET_GUIDE.md) |
 | System reference | [info.md](./info.md) |

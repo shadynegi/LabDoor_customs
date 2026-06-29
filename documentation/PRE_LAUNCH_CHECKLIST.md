@@ -2,7 +2,7 @@
 
 Tick every item before pointing production traffic at Lab Door Customs.
 
-**References:** [`info.md`](info.md) · [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) · [LAUNCH_COST_STRATEGY.md](./LAUNCH_COST_STRATEGY.md) · [SUPABASE_SQL_TO_RUN.md](./SUPABASE_SQL_TO_RUN.md) · [PAYPAL_SETUP_GUIDE.md](./PAYPAL_SETUP_GUIDE.md) · [SSL_DNS_CHECKLIST.md](./SSL_DNS_CHECKLIST.md)
+**References:** [`info.md`](info.md) · [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) · [LAUNCH_COST_STRATEGY.md](./LAUNCH_COST_STRATEGY.md) · [SUPABASE_SQL_TO_RUN.md](./SUPABASE_SQL_TO_RUN.md) · [WHATSAPP_CHECKOUT_GUIDE.md](./WHATSAPP_CHECKOUT_GUIDE.md) · [SSL_DNS_CHECKLIST.md](./SSL_DNS_CHECKLIST.md)
 
 ---
 
@@ -48,10 +48,7 @@ Set on the **Railway service** (repository root). The server **exits on boot** i
 - [ ] `ADMIN_PASSWORD_HASH` — bcrypt hash from `node backend/scripts/generate-admin-hash.mjs "YourSecurePassword"` (**not** plain text)
 - [ ] `ORDER_TOKEN_ENCRYPTION_KEY` — 32+ chars (`openssl rand -base64 32`)
 - [ ] `IP_SALT` — random salt for activity anonymization and review voter IDs
-- [ ] `PAYPAL_CLIENT_ID` — **Live** app credentials
-- [ ] `PAYPAL_SECRET` — **Live** app secret
-- [ ] `PAYPAL_MODE=live`
-- [ ] `PAYPAL_WEBHOOK_ID` — from PayPal Developer Dashboard → Webhooks
+- [ ] `WHATSAPP_ORDER_PHONE` — optional; digits only (default `919888514572`)
 - [ ] `RESEND_API_KEY` — transactional email
 - [ ] `SENTRY_DSN` — backend error tracking
 
@@ -105,15 +102,14 @@ See [SSL_DNS_CHECKLIST.md](./SSL_DNS_CHECKLIST.md) and [CLOUDFLARE_RAILWAY.md](.
 
 ---
 
-## Phase 5 — PayPal Live
+## Phase 5 — WhatsApp checkout
 
-See [PAYPAL_SETUP_GUIDE.md](./PAYPAL_SETUP_GUIDE.md).
+See [WHATSAPP_CHECKOUT_GUIDE.md](./WHATSAPP_CHECKOUT_GUIDE.md).
 
-- [ ] PayPal **Live** REST app created; Client ID + Secret in Railway
-- [ ] Webhook subscribed to production URL: `https://www.yourdomain.com/api/paypal/webhook`
-- [ ] Webhook events include at least: `PAYMENT.CAPTURE.COMPLETED`, `PAYMENT.CAPTURE.DENIED`, refund/reversal events your flow uses
-- [ ] `PAYPAL_WEBHOOK_ID` matches the live webhook in the dashboard
-- [ ] Return URL domain matches `FRONTEND_URL` (PayPal redirects to your site after approval)
+- [ ] `WHATSAPP_ORDER_PHONE` set to the correct business number (or default verified)
+- [ ] Test **Place Order** on staging/production → WhatsApp opens with pre-filled message
+- [ ] Admin can find order by order number from the message
+- [ ] **Mark paid** moves order to `processing` and sends confirmation email (if Resend configured)
 
 ---
 
@@ -135,7 +131,7 @@ See [PAYPAL_SETUP_GUIDE.md](./PAYPAL_SETUP_GUIDE.md).
 curl -s https://www.yourdomain.com/api/health | jq .
 ```
 
-Expected: `"status": "OK"`, PayPal `mode: live`.
+Expected: `"status": "OK"`, database and Redis connected.
 
 ---
 
@@ -147,21 +143,21 @@ From repository root on Railway:
 - [ ] Start: `npm start`
 - [ ] Deploy logs show no missing-env exit
 - [ ] Deploy logs show RLS migration applied
-- [ ] CI on `main` is green (**233** automated tests + build + E2E smoke — see [`test_guidelines.md`](test_guidelines.md))
+- [ ] CI on `main` is green (**198** automated tests + build + E2E smoke — see [`test_guidelines.md`](test_guidelines.md))
 
 ---
 
 ## Phase 9 — Manual smoke tests (required)
 
-CI does **not** run a live PayPal payment. Complete these on **desktop and a real phone**.
+CI does **not** open a live WhatsApp session. Complete these on **desktop and a real phone**.
 
 ### Storefront
 
 - [ ] Home, products, product detail load over HTTPS
 - [ ] Add to cart → cart page → checkout
-- [ ] Cookie banner does not block PayPal / Checkout on mobile (banner at top on purchase routes)
-- [ ] PayPal Live checkout completes → payment success page
-- [ ] Cart cleared after successful payment
+- [ ] Cookie banner does not block checkout on mobile (banner at top on purchase routes)
+- [ ] **Place Order** completes → WhatsApp opens with order details
+- [ ] Cart cleared after successful place-order
 - [ ] Out-of-stock product shows badge and disabled add-to-cart
 
 ### Order email and tracking
@@ -175,7 +171,7 @@ CI does **not** run a live PayPal payment. Complete these on **desktop and a rea
 
 - [ ] `/admin` redirects to login when logged out, dashboard when logged in
 - [ ] Login with `ADMIN_USERNAME` + password (hash verified server-side)
-- [ ] Orders tab shows new order; payment status `completed`
+- [ ] Orders tab shows new order; **Mark paid** after WhatsApp confirmation
 - [ ] Update order status (e.g. processing → shipped) if applicable
 - [ ] Products tab: stock/OOS toggle works; catalog refreshes on storefront
 
@@ -184,10 +180,10 @@ CI does **not** run a live PayPal payment. Complete these on **desktop and a rea
 - [ ] Submit contact form; confirm submission succeeds (stored in `contact_messages`; no admin inbox tab — check Supabase or email notifications if configured)
 - [ ] Submit product review (pending); approve in Reviews tab; visible on storefront **without** customer email
 
-### PayPal webhook
+### WhatsApp confirmation
 
-- [ ] PayPal Developer Dashboard → Webhook → recent delivery **success** after a test payment
-- [ ] Or: payment still completes via capture endpoint if webhook delayed (capture path is primary)
+- [ ] Customer sends WhatsApp message; admin receives order number in message
+- [ ] Admin **Mark paid** with payment reference updates order to `completed` / `processing`
 
 ---
 
@@ -210,10 +206,10 @@ Do **not** go live if any of these are true:
 | `validate-env` fails | Fix missing/invalid env vars |
 | `/api/health` returns 503 | Fix DB or Redis |
 | Boot log: RLS migration failed | Run SQL migrations; check Supabase URL |
-| PayPal still in `sandbox` | Set `PAYPAL_MODE=live` and live credentials |
+| PayPal env vars still set | Remove `PAYPAL_*` — no longer used |
 | `TRUST_CLOUDFLARE` not `true` | Set before production traffic |
 | Admin password is plain text in env | Use `ADMIN_PASSWORD_HASH` only |
-| No webhook ID | Set `PAYPAL_WEBHOOK_ID`; reconciliation may lag |
+| No WhatsApp number | Set `WHATSAPP_ORDER_PHONE` or verify default |
 
 ---
 
@@ -222,7 +218,7 @@ Do **not** go live if any of these are true:
 | Role | Name | Date | Notes |
 |------|------|------|-------|
 | Technical | | | Migrations + env + health OK |
-| Payments | | | Live PayPal + webhook verified |
+| Payments | | | WhatsApp checkout + admin mark paid verified |
 | QA | | | Phase 9 smoke tests passed |
 
 When all phases are checked, the codebase and operations are aligned for production traffic.

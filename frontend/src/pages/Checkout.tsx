@@ -171,7 +171,7 @@ const InputField = React.memo(({
 InputField.displayName = 'InputField';
 
 export default function Checkout() {
-  const { state, cartValidationError, isCartValidating, retryCartValidation } = useCart();
+  const { state, cartValidationError, isCartValidating, retryCartValidation, clearCart } = useCart();
   const navigate = useNavigate();
   const { isMobile } = useResponsive();
   const [isProcessing, setIsProcessing] = useState(false);
@@ -420,7 +420,7 @@ export default function Checkout() {
     }
   }, [errors]);
 
-  const handlePayPalPayment = async () => {
+  const handlePlaceOrder = async () => {
     if (!policyAccepted) {
       setPolicyError("You must accept the No Refund & Replacement Policy to continue.");
       toast.error("Policy acceptance required", {
@@ -444,15 +444,14 @@ export default function Checkout() {
     if (formData.email?.trim()) {
       setUserEmail(formData.email.trim());
     }
+    trackCheckoutStart(total, totalItemCount);
 
     try {
-      const response = await apiFetch('/paypal/create-payment', {
+      const response = await apiFetch('/checkout/place-order', {
         method: 'POST',
         headers: { 'X-Idempotency-Key': paymentIdempotencyKey.current },
         body: JSON.stringify({
           amount: total.toFixed(2),
-          currency: 'USD',
-          description: `Order for ${state.items.length} items`,
           policy_accepted: true,
           coupon_code: appliedCoupon?.code,
           customerInfo: formData,
@@ -468,12 +467,12 @@ export default function Checkout() {
       const data = await response.json();
 
       if (!response.ok) {
-        const friendlyError = getFriendlyError(data.error || data.message || 'Payment creation failed');
+        const friendlyError = getFriendlyError(data.error || data.message || 'Order placement failed');
         toast.error(friendlyError.message, {
           description: friendlyError.description,
           duration: 6000,
         });
-        throw new Error('Payment creation failed');
+        throw new Error('Order placement failed');
       }
 
       const serverTotal =
@@ -486,39 +485,23 @@ export default function Checkout() {
         setIsProcessing(false);
         return;
       }
-      
-      const approvalUrl = data.links?.find((link: any) => 
-        link.rel === 'approval_url' || link.rel === 'approve'
-      )?.href;
 
-      if (approvalUrl) {
-        sessionStorage.setItem('pendingOrder', JSON.stringify({
-          total: serverTotal ?? total,
-          serverOrderId: data.serverOrderId,
-          orderNumber: data.orderNumber,
-          paypalOrderId: data.orderId,
-          idempotencyKey: paymentIdempotencyKey.current,
-          coupon: appliedCoupon ? {
-            id: data.couponId || appliedCoupon.id,
-            code: appliedCoupon.code,
-            discount_amount: data.discount ?? appliedCoupon.discount_amount,
-          } : null,
-          timestamp: new Date().toISOString(),
-        }));
-        sessionStorage.setItem('checkoutRecovery', JSON.stringify({
-          formData,
-          items: state.items,
-        }));
-        localStorage.removeItem('pendingOrder');
-
-        window.location.href = approvalUrl;
-      } else {
-        throw new Error('No approval URL received from PayPal');
+      if (!data.whatsappUrl) {
+        throw new Error('WhatsApp redirect URL missing');
       }
+
+      sessionStorage.setItem('lastPlacedOrder', JSON.stringify({
+        orderNumber: data.orderNumber,
+        serverOrderId: data.serverOrderId,
+        total: serverTotal ?? total,
+        timestamp: new Date().toISOString(),
+      }));
+      clearCart();
+      window.location.href = data.whatsappUrl;
     } catch (error) {
-      logError('Payment error:', error);
+      logError('Place order error:', error);
       paymentIdempotencyKey.current = crypto.randomUUID();
-      if (error instanceof Error && error.message !== 'Payment creation failed') {
+      if (error instanceof Error && error.message !== 'Order placement failed') {
         const friendlyError = getFriendlyError(error);
         toast.error(friendlyError.message, {
           description: friendlyError.description,
@@ -1231,14 +1214,14 @@ export default function Checkout() {
               )}
 
               <button
-                onClick={handlePayPalPayment}
+                onClick={handlePlaceOrder}
                 disabled={isProcessing || checkoutBlocked || !policyAccepted}
                 style={{
                   width: "100%",
                   padding: "16px",
                   background: isProcessing || checkoutBlocked
                     ? "#9ca3af"
-                    : "linear-gradient(135deg, #0070ba 0%, #1546a0 100%)",
+                    : "linear-gradient(135deg, #361906 0%, #9c6649 100%)",
                   color: "white",
                   border: "none",
                   borderRadius: 12,
@@ -1255,7 +1238,7 @@ export default function Checkout() {
                 onMouseEnter={(e) => {
                   if (!isProcessing) {
                     e.currentTarget.style.transform = "translateY(-2px)";
-                    e.currentTarget.style.boxShadow = "0 8px 20px rgba(0,112,186,0.3)";
+                    e.currentTarget.style.boxShadow = "0 8px 20px rgba(156,102,73,0.3)";
                   }
                 }}
                 onMouseLeave={(e) => {
@@ -1273,7 +1256,7 @@ export default function Checkout() {
                 ) : (
                   <>
                     <Lock size={18} />
-                    Pay with PayPal
+                    Place Order
                   </>
                 )}
               </button>
@@ -1298,11 +1281,11 @@ export default function Checkout() {
       {isMobile && (
         <MobileStickyCta
           amount={`$${total.toFixed(2)}`}
-          label={isProcessing ? "Processing…" : "Pay with PayPal"}
-          onClick={handlePayPalPayment}
+          label={isProcessing ? "Processing…" : "Place Order"}
+          onClick={handlePlaceOrder}
           disabled={isProcessing || checkoutBlocked || !policyAccepted}
           keyboardOffset={keyboardOffset}
-          ariaLabel="Complete payment"
+          ariaLabel="Place order"
           hint={
             cartValidationError ? (
               <div role="alert">

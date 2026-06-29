@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { resolveCouponDiscount } from '../../backend/src/lib/paypalCheckout';
+import { resolveCouponDiscount } from '../../backend/src/lib/checkoutPricing';
 import { sqlMock } from '../setup';
 
 describe('coupon applies_to scope', () => {

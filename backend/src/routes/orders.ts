@@ -17,7 +17,6 @@ import { cancelPendingOrderAndRestoreStock } from '../lib/orderLifecycle';
 import { PAID_ORDER_CANCEL_DISABLED_MESSAGE } from '../lib/returnPolicy';
 import { getClientIp } from '../lib/clientIp';
 import { validateStatusTransition, type OrderStatus } from '../lib/orderStatus';
-import { verifyPayPalCaptureForOrder } from '../lib/paypalCaptureVerify';
 import { patchOrderCustomerDetails, patchPendingOrderItems } from '../lib/adminOrderEdits';
 import type { ValidatedLineItem } from '../lib/orderLifecycle';
 import { redeemOrderAccessExchangeCode } from '../lib/orderAccessExchange';
@@ -62,7 +61,7 @@ async function updateInventory(items: StockItem[], operation: 'decrement' | 'res
     await restoreInventoryTransactional(items);
     return;
   }
-  throw new Error('Direct inventory decrement is deprecated; use PayPal checkout flow');
+  throw new Error('Direct inventory decrement is deprecated; use checkout place-order flow');
 }
 
 // Types
@@ -112,13 +111,13 @@ interface Order {
   updated_at?: string;
 }
 
-// POST create new order — deprecated; storefront uses PayPal checkout only
+// POST create new order — deprecated; storefront uses POST /api/checkout/place-order
 router.post('/', async (_req: Request, res: Response) => {
   return res.status(410).json({
     success: false,
     error: 'Direct order creation deprecated',
     message:
-      'Orders must be placed through PayPal checkout (POST /api/paypal/create-payment). This endpoint no longer accepts public order submissions.',
+      'Orders must be placed through checkout (POST /api/checkout/place-order). This endpoint no longer accepts public order submissions.',
   });
 });
 
@@ -682,24 +681,10 @@ router.patch('/:id/payment-status', verifyAdmin, async (req: Request, res: Respo
           error: 'admin_note is required (min 3 characters) when manually marking an order paid',
         });
       }
-      if (!payment_id || String(payment_id).trim().length < 5) {
+      if (!payment_id || String(payment_id).trim().length < 3) {
         return res.status(400).json({
           success: false,
-          error: 'payment_id (PayPal capture ID) is required when marking an order paid',
-        });
-      }
-
-      const captureId = String(payment_id).trim();
-      const expectedTotal = parseFloat(String(currentOrder[0].total ?? '0'));
-      const verification = await verifyPayPalCaptureForOrder(
-        captureId,
-        expectedTotal,
-        currentOrder[0].paypal_order_id as string | null
-      );
-      if (!verification.ok) {
-        return res.status(400).json({
-          success: false,
-          error: verification.error,
+          error: 'payment_id (payment reference) is required when marking an order paid',
         });
       }
     }
@@ -801,14 +786,14 @@ router.patch('/:id/payment-status', verifyAdmin, async (req: Request, res: Respo
       }
       return res.status(400).json({
         success: false,
-        error: 'Only pending orders can be marked paid with PayPal verification',
+        error: 'Only pending orders can be marked paid',
       });
     }
 
     if (payment_status === 'completed') {
       return res.status(400).json({
         success: false,
-        error: 'Only pending orders can be marked paid with PayPal verification',
+        error: 'Only pending orders can be marked paid',
       });
     }
 
@@ -945,7 +930,7 @@ router.delete('/:id', verifyAdmin, async (req: Request, res: Response) => {
       return res.status(409).json({
         success: false,
         error: 'Cannot delete a completed order',
-        message: 'Completed orders cannot be deleted. Mark cancelled in PayPal only if required for reconciliation.',
+        message: 'Completed orders cannot be deleted. Mark cancelled only if required for reconciliation.',
       });
     }
 

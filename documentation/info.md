@@ -1,6 +1,6 @@
 # Lab Door Customs — Project Reference
 
-**Lab Door Customs** is a full-stack e-commerce application for custom footwear. A React storefront handles browsing, cart, and PayPal checkout; an Express API owns pricing, inventory, orders, admin operations, and PayPal webhooks. PostgreSQL (Supabase) is the system of record.
+**Lab Door Customs** is a full-stack e-commerce application for custom footwear. A React storefront handles browsing, cart, and WhatsApp checkout; an Express API owns pricing, inventory, orders, and admin operations. PostgreSQL (Supabase) is the system of record.
 
 **Documentation hub:** [`DOCUMENTATION_INDEX.md`](DOCUMENTATION_INDEX.md)
 
@@ -44,11 +44,11 @@
 │  • /api/*  → REST API                                        │
 │  • /*      → React SPA (frontend/dist) + client-side routes  │
 └────────┬───────────────────────────────────────┬────────────┘
-         │ PayPal redirect                       │ postgres.js
+         │ WhatsApp redirect                       │ postgres.js
          ▼                                       ▼
 ┌─────────────────┐                     ┌──────────────────┐
-│  PayPal         │ ─── webhooks ──────►│  Supabase        │
-│  Checkout       │                     │  PostgreSQL      │
+│  WhatsApp       │                     │  Supabase        │
+│  (customer)     │                     │  PostgreSQL      │
 └─────────────────┘                     └────────┬─────────┘
                                                  │
          ┌───────────────────────────────────────┤
@@ -65,7 +65,7 @@
 |------|------|
 | `package.json` | Root workspace — `npm run dev`, `build`, `start`, `test` |
 | `frontend/` | React 19 SPA — Vite build output consumed by Express |
-| `backend/` | Express server — API, static SPA hosting, PayPal, jobs, cache |
+| `backend/` | Express server — API, static SPA hosting, jobs, cache |
 | `Tests/` | Vitest + Playwright |
 | `.github/workflows/` | CI, Supabase keep-alive cron |
 | `` | Setup, deploy, and operational guides |
@@ -75,7 +75,7 @@
 
 **Production** builds both packages (`npm run build`) and starts one process (`npm start`) that serves API + static files.
 
-**Order creation rule:** New orders are created only through `POST /api/paypal/create-payment`. `POST /api/orders` returns **410 Gone**.
+**Order creation rule:** New orders are created only through `POST /api/checkout/place-order`. `POST /api/orders` returns **410 Gone**.
 
 ---
 
@@ -85,7 +85,7 @@
 |-------|--------------|
 | Frontend | React 19, React Router 7, TypeScript, Vite 7, Framer Motion, Sonner, liquid-web |
 | Backend | Node.js 20, Express 4, TypeScript, postgres.js, Helmet, compression |
-| Payments | PayPal Checkout (create + capture + webhooks); no customer refunds; operational/webhook refund sync only |
+| Payments | WhatsApp order placement (`payment_status=pending` until admin confirms); no online payment processor |
 | Database | Supabase PostgreSQL (PgBouncer pooler on port 6543 recommended) |
 | Cache | Redis 6 (required in production) + in-memory fallback |
 | Email | Resend |
@@ -105,9 +105,9 @@
 | `/products` | Catalog — filters, server search (`POST /api/products/search`), pagination; supports `?q=` deep links |
 | `/product/:id` | Product detail — 360° viewer (real multi-angle or static placeholder), reviews, JSON-LD, meta tags; trust badges aligned with store policy (free shipping over $200, secure payment, **all sales final** with link to replacement policy) |
 | `/cart` | Shopping cart (localStorage via `CartContext`) |
-| `/checkout` | Customer/shipping form (native country `<select>`, pre-selected US via `country-list`), coupon validation, no-refund policy checkbox, PayPal redirect |
-| `/payment/success` | Redeems `?code=` via checkout exchange, captures payment; **409** shows “payment received — processing” (polls checkout-context; cart not cleared until confirmed); expired exchange shows explicit error |
-| `/payment/cancel` | Abandoned checkout; clears `pendingOrder`, `paypalReturnCode`, and `checkoutRecovery` from sessionStorage |
+| `/checkout` | Customer/shipping form, coupon validation, no-refund policy checkbox, **Place Order** → WhatsApp redirect |
+| `/payment/success` | Optional confirmation page after WhatsApp redirect (order stored in sessionStorage) |
+| `/payment/cancel` | Abandoned checkout cleanup |
 | `/orders` | Customer order lookup (`POST /api/orders/lookup`); email links redeem `?code=` via `GET /api/orders/access-exchange/:code`; legacy `?orderNumber=&token=` URLs are stripped with a deprecation warning |
 | `/contact` | Contact form with CSRF-protected POST |
 | `/about`, `/help` | Static content |
@@ -126,7 +126,7 @@
 - Cart state persists in browser localStorage (synced across tabs via `BroadcastChannel`).
 - On every cart change, `POST /api/products/validate-cart` re-validates each line against the database (product exists, current price, stock) and refreshes displayed prices via `REFRESH_PRICES`.
 - Cart page shows validation errors and a **Retry validation** button when network validation fails.
-- Server recalculates all totals at checkout; client totals are validated against server pricing before PayPal order creation.
+- Server recalculates all totals at checkout; client totals are validated against server pricing before place-order.
 - Checkout syncs customer email to activity batches on field change/blur (when analytics consent is granted), not only on initial page load.
 
 ---
@@ -149,110 +149,64 @@
 | Reviews | List/create/edit/delete; **server product search** when creating reviews; **customer email visible only here**; edit modal includes **admin response** (shown on storefront); filter by status; quick approve/reject; pagination (50/page); self-loads (no parent tab skeleton flash) |
 | Settings | **Activity log export** (NDJSON, optional date range); **admin sessions** list + expired-session cleanup; **customer aggregate recompute** |
 
-**API-only admin features** (no dedicated UI tab): PayPal test endpoint. Admin PayPal refunds are **disabled** (no-refund store policy).
+**API-only admin features** (no dedicated UI tab): none beyond Settings tab operational tools. Customer refunds remain disabled (no-refund store policy).
 
-**Store policy:** All sales final — no refunds. Replacements only for verified manufacturing defects within **30 days of delivery** (`/returns-policy`; `/replacement-policy` is an alias). Checkout requires `policy_accepted: true` on create-payment. Shared policy text lives in `backend/src/lib/returnPolicy.ts` and `frontend/src/constants/returnPolicy.ts`. Manufacturing-defect claims: `support@labdoorcustoms.com`.
+**Store policy:** All sales final — no refunds. Replacements only for verified manufacturing defects within **30 days of delivery** (`/returns-policy`; `/replacement-policy` is an alias). Checkout requires `policy_accepted: true` on place-order. Shared policy text lives in `backend/src/lib/returnPolicy.ts` and `frontend/src/constants/returnPolicy.ts`. Manufacturing-defect claims: `support@labdoorcustoms.com`.
 
 ---
 
 ## Checkout and payments
 
+See also [`WHATSAPP_CHECKOUT_GUIDE.md`](WHATSAPP_CHECKOUT_GUIDE.md).
+
 ### Flow overview
 
 ```
-Customer submits checkout
+Customer submits checkout (Place Order)
         │
         ▼
-POST /api/paypal/create-payment
+POST /api/checkout/place-order
   • Validate cart (price, stock)
   • Apply coupon (server-side)
-  • Claim idempotency key
+  • Claim idempotency key (place_order)
   • Create pending order + decrement stock (single transaction)
   • Reserve coupon usage
-  • Create PayPal order (intent: CAPTURE)
-  • Bind paypal_order_id to server order
+  • Build WhatsApp message with order details
         │
         ▼
-Customer approves on PayPal
+Browser redirects to wa.me/{phone}?text=...
         │
         ▼
-POST /api/paypal/capture-payment/:paypalOrderId
-  • Requires serverOrderId + order access token
-  • Capture via PayPal API (with PayPal-Request-Id)
-  • Validate captured amount vs order total
-  • Mark order completed; upsert customer stats
-  • Send confirmation email with tracking link
-        │
-        ▼
-Payment success page redeems ?code= via GET /api/paypal/checkout-exchange/:code
+Admin confirms payment → Mark paid in dashboard
+  • payment_status=completed, status=processing
+  • Confirmation email (Resend)
 ```
 
-### Create payment (`POST /api/paypal/create-payment`)
+### Place order (`POST /api/checkout/place-order`)
 
-1. Requires `policy_accepted: true` in the request body (customer agrees to no-refund / manufacturing-defect replacement-only policy).
-2. Validates each cart line against the database (product exists, price, stock).
-3. Resolves coupon discount with scope rules (`applies_to`: all, product, or category).
-4. Calculates pricing: subtotal, shipping ($25 or free over $200), tax ($0), discount, total.
-5. Claims a **create_payment** idempotency key (header `X-Idempotency-Key` or fingerprint hash).
-6. Atomically inserts a pending order and decrements product stock; stores `access_token_hash` and **AES-256-GCM** `access_token_encrypted` on the order row for durable post-capture email link minting.
-7. Reserves coupon usage in `coupon_usage`.
-8. Creates a PayPal order with `reference_id` / `custom_id` set to the server order UUID.
-9. Creates a one-time **checkout exchange code** (stored hashed in `order_checkout_exchanges`, 30-minute TTL, single use).
-10. Stores `paypal_order_id` on the order; returns PayPal approval links and `serverOrderId` (access token is **not** returned — redeem checkout exchange code on return).
-11. On any failure after order creation: rolls back pending order, restores stock, marks idempotency key failed.
+1. Requires `policy_accepted: true`.
+2. Validates cart lines against the database.
+3. Resolves coupon discount with scope rules.
+4. Calculates pricing server-side; optional client `amount` must match within $0.01.
+5. Claims **place_order** idempotency key (`X-Idempotency-Key` or fingerprint).
+6. Atomically inserts pending order (`payment_method=WhatsApp`, `payment_status=pending`, `status=pending`) and decrements stock.
+7. Reserves coupon usage when applicable.
+8. Returns `orderNumber`, `serverOrderId`, `total`, and `whatsappUrl`.
+9. On failure after order creation: rolls back pending order, restores stock, marks idempotency failed.
 
-**PayPal return URL:** `{FRONTEND_URL}/payment/success?code={exchangeCode}` — PayPal appends `&token={paypalOrderId}`. Access token is **not** in the URL.
+**WhatsApp phone:** `WHATSAPP_ORDER_PHONE` env var (default `919888514572`).
 
-### Capture payment (`POST /api/paypal/capture-payment/:orderId`)
+### Admin payment confirmation
 
-1. Requires `serverOrderId`, `accessToken`, and matching `paypal_order_id` binding.
-2. Validates order access token against stored SHA-256 hash.
-3. Claims **capture_payment** idempotency key; failed keys can be reclaimed while order is still pending.
-4. Calls PayPal capture with `PayPal-Request-Id` header.
-5. Handles `ORDER_ALREADY_CAPTURED` (422) by fetching existing capture details from PayPal.
-6. Resolves captured amount from PayPal response or API fetch; **fails closed** if amount cannot be verified. Mismatch triggers auto-refund and order rollback.
-7. Requires a verified `paypal_capture_id` before `completeOrderPaymentCapture`.
-8. `completeOrderPaymentCapture` sets `payment_status=completed`, `status=processing`, stores `paypal_capture_id`.
-9. Upserts customer aggregate stats (only after successful capture).
-10. Sends order confirmation email; caches idempotency response for safe retries.
-11. Returns **409** if PayPal capture succeeds but the order is not `payment_status=completed` in the database (prevents false-success UI). The payment success page shows a processing state, polls `GET /api/paypal/checkout-context/:paypalOrderId`, and does **not** clear the cart until reconciliation completes.
-
-### Checkout exchange (PayPal return)
-
-`GET /api/paypal/checkout-exchange/:code` — atomically redeems the one-time `code` from the PayPal return URL and returns `accessToken`, `serverOrderId`, order totals, and coupon context. Access tokens are **AES-256-GCM encrypted** at rest in `order_checkout_exchanges`. Code is single-use and expires in 30 minutes.
-
-### Checkout context recovery
-
-`GET /api/paypal/checkout-context/:paypalOrderId` — restores checkout state when the exchange code is unavailable. Requires the order access token via header `X-Order-Access-Token` only (query `?aid=` deprecated).
-
-### PayPal webhooks (`POST /api/paypal/webhook`)
-
-- Registered **before** `express.json()` with raw body parser for signature verification.
-- CSRF and rate limits are skipped for this path.
-- Production requires `PAYPAL_WEBHOOK_ID`; signatures verified via PayPal API.
-
-| Event | Behavior |
-|-------|----------|
-| `PAYMENT.CAPTURE.COMPLETED` | Resolve capture amount from webhook or PayPal API if missing; complete order with amount validation; auto-refund on mismatch; returns **500** (PayPal retry) when order binding or capture application fails |
-| `PAYMENT.CAPTURE.DENIED` | Cancel pending order, restore stock; returns **500** when order binding cannot be resolved (PayPal retry) |
-| `PAYMENT.CAPTURE.REFUNDED` | Sync refund to DB with deduplication |
-| `PAYMENT.CAPTURE.REVERSED` | Sync reversal with deduplication |
-| `CHECKOUT.ORDER.APPROVED` / `COMPLETED` | Logged; capture handled by frontend or CAPTURE.COMPLETED |
-
-Returns **500** on processing failure so PayPal retries.
+Admin marks pending orders paid via `PATCH /api/orders/:id/payment-status` with `payment_id` (reference) and `admin_note`. Sets `payment_status=completed`, `status=processing`, sends confirmation email.
 
 ### Refunds and replacements
 
-**Customer policy:** No refunds. Manufacturing-defect replacements are handled manually via support email (see Replacement Policy).
+**Customer policy:** No refunds. Manufacturing-defect replacements via support email.
 
 | Path | Auth | Behavior |
 |------|------|----------|
-| `POST /api/paypal/refund/:captureId` | Admin | **403** — customer refunds disabled by store policy |
-| `POST /api/orders/:id/cancel` | Admin | **Pending payment only:** cancel + restore stock. Paid orders return **403** (no refund). |
-
-**Operational refunds (not customer policy):** Capture amount mismatch may auto-refund via `paypalRefund.ts` before the order is fulfilled.
-
-**Webhook refund sync (`syncOrderAfterRefund`):** Still processes PayPal-initiated `REFUNDED`/`REVERSED` events (chargebacks, operational reversals) with `processed_refund_events` deduplication.
+| `POST /api/orders/:id/cancel` | Admin | **Pending payment only:** cancel + restore stock. Paid orders return **403**. |
 
 ### Payment idempotency
 
@@ -260,10 +214,9 @@ Returns **500** on processing failure so PayPal retries.
 
 | Operation | TTL | Key source |
 |-----------|-----|------------|
-| `create_payment` | 30 min | `X-Idempotency-Key` or SHA-256 fingerprint (email + items + coupon) |
-| `capture_payment` | 15 min | Header or PayPal order ID |
+| `place_order` | 30 min | `X-Idempotency-Key` or SHA-256 fingerprint (email + items + coupon) |
 
-Statuses: `processing`, `completed`, `failed`. Stuck `processing` rows are reaped after `IDEMPOTENCY_STALE_MINUTES` (default 5). Failed create/capture keys can be reclaimed when the underlying order is still pending.
+Statuses: `processing`, `completed`, `failed`. Stuck `processing` rows are reaped after `IDEMPOTENCY_STALE_MINUTES` (default 5).
 
 ---
 
@@ -273,7 +226,7 @@ Statuses: `processing`, `completed`, `failed`. Stuck `processing` rows are reape
 
 | `payment_status` | Meaning |
 |------------------|---------|
-| `pending` | Awaiting PayPal capture |
+| `pending` | Awaiting payment confirmation (WhatsApp / manual) |
 | `completed` | Payment captured |
 | `failed` | Checkout failed or expired |
 | `refunded` | Fully refunded |
@@ -294,7 +247,7 @@ Statuses: `processing`, `completed`, `failed`. Stuck `processing` rows are reape
 - Customer lookup: `POST /api/orders/lookup` with `{ orderNumber, accessToken }` in the JSON body.
 - Tracked orders in `sessionStorage` auto-refresh; partial refresh failures keep last-known order data and show a non-blocking warning.
 - Alternate lookup: `GET /api/orders/number/:orderNumber` with `X-Order-Access-Token` header only.
-- Access token is also required for payment capture and checkout context recovery.
+- Access token is also required for order detail recovery when using token-based lookup.
 - Public listing of orders by email is blocked (`GET /api/orders/customer/:email` is admin-only).
 
 ### Customer aggregates
@@ -308,7 +261,7 @@ Statuses: `processing`, `completed`, `failed`. Stuck `processing` rows are reape
 - Cancel pending orders (restores stock automatically).
 - Cancel **unpaid** pending orders only; paid orders use replacement workflow for manufacturing defects (no admin refund).
 - Send shipping notification email.
-- **Mark paid manually** via `PATCH /api/orders/:id/payment-status` with `payment_status: completed`, `admin_note` (≥3 chars), and `payment_id` (PayPal capture ID or external reference, ≥5 chars); logged to `activity_logs` as `admin_mark_paid`.
+- **Mark paid manually** via `PATCH /api/orders/:id/payment-status` with `payment_status: completed`, `admin_note` (≥3 chars), and `payment_id` (external payment reference, ≥5 chars); logged to `activity_logs` as `admin_mark_paid`.
 - **Bulk updates** — `POST /api/admin/*/bulk-update` accepts at most **500** IDs per request; order bulk update validates status transitions and rejects `cancelled` and any `payment_status` change.
 - Hard delete blocked when `payment_status === 'completed'`.
 - Bulk status update rejects `cancelled` — use `POST /api/orders/:id/cancel` instead.
@@ -328,7 +281,7 @@ Statuses: `processing`, `completed`, `failed`. Stuck `processing` rows are reape
 
 ### Coupon validation
 
-- `POST /api/coupons/validate` — public, rate-limited, cached 30s. Requires cart **`items`** (`product_id`, `quantity`); prices are loaded from the database via the same `computeCheckoutPricingForCart` helper as create-payment (volume discount, shipping, coupon scope). Response includes a **`pricing`** breakdown when valid. Checkout compares server `total` to the client total before PayPal redirect (blocks on mismatch > $0.01).
+- `POST /api/coupons/validate` — public, rate-limited, cached 30s. Requires cart **`items`** (`product_id`, `quantity`); prices are loaded from the database via the same `computeCheckoutPricingForCart` helper as place-order (volume discount, shipping, coupon scope). Response includes a **`pricing`** breakdown when valid. Checkout compares server `total` to the client total before place-order (blocks on mismatch > $0.01).
 - Scope enforcement at checkout:
   - `all` — applies to full eligible cart subtotal
   - `product` — only matching `applies_to_ids` product IDs
@@ -338,7 +291,7 @@ Statuses: `processing`, `completed`, `failed`. Stuck `processing` rows are reape
 
 ### Coupon reservation
 
-At create-payment, a row in `coupon_usage` reserves the coupon for the pending order. Released automatically on cancel, expiry, or full refund.
+At place-order, a row in `coupon_usage` reserves the coupon for the pending order. Released automatically on cancel, expiry, or full refund.
 
 ---
 
@@ -373,7 +326,7 @@ At create-payment, a row in `coupon_usage` reserves the coupon for the pending o
 
 - Frontend batches page views, cart actions, checkout events (`checkout_start`, `checkout_complete`, `purchase_complete`), size/quantity changes, and **contact submit** to `POST /api/activity/batch` only when analytics cookie consent is granted (`hasAnalyticsConsent()`). Checkout email is stored in `sessionStorage` only when consent is granted (`setUserEmail` on checkout email change/blur); cleared on cookie reject.
 - Allowed batch action types: `page_view`, `product_view`, `add_to_cart`, `remove_from_cart`, `checkout_start`, `checkout_complete`, `purchase_complete`, `search`, `filter_apply`, `contact_submit`, `size_select`, `quantity_change`.
-- Wired on storefront: `size_select` (product detail), `quantity_change` (cart +/-), `checkout_complete` (before PayPal redirect), `purchase_complete` (payment success).
+- Wired on storefront: `size_select` (product detail), `quantity_change` (cart +/-), `checkout_complete` (before WhatsApp redirect), `purchase_complete` (order placed).
 - `POST /api/activity/batch` is **CSRF-exempt** (supports `sendBeacon`) and rate-limited separately; max **20** events per batch. Response includes `inserted` and `skipped` counts; unknown action types are skipped (not persisted). Returns **500** when every valid event in the batch fails to persist. `POST /api/activity/log` returns **500** on database insert failure.
 - IP addresses anonymized with daily-salted SHA-256 (`IP_SALT`); stored as `anon_{hash}`.
 - `product_view` and `add_to_cart` events can bump product metrics when `canBumpProductMetric()` allows (per-IP per-product rate limit).
@@ -395,7 +348,6 @@ At create-payment, a row in `coupon_usage` reserves the coupon for the pending o
 |-------|-----------|
 | Admin | Bcrypt password hash (`ADMIN_PASSWORD_HASH` in production); HMAC-signed session token in HttpOnly cookie; **SHA-256 hash** stored in `admin_sessions`; optional `Authorization: Bearer` header |
 | Customer orders | Per-order access token (`access_token_hash` + `access_token_encrypted` at rest); email links use one-time `order_access_exchanges` code (`GET /api/orders/access-exchange/:code`) |
-| PayPal webhooks | PayPal signature verification via API |
 
 **JWT_SECRET:** used for admin token signing; complexity rules enforced when present (32+ chars, mixed case, number, special character).
 
@@ -404,7 +356,7 @@ At create-payment, a row in `coupon_usage` reserves the coupon for the pending o
 - Double-submit cookie pattern: `csrf_token` cookie + `X-CSRF-Token` header on mutating requests.
 - `GET /api/csrf-token` initializes token for cross-origin API setups (in-memory cache on frontend).
 - Frontend `apiFetch` retries once on CSRF 403 after refreshing token.
-- Skipped for: GET/HEAD/OPTIONS, `/api/paypal/webhook`, `/api/activity/batch`.
+- Skipped for: GET/HEAD/OPTIONS, `/api/activity/batch`.
 
 ### Rate limiting
 
@@ -418,7 +370,7 @@ At create-payment, a row in `coupon_usage` reserves the coupon for the pending o
 |---------|--------|
 | **Cloudflare** | `TRUST_CLOUDFLARE=true` required in production; blocks direct origin access; uses `CF-Connecting-IP` |
 | **CORS** | Whitelist `FRONTEND_URL` + localhost dev origins; **non-production:** private LAN IPs (any port) and localhost on ports 5173–5175, 3000, 4173 (Vite fallback when 5173 is busy); no-origin allowed in prod only for `/api/health` and webhook |
-| **Helmet** | CSP (PayPal domains allowed), HSTS in production, frameguard deny, noSniff, XSS filter |
+| **Helmet** | CSP, HSTS in production, frameguard deny, noSniff, XSS filter |
 | **compression** | `compression` middleware — gzip/deflate responses **> 1 KB**; honors `x-no-compression`; level 6 |
 | **JSON body limit** | `express.json({ limit: '1mb' })` — large admin images use **Multer** multipart, not JSON |
 | **HTTPS** | Production redirect via `x-forwarded-proto`; optional direct SSL via cert env paths |
@@ -433,14 +385,13 @@ Registered in `backend/src/server.ts` (simplified):
 2. HTTPS redirect (production), Cloudflare proxy check
 3. **Helmet** — security headers + CSP
 4. CORS
-5. PayPal webhook raw body parser (before JSON)
+5. `compression` middleware
 6. `express.json` / `urlencoded`
-7. **compression**
-8. Per-request timeout handler
-9. CSRF (`csrfTokenSetter`, `csrfProtection`)
-10. **express-rate-limit** — `mountRateLimits()` in `middleware/rateLimits.ts` (global `/api/` + per-route)
-11. `requestLogMiddleware` — **HTTP access logging via Pino** (`Request started` / `Request finished`); **not Morgan**
-12. API routes + static `/uploads` + SPA fallback
+7. Per-request timeout handler
+8. CSRF (`csrfTokenSetter`, `csrfProtection`)
+9. **express-rate-limit** — `mountRateLimits()` in `middleware/rateLimits.ts` (global `/api/` + per-route)
+10. `requestLogMiddleware` — **HTTP access logging via Pino** (`Request started` / `Request finished`); **not Morgan**
+11. API routes + static `/uploads` + SPA fallback
 
 **Morgan:** not used — structured Pino logs replace Apache-style access lines and integrate with Sentry/request IDs.
 
@@ -451,7 +402,7 @@ Registered in `backend/src/server.ts` (simplified):
 - Order secrets stripped from API responses (`stripOrderSecrets` removes `access_token_hash` and `access_token_encrypted` — never returned in JSON).
 - Review PII stripped from public API responses (`toPublicReview` — no `customer_email` on storefront).
 - DB TLS verification in production (`DB_SSL_CA_PATH`; `rejectUnauthorized` defaults true).
-- PayPal order/capture IDs have partial unique indexes to prevent duplicate binding.
+- Legacy `paypal_order_id` / `paypal_capture_id` columns retained for historical orders; partial unique indexes prevent duplicate binding on new captures.
 - Product images: admin uploads via **`POST /api/admin/uploads/product-media`** (Multer multipart, images ≤20MB, MP4 ≤15MB) → stored under `uploads/products/` and served at `/uploads/products/*`. Create/update accepts HTTPS/relative URLs (max 2048 chars) or legacy JSON `data:image/*` ≤1MB (`lib/productImage.ts`, aligned with `express.json` 1MB limit). Optional **`UPLOAD_DIR`** env overrides storage path.
 - Supabase RLS at startup (`ensureRlsPolicies()`): all **14** application tables (including `order_access_exchanges`) use **service_role-only** policies; `anon` and `authenticated` grants are revoked — no public product read via PostgREST/GraphQL; all data access goes through Express. Boot is **non-destructive** when policies already exist (skips DROP/CREATE that caused pooler lock hangs). **Production Supabase:** all required SQL migrations applied (June 2026), including `migration-performance-linter-fixes.sql` (lint 0006 policy consolidation + FK indexes) and `migration-products-search-trgm.sql`.
 
@@ -459,7 +410,7 @@ Registered in `backend/src/server.ts` (simplified):
 
 Backend exits on startup if missing (mirrors `backend/scripts/validate-env.mjs`):
 
-- `DATABASE_URL`, `FRONTEND_URL`, `ADMIN_PASSWORD_HASH`, `ADMIN_USERNAME`, `JWT_SECRET` (32+ chars), `PAYPAL_WEBHOOK_ID`, `PAYPAL_CLIENT_ID`, `PAYPAL_SECRET`, `RESEND_API_KEY`, `TRUST_CLOUDFLARE=true`, `REDIS_URL`, `SENTRY_DSN`, `ORDER_TOKEN_ENCRYPTION_KEY`, `IP_SALT`
+- `DATABASE_URL`, `FRONTEND_URL`, `ADMIN_PASSWORD_HASH`, `ADMIN_USERNAME`, `JWT_SECRET` (32+ chars), `RESEND_API_KEY`, `TRUST_CLOUDFLARE=true`, `REDIS_URL`, `SENTRY_DSN`, `ORDER_TOKEN_ENCRYPTION_KEY`, `IP_SALT`
 
 CI runs `npm run validate-env` in the backend job with `CI_VALIDATE_PRODUCTION=true`.
 
@@ -500,7 +451,7 @@ Redis connection failure in production prevents server startup.
 
 `GET /api/health` (public) returns a minimal payload (`status`, `timestamp`, `responseTime_ms`) for load balancers. Returns **503** if the database is unreachable or Redis is required but disconnected.
 
-`GET /api/health/detail` (admin) returns database latency, pool stats, PayPal mode, Redis status, and uptime.
+`GET /api/health/detail` (admin) returns database latency, pool stats, Redis status, and uptime.
 
 ---
 
@@ -587,7 +538,7 @@ Powered by **Resend** (`RESEND_API_KEY`, `SENDER_EMAIL`, `COMPANY_NAME`, `COMPAN
 
 | Email | Trigger |
 |-------|---------|
-| Order confirmation | After successful PayPal capture — includes tracking URL with access token |
+| Order confirmation | After admin marks order paid (or optional future automation) — includes tracking URL with access token |
 | Shipping notification | Admin `POST /api/orders/:id/notify-shipped` |
 | Order cancellation | Admin cancel of **unpaid pending** orders (no customer refunds) |
 | Contact auto-reply | Contact form submission |
@@ -656,14 +607,14 @@ A **correct** `DATABASE_URL` can still produce occasional maintenance warnings w
 | Table | Purpose |
 |-------|---------|
 | `products` | Catalog — price, stock, category, size, color, ratings, optional `video_360` (MP4 URL for 360° viewer) |
-| `orders` | Orders — JSONB items/shipping, PayPal IDs, `refunded_amount`, `access_token_hash`, `access_token_encrypted` |
+| `orders` | Orders — JSONB items/shipping, legacy PayPal ID columns, `refunded_amount`, `access_token_hash`, `access_token_encrypted` |
 | `customers` | Aggregated customer stats, soft delete |
 | `coupons` | Discount rules, scope, validity, usage limits |
 | `coupon_usage` | Per-order coupon reservations |
 | `contact_messages` | Contact form submissions (audit storage; no admin API) |
 | `activity_logs` | Anonymized activity events |
 | `admin_sessions` | Admin session token hashes (SHA-256) |
-| `order_checkout_exchanges` | One-time PayPal return codes → order access tokens |
+| `order_checkout_exchanges` | Legacy one-time checkout codes (maintenance cleanup only) |
 | `reviews` / `review_votes` | Product reviews and voting |
 
 ### Payment tables (runtime migrations at startup)
@@ -701,7 +652,6 @@ A **correct** `DATABASE_URL` can still produce occasional maintenance warnings w
 | CSRF | State-changing methods require `X-CSRF-Token` header + `csrf_token` cookie (SPA uses `/api/csrf-token`) |
 | Admin | `admin_session` HttpOnly cookie or `Authorization: Bearer` |
 | Order token | Per-order access token via `X-Order-Access-Token` header only (legacy `?aid=` query ignored; legacy `?token=` URLs stripped on `/orders`) |
-| PayPal | Webhook signature verification (`PAYPAL_WEBHOOK_ID`) |
 
 Expanded request/response docs: [`API_DOCUMENTATION.md`](API_DOCUMENTATION.md)
 
@@ -712,14 +662,12 @@ Expanded request/response docs: [`API_DOCUMENTATION.md`](API_DOCUMENTATION.md)
 | GET | `/api/csrf-token` | Public | Issue CSRF cookie + token for SPA |
 | GET | `/api/health` | Public | Minimal health check (DB ping); used by Railway |
 | GET | `/api/health/detail` | Admin | Full service diagnostics |
-| POST | `/api/paypal/webhook` | PayPal | PayPal event webhook (raw JSON body) |
-| GET | `/api/paypal/test` | Admin | PayPal API connectivity test |
-| POST | `/api/paypal/create-payment` | Public + CSRF | Create pending order + PayPal order |
-| POST | `/api/paypal/capture-payment/:orderId` | Order token + CSRF | Capture PayPal payment after approval |
-| GET | `/api/paypal/checkout-exchange/:code` | Public | Redeem one-time checkout code → access token |
-| GET | `/api/paypal/checkout-context/:paypalOrderId` | Order token | Checkout recovery when exchange code is unavailable |
-| GET | `/api/paypal/order/:orderId` | Admin | Fetch PayPal order details |
-| POST | `/api/paypal/refund/:captureId` | Admin + CSRF | **403** — customer refunds disabled (no-refund store policy) |
+
+### Checkout (`/api/checkout` — `backend/src/routes/checkout.ts`)
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/api/checkout/place-order` | Public + CSRF | Validate cart, create pending order, return `whatsappUrl` |
 
 Any unmatched `/api/*` path returns **404** JSON `{ error: "Route not found" }`.
 
@@ -742,7 +690,7 @@ Any unmatched `/api/*` path returns **404** JSON `{ error: "Route not found" }`.
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/api/orders` | — | **410 Gone** — use `POST /api/paypal/create-payment` |
+| POST | `/api/orders` | — | **410 Gone** — use `POST /api/checkout/place-order` |
 | GET | `/api/orders` | Admin | List all orders (pagination, status filters, `?search=` on order number/email/name) |
 | GET | `/api/orders/access-exchange/:code` | Public | Redeem email tracking link (one-time) |
 | POST | `/api/orders/lookup` | Public + CSRF | Lookup order by `orderNumber` + `accessToken` in request body |
@@ -828,7 +776,7 @@ Any unmatched `/api/*` path returns **404** JSON `{ error: "Route not found" }`.
 | PATCH | `/api/orders/:id/pending-items` | Admin + CSRF | Edit line items on unpaid pending orders |
 | POST | `/api/admin/orders/bulk-update` | Admin + CSRF | Bulk order status updates |
 
-**Endpoint count:** 73 routes (71 active + 2 deprecated **410** responses: `POST /api/orders`, `POST /api/coupons/use`).
+**Endpoint count:** 66 routes (64 active + 2 deprecated **410** responses: `POST /api/orders`, `POST /api/coupons/use`).
 
 ---
 
@@ -852,10 +800,10 @@ Any unmatched `/api/*` path returns **404** JSON `{ error: "Route not found" }`.
 | `/replacement-policy` | `ReturnsPolicy` | Alias for returns policy |
 | `/shipping-policy` | `ShippingPolicy` | Shipping policy |
 | `/cart` | `CartPage` | Shopping cart |
-| `/checkout` | `Checkout` | Checkout form + PayPal redirect |
+| `/checkout` | `Checkout` | Checkout form + WhatsApp place-order |
 | `/orders` | `MyOrders` | Order lookup via POST body; email links use `?code=`; legacy `?orderNumber=&token=` stripped with deprecation warning |
-| `/payment/success` | `PaymentSuccess` | PayPal return; query params `code` (exchange), `token` (PayPal order ID); optional `aid` (access token) |
-| `/payment/cancel` | `Cancel` | PayPal cancel return |
+| `/payment/success` | `PaymentSuccess` | Optional return after WhatsApp redirect; reads `lastPlacedOrder` from sessionStorage |
+| `/payment/cancel` | `Cancel` | Legacy cancel route (redirects home) |
 
 ### Admin routes
 
@@ -885,7 +833,7 @@ Any unmatched `/api/*` path returns **404** JSON `{ error: "Route not found" }`.
 
 ### URLs referenced in navigation (not separate routes)
 
-Footer/header links use the routes above. Product search navigates to `/products?q={query}`. Cart badge and checkout flow link `/cart` → `/checkout` → PayPal → `/payment/success` or `/payment/cancel`.
+Footer/header links use the routes above. Product search navigates to `/products?q={query}`. Cart badge and checkout flow link `/cart` → `/checkout` → WhatsApp → optional `/payment/success`.
 
 ---
 
@@ -898,22 +846,20 @@ Templates: `backend/env.template`, `frontend/env.template`
 | Variable | Purpose |
 |----------|---------|
 | `DATABASE_URL` | PostgreSQL connection (pooler port 6543) |
-| `FRONTEND_URL` | CORS, CSP, PayPal return URLs |
+| `FRONTEND_URL` | CORS, CSP |
 | `ADMIN_PASSWORD_HASH` | Bcrypt admin password |
 | `ADMIN_USERNAME` | Admin login username |
 | `JWT_SECRET` | Admin session signing (32+ chars required) |
-| `PAYPAL_CLIENT_ID`, `PAYPAL_SECRET` | PayPal API credentials |
-| `PAYPAL_WEBHOOK_ID` | Webhook signature verification |
 | `RESEND_API_KEY` | Transactional email |
 | `TRUST_CLOUDFLARE` | Must be `true` |
 | `REDIS_URL` | Cache and rate limits |
 | `SENTRY_DSN` | Error tracking |
 
-### Backend — payment and auth (optional in dev)
+### Backend — checkout (optional)
 
-| Variable | Purpose |
-|----------|---------|
-| `PAYPAL_MODE` | `sandbox` or `live` |
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `WHATSAPP_ORDER_PHONE` | `919888514572` | WhatsApp number for order messages (digits only) |
 
 ### Backend — optional / operational
 
@@ -984,7 +930,7 @@ Cron every 6 days — pings database via `backend/scripts/keep-alive.js` (requir
 
 ### Dependabot
 
-Weekly patch/minor updates for Express, PayPal SDK, React, Sentry, GitHub Actions.
+Weekly patch/minor updates for Express, React, Sentry, GitHub Actions.
 
 ### Deployment pattern
 
@@ -1010,7 +956,7 @@ See [`PRE_LAUNCH_CHECKLIST.md`](PRE_LAUNCH_CHECKLIST.md) before first production
 
 ```bash
 # From repository root (monorepo)
-cp backend/env.template backend/.env   # DATABASE_URL, PayPal sandbox, ADMIN_PASSWORD_HASH, etc.
+cp backend/env.template backend/.env   # DATABASE_URL, WHATSAPP_ORDER_PHONE, ADMIN_PASSWORD_HASH, etc.
 cp frontend/env.template frontend/.env # VITE_API_BASE_URL=/api (default)
 npm install                            # installs frontend + backend workspaces
 npm run dev                            # API :5000 + Vite :5173 (proxy /api)
@@ -1056,10 +1002,10 @@ npm run links:check
 
 | Suite | Tool | Coverage |
 |-------|------|----------|
-| Backend unit/API | Vitest | Checkout validation + create-payment happy path, capture 409/refund mismatch, checkout-context API, checkout exchange, PayPal webhooks (COMPLETED + DENIED), admin mark-paid, **admin analytics** (401, IST custom range, CSV export), **validate-cart** (empty/invalid/OOS), **products search** edge cases, **stability/concurrency smoke**, coupon scope, `computeCheckoutPricingForCart`, payment idempotency, order tokens, process error handlers, RLS table list + grant revoke, email portal URL, activity batch/log, order lookup, reviews check, **IST date helpers**, **build performance budgets**, sales analytics invalid-date fallback |
-| Frontend E2E / UI | Playwright | Storefront smoke + deep flows (search, policy gate, coupon, cart qty, payment 409), **checkout create-payment + total mismatch** (serial `chromium-checkout-serial` project), **admin analytics custom range** (Apply-before-export), **responsive UI** (mobile cart sticky CTA, checkout, overflow), checkout/contact/admin UI, mobile viewport |
+| Backend unit/API | Vitest | **place-order** checkout, WhatsApp message formatting, admin mark-paid, **admin analytics** (401, IST custom range, CSV export), **validate-cart** (empty/invalid/OOS), **products search** edge cases, **stability/concurrency smoke**, coupon scope, `computeCheckoutPricingForCart`, payment idempotency, order tokens, process error handlers, RLS table list + grant revoke, email portal URL, activity batch/log, order lookup, reviews check, **IST date helpers**, **build performance budgets**, sales analytics invalid-date fallback |
+| Frontend E2E / UI | Playwright | Storefront smoke + deep flows (search, policy gate, coupon, cart qty, order confirmation), checkout/contact/admin UI, mobile viewport |
 
-**Total automated tests:** 233 (113 backend unit + 75 API + 45 Playwright UI).
+**Total automated tests:** 198 (100 backend unit + 56 API + 42 Playwright UI).
 
 | Link check | Custom script | Documentation internal links |
 
@@ -1081,7 +1027,7 @@ API tests mock the database layer (`Tests/setup.ts`) for fast isolated runs.
 | [PRE_LAUNCH_CHECKLIST.md](PRE_LAUNCH_CHECKLIST.md) | Go-live checklist |
 | [DEPLOYMENT.md](DEPLOYMENT.md) | Production deploy |
 | [ADMIN_DASHBOARD_GUIDE.md](ADMIN_DASHBOARD_GUIDE.md) | Admin UI |
-| [PAYPAL_SETUP_GUIDE.md](PAYPAL_SETUP_GUIDE.md) | PayPal credentials and webhooks |
+| [WHATSAPP_CHECKOUT_GUIDE.md](WHATSAPP_CHECKOUT_GUIDE.md) | WhatsApp checkout and admin payment confirmation |
 | [DATABASE_SETUP.md](DATABASE_SETUP.md) | Schema and migrations |
 | [PERFORMANCE_BASELINE.md](PERFORMANCE_BASELINE.md) | Bundle budgets, WebP pipeline, before/after metrics |
 | [MEDIA_ASSET_GUIDE.md](MEDIA_ASSET_GUIDE.md) | Product and static image conventions |

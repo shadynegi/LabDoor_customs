@@ -11,12 +11,9 @@ const requiredProduction = [
   'ADMIN_PASSWORD_HASH',
   'ADMIN_USERNAME',
   'JWT_SECRET',
-  'PAYPAL_WEBHOOK_ID',
   'REDIS_URL',
   'SENTRY_DSN',
   'RESEND_API_KEY',
-  'PAYPAL_CLIENT_ID',
-  'PAYPAL_SECRET',
   'ORDER_TOKEN_ENCRYPTION_KEY',
   'IP_SALT',
 ];
@@ -65,11 +62,6 @@ if (isProduction) {
 
   if (process.env.ALLOW_INSECURE_RLS === 'true') {
     fail('ALLOW_INSECURE_RLS=true is forbidden in production');
-  }
-
-  const mode = (process.env.PAYPAL_MODE || 'sandbox').toLowerCase();
-  if (mode !== 'live' && process.env.REQUIRE_PAYPAL_LIVE !== 'false') {
-    fail('PAYPAL_MODE must be "live" in production (set REQUIRE_PAYPAL_LIVE=false for CI sandbox)');
   }
 }
 

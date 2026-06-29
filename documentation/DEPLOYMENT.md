@@ -14,7 +14,7 @@ Deploy Lab Door Customs from the repository root on Railway. Express serves the 
 User → Cloudflare (DNS + proxy) → Railway (Express API + static SPA)
                                → Supabase PostgreSQL
                                → Redis
-                               → PayPal (live)
+                               → WhatsApp (customer order messages)
                                → Resend (email)
                                → Sentry (errors)
 ```
@@ -44,16 +44,13 @@ User → Cloudflare (DNS + proxy) → Railway (Express API + static SPA)
 | `FRONTEND_URL` | `https://www.labdoorcustoms.com` (same public URL as the Railway service) |
 | `ADMIN_PASSWORD_HASH` | Bcrypt hash — `node backend/scripts/generate-admin-hash.mjs "password"` |
 | `ADMIN_USERNAME` | Admin login username |
-| `PAYPAL_CLIENT_ID` | Live PayPal client ID |
-| `PAYPAL_SECRET` | Live PayPal secret |
-| `PAYPAL_MODE` | `live` |
-| `PAYPAL_WEBHOOK_ID` | PayPal webhook ID |
+| `WHATSAPP_ORDER_PHONE` | Optional — digits only (default `919888514572`) |
 | `TRUST_CLOUDFLARE` | `true` |
 | `REDIS_URL` | Redis connection string |
 | `SENTRY_DSN` | Sentry backend DSN |
 | `JWT_SECRET` | 32+ characters with mixed case, number, and special character |
 | `RESEND_API_KEY` | Resend API key (required at startup) |
-| `ORDER_TOKEN_ENCRYPTION_KEY` | AES-256-GCM key for checkout exchange token encryption |
+| `ORDER_TOKEN_ENCRYPTION_KEY` | AES-256-GCM key for order access token encryption |
 | `IP_SALT` | Salt for activity IP anonymization and review voter IDs |
 
 ### Required build-time variables (frontend Vite build)
@@ -101,12 +98,12 @@ See [CLOUDFLARE_RAILWAY.md](./CLOUDFLARE_RAILWAY.md).
 
 ---
 
-## PayPal webhooks
+## WhatsApp checkout
 
-1. In PayPal Developer Dashboard (live mode), create a webhook pointing to:
-   `https://www.labdoorcustoms.com/api/paypal/webhook`
-2. Subscribe to: `PAYMENT.CAPTURE.COMPLETED`, `PAYMENT.CAPTURE.DENIED`, `PAYMENT.CAPTURE.REFUNDED`, `PAYMENT.CAPTURE.REVERSED`
-3. Set `PAYPAL_WEBHOOK_ID` on the Railway service.
+Customers complete payment off-site via WhatsApp after `POST /api/checkout/place-order`. See [WHATSAPP_CHECKOUT_GUIDE.md](./WHATSAPP_CHECKOUT_GUIDE.md).
+
+- Set `WHATSAPP_ORDER_PHONE` if the business number differs from the default.
+- Admin confirms payment via **Mark paid** in the dashboard.
 
 ---
 
@@ -122,7 +119,7 @@ See [CLOUDFLARE_RAILWAY.md](./CLOUDFLARE_RAILWAY.md).
 
 ## Health and Redis
 
-`GET /api/health` reports database latency, Redis connectivity, PayPal mode, and uptime. Returns **503** in production when Redis is required but disconnected.
+`GET /api/health` reports database latency, Redis connectivity, and uptime. Returns **503** in production when Redis is required but disconnected.
 
 ---
 
@@ -130,7 +127,7 @@ See [CLOUDFLARE_RAILWAY.md](./CLOUDFLARE_RAILWAY.md).
 
 1. `GET https://www.labdoorcustoms.com/api/health` — DB and Redis healthy
 2. `GET https://www.labdoorcustoms.com/` — storefront loads
-3. Complete a test order (PayPal sandbox or live)
+3. Complete a test order (place-order → WhatsApp → admin mark paid)
 4. Admin login at `/admin/login`
 5. Verify `/sitemap.xml` contains product URLs
 

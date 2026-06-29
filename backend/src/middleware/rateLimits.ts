@@ -13,12 +13,6 @@ const rateLimit429 = (error: string) => (_req: Request, res: Response) => {
   });
 };
 
-const isPayPalWebhookRequest = (req: Request) =>
-  req.method === 'POST' &&
-  (req.path === '/webhook' ||
-    req.path === '/api/paypal/webhook' ||
-    req.originalUrl.startsWith('/api/paypal/webhook'));
-
 let mounted = false;
 
 export function mountRateLimits(app: Express): void {
@@ -43,7 +37,7 @@ export function mountRateLimits(app: Express): void {
       windowMs: 15 * 60 * 1000,
       max: 300,
       handler: rateLimit429('Too many requests, please try again later.'),
-      skip: (req) => req.path === '/api/health' || isPayPalWebhookRequest(req),
+      skip: (req) => req.path === '/api/health',
     })
   );
 
@@ -59,15 +53,14 @@ export function mountRateLimits(app: Express): void {
     })
   );
 
-  app.use(
-    '/api/paypal',
+  app.post(
+    '/api/checkout/place-order',
     rateLimit({
       ...common,
-      store: storeFor('rl:paypal'),
+      store: storeFor('rl:checkout'),
       windowMs: 15 * 60 * 1000,
       max: 30,
-      skip: isPayPalWebhookRequest,
-      handler: rateLimit429('Too many payment attempts, please try again later.'),
+      handler: rateLimit429('Too many order attempts, please try again later.'),
     })
   );
 
@@ -178,17 +171,6 @@ export function mountRateLimits(app: Express): void {
       windowMs: 15 * 60 * 1000,
       max: 60,
       handler: rateLimit429('Too many search requests. Please try again later.'),
-    })
-  );
-
-  app.get(
-    '/api/paypal/checkout-exchange/:code',
-    rateLimit({
-      ...common,
-      store: storeFor('rl:checkout-exchange'),
-      windowMs: 15 * 60 * 1000,
-      max: 30,
-      handler: rateLimit429('Too many checkout exchange attempts. Please try again later.'),
     })
   );
 

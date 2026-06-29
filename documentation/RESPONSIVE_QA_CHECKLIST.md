@@ -13,7 +13,7 @@ Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API
 
 | Area | How it works |
 |------|----------------|
-| **Checkout** | Cart validation with retry; PayPal `?code=` exchange; capture **409** -> processing UI; checkout email synced to activity on change/blur. |
+| **Checkout** | Cart validation with retry; **Place Order** → WhatsApp redirect; checkout email synced to activity on change/blur. |
 | **Orders** | Email links `GET /api/orders/access-exchange/:code`; legacy `?orderNumber=&token=` stripped; partial refresh keeps stale data + warning. |
 | **Admin** | Products paginated (load more); messages mark read on open; coupons scope UI; reviews admin response; estimated delivery; error/retry states. |
 | **Activity** | Consent-gated batch; `contact_submit` on contact success. |
@@ -69,9 +69,9 @@ Use browser DevTools device mode or resize the window to each width.
 ### Cart and checkout
 
 - [ ] Cart items stack vertically on mobile
-- [ ] Sticky bottom bar shows total + Checkout (cart) or PayPal (checkout)
+- [ ] Sticky bottom bar shows total + Checkout (cart) or Place Order (checkout)
 - [ ] Checkout form fields full-width on mobile
-- [ ] No duplicate PayPal buttons on mobile
+- [ ] No duplicate Place Order buttons on mobile
 
 ### Policies and contact
 

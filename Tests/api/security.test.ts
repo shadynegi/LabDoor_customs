@@ -14,17 +14,6 @@ describe('security hardening', () => {
     expect(res.headers['access-control-allow-origin']).toBe('http://192.168.1.7:5174');
   });
 
-  it('requires admin auth for PayPal refunds', async () => {
-    const { agent, csrfToken } = await createCsrfAgent();
-    const res = await withCsrf(
-      agent.post('/api/paypal/refund/CAPTURE123'),
-      csrfToken
-    ).send({ amount: '10.00', currency: 'USD' });
-
-    expect(res.status).toBe(401);
-    expect(res.body.success).toBe(false);
-  });
-
   it('blocks public customer order listing by email', async () => {
     const res = await request(app).get('/api/orders/customer/user@example.com');
 

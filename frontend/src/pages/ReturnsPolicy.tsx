@@ -138,7 +138,7 @@ export default function ReturnsPolicy() {
 
           <Section icon={XCircle} title="What we do not offer">
             <ul style={{ paddingLeft: 20 }}>
-              <li>Refunds to your original payment method (PayPal or card)</li>
+              <li>Refunds to your original payment method</li>
               <li>Returns or exchanges for size, fit, color, or change of mind</li>
               <li>Store credit in place of a refund</li>
               <li>Replacements for wear-and-tear, misuse, or damage after delivery</li>
@@ -179,12 +179,12 @@ export default function ReturnsPolicy() {
             </ol>
           </Section>
 
-          <Section icon={Package} title="PayPal purchases">
+          <Section icon={Package} title="Payment and disputes">
             <p>
-              Payments are processed through PayPal. Because all sales are final, PayPal&apos;s standard
-              buyer protection does not entitle you to a refund for preference or fit issues. If you
-              believe you have a manufacturing defect, follow the replacement process above — do not
-              open a PayPal dispute for a refund before contacting us.
+              Payment is confirmed manually after you send your order details on WhatsApp. Because all
+              sales are final, we do not offer refunds for preference or fit issues. If you believe you
+              have a manufacturing defect, follow the replacement process above before disputing payment
+              with your bank or payment provider.
             </p>
           </Section>
 

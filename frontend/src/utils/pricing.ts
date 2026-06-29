@@ -1,4 +1,4 @@
-// Shared pricing calculation utilities (mirror backend/src/lib/paypalCheckout.ts)
+// Shared pricing calculation utilities (mirror backend/src/lib/checkoutPricing.ts)
 // No tax. Shipping $25 fixed; free when merchandise subtotal is $200+.
 
 export interface PricingBreakdown {

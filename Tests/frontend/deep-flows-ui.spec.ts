@@ -29,7 +29,7 @@ test.describe('Deep storefront flows', () => {
     await expect(page.getByText('Great quality')).toBeVisible();
   });
 
-  test('checkout blocks PayPal until no-refund policy is accepted', async ({ page }) => {
+  test('checkout blocks Place Order until no-refund policy is accepted', async ({ page }) => {
     const product = MOCK_PRODUCTS[0];
     await seedCart(page, [
       {
@@ -48,8 +48,8 @@ test.describe('Deep storefront flows', () => {
     const policyCheckbox = page.getByRole('checkbox', { name: /all sales are final/i });
     await expect(policyCheckbox).not.toBeChecked();
 
-    const payButton = page.locator('button:visible', { hasText: 'Pay with PayPal' });
-    await expect(payButton).toBeDisabled();
+    const placeOrderButton = page.locator('button:visible', { hasText: 'Place Order' });
+    await expect(placeOrderButton).toBeDisabled();
   });
 
   test('checkout applies coupon and shows discount in order summary', async ({ page }) => {
@@ -92,14 +92,16 @@ test.describe('Deep storefront flows', () => {
     await expect(page.locator('text=2').first()).toBeVisible({ timeout: 10_000 });
   });
 
-  test('payment success shows processing UI on capture 409', async ({ page }) => {
-    await page.goto('/payment/success?code=RECON-CODE&token=PAYPAL-409');
-    await expect(page.getByText('Payment received — order processing')).toBeVisible({
-      timeout: 15_000,
+  test('payment success shows order received confirmation', async ({ page }) => {
+    await page.addInitScript(() => {
+      sessionStorage.setItem(
+        'lastPlacedOrder',
+        JSON.stringify({ orderNumber: 'GSS-RECON-TEST', total: 98 }),
+      );
     });
-    await expect(
-      page.getByText(/still being confirmed|usually resolves within a minute/i),
-    ).toBeVisible();
-    await expect(page.getByText('GSS-RECON-TEST')).toBeVisible();
+    await page.goto('/payment/success');
+    await expect(page.getByText('Order received')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('Order ID: GSS-RECON-TEST')).toBeVisible();
+    await expect(page.getByText('Total: $98.00')).toBeVisible();
   });
 });

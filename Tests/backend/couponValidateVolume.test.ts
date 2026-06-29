@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculateVolumeDiscount, resolveCouponDiscount } from '../../backend/src/lib/paypalCheckout';
+import { calculateVolumeDiscount, resolveCouponDiscount } from '../../backend/src/lib/checkoutPricing';
 import { sqlMock } from '../setup';
 
 describe('coupon validate volume alignment', () => {

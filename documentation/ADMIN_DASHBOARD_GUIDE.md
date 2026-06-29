@@ -170,8 +170,6 @@ These are available via API but do not have dedicated dashboard tabs:
 | Feature | Endpoints |
 |---------|-----------|
 | Activity log query | `GET /api/activity/logs`, `GET /api/activity/stats` |
-| PayPal refunds | `POST /api/paypal/refund/:captureId` — **disabled** (403; no-refund policy) |
-| PayPal test | `GET /api/paypal/test` |
 
 ---
 

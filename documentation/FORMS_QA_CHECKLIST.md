@@ -13,7 +13,7 @@ Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API
 
 | Area | How it works |
 |------|----------------|
-| **Checkout** | Cart validation with retry; `policy_accepted` required; no-refund policy checkbox; PayPal `?code=` exchange; capture **409** → processing UI; checkout email synced to activity on change/blur. |
+| **Checkout** | Cart validation with retry; `policy_accepted` required; no-refund policy checkbox; **Place Order** → WhatsApp redirect; checkout email synced to activity on change/blur. |
 | **Orders** | Email links `GET /api/orders/access-exchange/:code`; legacy `?orderNumber=&token=` stripped; partial refresh keeps stale data + warning. 
 | **Admin** | Products paginated (load more); **Settings** tab (activity export, sessions, customer recompute); coupons scope UI; reviews admin response; estimated delivery; error/retry states. |
 | **Activity** | Consent-gated batch; `contact_submit` on contact success. |
@@ -37,7 +37,7 @@ On CSRF 403, `apiFetch` refreshes the token and retries once.
 ### Test
 
 - [ ] Contact form submits successfully
-- [ ] Checkout create-payment succeeds
+- [ ] Checkout place-order succeeds
 - [ ] Admin login works
 - [ ] Admin product create/update works
 
@@ -61,13 +61,12 @@ On CSRF 403, `apiFetch` refreshes the token and retries once.
 - [ ] Email format validated
 - [ ] Empty cart redirects or shows error
 - [ ] Coupon validation shows correct discount/error
-- [ ] No-refund / replacement-only policy checkbox required; PayPal button disabled until accepted
-- [ ] PayPal redirect occurs on valid submission
+- [ ] No-refund / replacement-only policy checkbox required; **Place Order** disabled until accepted
+- [ ] WhatsApp redirect occurs on valid submission (or mocked redirect in E2E)
 - [ ] Checkout email updates activity batch identity on change/blur (with consent)
 - [ ] Cart validation failure shows **Retry validation** on cart and checkout pages (desktop + mobile sticky hint)
 - [ ] Server rejects tampered totals (amount mismatch)
-- [ ] Payment success **409** shows processing UI (cart not cleared)
-- [ ] Expired checkout `code` shows explicit error on success page
+- [ ] Optional `/payment/success` shows order confirmation when returning from WhatsApp
 
 ---
 

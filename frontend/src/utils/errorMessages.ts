@@ -71,9 +71,9 @@ const ERROR_MAPPINGS: ErrorMapping[] = [
     description: 'Your card has expired. Please use a different payment method.',
   },
   {
-    pattern: /paypal.*error|paypal.*failed/i,
-    message: 'PayPal error',
-    description: 'There was an issue with PayPal. Please try again or use a different payment method.',
+    pattern: /place.*order.*failed|checkout.*failed/i,
+    message: 'Order could not be placed',
+    description: 'We could not save your order. Please check your details and try again.',
   },
 
   // Order errors

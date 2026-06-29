@@ -35,7 +35,7 @@ Production TLS: set `DB_SSL_CA_PATH` to Supabase CA bundle.
 | Table | Purpose |
 |-------|---------|
 | `products` | Catalog — price, stock, category, size, color, ratings |
-| `orders` | Orders — JSONB items/shipping, PayPal IDs, payment/status enums |
+| `orders` | Orders — JSONB items/shipping, legacy PayPal ID columns (optional), payment/status enums |
 | `customers` | Aggregated stats — total_orders, total_spent, soft delete |
 | `coupons` | Discount rules — type, limits, scope (`applies_to`) |
 | `coupon_usage` | Per-order coupon reservations |
@@ -51,9 +51,9 @@ Created at server startup via `ensureIdempotencyTable()`, `ensureOrderPaymentSch
 
 | Table | Purpose |
 |-------|---------|
-| `payment_idempotency` | Create/capture deduplication |
-| `processed_refund_events` | Refund webhook/admin deduplication |
-| `order_checkout_exchanges` | One-time PayPal return codes → access tokens |
+| `payment_idempotency` | Place-order / legacy capture deduplication |
+| `processed_refund_events` | Legacy refund deduplication |
+| `order_checkout_exchanges` | Legacy one-time checkout codes (maintenance cleanup only) |
 
 Migration files:
 
@@ -69,8 +69,8 @@ Boot creates missing indexes via `ensureIdempotencyIndexes()` even when `BOOTSTR
 
 | Column | Purpose |
 |--------|---------|
-| `paypal_order_id` | PayPal checkout order ID (unique when set) |
-| `paypal_capture_id` | PayPal capture ID (unique when set) |
+| `paypal_order_id` | Legacy PayPal checkout order ID (unique when set; not written on new orders) |
+| `paypal_capture_id` | Legacy PayPal capture ID (unique when set; not written on new orders) |
 | `refunded_amount` | Cumulative refunded total |
 | `access_token_hash` | SHA-256 hash of customer access token |
 | `items` | JSONB line items |

@@ -13,7 +13,7 @@ import {
   validateOptionalProductImageUrl,
 } from '../lib/productImage';
 import { validateOptionalProductVideo360Url } from '../lib/productVideo';
-import { validateCartItems } from '../lib/paypalCheckout';
+import { validateCartItems } from '../lib/checkoutPricing';
 import { setProductStockAbsolute } from '../lib/inventoryMovements';
 
 const router = Router();

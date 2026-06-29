@@ -10,7 +10,6 @@ Get Lab Door Customs running locally in about 10 minutes.
 
 - Node.js 20+
 - PostgreSQL database (Supabase free tier works)
-- PayPal Developer sandbox account
 - Resend API key (for emails — optional for basic testing)
 
 ---
@@ -35,9 +34,7 @@ PORT=5000
 NODE_ENV=development
 FRONTEND_URL=http://localhost:5173
 DATABASE_URL=postgresql://postgres:PASSWORD@db.PROJECT.supabase.co:6543/postgres?pgbouncer=true
-PAYPAL_CLIENT_ID=your_sandbox_client_id
-PAYPAL_SECRET=your_sandbox_secret
-PAYPAL_MODE=sandbox
+WHATSAPP_ORDER_PHONE=919888514572
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD_HASH=$2b$12$your_bcrypt_hash_here
 JWT_SECRET=your_secure_jwt_secret_at_least_32_characters_long
@@ -139,6 +136,6 @@ npm run build
 ## Next steps
 
 - [SETUP_GUIDE.md](./SETUP_GUIDE.md) — detailed configuration
-- [PAYPAL_SETUP_GUIDE.md](./PAYPAL_SETUP_GUIDE.md) — PayPal sandbox and webhooks
+- [WHATSAPP_CHECKOUT_GUIDE.md](./WHATSAPP_CHECKOUT_GUIDE.md) — WhatsApp checkout and admin payment confirmation
 - [DATABASE_SETUP.md](./DATABASE_SETUP.md) — schema and migrations
 - [ADMIN_DASHBOARD_GUIDE.md](./ADMIN_DASHBOARD_GUIDE.md) — admin workflows

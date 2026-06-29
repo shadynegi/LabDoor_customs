@@ -139,7 +139,7 @@ export default function TermsOfService() {
             <ul style={{ paddingLeft: 20 }}>
               <li>You warrant that you are legally capable of entering into binding contracts</li>
               <li>You warrant that all information provided is true and accurate</li>
-              <li>Payment is required at the time of order placement via PayPal</li>
+              <li>Payment is arranged via WhatsApp after you place your order on the site</li>
               <li>You must accept the No Refund & Replacement Policy before checkout</li>
               <li>Orders are subject to product availability and are final once paid</li>
             </ul>

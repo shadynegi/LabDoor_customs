@@ -55,13 +55,11 @@ DATABASE_URL=postgresql://postgres:PASSWORD@db.PROJECT.supabase.co:6543/postgres
 
 Run `backend/src/database/schema.sql` in the Supabase SQL editor, then apply migration files as needed. The server also runs runtime patches for payment tables at startup.
 
-### PayPal (sandbox)
+### WhatsApp checkout
 
-1. Create an app at [developer.paypal.com](https://developer.paypal.com).
-2. Set `PAYPAL_CLIENT_ID`, `PAYPAL_SECRET`, `PAYPAL_MODE=sandbox`.
-3. For webhook testing locally, use ngrok and set `PAYPAL_WEBHOOK_ID`.
+Optional `WHATSAPP_ORDER_PHONE` (digits only, default `919888514572`). Customers complete payment off-site; admin confirms via **Mark paid**.
 
-See [PAYPAL_SETUP_GUIDE.md](./PAYPAL_SETUP_GUIDE.md).
+See [WHATSAPP_CHECKOUT_GUIDE.md](./WHATSAPP_CHECKOUT_GUIDE.md).
 
 ### Admin password
 
@@ -88,7 +86,7 @@ ORDER_TOKEN_ENCRYPTION_KEY=your_32_char_key_for_aes_gcm_checkout_exchange
 IP_SALT=random_salt_for_ip_anonymization_and_review_votes
 ```
 
-Both are required in production (`validate-env.mjs`). `ORDER_TOKEN_ENCRYPTION_KEY` encrypts access tokens in `order_checkout_exchanges`; `IP_SALT` salts activity IP anonymization and review voter ID derivation.
+Both are required in production (`validate-env.mjs`). `ORDER_TOKEN_ENCRYPTION_KEY` encrypts order access tokens at rest; `IP_SALT` salts activity IP anonymization and review voter ID derivation.
 
 ### Email (Resend)
 
@@ -162,9 +160,9 @@ Workspace-specific commands: `npm run dev -w backend`, `npm run build -w fronten
 |-------|-------|
 | CORS errors | `FRONTEND_URL` matches the browser origin |
 | CSRF 403 | Call `/api/csrf-token` first; cookies enabled |
-| PayPal redirect fails | `FRONTEND_URL` and PayPal return URLs |
+| WhatsApp redirect fails | `WHATSAPP_ORDER_PHONE` digits-only; check place-order response |
 | DB connection | Pooler URL, SSL settings, Supabase status |
 | Empty products | Run schema.sql and seed data |
 | SPA routes 404 in production | Run `npm run build`; check `frontend/dist` exists |
 
-See [DEBUG_FETCH_ERROR.md](./DEBUG_FETCH_ERROR.md) and [diagnose-paypal-issue.md](./diagnose-paypal-issue.md).
+See [DEBUG_FETCH_ERROR.md](./DEBUG_FETCH_ERROR.md) and [WHATSAPP_CHECKOUT_GUIDE.md](./WHATSAPP_CHECKOUT_GUIDE.md).

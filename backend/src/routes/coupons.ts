@@ -7,7 +7,7 @@ import { cached } from '../lib/cache';
 import { CACHE, TTL, invalidateCouponCaches } from '../lib/cacheKeys';
 import { verifyAdmin } from './admin';
 import { parsePagination, paginationMeta } from '../lib/pagination';
-import { computeCheckoutPricingForCart } from '../lib/paypalCheckout';
+import { computeCheckoutPricingForCart } from '../lib/checkoutPricing';
 
 const router = Router();
 

@@ -17,7 +17,7 @@ export interface ValidatedLineItem {
   size_value?: string;
 }
 
-export interface PendingPayPalOrderInput {
+export interface PendingOrderInput {
   customerInfo: {
     fullName: string;
     email: string;
@@ -49,7 +49,7 @@ function parseOrderItems(items: unknown): ValidatedLineItem[] {
 /**
  * Create pending order + decrement inventory in a single DB transaction.
  */
-export async function createPendingPayPalOrderAtomic(input: PendingPayPalOrderInput) {
+export async function createPendingOrderAtomic(input: PendingOrderInput) {
   const customerInfo = sanitizeCustomerInfo(input.customerInfo);
   const orderNumber = `GSS-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
   const { token: accessToken, hash: accessTokenHash } = generateOrderAccessToken();
@@ -119,7 +119,7 @@ export async function createPendingPayPalOrderAtomic(input: PendingPayPalOrderIn
         ${input.pricing.tax},
         ${input.pricing.total},
         'pending',
-        'PayPal',
+        'WhatsApp',
         ${accessTokenHash},
         ${accessTokenEncrypted},
         'pending'
@@ -138,7 +138,7 @@ export async function createPendingPayPalOrderAtomic(input: PendingPayPalOrderIn
   };
 }
 
-/** Cancel a pending order and restore reserved inventory (PayPal failure / rollback). */
+/** Cancel a pending order and restore reserved inventory (checkout failure / rollback). */
 export async function cancelPendingOrderAndRestoreStock(serverOrderId: string): Promise<boolean> {
   let cancelled = false;
 

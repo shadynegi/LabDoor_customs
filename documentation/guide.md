@@ -10,7 +10,7 @@ Sequential commands from a fresh clone through running the app and executing the
 
 - **Node.js 20+**
 - **PostgreSQL** (Supabase free tier works) — required for local dev with a real database
-- **PayPal Developer** sandbox account — for checkout testing
+- **WhatsApp** — business phone for order messages (optional `WHATSAPP_ORDER_PHONE`; default in code)
 - **Resend API key** — optional for email; contact form and order emails need it in production
 
 ---
@@ -54,9 +54,7 @@ PORT=5000
 NODE_ENV=development
 FRONTEND_URL=http://localhost:5173
 DATABASE_URL=postgresql://postgres:PASSWORD@db.PROJECT.supabase.co:6543/postgres?pgbouncer=true
-PAYPAL_CLIENT_ID=your_sandbox_client_id
-PAYPAL_SECRET=your_sandbox_secret
-PAYPAL_MODE=sandbox
+WHATSAPP_ORDER_PHONE=919888514572
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD_HASH=$2b$12$your_bcrypt_hash_here
 JWT_SECRET=your_secure_jwt_secret_at_least_32_characters_long
@@ -161,10 +159,10 @@ This single command runs all suites in order:
 
 | Suite | Tool | Tests | Needs live DB? |
 |-------|------|-------|----------------|
-| Backend unit | Vitest | 113 | No (mocked) |
-| API integration | Vitest | 75 | No (mocked) |
-| Frontend UI | Playwright | 45 | No (mocked API + static preview) |
-| **Total** | | **233** | |
+| Backend unit | Vitest | 100 | No (mocked) |
+| API integration | Vitest | 56 | No (mocked) |
+| Frontend UI | Playwright | 42 | No (mocked API + static preview) |
+| **Total** | | **198** | |
 
 The runner auto-builds the frontend for UI tests if `frontend/dist` is missing and installs Playwright in `Tests/` on first run if needed.
 
@@ -232,7 +230,7 @@ npm run links:check
 
 ## Tests only (no database or dev server)
 
-If you only want to verify the codebase without configuring Supabase or PayPal:
+If you only want to verify the codebase without configuring Supabase:
 
 ```powershell
 cd C:\Users\TejasBogra\Downloads\LDC
@@ -277,7 +275,7 @@ More detail: [DEBUG_FETCH_ERROR.md](DEBUG_FETCH_ERROR.md), [RESTART_BACKEND.md](
 
 ## Next steps
 
-- [PAYPAL_SETUP_GUIDE.md](PAYPAL_SETUP_GUIDE.md) — PayPal sandbox and webhooks
+- [WHATSAPP_CHECKOUT_GUIDE.md](WHATSAPP_CHECKOUT_GUIDE.md) — WhatsApp checkout and admin payment confirmation
 - [ADMIN_DASHBOARD_GUIDE.md](ADMIN_DASHBOARD_GUIDE.md) — admin workflows
 - [PRE_LAUNCH_CHECKLIST.md](PRE_LAUNCH_CHECKLIST.md) — production go-live
 - [DEPLOYMENT.md](DEPLOYMENT.md) — deploy topology

@@ -45,7 +45,6 @@ export const csrfProtection = (req: Request, res: Response, next: NextFunction) 
 
   // Skip CSRF for certain paths (webhooks, public APIs)
   const skipPaths = [
-    '/api/paypal/webhook',
     '/api/activity/batch', // sendBeacon cannot attach CSRF headers; rate-limited separately
   ];
   

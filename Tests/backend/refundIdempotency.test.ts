@@ -3,7 +3,6 @@ import {
   buildPayPalRefundDedupeKey,
   buildWebhookRefundDedupeKey,
 } from '../../backend/src/lib/refundIdempotency';
-import { isFullRefundAmount } from '../../backend/src/lib/refundSync';
 
 describe('refundIdempotency helpers', () => {
   it('builds PayPal refund dedupe key', () => {
@@ -20,16 +19,5 @@ describe('refundIdempotency helpers', () => {
     expect(buildWebhookRefundDedupeKey(undefined, 'PAYMENT.CAPTURE.REVERSED', 'REV1')).toBe(
       'webhook:PAYMENT.CAPTURE.REVERSED:REV1'
     );
-  });
-});
-
-describe('isFullRefundAmount', () => {
-  it('treats missing amount as not a full refund', () => {
-    expect(isFullRefundAmount(100)).toBe(false);
-  });
-
-  it('detects partial and full refund amounts', () => {
-    expect(isFullRefundAmount(100, '50.00')).toBe(false);
-    expect(isFullRefundAmount(100, '100.00')).toBe(true);
   });
 });

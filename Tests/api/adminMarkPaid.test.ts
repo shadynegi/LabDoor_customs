@@ -19,10 +19,6 @@ vi.mock('../../backend/src/routes/admin', async (importOriginal) => {
   };
 });
 
-vi.mock('../../backend/src/lib/paypalCaptureVerify', () => ({
-  verifyPayPalCaptureForOrder: vi.fn(async () => ({ ok: true, captureId: 'CAP-ADMIN-1' })),
-}));
-
 describe('PATCH /api/orders/:id/payment-status', () => {
   const orderId = '00000000-0000-0000-0000-000000000077';
 
@@ -34,14 +30,14 @@ describe('PATCH /api/orders/:id/payment-status', () => {
     vi.restoreAllMocks();
   });
 
-  it('marks pending order paid when PayPal capture verifies', async () => {
+  it('marks pending order paid with payment reference', async () => {
     const completedOrder = {
       id: orderId,
       order_number: 'GSS-PAID-1',
       payment_status: 'completed',
       status: 'processing',
       total: 99,
-      paypal_capture_id: 'CAP-ADMIN-1',
+      payment_id: 'UPI-12345',
     };
 
     sqlMock.mockResolvedValueOnce([
@@ -49,8 +45,6 @@ describe('PATCH /api/orders/:id/payment-status', () => {
         payment_status: 'pending',
         order_number: 'GSS-PAID-1',
         total: 99,
-        paypal_order_id: 'PP-PAID-1',
-        paypal_capture_id: null,
       },
     ]);
 
@@ -66,8 +60,8 @@ describe('PATCH /api/orders/:id/payment-status', () => {
       csrfToken
     ).send({
       payment_status: 'completed',
-      admin_note: 'Paid via bank transfer',
-      payment_id: 'CAP-ADMIN-1',
+      admin_note: 'Paid via WhatsApp',
+      payment_id: 'UPI-12345',
     });
 
     expect(res.status).toBe(200);
@@ -82,8 +76,6 @@ describe('PATCH /api/orders/:id/payment-status', () => {
         payment_status: 'pending',
         order_number: 'GSS-1',
         total: 99,
-        paypal_order_id: 'PP-1',
-        paypal_capture_id: null,
       },
     ]);
 
