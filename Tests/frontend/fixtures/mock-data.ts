@@ -1,5 +1,7 @@
 /** Stable product fixtures for Playwright API mocks (image paths match frontend imageMap keys). */
 
+import { TEST_PRODUCT_IDS, TEST_PRODUCTS } from '../../fixtures/products';
+
 export interface MockProduct {
   id: number;
   name: string;
@@ -17,37 +19,39 @@ export interface MockProduct {
   created_at?: string;
 }
 
+export { TEST_PRODUCT_IDS };
+
 export const MOCK_PRODUCTS: MockProduct[] = [
   {
-    id: 1,
-    name: 'Nike Drops - Blue',
-    price: 98,
-    image: '/assets/blue-nike.png',
+    id: TEST_PRODUCTS.nikeBlue.id,
+    name: TEST_PRODUCTS.nikeBlue.name,
+    price: TEST_PRODUCTS.nikeBlue.price as number,
+    image: TEST_PRODUCTS.nikeBlue.image,
     background: '/assets/blue-bg.png',
     description: 'Custom blue athletic drops for everyday wear.',
     category: 'Athletic',
     size: 'US 9',
     color: 'Blue',
-    stock: 10,
+    stock: TEST_PRODUCTS.nikeBlue.stock,
     rating: 4.5,
     review_count: 12,
-    is_out_of_stock: false,
+    is_out_of_stock: TEST_PRODUCTS.nikeBlue.is_out_of_stock,
     created_at: '2024-06-01T00:00:00.000Z',
   },
   {
-    id: 2,
-    name: 'Golden ESSENCE',
-    price: 98,
-    image: '/assets/gold-black-nike.png',
+    id: TEST_PRODUCTS.goldenEssence.id,
+    name: TEST_PRODUCTS.goldenEssence.name,
+    price: TEST_PRODUCTS.goldenEssence.price as number,
+    image: TEST_PRODUCTS.goldenEssence.image,
     background: '/assets/gold-bg.png',
     description: 'Premium gold and black custom design.',
     category: 'Lifestyle',
     size: 'US 10',
     color: 'Gold',
-    stock: 0,
+    stock: TEST_PRODUCTS.goldenEssence.stock,
     rating: 4.8,
     review_count: 8,
-    is_out_of_stock: true,
+    is_out_of_stock: TEST_PRODUCTS.goldenEssence.is_out_of_stock,
     created_at: '2024-05-15T00:00:00.000Z',
   },
 ];
@@ -80,8 +84,8 @@ export const MOCK_REVIEWS_STATS = {
 };
 
 export const MOCK_PUBLIC_REVIEW = {
-  id: 1,
-  product_id: 1,
+  id: 9001,
+  product_id: TEST_PRODUCT_IDS.nikeBlue,
   rating: 5,
   title: 'Great quality',
   review_text: 'Love the custom work.',
@@ -91,3 +95,6 @@ export const MOCK_PUBLIC_REVIEW = {
   helpful_count: 2,
   created_at: '2024-07-01T00:00:00.000Z',
 };
+
+/** Primary in-stock catalog product for UI tests. */
+export const PRIMARY_MOCK_PRODUCT = MOCK_PRODUCTS[0];

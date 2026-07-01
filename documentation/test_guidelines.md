@@ -41,20 +41,20 @@ If the user did not mention testing, **skip** `npm test`, `npm run test:all`, Pl
 
 | Suite | Tool | Location | Count | Needs live DB? |
 |-------|------|----------|-------|----------------|
-| Backend unit | Vitest | `Tests/backend/` | 29 files, 100 tests | No (mocked) |
-| API integration | Vitest + Supertest | `Tests/api/` | 18 files, 56 tests | No (mocked) |
-| Frontend E2E / UI | Playwright | `Tests/frontend/` | 14 files, 42 tests | No (mocked `/api` + static preview) |
+| Backend unit | Vitest | `Tests/backend/` | 29 files, 103 tests | No (mocked) |
+| API integration | Vitest + Supertest | `Tests/api/` | 19 files, 61 tests | No (mocked) |
+| Frontend E2E / UI | Playwright | `Tests/frontend/` | 15 files, 43 tests | No (mocked `/api` + static preview) |
 | Link checker | Custom script | repo root | — | No |
 
-**Total:** 198 automated tests — 100 backend unit + 56 API + 42 Playwright UI (desktop + mobile projects).
+**Total:** 207 automated tests — 103 backend unit + 61 API + 43 Playwright UI (desktop + mobile projects).
 
-Backend unit tests include: payment idempotency, order tokens, order token encryption, product image validation, admin session hashing, refund idempotency, checkout pricing, **WhatsApp message formatting** (`whatsappCheckout.test.ts`), coupon scope (`applies_to`), `computeCheckoutPricingForCart`, RLS table list + bootstrap contract, RLS grant revoke under `BOOTSTRAP_SKIP_DDL`, email portal URL (`buildOrderPortalUrl`), client IP, keep-alive, **admin analytics IST date helpers** (`adminAnalyticsDates.test.ts`), **build performance budgets** (`performanceBudgets.test.ts`), **sales analytics** invalid custom-date fallback.
+Backend unit tests include: payment idempotency, order tokens, order token encryption, product image validation, admin session hashing, refund idempotency, checkout pricing, **WhatsApp message formatting** (`whatsappCheckout.test.ts` — totals, volume/coupon lines, size, free shipping, URL encoding), coupon scope (`applies_to`), `computeCheckoutPricingForCart`, RLS table list + bootstrap contract, RLS grant revoke under `BOOTSTRAP_SKIP_DDL`, email portal URL (`buildOrderPortalUrl`), client IP, keep-alive, **admin analytics IST date helpers** (`adminAnalyticsDates.test.ts`), **build performance budgets** (`performanceBudgets.test.ts`), **sales analytics** invalid custom-date fallback.
 
-API tests include: **place-order** checkout (incl. client amount mismatch + policy acceptance), admin mark-paid (validation + success), **admin analytics** (401, custom IST range, CSV export, unknown period), **admin enhancements** (low-stock, inventory movements, customer PATCH, bulk stock delta, order customer-details, analytics period), **products search** (invalid limit, blank query browse), **validate-cart** (empty, invalid item, OOS, happy path), **stability/concurrency smoke** (parallel health + CSRF), no-refund policy (admin refund route removed, cancel 403), health, orders, security (incl. LAN dev CORS, analytics export 401, CSRF logout), activity batch/log, order lookup, reviews check.
+API tests include: **place-order** checkout (validation — amount mismatch, policy, customer, OOS; **WhatsApp integration** happy path, message in `whatsappUrl`, idempotency cache via `checkoutWhatsAppIntegration.test.ts`), admin mark-paid (validation + success), **admin analytics** (401, custom IST range, CSV export, unknown period), **admin enhancements** (low-stock, inventory movements, customer PATCH, bulk stock delta, order customer-details, analytics period), **products search** (invalid limit, blank query browse), **validate-cart** (empty, invalid item, OOS, happy path), **stability/concurrency smoke** (parallel health + CSRF), no-refund policy (admin refund route removed, cancel 403), health, orders, security (incl. LAN dev CORS, analytics export 401, CSRF logout), activity batch/log, order lookup, reviews check.
 
 Backend unit tests also cover: **sales analytics** period parsing + CSV export, **admin analytics cache** keys/TTL, inventory movement helpers (via integration paths), payment idempotency, order tokens, RLS, email portal URL, and related order utilities.
 
-Playwright includes: orders legacy URL deprecation + `?code=` email redeem, checkout country pre-select (native `<select>`), **admin analytics custom range** (Apply-before-export, IST query params), admin login redirect + dashboard analytics smoke, **responsive UI** (`responsive-ui.spec.ts`: mobile checkout/cart sticky CTA, product overflow, admin login), **deep flows** (`deep-flows-ui.spec.ts`: catalog `?q=` server search, product trust badges + reviews, checkout policy gate + coupon, cart quantity, order confirmation). Checkout tests use `clickPlaceOrderAndWaitForResponse()` in `Tests/frontend/helpers/checkout.ts`. The storefront fixture warms `/api/csrf-token` on load to avoid first-test timeouts.
+Playwright includes: orders legacy URL deprecation + `?code=` email redeem, checkout country pre-select (native `<select>`), **WhatsApp place-order** (`checkout-place-order-ui.spec.ts` — policy + form + mocked `whatsappUrl`), **admin analytics custom range** (Apply-before-export, IST query params), admin login redirect + dashboard analytics smoke, **responsive UI** (`responsive-ui.spec.ts`: mobile checkout/cart sticky CTA, product overflow, admin login), **deep flows** (`deep-flows-ui.spec.ts`: catalog `?q=` server search, product trust badges + reviews, checkout policy gate + coupon, cart quantity, order confirmation). Checkout helpers live in `Tests/frontend/helpers/checkout.ts` (`clickPlaceOrderAndWaitForResponse`, `fillCheckoutCustomerForm`). Playwright product IDs come from `Tests/fixtures/products.ts` via `Tests/frontend/fixtures/mock-data.ts`. The storefront fixture warms `/api/csrf-token` on load to avoid first-test timeouts.
 
 ---
 
@@ -66,6 +66,8 @@ Tests/
 ├── setup.ts             # Shared Vitest mocks (DB, Redis, idempotency)
 ├── helpers/
 │   └── http.ts          # CSRF cookie/header helpers for API tests
+├── fixtures/
+│   └── products.ts      # DB-shaped product catalog + sqlMock lookup helpers
 ├── backend/             # Backend unit tests (Vitest)
 ├── api/                 # HTTP API tests (Vitest + Supertest)
 ├── frontend/            # Storefront E2E + UI tests (Playwright)
@@ -91,7 +93,7 @@ npm install            # from repository root (workspaces)
 npm test
 ```
 
-No running server or database required. `Tests/setup.ts` mocks Postgres, Redis, and idempotency storage.
+No running server or database required. `Tests/setup.ts` mocks Postgres, Redis, and idempotency storage. Checkout and cart API tests use **`Tests/fixtures/products.ts`** for DB-shaped product rows and `product_id` values (see [Product catalog fixtures](#product-catalog-fixtures) below).
 
 ### Frontend E2E (Playwright)
 
@@ -107,7 +109,7 @@ npm run test:frontend
 
 Playwright starts `vite preview` on `http://127.0.0.1:4173` automatically (see `playwright.config.ts`). Preview sets `PLAYWRIGHT=true` so Vite **does not proxy** `/api` to a live backend — all API traffic is mocked in-browser via `page.route()`. The backend does **not** need to be running.
 
-**UI coverage:** products list/detail, cart, checkout shell, contact form, navigation, cookie consent, **admin analytics custom range**, **responsive mobile layouts** (`mobile-ui.spec.ts` + `responsive-ui.spec.ts` in the `mobile-chrome` project), checkout place-order flows in **deep flows**. Playwright uses `workers: 1` and `retries: 1` for stable checkout flows.
+**UI coverage:** products list/detail, cart, checkout shell, contact form, navigation, cookie consent, **admin analytics custom range**, **responsive mobile layouts** (`mobile-ui.spec.ts` + `responsive-ui.spec.ts` in the `mobile-chrome` project), **WhatsApp place-order** (`checkout-place-order-ui.spec.ts`), checkout policy/coupon flows in **deep flows**. Playwright uses `workers: 1` and `retries: 1` for stable checkout flows.
 
 ---
 
@@ -207,7 +209,7 @@ Production frontend builds run `optimize-assets` (WebP from source PNGs) and `bu
 | File | What it covers |
 |------|----------------|
 | `checkoutPricing.test.ts` | Volume discounts, shipping rules, checkout pricing |
-| `whatsappCheckout.test.ts` | WhatsApp message formatting and URL builder |
+| `whatsappCheckout.test.ts` | WhatsApp message formatting, URL builder, volume/coupon/size/shipping lines, URL encoding |
 | `clientIp.test.ts` | Client IP extraction, anonymization, Cloudflare headers |
 | `orderTokens.test.ts` | Order access token generation and validation |
 | `refundIdempotency.test.ts` | Refund request deduplication (legacy helpers) |
@@ -218,7 +220,7 @@ Production frontend builds run `optimize-assets` (WebP from source PNGs) and `bu
 | `performanceBudgets.test.ts` | Frontend `build-budget.mjs` contract (JS bundle limits) |
 | `keepAlive.test.ts` | Supabase pooler keep-alive connection options |
 
-See `Tests/backend/` for the full list (29 files, 100 tests).
+See `Tests/backend/` for the full list (29 files, 103 tests).
 
 ### API tests (`Tests/api/`)
 
@@ -227,6 +229,7 @@ See `Tests/backend/` for the full list (29 files, 100 tests).
 | `health.test.ts` | `GET /api/health` — status and dependencies |
 | `security.test.ts` | CSRF protection, CORS, rate limiting, analytics export 401, CSRF logout |
 | `checkout.test.ts` | `POST /api/checkout/place-order` validation and edge cases |
+| `checkoutWhatsAppIntegration.test.ts` | Place-order happy path — `whatsappUrl`, pending statuses, idempotency cache |
 | `orders.test.ts` | Order lookup routes, deprecated endpoints |
 | `validateCart.test.ts` | `POST /api/products/validate-cart` — empty cart, invalid item, OOS, happy path |
 | `stabilityConcurrency.test.ts` | Parallel health + CSRF smoke (latency bounds) |
@@ -234,7 +237,7 @@ See `Tests/backend/` for the full list (29 files, 100 tests).
 | `adminAnalytics.test.ts` | Admin analytics API — 401, IST custom range, CSV export, unknown period |
 | `productsSearch.test.ts` | Product search API — invalid limit, blank query browse, happy path |
 
-See `Tests/api/` for the full list (18 files, 56 tests).
+See `Tests/api/` for the full list (19 files, 61 tests).
 
 API tests use `Tests/helpers/http.ts` for CSRF token flow with Supertest.
 
@@ -245,12 +248,13 @@ API tests use `Tests/helpers/http.ts` for CSRF token flow with Supertest.
 | `storefront.spec.ts` | Home, products, checkout route, contact page render |
 | `deep-flows-ui.spec.ts` | Search, policy gate, coupon, cart qty, order confirmation |
 | `checkout-ui.spec.ts` | Checkout form, country pre-select |
+| `checkout-place-order-ui.spec.ts` | Policy acceptance + place-order → mocked `whatsappUrl` |
 | `admin-analytics-ui.spec.ts` | Custom IST range — Apply before export, CSV disabled until applied |
 | `responsive-ui.spec.ts` | Mobile checkout fields, cart sticky CTA, product overflow, admin login |
 | `admin-ui.spec.ts` | Admin login redirect + dashboard analytics smoke |
 | `mobile-ui.spec.ts` | Home/products/cart nav on Pixel 5 viewport |
 
-See `Tests/frontend/` for the full list (14 files, 42 tests).
+See `Tests/frontend/` for the full list (15 files, 43 tests).
 
 Individual smoke cases (`storefront.spec.ts`):
 
@@ -268,11 +272,25 @@ Individual smoke cases (`storefront.spec.ts`):
 | Vitest include paths | `backend/vitest.config.ts` | `Tests/backend/**/*.test.ts`, `Tests/api/**/*.test.ts` |
 | Vitest setup / mocks | `Tests/setup.ts` | Mocks `../backend/src/lib/db`, Redis, idempotency |
 | Test env vars | `backend/vitest.config.ts` | Fake JWT, WhatsApp phone, admin credentials for tests |
-| Playwright | `Tests/playwright.config.ts` | `testDir: ./frontend`, preview on port **4173**, projects: `chromium`, `mobile-chrome`; `workers: 1`, `retries: 1` |
+| Playwright | `Tests/playwright.config.ts` | `testDir: ./frontend`, preview on port **4173**, projects: `chromium`, `chromium-checkout-serial` (legacy checkout mismatch specs), `mobile-chrome`; `workers: 1`, `retries: 1` |
 | Frontend npm scripts | `frontend/package.json` | `test:e2e` → `npm run test:frontend --prefix ../Tests` |
 | Root npm scripts | `package.json` | `test`, `test:backend`, `test:api`, `test:frontend`, `test:all` |
 
 Import paths in test files use `../../backend/src/...` (tests live outside `backend/` but import backend source).
+
+### Product catalog fixtures
+
+Vitest API/backend tests mock Postgres via `sqlMock` in `Tests/setup.ts`. Do **not** hardcode `product_id: 1` for checkout or cart tests — use the shared catalog in **`Tests/fixtures/products.ts`**, which mirrors real `products` table rows (SERIAL ids such as `10042`, `10104`).
+
+| Export | Purpose |
+|--------|---------|
+| `TEST_PRODUCTS` | Named rows (`nikeBlue`, `checkoutShoe`, `soldOutShoe`, …) with `id`, `name`, `price`, `stock`, `is_out_of_stock` |
+| `TEST_PRODUCT_IDS` | Stable id constants shared with Playwright mocks |
+| `cartLine(product, qty?)` | `{ product_id: product.id, quantity }` for request bodies |
+| `installProductCatalogMock(sqlMock)` | Routes `SELECT … FROM products WHERE id = ?` through the in-memory catalog |
+| `mockProductDbLookup(sqlMock, product)` | One-shot mock for a single product lookup; returns the row’s `id` |
+
+Playwright reuses the same ids via `Tests/frontend/fixtures/mock-data.ts` (`PRIMARY_MOCK_PRODUCT`, `MOCK_PRODUCTS`). Product detail URLs in UI tests use `` `/product/${TEST_PRODUCT_IDS.nikeBlue}` `` rather than `/product/1`.
 
 ---
 
@@ -351,6 +369,8 @@ Expect `success: true` with database and Redis status.
 
 Place a test order on staging/production; confirm WhatsApp message contains order number; mark paid in admin.
 
+**Automated coverage:** `whatsappCheckout.test.ts`, `checkoutWhatsAppIntegration.test.ts`, `checkout.test.ts`, `checkout-place-order-ui.spec.ts` — see [Product catalog fixtures](#product-catalog-fixtures).
+
 See [WHATSAPP_CHECKOUT_GUIDE.md](WHATSAPP_CHECKOUT_GUIDE.md).
 
 ---
@@ -373,8 +393,8 @@ See [WHATSAPP_CHECKOUT_GUIDE.md](WHATSAPP_CHECKOUT_GUIDE.md).
 ## Adding new tests
 
 1. **Backend unit** — add `Tests/backend/yourFeature.test.ts`; import from `../../backend/src/...`
-2. **API** — add `Tests/api/yourRoute.test.ts`; use `Tests/helpers/http.ts` for authenticated/CSRF requests
-3. **Frontend E2E** — add `Tests/frontend/yourFlow.spec.ts`; follow patterns in `storefront.spec.ts`
+2. **API** — add `Tests/api/yourRoute.test.ts`; use `Tests/helpers/http.ts` for authenticated/CSRF requests; for cart/checkout lines use `Tests/fixtures/products.ts` (`cartLine`, `installProductCatalogMock`)
+3. **Frontend E2E** — add `Tests/frontend/yourFlow.spec.ts`; follow patterns in `storefront.spec.ts`; seed carts with `PRIMARY_MOCK_PRODUCT.id` from `mock-data.ts`
 
 Keep mocks in `Tests/setup.ts` when new tests need shared DB/Redis stubs. Run the relevant suite **only when explicitly validating** your change.
 

@@ -1,5 +1,6 @@
 import type { Page, Response } from '@playwright/test';
 import { expect } from '@playwright/test';
+import { buildPlaceOrderMockResponse, type PlaceOrderMockResponse } from './mock-api';
 
 function visiblePlaceOrderButton(page: Page) {
   return page.locator('button:visible', { hasText: /place order/i }).first();
@@ -26,28 +27,27 @@ async function isCartValidationIdle(page: Page): Promise<boolean> {
 export async function waitForCheckoutPayReady(page: Page): Promise<void> {
   const placeOrderButton = visiblePlaceOrderButton(page);
 
-  for (let i = 0; i < 10; i++) {
-    await page
-      .waitForResponse(
-        (response) =>
-          response.url().includes('/products/validate-cart') &&
-          response.request().method() === 'POST' &&
-          response.ok(),
-        { timeout: 20_000 },
-      )
-      .catch(() => undefined);
-    await page.waitForTimeout(150);
-  }
+  // Checkout may have already validated the cart before this helper runs — wait briefly,
+  // but do not loop on 20s timeouts (that alone can exceed the test timeout).
+  await page
+    .waitForResponse(
+      (response) =>
+        response.url().includes('/products/validate-cart') &&
+        response.request().method() === 'POST' &&
+        response.ok(),
+      { timeout: 10_000 },
+    )
+    .catch(() => undefined);
 
   await expect
     .poll(
       async () => {
         if (!(await isCartValidationIdle(page))) return false;
         if (!(await placeOrderButton.isEnabled())) return false;
-        await page.waitForTimeout(400);
+        await page.waitForTimeout(200);
         return (await isCartValidationIdle(page)) && placeOrderButton.isEnabled();
       },
-      { timeout: 90_000, intervals: [300, 500, 1000] },
+      { timeout: 60_000, intervals: [300, 500, 1000] },
     )
     .toBe(true);
 }
@@ -83,27 +83,96 @@ export async function fillCheckoutCustomerForm(page: Page): Promise<void> {
   await expect(page.locator('#email')).toHaveValue('buyer@example.com');
 }
 
-/** Click Place Order and wait for checkout API — listener registered before click. */
-export async function clickPlaceOrderAndWaitForResponse(page: Page): Promise<Response> {
-  await page.evaluate(async () => {
-    await fetch('/api/csrf-token', { credentials: 'include' });
+export type PlaceOrderResponseBody = PlaceOrderMockResponse;
+
+async function blockWhatsAppNavigation(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    sessionStorage.removeItem('__waRedirect');
+    const native = window.location;
+    const captureWa = (url: string) => {
+      if (String(url).includes('wa.me')) {
+        sessionStorage.setItem('__waRedirect', url);
+        return true;
+      }
+      return false;
+    };
+    window.location.assign = (url: string) => {
+      if (!captureWa(url)) native.assign(url);
+    };
+    window.location.replace = (url: string) => {
+      if (!captureWa(url)) native.replace(url);
+    };
+    try {
+      Object.defineProperty(window.location, 'href', {
+        configurable: true,
+        set(url: string) {
+          if (!captureWa(url)) {
+            native.href = url;
+          }
+        },
+        get() {
+          return native.href;
+        },
+      });
+    } catch {
+      // Some browsers lock location.href; assign/replace interception still helps.
+    }
   });
+}
 
-  await waitForCheckoutPayReady(page);
+/** Click Place Order and wait for checkout API — listener registered before click. */
+export async function clickPlaceOrderAndWaitForResponse(page: Page): Promise<{
+  response: Response;
+  body: PlaceOrderResponseBody;
+}> {
+  await blockWhatsAppNavigation(page);
 
-  const placeOrderButton = visiblePlaceOrderButton(page);
-  await placeOrderButton.scrollIntoViewIfNeeded();
+  let capturedBody: PlaceOrderResponseBody | null = null;
+  const captureRoute = async (route: import('@playwright/test').Route) => {
+    if (route.request().method() !== 'POST') {
+      await route.fallback();
+      return;
+    }
+    let postData: { amount?: string } = {};
+    try {
+      postData = route.request().postDataJSON() as typeof postData;
+    } catch {
+      postData = {};
+    }
+    capturedBody = buildPlaceOrderMockResponse(postData);
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(capturedBody),
+    });
+  };
 
-  const waitForPlaceOrder = () =>
-    page.waitForResponse(
+  await page.route('**/api/checkout/place-order', captureRoute);
+
+  try {
+    await page.evaluate(async () => {
+      await fetch('/api/csrf-token', { credentials: 'include' });
+    });
+
+    await waitForCheckoutPayReady(page);
+
+    const placeOrderButton = visiblePlaceOrderButton(page);
+    await placeOrderButton.scrollIntoViewIfNeeded();
+
+    const responsePromise = page.waitForResponse(
       (res) =>
-        res.url().includes('/checkout/place-order') &&
-        res.request().method() === 'POST',
+        res.url().includes('/checkout/place-order') && res.request().method() === 'POST',
       { timeout: 60_000 },
     );
 
-  const [response] = await Promise.all([waitForPlaceOrder(), placeOrderButton.click()]);
-  return response;
+    await placeOrderButton.click();
+    await expect.poll(() => capturedBody, { timeout: 15_000 }).not.toBeNull();
+
+    const response = await responsePromise;
+    return { response, body: capturedBody! };
+  } finally {
+    await page.unroute('**/api/checkout/place-order', captureRoute);
+  }
 }
 
 /** @deprecated Use clickPlaceOrderAndWaitForResponse */

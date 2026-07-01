@@ -1,6 +1,6 @@
 import { test, expect } from './fixtures/storefront';
 import { seedCart } from './helpers/ui';
-import { MOCK_PRODUCTS } from './fixtures/mock-data';
+import { PRIMARY_MOCK_PRODUCT } from './fixtures/mock-data';
 
 test.describe('Cart UI', () => {
   test('empty cart shows start shopping message', async ({ page }) => {
@@ -11,7 +11,7 @@ test.describe('Cart UI', () => {
   });
 
   test('seeded cart shows line item and checkout link', async ({ page }) => {
-    const product = MOCK_PRODUCTS[0];
+    const product = PRIMARY_MOCK_PRODUCT;
     await seedCart(page, [
       {
         id: product.id,
@@ -32,7 +32,7 @@ test.describe('Cart UI', () => {
   });
 
   test('cart badge reflects item count in navigation', async ({ page }) => {
-    const product = MOCK_PRODUCTS[0];
+    const product = PRIMARY_MOCK_PRODUCT;
     await seedCart(page, [
       {
         id: product.id,

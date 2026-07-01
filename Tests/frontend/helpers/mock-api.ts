@@ -4,6 +4,7 @@ import {
   MOCK_PRODUCTS,
   MOCK_PUBLIC_REVIEW,
   MOCK_REVIEWS_STATS,
+  TEST_PRODUCT_IDS,
   type MockProduct,
 } from '../fixtures/mock-data';
 
@@ -13,6 +14,33 @@ function json(route: Route, body: unknown, status = 200) {
     contentType: 'application/json',
     body: JSON.stringify(body),
   });
+}
+
+export interface PlaceOrderMockResponse {
+  success: boolean;
+  total: number;
+  serverOrderId: string;
+  orderNumber: string;
+  whatsappUrl: string;
+}
+
+export function buildPlaceOrderMockResponse(
+  postData: { amount?: string },
+  createPaymentTotal?: number,
+): PlaceOrderMockResponse {
+  const parsedAmount = parseFloat(postData.amount ?? '');
+  const mismatch = createPaymentTotal != null;
+  const total = createPaymentTotal ?? (Number.isFinite(parsedAmount) ? parsedAmount : 123);
+  const orderNumber = mismatch ? 'GSS-MISMATCH' : 'GSS-CHECKOUT-TEST';
+  return {
+    success: true,
+    total,
+    serverOrderId: mismatch
+      ? '00000000-0000-0000-0000-00000000ff01'
+      : '00000000-0000-0000-0000-00000000dd01',
+    orderNumber,
+    whatsappUrl: `https://wa.me/919888514572?text=${encodeURIComponent(`Order ${orderNumber}`)}`,
+  };
 }
 
 function apiPath(url: string): string {
@@ -140,7 +168,7 @@ export async function installStorefrontApiMocks(
     const reviewsMatch = path.match(/^\/reviews\/product\/(\d+)$/);
     if (reviewsMatch && method === 'GET') {
       const productId = parseInt(reviewsMatch[1], 10);
-      const reviews = productId === 1 ? [MOCK_PUBLIC_REVIEW] : [];
+      const reviews = productId === TEST_PRODUCT_IDS.nikeBlue ? [MOCK_PUBLIC_REVIEW] : [];
       return json(route, {
         success: true,
         data: {
@@ -219,18 +247,7 @@ export async function installStorefrontApiMocks(
       } catch {
         body = {};
       }
-      const parsedAmount = parseFloat(body.amount ?? '');
-      const mismatch = createPaymentTotal != null;
-      const total = createPaymentTotal ?? (Number.isFinite(parsedAmount) ? parsedAmount : 123);
-      return json(route, {
-        success: true,
-        total,
-        serverOrderId: mismatch
-          ? '00000000-0000-0000-0000-00000000ff01'
-          : '00000000-0000-0000-0000-00000000dd01',
-        orderNumber: mismatch ? 'GSS-MISMATCH' : 'GSS-CHECKOUT-TEST',
-        whatsappUrl: `https://wa.me/919888514572?text=${encodeURIComponent(`Order ${mismatch ? 'GSS-MISMATCH' : 'GSS-CHECKOUT-TEST'}`)}`,
-      });
+      return json(route, buildPlaceOrderMockResponse(body, createPaymentTotal));
     }
 
     if (path === '/activity/batch' && method === 'POST') {

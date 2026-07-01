@@ -1,10 +1,10 @@
 import { test, expect } from './fixtures/storefront';
 import { seedCart } from './helpers/ui';
-import { MOCK_PRODUCTS } from './fixtures/mock-data';
+import { PRIMARY_MOCK_PRODUCT, TEST_PRODUCT_IDS } from './fixtures/mock-data';
 
 test.describe('Responsive storefront UI', () => {
   test('checkout form fields are usable on mobile', async ({ page }) => {
-    const product = MOCK_PRODUCTS[0];
+    const product = PRIMARY_MOCK_PRODUCT;
     await seedCart(page, [
       {
         id: product.id,
@@ -23,7 +23,7 @@ test.describe('Responsive storefront UI', () => {
   });
 
   test('cart page stacks actions on narrow viewport', async ({ page }) => {
-    const product = MOCK_PRODUCTS[0];
+    const product = PRIMARY_MOCK_PRODUCT;
     await seedCart(page, [
       {
         id: product.id,
@@ -46,7 +46,7 @@ test.describe('Responsive storefront UI', () => {
   });
 
   test('product detail avoids horizontal overflow on mobile', async ({ page }) => {
-    await page.goto('/product/1');
+    await page.goto(`/product/${TEST_PRODUCT_IDS.nikeBlue}`);
     await expect(page.getByText('Customer Reviews')).toBeVisible({ timeout: 15_000 });
 
     const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);

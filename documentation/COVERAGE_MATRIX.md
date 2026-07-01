@@ -5,7 +5,7 @@
 **Authoritative behavior:** [`info.md`](info.md)  
 **Full audit:** [`PROJECT_AUDIT.md`](PROJECT_AUDIT.md) (2026-06-08 initial + follow-up)
 
-**Test count marker (CI should match):** `<!-- tests: 198 -->` (100 unit + 56 API + 42 Playwright)
+**Test count marker (CI should match):** `<!-- tests: 207 -->` (103 unit + 61 API + 43 Playwright)
 
 ---
 
@@ -24,8 +24,8 @@
 
 | ID | Behavior | Implementation | Test(s) | Status |
 |----|----------|----------------|---------|--------|
-| PAY-PLACE | Atomic place-order + stock reserve + WhatsApp URL | `checkout.ts`, `orderLifecycle.ts`, `whatsappCheckout.ts` | `checkout.test.ts`, `checkoutPricing.test.ts`, `whatsappCheckout.test.ts` | COVERED |
-| PAY-WA-MSG | WhatsApp message includes order number, items, totals | `whatsappCheckout.ts` | `whatsappCheckout.test.ts` | COVERED |
+| PAY-PLACE | Atomic place-order + stock reserve + WhatsApp URL | `checkout.ts`, `orderLifecycle.ts`, `whatsappCheckout.ts` | `checkout.test.ts`, `checkoutWhatsAppIntegration.test.ts`, `checkoutPricing.test.ts`, `whatsappCheckout.test.ts` | COVERED |
+| PAY-WA-MSG | WhatsApp message includes order number, items, totals | `whatsappCheckout.ts` | `whatsappCheckout.test.ts`, `checkoutWhatsAppIntegration.test.ts` | COVERED |
 | PAY-VOLUME | Volume discount 10%/20% in pricing | `checkoutPricing.ts` | `checkoutPricing.test.ts`, `couponValidateVolume.test.ts` | COVERED |
 | PAY-SHIPPING | Free shipping threshold $200 | `checkoutPricing.ts`, `pricing.ts` | `checkoutPricing.test.ts` | COVERED |
 | PAY-FE-TOTAL | Client compares server total before place-order | `Checkout.tsx`, `checkout.ts` | `checkout.test.ts` | COVERED |
@@ -78,13 +78,13 @@
 
 | ID | Behavior | Implementation | Test(s) | Status |
 |----|----------|----------------|---------|--------|
-| UI-SMOKE | Home, products, cart, checkout shell, contact | `Tests/frontend/*.spec.ts` | 42 tests | COVERED |
+| UI-SMOKE | Home, products, cart, checkout shell, contact | `Tests/frontend/*.spec.ts` | 43 tests | COVERED |
 | UI-ORDER-CONFIRM | Payment success / order received confirmation | `PaymentSuccess.tsx` | `deep-flows-ui.spec.ts` | COVERED |
 | UI-ORDERS | Orders legacy `?token=` strip + `?code=` email redeem | `MyOrders.tsx` | `orders-ui.spec.ts` | COVERED |
 | UI-ADMIN | Admin `/admin` redirect, login, dashboard analytics smoke | `AdminLogin.tsx`, `AdminDashboard.tsx`, `App.tsx` | `admin-ui.spec.ts` | COVERED |
 | UI-ADMIN-ANALYTICS | Custom IST range Apply-before-export + CSV enablement | `AdminDashboard.tsx`, `adminAnalyticsDates.ts` | `admin-analytics-ui.spec.ts` | COVERED |
 | UI-CHECKOUT-COUNTRY | Checkout country pre-selected (`country-list` US value) | `Checkout.tsx`, `constants/checkoutForm.ts` | `checkout-ui.spec.ts` | COVERED |
-| UI-CHECKOUT-PAY | Place Order after policy + form fill | `Checkout.tsx`, `helpers/checkout.ts` | `deep-flows-ui.spec.ts` | COVERED |
+| UI-CHECKOUT-PAY | Place Order after policy + form fill | `Checkout.tsx`, `helpers/checkout.ts` | `checkout-place-order-ui.spec.ts`, `deep-flows-ui.spec.ts` | COVERED |
 | UI-PRODUCT-POLICY | Product detail trust badges match no-refund policy | `ProductDetailPage.tsx`, `constants/returnPolicy.ts` | `deep-flows-ui.spec.ts` | COVERED |
 | UI-DEEP-FLOWS | Search, policy gate, coupon, cart qty, order confirmation | `deep-flows-ui.spec.ts`, `mock-api.ts` | `deep-flows-ui.spec.ts` | COVERED |
 | UI-RESPONSIVE | Mobile checkout/cart sticky CTA, overflow, admin login | `CartPage.tsx`, `MobileStickyCta.tsx`, `responsive.css` | `responsive-ui.spec.ts`, `mobile-ui.spec.ts` | COVERED |
@@ -107,7 +107,7 @@
 |----|----------|----------------|---------|--------|
 | CI-ENV | Production env validation in CI | `validate-env.mjs`, `ci.yml` | CI job | COVERED |
 | SEC-ORDER-SECRETS | `access_token_hash` + `access_token_encrypted` stripped from order JSON | `orderTokens.ts` `stripOrderSecrets` | `orderTokens.test.ts` | COVERED |
-| DOC-TESTS | Test count in `info.md` | `info.md` | `npm test` (198) | COVERED |
+| DOC-TESTS | Test count in `info.md` | `info.md` | `npm test` (207) | COVERED |
 | PERF-BUDGET | Frontend JS bundle budget contract | `frontend/scripts/build-budget.mjs` | `performanceBudgets.test.ts` | COVERED |
 | STAB-SMOKE | Parallel health + CSRF latency smoke | `server.ts`, `csrf.ts` | `stabilityConcurrency.test.ts` | COVERED |
 

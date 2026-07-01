@@ -9,6 +9,7 @@ import {
   SHIPPING_COST,
 } from '../../backend/src/lib/checkoutPricing';
 import { sqlMock } from '../setup';
+import { TEST_PRODUCTS, cartLine, mockProductDbLookup } from '../fixtures/products';
 
 describe('checkoutPricing', () => {
   it('charges shipping one cent below free-shipping threshold', () => {
@@ -124,22 +125,15 @@ describe('validateCartItems', () => {
   });
 
   it('validates product stock from database', async () => {
-    sqlMock.mockResolvedValueOnce([
-      {
-        id: 1,
-        name: 'Test Shoe',
-        price: '99.00',
-        image: '/img.png',
-        stock: 5,
-        is_out_of_stock: false,
-      },
-    ]);
+    const product = TEST_PRODUCTS.checkoutShoe;
+    mockProductDbLookup(sqlMock, product);
 
-    const result = await validateCartItems([{ product_id: 1, quantity: 2 }]);
+    const result = await validateCartItems([cartLine(product, 2)]);
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.lineItems[0].price).toBe(99);
-      expect(result.lineItems[0].product_name).toBe('Test Shoe');
+      expect(result.lineItems[0].product_id).toBe(product.id);
+      expect(result.lineItems[0].price).toBe(100);
+      expect(result.lineItems[0].product_name).toBe(product.name);
     }
   });
 });

@@ -1,4 +1,5 @@
 import { test, expect } from './fixtures/storefront';
+import { TEST_PRODUCT_IDS } from './fixtures/mock-data';
 
 test.describe('Products UI', () => {
   test('lists mocked products with titles and prices', async ({ page }) => {
@@ -10,7 +11,7 @@ test.describe('Products UI', () => {
   });
 
   test('product detail shows add to cart for in-stock item', async ({ page }) => {
-    await page.goto('/product/1');
+    await page.goto(`/product/${TEST_PRODUCT_IDS.nikeBlue}`);
     await expect(page.getByRole('heading', { name: 'Nike Drops - Blue' })).toBeVisible({
       timeout: 15_000,
     });
@@ -18,7 +19,7 @@ test.describe('Products UI', () => {
   });
 
   test('product detail shows out of stock state', async ({ page }) => {
-    await page.goto('/product/2');
+    await page.goto(`/product/${TEST_PRODUCT_IDS.goldenEssence}`);
     await expect(page.getByRole('heading', { name: 'Golden ESSENCE' })).toBeVisible({
       timeout: 15_000,
     });

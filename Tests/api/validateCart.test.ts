@@ -3,10 +3,19 @@ import request from 'supertest';
 import { app } from '../../backend/src/server';
 import { sqlMock } from '../setup';
 import { createCsrfAgent, withCsrf } from '../helpers/http';
+import {
+  TEST_PRODUCTS,
+  cartLine,
+  installProductCatalogMock,
+} from '../fixtures/products';
 
 describe('POST /api/products/validate-cart', () => {
+  const inStockProduct = TEST_PRODUCTS.nikeBlue;
+  const soldOutProduct = TEST_PRODUCTS.soldOutShoe;
+
   beforeEach(() => {
     sqlMock.mockReset();
+    installProductCatalogMock(sqlMock);
   });
 
   it('rejects empty cart payload', async () => {
@@ -30,20 +39,9 @@ describe('POST /api/products/validate-cart', () => {
   });
 
   it('rejects out-of-stock product', async () => {
-    sqlMock.mockResolvedValueOnce([
-      {
-        id: 1,
-        name: 'Sold Out Shoe',
-        price: 98,
-        image: '/assets/test.png',
-        stock: 0,
-        is_out_of_stock: true,
-      },
-    ]);
-
     const { agent, csrfToken } = await createCsrfAgent();
     const res = await withCsrf(agent.post('/api/products/validate-cart'), csrfToken).send({
-      items: [{ product_id: 1, quantity: 1 }],
+      items: [cartLine(soldOutProduct)],
     });
 
     expect(res.status).toBe(400);
@@ -52,26 +50,16 @@ describe('POST /api/products/validate-cart', () => {
   });
 
   it('returns refreshed prices for valid cart', async () => {
-    sqlMock.mockResolvedValueOnce([
-      {
-        id: 1,
-        name: 'Test Shoe',
-        price: 98,
-        image: '/assets/test.png',
-        stock: 10,
-        is_out_of_stock: false,
-      },
-    ]);
-
     const { agent, csrfToken } = await createCsrfAgent();
     const res = await withCsrf(agent.post('/api/products/validate-cart'), csrfToken).send({
-      items: [{ product_id: 1, quantity: 2 }],
+      items: [cartLine(inStockProduct, 2)],
     });
 
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
     expect(res.body.items).toHaveLength(1);
-    expect(res.body.items[0].price).toBe(98);
-    expect(res.body.subtotal).toBe(196);
+    expect(res.body.items[0].id).toBe(inStockProduct.id);
+    expect(res.body.items[0].price).toBe(inStockProduct.price);
+    expect(res.body.subtotal).toBe(inStockProduct.price * 2);
   });
 });

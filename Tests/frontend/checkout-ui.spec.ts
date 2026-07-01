@@ -1,6 +1,6 @@
 import { test, expect } from './fixtures/storefront';
 import { seedCart } from './helpers/ui';
-import { MOCK_PRODUCTS } from './fixtures/mock-data';
+import { PRIMARY_MOCK_PRODUCT } from './fixtures/mock-data';
 
 test.describe('Checkout UI', () => {
   test('empty checkout shows cart empty messaging', async ({ page }) => {
@@ -9,7 +9,7 @@ test.describe('Checkout UI', () => {
   });
 
   test('checkout with items shows secure checkout form', async ({ page }) => {
-    const product = MOCK_PRODUCTS[0];
+    const product = PRIMARY_MOCK_PRODUCT;
     await seedCart(page, [
       {
         id: product.id,
@@ -27,7 +27,7 @@ test.describe('Checkout UI', () => {
   });
 
   test('checkout pre-selects United States country', async ({ page }) => {
-    const product = MOCK_PRODUCTS[0];
+    const product = PRIMARY_MOCK_PRODUCT;
     await seedCart(page, [
       {
         id: product.id,

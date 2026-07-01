@@ -1,6 +1,6 @@
 import { test, expect } from './fixtures/storefront';
 import { seedCart } from './helpers/ui';
-import { MOCK_PRODUCTS } from './fixtures/mock-data';
+import { PRIMARY_MOCK_PRODUCT, TEST_PRODUCT_IDS } from './fixtures/mock-data';
 
 test.describe('Deep storefront flows', () => {
   test('products?q= filters catalog to matching items', async ({ page }) => {
@@ -15,7 +15,7 @@ test.describe('Deep storefront flows', () => {
   test('product detail shows no-refund trust badges and replacement policy link', async ({
     page,
   }) => {
-    await page.goto('/product/1');
+    await page.goto(`/product/${TEST_PRODUCT_IDS.nikeBlue}`);
     await expect(page.getByText('All Sales Final')).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole('link', { name: 'Manufacturing-defect replacements' })).toBeVisible();
     await expect(page.getByText('Free Shipping', { exact: true })).toBeVisible();
@@ -23,14 +23,14 @@ test.describe('Deep storefront flows', () => {
   });
 
   test('product detail lists approved public review', async ({ page }) => {
-    await page.goto('/product/1');
+    await page.goto(`/product/${TEST_PRODUCT_IDS.nikeBlue}`);
     await expect(page.getByText('Customer Reviews')).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText('Alex')).toBeVisible();
     await expect(page.getByText('Great quality')).toBeVisible();
   });
 
   test('checkout blocks Place Order until no-refund policy is accepted', async ({ page }) => {
-    const product = MOCK_PRODUCTS[0];
+    const product = PRIMARY_MOCK_PRODUCT;
     await seedCart(page, [
       {
         id: product.id,
@@ -53,7 +53,7 @@ test.describe('Deep storefront flows', () => {
   });
 
   test('checkout applies coupon and shows discount in order summary', async ({ page }) => {
-    const product = MOCK_PRODUCTS[0];
+    const product = PRIMARY_MOCK_PRODUCT;
     await seedCart(page, [
       {
         id: product.id,
@@ -75,7 +75,7 @@ test.describe('Deep storefront flows', () => {
   });
 
   test('cart quantity increase updates displayed quantity', async ({ page }) => {
-    const product = MOCK_PRODUCTS[0];
+    const product = PRIMARY_MOCK_PRODUCT;
     await seedCart(page, [
       {
         id: product.id,

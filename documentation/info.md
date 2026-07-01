@@ -1002,14 +1002,14 @@ npm run links:check
 
 | Suite | Tool | Coverage |
 |-------|------|----------|
-| Backend unit/API | Vitest | **place-order** checkout, WhatsApp message formatting, admin mark-paid, **admin analytics** (401, IST custom range, CSV export), **validate-cart** (empty/invalid/OOS), **products search** edge cases, **stability/concurrency smoke**, coupon scope, `computeCheckoutPricingForCart`, payment idempotency, order tokens, process error handlers, RLS table list + grant revoke, email portal URL, activity batch/log, order lookup, reviews check, **IST date helpers**, **build performance budgets**, sales analytics invalid-date fallback |
-| Frontend E2E / UI | Playwright | Storefront smoke + deep flows (search, policy gate, coupon, cart qty, order confirmation), checkout/contact/admin UI, mobile viewport |
+| Backend unit/API | Vitest | **place-order** checkout (validation + WhatsApp integration happy path), WhatsApp message formatting, admin mark-paid, **admin analytics** (401, IST custom range, CSV export), **validate-cart** (empty/invalid/OOS), **products search** edge cases, **stability/concurrency smoke**, coupon scope, `computeCheckoutPricingForCart`, payment idempotency, order tokens, process error handlers, RLS table list + grant revoke, email portal URL, activity batch/log, order lookup, reviews check, **IST date helpers**, **build performance budgets**, sales analytics invalid-date fallback |
+| Frontend E2E / UI | Playwright | Storefront smoke + deep flows (search, policy gate, coupon, cart qty, order confirmation), **WhatsApp place-order UI**, checkout/contact/admin UI, mobile viewport |
 
-**Total automated tests:** 198 (100 backend unit + 56 API + 42 Playwright UI).
+**Total automated tests:** 207 (103 backend unit + 61 API + 43 Playwright UI).
 
 | Link check | Custom script | Documentation internal links |
 
-API tests mock the database layer (`Tests/setup.ts`) for fast isolated runs.
+API and backend unit tests mock Postgres via `Tests/setup.ts`. Checkout/cart tests use **`Tests/fixtures/products.ts`** for DB-shaped product rows and `product_id` values (not hardcoded `1`). Playwright mocks share the same ids through `Tests/frontend/fixtures/mock-data.ts`.
 
 **Detailed runbook:** [test_guidelines.md](test_guidelines.md) — automated tests, manual QA, CI, commands, and policy (run tests only when explicitly requested).
 

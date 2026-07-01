@@ -38,6 +38,7 @@ export default defineConfig({
       testMatch: /checkout-total-mismatch-ui\.spec\.ts|checkout-create-payment-ui\.spec\.ts/,
       fullyParallel: false,
       workers: 1,
+      timeout: 120_000,
       use: { ...devices['Desktop Chrome'] },
     },
     {

@@ -31,3 +31,13 @@ See [`info.md`](info.md) for the full API reference.
 | POST | `/api/checkout/place-order` | Validate cart, create order, return `whatsappUrl` |
 
 Response includes `orderNumber`, `serverOrderId`, `total`, and `whatsappUrl`.
+
+## Automated tests
+
+| Layer | Files | Coverage |
+|-------|-------|----------|
+| Unit | `Tests/backend/whatsappCheckout.test.ts` | Message formatting, URL encoding, volume/coupon lines |
+| API | `Tests/api/checkout.test.ts`, `checkoutWhatsAppIntegration.test.ts` | Validation, happy path, `whatsappUrl` payload, idempotency cache |
+| UI | `Tests/frontend/checkout-place-order-ui.spec.ts` | Policy + form + Place Order → mocked `whatsappUrl` |
+
+Product ids in tests come from **`Tests/fixtures/products.ts`** (DB-shaped SERIAL ids, not hardcoded `1`). See [`test_guidelines.md`](test_guidelines.md#product-catalog-fixtures).
