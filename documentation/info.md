@@ -108,7 +108,7 @@
 | `/checkout` | Customer/shipping form, coupon validation, no-refund policy checkbox, **Place Order** → WhatsApp redirect |
 | `/payment/success` | Optional confirmation page after WhatsApp redirect (order stored in sessionStorage) |
 | `/payment/cancel` | Abandoned checkout cleanup |
-| `/orders` | Customer order lookup (`POST /api/orders/lookup`); email links redeem `?code=` via `GET /api/orders/access-exchange/:code`; legacy `?orderNumber=&token=` URLs are stripped with a deprecation warning |
+| `/orders` | Customer order lookup — order ID + checkout email (`POST /api/orders/lookup`); email links pre-fill `?orderId=` |
 | `/contact` | Contact form with CSRF-protected POST |
 | `/about`, `/help` | Static content |
 | `/privacy-policy`, `/terms-of-service`, `/returns-policy`, `/replacement-policy`, `/shipping-policy` | Legal pages (no-refund / manufacturing-defect replacement policy) |
@@ -198,7 +198,7 @@ Admin confirms payment → Mark paid in dashboard
 
 ### Admin payment confirmation
 
-Admin marks pending orders paid via `PATCH /api/orders/:id/payment-status` with `payment_id` (reference) and `admin_note`. Sets `payment_status=completed`, `status=processing`, sends confirmation email.
+Admin marks pending orders paid via `PATCH /api/orders/:id/payment-status` with `payment_id` (reference) and `admin_note`. Sets `payment_status=completed`, `status=processing`, then sends **confirmation email** (Resend) and **WhatsApp text** to the customer mobile from checkout (WhatsApp Cloud API when configured).
 
 ### Refunds and replacements
 
@@ -241,13 +241,13 @@ Statuses: `processing`, `completed`, `failed`. Stuck `processing` rows are reape
 
 ### Customer order access
 
-- Each order receives a 64-character hex **access token** at creation; a SHA-256 hash and **AES-256-GCM encrypted** copy (`access_token_encrypted`) are stored on the order row.
-- Confirmation and shipping emails mint a **one-time tracking link** (`/orders?code=...`) via `order_access_exchanges`, using the encrypted token on the order (fallback: ephemeral `order_checkout_exchanges` row for legacy orders). Redeemed via `GET /api/orders/access-exchange/:code` — no long-lived token in the URL.
-- Legacy deep links with `?orderNumber=&token=` in the URL are deprecated: the storefront strips them and shows a warning; customers enter credentials manually or use a fresh email link.
-- Customer lookup: `POST /api/orders/lookup` with `{ orderNumber, accessToken }` in the JSON body.
-- Tracked orders in `sessionStorage` auto-refresh; partial refresh failures keep last-known order data and show a non-blocking warning.
-- Alternate lookup: `GET /api/orders/number/:orderNumber` with `X-Order-Access-Token` header only.
-- Access token is also required for order detail recovery when using token-based lookup.
+- Customers track orders on `/orders` with **order ID** (`orders.id` UUID) and **checkout email** — no access tokens are issued or emailed.
+- Confirmation and shipping emails link to `/orders?orderId={uuid}` (order ID pre-filled; customer enters email on the page).
+- Customer lookup: `POST /api/orders/lookup` with `{ orderId, email }` in the JSON body (CSRF-protected).
+- Wrong order ID, wrong email, or invalid UUID all return **404** `{ "error": "Order not found or invalid credentials" }` (anti-enumeration).
+- Tracked orders in `sessionStorage` (order ID + email) auto-refresh; partial refresh failures keep last-known order data and show a non-blocking warning.
+- `GET /api/orders/:id` and `GET /api/orders/number/:orderNumber` are **admin-only**.
+- `GET /api/orders/access-exchange/:code` returns **410 Gone** (legacy one-time links removed).
 - Public listing of orders by email is blocked (`GET /api/orders/customer/:email` is admin-only).
 
 ### Customer aggregates
@@ -347,7 +347,7 @@ At place-order, a row in `coupon_usage` reserves the coupon for the pending orde
 | Actor | Mechanism |
 |-------|-----------|
 | Admin | Bcrypt password hash (`ADMIN_PASSWORD_HASH` in production); HMAC-signed session token in HttpOnly cookie; **SHA-256 hash** stored in `admin_sessions`; optional `Authorization: Bearer` header |
-| Customer orders | Per-order access token (`access_token_hash` + `access_token_encrypted` at rest); email links use one-time `order_access_exchanges` code (`GET /api/orders/access-exchange/:code`) |
+| Customer orders | Order ID (`orders.id` UUID) + checkout email via `POST /api/orders/lookup` (CSRF); email links use `/orders?orderId=` |
 
 **JWT_SECRET:** used for admin token signing; complexity rules enforced when present (32+ chars, mixed case, number, special character).
 
@@ -538,7 +538,8 @@ Powered by **Resend** (`RESEND_API_KEY`, `SENDER_EMAIL`, `COMPANY_NAME`, `COMPAN
 
 | Email | Trigger |
 |-------|---------|
-| Order confirmation | After admin marks order paid (or optional future automation) — includes tracking URL with access token |
+| Order confirmation | After admin marks order paid — email with Order ID (UUID), order number, line items, and tracking URL `/orders?orderId={uuid}` |
+| WhatsApp payment confirmation | Same trigger — outbound text to customer phone via WhatsApp Cloud API (`WHATSAPP_CLOUD_*` env vars) |
 | Shipping notification | Admin `POST /api/orders/:id/notify-shipped` |
 | Order cancellation | Admin cancel of **unpaid pending** orders (no customer refunds) |
 | Contact auto-reply | Contact form submission |
@@ -651,7 +652,7 @@ A **correct** `DATABASE_URL` can still produce occasional maintenance warnings w
 | Public | No login required |
 | CSRF | State-changing methods require `X-CSRF-Token` header + `csrf_token` cookie (SPA uses `/api/csrf-token`) |
 | Admin | `admin_session` HttpOnly cookie or `Authorization: Bearer` |
-| Order token | Per-order access token via `X-Order-Access-Token` header only (legacy `?aid=` query ignored; legacy `?token=` URLs stripped on `/orders`) |
+| Order lookup | Customer `POST /api/orders/lookup` with `{ orderId, email }` — no access tokens |
 
 Expanded request/response docs: [`API_DOCUMENTATION.md`](API_DOCUMENTATION.md)
 
@@ -692,12 +693,12 @@ Any unmatched `/api/*` path returns **404** JSON `{ error: "Route not found" }`.
 |--------|------|------|-------------|
 | POST | `/api/orders` | — | **410 Gone** — use `POST /api/checkout/place-order` |
 | GET | `/api/orders` | Admin | List all orders (pagination, status filters, `?search=` on order id, order number, email, name) |
-| GET | `/api/orders/access-exchange/:code` | Public | Redeem email tracking link (one-time) |
-| POST | `/api/orders/lookup` | Public + CSRF | Lookup order by `orderNumber` + `accessToken` in request body |
+| GET | `/api/orders/access-exchange/:code` | — | **410 Gone** — use `POST /api/orders/lookup` |
+| POST | `/api/orders/lookup` | Public + CSRF | Lookup order by `orderId` + `email` in request body |
 | GET | `/api/orders/stats/summary` | Admin | Order/revenue summary stats |
-| GET | `/api/orders/number/:orderNumber` | Order token or Admin | Lookup by order number |
+| GET | `/api/orders/number/:orderNumber` | Admin | Lookup by order number |
 | GET | `/api/orders/customer/:email` | Admin | Orders for customer email |
-| GET | `/api/orders/:id` | Order token or Admin | Lookup by order UUID |
+| GET | `/api/orders/:id` | Admin | Lookup by order UUID |
 | PUT | `/api/orders/:id` | Admin + CSRF | Update order fields |
 | PATCH | `/api/orders/:id/status` | Admin + CSRF | Update fulfillment status |
 | PATCH | `/api/orders/:id/payment-status` | Admin + CSRF | Update payment status |
@@ -801,8 +802,8 @@ Any unmatched `/api/*` path returns **404** JSON `{ error: "Route not found" }`.
 | `/shipping-policy` | `ShippingPolicy` | Shipping policy |
 | `/cart` | `CartPage` | Shopping cart |
 | `/checkout` | `Checkout` | Checkout form + WhatsApp place-order |
-| `/orders` | `MyOrders` | Order lookup via POST body; email links use `?code=`; legacy `?orderNumber=&token=` stripped with deprecation warning |
-| `/payment/success` | `PaymentSuccess` | Optional return after WhatsApp redirect; reads `lastPlacedOrder` from sessionStorage |
+| `/orders` | `MyOrders` | Order lookup via POST body (`orderId` + email); email links pre-fill `?orderId=` only |
+| `/payment/success` | `PaymentSuccess` | Optional return after WhatsApp redirect; shows UUID Order ID + GSS order number from sessionStorage |
 | `/payment/cancel` | `Cancel` | Legacy cancel route (redirects home) |
 
 ### Admin routes
@@ -859,7 +860,9 @@ Templates: `backend/env.template`, `frontend/env.template`
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `WHATSAPP_ORDER_PHONE` | `919888514572` | WhatsApp number for order messages (digits only) |
+| `WHATSAPP_ORDER_PHONE` | `919888514572` | WhatsApp number for inbound place-order messages (digits only) |
+| `WHATSAPP_CLOUD_ACCESS_TOKEN` | — | Meta Graph API token for outbound customer payment confirmations |
+| `WHATSAPP_CLOUD_PHONE_NUMBER_ID` | — | WhatsApp Business phone number ID for Cloud API sends |
 
 ### Backend — optional / operational
 
@@ -1005,7 +1008,7 @@ npm run links:check
 | Backend unit/API | Vitest | **place-order** checkout (validation + WhatsApp integration happy path), WhatsApp message formatting, admin mark-paid, **admin analytics** (401, IST custom range, CSV export), **validate-cart** (empty/invalid/OOS), **products search** edge cases, **stability/concurrency smoke**, coupon scope, `computeCheckoutPricingForCart`, payment idempotency, order tokens, process error handlers, RLS table list + grant revoke, email portal URL, activity batch/log, order lookup, reviews check, **IST date helpers**, **build performance budgets**, sales analytics invalid-date fallback |
 | Frontend E2E / UI | Playwright | Storefront smoke + deep flows (search, policy gate, coupon, cart qty, order confirmation), **WhatsApp place-order UI**, checkout/contact/admin UI, mobile viewport |
 
-**Total automated tests:** 207 (103 backend unit + 61 API + 43 Playwright UI).
+**Total automated tests:** 233 (114 backend unit + 73 API + 46 Playwright UI).
 
 | Link check | Custom script | Documentation internal links |
 

@@ -55,9 +55,14 @@ export default function PaymentSuccess() {
           Your order has been saved. Complete your purchase by sending the pre-filled message in WhatsApp.
           We will confirm payment and processing after we receive your message.
         </p>
-        {order?.orderNumber && (
+        {order?.serverOrderId && (
           <p style={{ margin: '0 0 8px', fontWeight: 700, color: '#374151' }}>
-            Order ID: {order.orderNumber}
+            Order ID: {order.serverOrderId}
+          </p>
+        )}
+        {order?.orderNumber && (
+          <p style={{ margin: '0 0 8px', color: '#6b7280', fontSize: 14 }}>
+            Order number: {order.orderNumber}
           </p>
         )}
         {order?.total != null && (

@@ -13,7 +13,6 @@ import {
   toPublicReview,
 } from '../lib/reviewHelpers';
 import { respond500 } from '../lib/safeError';
-import { getOrderAccessTokenFromRequest } from '../lib/orderTokens';
 
 const router = Router();
 
@@ -271,9 +270,8 @@ router.post('/', async (req: Request, res: Response) => {
       });
     }
 
-    const orderAccessToken = getOrderAccessTokenFromRequest(req);
     const isVerified = order_id
-      ? await checkVerifiedPurchase(normalizedEmail, product_id, order_id, orderAccessToken)
+      ? await checkVerifiedPurchase(normalizedEmail, product_id, order_id)
       : false;
 
     const sanitizedTitle = title ? sanitizeString(title) : null;

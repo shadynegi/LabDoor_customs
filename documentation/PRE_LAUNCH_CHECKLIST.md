@@ -143,7 +143,7 @@ From repository root on Railway:
 - [ ] Start: `npm start`
 - [ ] Deploy logs show no missing-env exit
 - [ ] Deploy logs show RLS migration applied
-- [ ] CI on `main` is green (**207** automated tests + build + E2E smoke — see [`test_guidelines.md`](test_guidelines.md))
+- [ ] CI on `main` is green (**233** automated tests + build + E2E smoke — see [`test_guidelines.md`](test_guidelines.md))
 
 ---
 
@@ -165,7 +165,7 @@ CI does **not** open a live WhatsApp session. Complete these on **desktop and a 
 - [ ] Order confirmation email received
 - [ ] **View Order Status** link uses `?code=` (not `?token=`)
 - [ ] Link opens `/orders` and shows the order without re-entering token
-- [ ] Manual lookup still works: order number + access token at `/orders`
+- [ ] Manual lookup still works: order ID (UUID) + checkout email at `/orders`
 
 ### Admin (`/admin` or `/adminshivamdashboard`)
 

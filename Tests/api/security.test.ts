@@ -21,11 +21,17 @@ describe('security hardening', () => {
     expect(res.body.error).toBe('Access denied');
   });
 
-  it('returns generic 404 for order lookup without credentials', async () => {
+  it('returns 410 for deprecated access-exchange tracking links', async () => {
+    const res = await request(app).get('/api/orders/access-exchange/old-email-code');
+
+    expect(res.status).toBe(410);
+    expect(res.body.message).toMatch(/order ID and checkout email/i);
+  });
+
+  it('requires admin auth for order lookup by number', async () => {
     const res = await request(app).get('/api/orders/number/GSS-TEST-123');
 
-    expect(res.status).toBe(404);
-    expect(res.body.error).toBe('Order not found or invalid credentials');
+    expect(res.status).toBe(401);
   });
 
   it('rate limits failed admin login attempts (5 per 15 minutes)', async () => {

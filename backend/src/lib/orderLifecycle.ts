@@ -2,8 +2,6 @@ import sql from './db';
 import { logger } from './logger';
 import { InsufficientStockError } from './inventory';
 import { applyStockDeltaInTx } from './inventoryMovements';
-import { generateOrderAccessToken } from './orderTokens';
-import { encryptOrderAccessToken } from './orderTokenEncryption';
 import { releaseCouponForOrder } from './couponReservation';
 import { sanitizeCustomerInfo } from '../utils/sanitizeCustomer';
 
@@ -52,8 +50,6 @@ function parseOrderItems(items: unknown): ValidatedLineItem[] {
 export async function createPendingOrderAtomic(input: PendingOrderInput) {
   const customerInfo = sanitizeCustomerInfo(input.customerInfo);
   const orderNumber = `GSS-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
-  const { token: accessToken, hash: accessTokenHash } = generateOrderAccessToken();
-  const accessTokenEncrypted = encryptOrderAccessToken(accessToken);
 
   const shippingAddress = {
     full_name: customerInfo.fullName,
@@ -107,7 +103,7 @@ export async function createPendingOrderAtomic(input: PendingOrderInput) {
       INSERT INTO orders (
         order_number, customer_email, customer_name, shipping_address,
         items, subtotal, shipping_cost, tax, total,
-        payment_status, payment_method, access_token_hash, access_token_encrypted, status
+        payment_status, payment_method, status
       ) VALUES (
         ${orderNumber},
         ${customerInfo.email},
@@ -120,8 +116,6 @@ export async function createPendingOrderAtomic(input: PendingOrderInput) {
         ${input.pricing.total},
         'pending',
         'WhatsApp',
-        ${accessTokenHash},
-        ${accessTokenEncrypted},
         'pending'
       )
       RETURNING *
@@ -133,7 +127,6 @@ export async function createPendingOrderAtomic(input: PendingOrderInput) {
   return {
     order,
     orderNumber,
-    accessToken,
     couponId: input.couponId,
   };
 }

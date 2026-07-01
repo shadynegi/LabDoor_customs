@@ -4,25 +4,18 @@ import sql from './db';
 export const GENERIC_REVIEW_ELIGIBILITY_MESSAGE =
   'A review may already exist for this product and email, or eligibility could not be confirmed.';
 import { validateOptionalProductImageUrl } from './productImage';
-import { orderAccessMatches } from './orderTokens';
-
 /** True when a completed order for this email contains the product (JSON-safe). */
 export async function checkVerifiedPurchase(
   email: string,
   productId: number,
   orderId?: string | null,
-  accessToken?: string | null,
 ): Promise<boolean> {
   try {
     if (orderId) {
-      if (!accessToken?.trim()) {
-        return false;
-      }
-
       const bound = await sql`
-        SELECT access_token_hash FROM orders
+        SELECT 1 FROM orders
         WHERE id = ${orderId}::uuid
-          AND customer_email = ${email}
+          AND LOWER(TRIM(customer_email)) = LOWER(TRIM(${email}))
           AND payment_status = 'completed'
           AND EXISTS (
             SELECT 1
@@ -37,8 +30,7 @@ export async function checkVerifiedPurchase(
           )
         LIMIT 1
       `;
-      if (!bound.length) return false;
-      return orderAccessMatches(bound[0].access_token_hash as string, accessToken.trim());
+      return bound.length > 0;
     }
 
     const result = await sql`

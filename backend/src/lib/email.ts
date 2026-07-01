@@ -6,11 +6,6 @@ import {
   REPLACEMENT_SUPPORT_EMAIL,
 } from './returnPolicy';
 import { logger } from './logger';
-import {
-  createOrderAccessExchangeCode,
-  issueOrderTrackingExchangeFromOrder,
-} from './orderAccessExchange';
-
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 async function sendResendEmail(payload: Parameters<typeof resend.emails.send>[0]) {
@@ -53,7 +48,6 @@ interface OrderEmailData {
   carrier?: string;
   estimatedDelivery?: string;
   orderDate?: string;
-  accessToken?: string;
   orderId?: string;
   orderPortalUrl?: string;
 }
@@ -77,22 +71,15 @@ const getProductImageUrl = (image: string | undefined): string => {
   return `https://via.placeholder.com/100x100?text=Product`;
 };
 
-/** Build a one-time order portal URL for confirmation / shipping emails. */
-export async function buildOrderPortalUrl(
-  data: Pick<OrderEmailData, 'orderId' | 'accessToken'>,
+/** Build order tracking URL for confirmation / shipping emails (order ID pre-filled; email entered on page). */
+export function buildOrderPortalUrl(
+  data: Pick<OrderEmailData, 'orderId'>,
   frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
-): Promise<string> {
+): string {
   const base = frontendUrl.replace(/\/$/, '');
 
   if (data.orderId) {
-    if (data.accessToken) {
-      const code = await createOrderAccessExchangeCode(data.orderId, data.accessToken);
-      return `${base}/orders?code=${encodeURIComponent(code)}`;
-    }
-    const code = await issueOrderTrackingExchangeFromOrder(data.orderId);
-    if (code) {
-      return `${base}/orders?code=${encodeURIComponent(code)}`;
-    }
+    return `${base}/orders?orderId=${encodeURIComponent(data.orderId)}`;
   }
 
   return `${base}/orders`;
@@ -109,7 +96,7 @@ export class EmailService {
     this.supportEmail = process.env.COMPANY_SUPPORT_EMAIL || 'support@labdoorcustoms.com';
   }
 
-  private async resolveOrderPortalUrl(data: OrderEmailData): Promise<string> {
+  private resolveOrderPortalUrl(data: OrderEmailData): string {
     return buildOrderPortalUrl(data);
   }
 
@@ -118,13 +105,13 @@ export class EmailService {
    */
   async sendOrderConfirmation(data: OrderEmailData) {
     try {
-      const orderPortalUrl = await this.resolveOrderPortalUrl(data);
+      const orderPortalUrl = this.resolveOrderPortalUrl(data);
       const emailHtml = this.generateOrderConfirmationHTML({ ...data, orderPortalUrl });
       
       const { data: emailData, error } = await sendResendEmail({
         from: `${this.companyName} <${this.senderEmail}>`,
         to: data.customerEmail,
-        subject: `Order Confirmation - ${data.orderNumber}`,
+        subject: `Payment Confirmed - ${data.orderNumber}`,
         html: emailHtml,
       });
 
@@ -290,10 +277,10 @@ export class EmailService {
         </svg>
       </div>
       <h2 style="color: #1f2937; margin: 0 0 10px 0; font-size: 24px; font-weight: 700;">
-        Thank You for Your Order!
+        Payment Confirmed!
       </h2>
       <p style="color: #6b7280; margin: 0; font-size: 16px;">
-        Hi ${data.customerName}, we've received your order and will process it shortly.
+        Hi ${data.customerName}, your payment has been confirmed and we are processing your order.
       </p>
     </div>
 
@@ -308,6 +295,12 @@ export class EmailService {
             <td style="padding: 8px 0; color: #6b7280;">Order Number:</td>
             <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #1f2937;">${data.orderNumber}</td>
           </tr>
+          ${data.orderId ? `
+          <tr>
+            <td style="padding: 8px 0; color: #6b7280;">Order ID:</td>
+            <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #1f2937; font-family: monospace; font-size: 13px;">${data.orderId}</td>
+          </tr>
+          ` : ''}
           <tr>
             <td style="padding: 8px 0; color: #6b7280;">Order Date:</td>
             <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #1f2937;">${new Date().toLocaleDateString()}</td>

@@ -13,7 +13,7 @@ Mutating requests require CSRF token (`X-CSRF-Token` header + cookie) except `PO
 | Actor | Method |
 |-------|--------|
 | Admin | HttpOnly `admin_session` cookie after `POST /api/admin/login` |
-| Customer orders | `X-Order-Access-Token` header; email links use one-time `?code=` exchanged via `/orders/access-exchange/:code` |
+| Customer orders | `POST /api/orders/lookup` with `{ orderId, email }` (CSRF-protected); confirmation emails link to `/orders?orderId={uuid}` |
 | Public | No auth (rate-limited) |
 
 ---
@@ -88,18 +88,18 @@ The storefront redirects the browser to `whatsappUrl`. The pre-filled WhatsApp t
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | POST | `/` | — | **410 Gone** — use `POST /checkout/place-order` |
-| POST | `/lookup` | Public + CSRF | Lookup by `orderNumber` + `accessToken` in JSON body |
-| GET | `/access-exchange/:code` | Public | Redeem one-time email tracking link → `{ orderNumber, accessToken, serverOrderId }` |
+| POST | `/lookup` | Public + CSRF | Lookup by `orderId` + `email` in JSON body |
+| GET | `/access-exchange/:code` | — | **410 Gone** — legacy one-time links removed |
 | GET | `/` | Admin | List orders — `?status=&payment_status=&page=&search=` (`search` matches order id UUID, order number, email, or name) |
 | GET | `/stats/summary` | Admin | Order/revenue statistics |
-| GET | `/number/:orderNumber` | Token or admin | Lookup by order number (`X-Order-Access-Token` header only) |
+| GET | `/number/:orderNumber` | Admin | Lookup by order number |
 | GET | `/customer/:email` | Admin | Customer order history |
-| GET | `/:id` | Token or admin | Single order (`X-Order-Access-Token` header only) |
+| GET | `/:id` | Admin | Single order by UUID |
 | PUT | `/:id` | Admin | Update fulfillment fields including `estimated_delivery` (not payment_status) |
 | PATCH | `/:id/customer-details` | Admin + CSRF | Edit customer name, email, shipping address, admin notes |
 | PATCH | `/:id/pending-items` | Admin + CSRF | Edit line items on unpaid pending orders (inventory adjusted) |
 | PATCH | `/:id/status` | Admin | Update order status |
-| PATCH | `/:id/payment-status` | Admin | Mark paid: `admin_note` + `payment_id` (external reference); logged to activity |
+| PATCH | `/:id/payment-status` | Admin | Mark paid: `admin_note` + `payment_id` (external reference); sends confirmation email (Resend) + WhatsApp text to customer mobile (Cloud API when configured); logged to activity |
 | POST | `/:id/cancel` | Admin | Cancel **unpaid pending** orders only; paid orders return **403** |
 | DELETE | `/:id` | Admin | Delete order (blocked if paid) |
 | POST | `/:id/notify-shipped` | Admin | Send shipping email |
@@ -108,12 +108,12 @@ The storefront redirects the browser to `whatsappUrl`. The pre-filled WhatsApp t
 
 ```json
 {
-  "orderNumber": "LDC-2026-00001",
-  "accessToken": "64-char-hex"
+  "orderId": "00000000-0000-0000-0000-000000000001",
+  "email": "customer@example.com"
 }
 ```
 
-Wrong order number, missing token, or invalid token all return **404** `{ "error": "Order not found or invalid credentials" }` (anti-enumeration).
+Wrong order ID, wrong email, or invalid UUID all return **404** `{ "error": "Order not found or invalid credentials" }` (anti-enumeration).
 
 ### Payment status body (manual mark paid)
 
@@ -241,8 +241,8 @@ How the React SPA uses these APIs (see also [`info.md`](info.md)):
 | Flow | Frontend behavior |
 |------|-------------------|
 | Cart | `POST /products/validate-cart` on cart changes; **Retry validation** on network failure — API tests: `Tests/api/validateCart.test.ts` |
-| Checkout | `setUserEmail` on email change/blur (consent-gated); `POST /checkout/place-order`; redirect to `whatsappUrl`; optional `/payment/success` reads `lastPlacedOrder` from sessionStorage |
-| Orders | `GET /orders/access-exchange/:code` for email links; `POST /orders/lookup` for manual entry; legacy `?orderNumber=&token=` stripped |
+| Checkout | `setUserEmail` on email change/blur (consent-gated); `POST /checkout/place-order`; redirect to `whatsappUrl`; optional `/payment/success` reads `lastPlacedOrder` from sessionStorage (shows UUID as Order ID) |
+| Orders | Email/confirmation links pre-fill `?orderId=` on `/orders`; customer enters checkout email; `POST /orders/lookup`; tracked orders in `sessionStorage`; legacy `GET /orders/access-exchange/:code` returns **410** |
 | Reviews | `POST /reviews/check` on email blur; submit shows pending-moderation copy; vote errors via toast |
 | Contact | `POST /contact` + `contact_submit` activity when consented |
 | Admin | Products 50/page load-more; **Multer** media upload (`POST /admin/uploads/product-media`, max **20 MB** images); coupons `applies_to` on create **and edit**; `admin_response` on review edit; `estimated_delivery` on order PUT; **Settings** tab: activity export, sessions, customer recompute |

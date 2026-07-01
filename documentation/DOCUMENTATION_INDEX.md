@@ -16,7 +16,7 @@
 | Production | One Express process: `/api/*` + built SPA; Supabase PostgreSQL via service_role |
 | Checkout | Server-side place-order; `policy_accepted` required; WhatsApp redirect (`Order ID` = `orders.id` UUID in message); email synced to activity on change/blur |
 | Cart | `POST /api/products/validate-cart` on item changes with retry; catalog search via `POST /api/products/search` (no full-catalog client cache) |
-| Orders | Email `?code=` access exchange; legacy URL tokens deprecated; partial refresh keeps stale data |
+| Orders | Email `?orderId=` pre-fill on `/orders`; lookup via order ID + checkout email |
 | RLS | 14 tables service_role-only; no public PostgREST product read |
 | Activity | Consent-gated batch; `contact_submit`, `purchase_complete`, `size_select`, `quantity_change`; CSRF-exempt `/activity/batch`; IP anonymized |
 | Admin | Server product search; order search by **id UUID**, order number, email, name; products paginated; **Settings** tab (activity export, sessions, customer recompute); coupon scope + edit; review admin response; estimated delivery; **no customer refunds** (cancel unpaid pending only) |

@@ -1,5 +1,6 @@
 import { emailService } from './email';
 import { logger } from './logger';
+import { sendWhatsAppPaymentConfirmation } from './whatsappNotifications';
 
 type OrderRow = Record<string, unknown>;
 
@@ -16,10 +17,7 @@ function parseJsonField<T>(value: unknown, fallback: T): T {
 }
 
 /** Send confirmation email after order payment is completed (idempotent-safe to call). */
-export async function sendPostCaptureNotifications(
-  order: OrderRow,
-  options: { accessToken?: string } = {},
-): Promise<void> {
+export async function sendPostCaptureNotifications(order: OrderRow): Promise<void> {
   const items = parseJsonField<Array<Record<string, unknown>>>(order.items, []);
   const shippingAddress = parseJsonField<Record<string, unknown> | null>(
     order.shipping_address,
@@ -48,7 +46,14 @@ export async function sendPostCaptureNotifications(
       >[0]['shippingAddress'],
       orderDate: new Date().toISOString(),
       orderId: String(order.id ?? ''),
-      accessToken: options.accessToken,
     })
     .catch((err) => logger.error('Confirmation email error after capture:', err));
+
+  await sendWhatsAppPaymentConfirmation({
+    orderId: String(order.id ?? ''),
+    orderNumber: String(order.order_number ?? ''),
+    customerName: String(order.customer_name ?? ''),
+    total: parseFloat(String(order.total ?? '0')),
+    shippingAddress,
+  }).catch((err) => logger.error('WhatsApp confirmation error after capture:', err));
 }

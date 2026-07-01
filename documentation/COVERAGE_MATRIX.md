@@ -5,7 +5,7 @@
 **Authoritative behavior:** [`info.md`](info.md)  
 **Full audit:** [`PROJECT_AUDIT.md`](PROJECT_AUDIT.md) (2026-06-08 initial + follow-up)
 
-**Test count marker (CI should match):** `<!-- tests: 207 -->` (103 unit + 61 API + 43 Playwright)
+**Test count marker (CI should match):** `<!-- tests: 233 -->` (114 unit + 73 API + 46 Playwright)
 
 ---
 
@@ -39,13 +39,13 @@
 
 | ID | Behavior | Implementation | Test(s) | Status |
 |----|----------|----------------|---------|--------|
-| ORD-LOOKUP | `POST /orders/lookup` body token | `orders.ts` L252+ | `orderLookup.test.ts` | COVERED |
-| ORD-ENUM | Uniform 404 for bad number vs bad token | `orders.ts` `orderAccessDenied` | `security.test.ts` | COVERED |
-| ORD-ACCESS-EX | Email `?code=` → access exchange | `orderAccessExchange.ts`, `MyOrders.tsx` | `orderAccessExchange.test.ts`, `orders-ui.spec.ts` | COVERED |
-| ORD-EMAIL-LINK | Confirmation email one-time tracking link | `email.ts` `buildOrderPortalUrl` | `emailPortalUrl.test.ts` | COVERED |
-| ORD-EMAIL-CONFIRM | Mark-paid confirmation emails include exchange link | `orderAccessExchange.ts` `getOrderAccessTokenForEmail` | `orderAccessExchange.test.ts`, `emailPortalUrl.test.ts` | COVERED |
-| ORD-MARK-PAID | Admin mark paid + activity log | `orders.ts`, `paymentReconciliation.ts` | `adminMarkPaid.test.ts` | COVERED |
-| ORD-TOKEN-STORE | Durable access token for post–mark-paid email minting | `orders.access_token_encrypted` | `orderAccessExchange.test.ts` | COVERED |
+| ORD-LOOKUP | `POST /orders/lookup` with orderId + email | `orders.ts` | `orderLookup.test.ts`, `orderTracking.test.ts` | COVERED |
+| ORD-ENUM | Uniform 404 for bad id vs bad email | `orders.ts` | `orderLookup.test.ts`, `orderTracking.test.ts` | COVERED |
+| ORD-TRACK-SHIP | Shipped order tracking fields in lookup | `orders.ts` | `orderTracking.test.ts` | COVERED |
+| ORD-ACCESS-DEP | Deprecated access-exchange links return 410 | `orders.ts` | `orderTracking.test.ts`, `security.test.ts` | COVERED |
+| ORD-EMAIL-LINK | Confirmation email tracking URL with orderId | `email.ts` `buildOrderPortalUrl` | `emailPortalUrl.test.ts` | COVERED |
+| ORD-MARK-PAID | Admin mark paid + email/WhatsApp notifications + activity log | `orders.ts`, `paymentReconciliation.ts`, `postPaymentCapture.ts` | `adminMarkPaid.test.ts`, `postPaymentCapture.test.ts`, `whatsappPaymentConfirmation.test.ts` | COVERED |
+| WA-PAY-CONFIRM | WhatsApp Cloud API payment confirmation text | `whatsappNotifications.ts`, `postPaymentCapture.ts` | `whatsappNotifications.test.ts`, `whatsappPaymentConfirmation.test.ts` | COVERED |
 
 ---
 
@@ -80,7 +80,8 @@
 |----|----------|----------------|---------|--------|
 | UI-SMOKE | Home, products, cart, checkout shell, contact | `Tests/frontend/*.spec.ts` | 43 tests | COVERED |
 | UI-ORDER-CONFIRM | Payment success / order received confirmation | `PaymentSuccess.tsx` | `deep-flows-ui.spec.ts` | COVERED |
-| UI-ORDERS | Orders legacy `?token=` strip + `?code=` email redeem | `MyOrders.tsx` | `orders-ui.spec.ts` | COVERED |
+| UI-ORDERS | Orders page orderId + email lookup | `MyOrders.tsx` | `orders-ui.spec.ts` | COVERED |
+| UI-ORDERS-SHIP | Shipped order tracking link on orders page | `MyOrders.tsx` | `orders-ui.spec.ts` | COVERED |
 | UI-ADMIN | Admin `/admin` redirect, login, dashboard analytics smoke | `AdminLogin.tsx`, `AdminDashboard.tsx`, `App.tsx` | `admin-ui.spec.ts` | COVERED |
 | UI-ADMIN-ANALYTICS | Custom IST range Apply-before-export + CSV enablement | `AdminDashboard.tsx`, `adminAnalyticsDates.ts` | `admin-analytics-ui.spec.ts` | COVERED |
 | UI-CHECKOUT-COUNTRY | Checkout country pre-selected (`country-list` US value) | `Checkout.tsx`, `constants/checkoutForm.ts` | `checkout-ui.spec.ts` | COVERED |
@@ -107,7 +108,7 @@
 |----|----------|----------------|---------|--------|
 | CI-ENV | Production env validation in CI | `validate-env.mjs`, `ci.yml` | CI job | COVERED |
 | SEC-ORDER-SECRETS | `access_token_hash` + `access_token_encrypted` stripped from order JSON | `orderTokens.ts` `stripOrderSecrets` | `orderTokens.test.ts` | COVERED |
-| DOC-TESTS | Test count in `info.md` | `info.md` | `npm test` (207) | COVERED |
+| DOC-TESTS | Test count in `info.md` | `info.md` | `npm test` (233) | COVERED |
 | PERF-BUDGET | Frontend JS bundle budget contract | `frontend/scripts/build-budget.mjs` | `performanceBudgets.test.ts` | COVERED |
 | STAB-SMOKE | Parallel health + CSRF latency smoke | `server.ts`, `csrf.ts` | `stabilityConcurrency.test.ts` | COVERED |
 

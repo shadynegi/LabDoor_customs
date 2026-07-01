@@ -96,12 +96,19 @@ test.describe('Deep storefront flows', () => {
     await page.addInitScript(() => {
       sessionStorage.setItem(
         'lastPlacedOrder',
-        JSON.stringify({ orderNumber: 'GSS-RECON-TEST', total: 98 }),
+        JSON.stringify({
+          orderNumber: 'GSS-RECON-TEST',
+          serverOrderId: '00000000-0000-4000-8000-000000000099',
+          total: 98,
+        }),
       );
     });
     await page.goto('/payment/success');
     await expect(page.getByText('Order received')).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText('Order ID: GSS-RECON-TEST')).toBeVisible();
+    await expect(
+      page.getByText('Order ID: 00000000-0000-4000-8000-000000000099'),
+    ).toBeVisible();
+    await expect(page.getByText('Order number: GSS-RECON-TEST')).toBeVisible();
     await expect(page.getByText('Total: $98.00')).toBeVisible();
   });
 });

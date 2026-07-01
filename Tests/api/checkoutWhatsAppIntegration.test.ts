@@ -42,7 +42,6 @@ describe('POST /api/checkout/place-order WhatsApp integration', () => {
     vi.spyOn(checkoutPricing, 'createPendingOrderAtomic').mockResolvedValue({
       order: { id: SERVER_ORDER_ID },
       orderNumber: ORDER_NUMBER,
-      accessToken: 'b'.repeat(64),
     });
   });
 
@@ -82,8 +81,24 @@ describe('POST /api/checkout/place-order WhatsApp integration', () => {
     expect(message).not.toContain('Reference:');
     expect(message).toContain('Jane Buyer');
     expect(message).toContain('jane@example.com');
+    expect(message).toContain('+919876543210');
     expect(message).toContain(checkoutProduct.name);
     expect(message).toContain('Total: $125.00');
+  });
+
+  it('uses WHATSAPP_ORDER_PHONE env for wa.me link', async () => {
+    const prev = process.env.WHATSAPP_ORDER_PHONE;
+    process.env.WHATSAPP_ORDER_PHONE = '+44 7700 900123';
+
+    const { agent, csrfToken } = await createCsrfAgent();
+    const res = await withCsrf(agent.post('/api/checkout/place-order'), csrfToken).send(
+      placeOrderPayload()
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.body.whatsappUrl).toMatch(/^https:\/\/wa\.me\/447700900123\?text=/);
+
+    process.env.WHATSAPP_ORDER_PHONE = prev;
   });
 
   it('returns cached place-order payload for duplicate idempotency key', async () => {

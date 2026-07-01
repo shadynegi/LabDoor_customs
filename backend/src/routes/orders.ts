@@ -7,8 +7,6 @@ import { upsertCustomerFromOrder } from '../lib/customers';
 import { emailService } from '../lib/email';
 import { parsePagination, paginationMeta } from '../lib/pagination';
 import {
-  getOrderAccessTokenFromRequest,
-  orderAccessMatches,
   stripOrderSecrets,
 } from '../lib/orderTokens';
 import { isAdminAuthenticated, verifyAdmin } from './admin';
@@ -19,7 +17,6 @@ import { getClientIp } from '../lib/clientIp';
 import { validateStatusTransition, type OrderStatus } from '../lib/orderStatus';
 import { patchOrderCustomerDetails, patchPendingOrderItems } from '../lib/adminOrderEdits';
 import type { ValidatedLineItem } from '../lib/orderLifecycle';
-import { redeemOrderAccessExchangeCode } from '../lib/orderAccessExchange';
 import { completeOrderPaymentCapture } from '../lib/paymentReconciliation';
 import { sendPostCaptureNotifications } from '../lib/postPaymentCapture';
 
@@ -36,11 +33,15 @@ function parseOrderRow(order: Record<string, unknown>) {
   });
 }
 
-function orderAccessDenied(res: Response) {
+function orderLookupDenied(res: Response) {
   return res.status(404).json({
     success: false,
     error: 'Order not found or invalid credentials',
   });
+}
+
+function isValidOrderId(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
 // ============================================
@@ -222,56 +223,46 @@ router.get('/stats/summary', verifyAdmin, async (req: Request, res: Response) =>
   }
 });
 
-// GET redeem one-time order access code from confirmation email (no token in URL)
-router.get('/access-exchange/:code', async (req: Request, res: Response) => {
-  try {
-    const { code } = req.params;
-    const result = await redeemOrderAccessExchangeCode(code);
+// GET redeem one-time order access code — removed (use POST /lookup with orderId + email)
+router.get('/access-exchange/:code', async (_req: Request, res: Response) => {
+  return res.status(410).json({
+    success: false,
+    error: 'Tracking link format deprecated',
+    message: 'Use the Track Orders page with your order ID and checkout email.',
+  });
+});
 
-    if (!result) {
-      return res.status(404).json({
+// POST order lookup (orderId + email in body — no access tokens)
+router.post('/lookup', async (req: Request, res: Response) => {
+  try {
+    const { orderId, email } = req.body as {
+      orderId?: string;
+      email?: string;
+    };
+
+    const trimmedId = orderId?.trim() ?? '';
+    const trimmedEmail = email?.trim() ?? '';
+
+    if (!trimmedId || !trimmedEmail) {
+      return res.status(400).json({
         success: false,
-        error: 'Invalid or expired tracking link',
+        error: 'orderId and email are required',
       });
     }
 
-    res.json({
-      success: true,
-      data: {
-        orderNumber: result.orderNumber,
-        accessToken: result.accessToken,
-        serverOrderId: result.serverOrderId,
-      },
-    });
-  } catch (error: unknown) {
-    logger.error('Order access exchange error:', error);
-    respond500(res, error, 'Failed to redeem tracking link');
-  }
-});
-
-// POST order lookup (token in body — avoids query-string leaks)
-router.post('/lookup', async (req: Request, res: Response) => {
-  try {
-    const { orderNumber, accessToken } = req.body as {
-      orderNumber?: string;
-      accessToken?: string;
-    };
-
-    if (!orderNumber?.trim() || !accessToken?.trim()) {
-      return res.status(400).json({
-        success: false,
-        error: 'orderNumber and accessToken are required',
-      });
+    if (!isValidOrderId(trimmedId)) {
+      return orderLookupDenied(res);
     }
 
     const order = await dbQuery(() => sql`
       SELECT * FROM orders
-      WHERE order_number = ${orderNumber.trim()}
+      WHERE id = ${trimmedId}::uuid
+        AND LOWER(TRIM(customer_email)) = LOWER(${trimmedEmail})
       LIMIT 1
     `, 'orders:q4');
 
-    if (!order?.length || !orderAccessMatches(order[0].access_token_hash, accessToken.trim())) {
-      return orderAccessDenied(res);
+    if (!order?.length) {
+      return orderLookupDenied(res);
     }
 
     res.json({
@@ -284,16 +275,10 @@ router.post('/lookup', async (req: Request, res: Response) => {
   }
 });
 
-// GET order by order number (requires per-order access token unless admin)
-router.get('/number/:orderNumber', async (req: Request, res: Response) => {
+// GET order by order number (Admin only)
+router.get('/number/:orderNumber', verifyAdmin, async (req: Request, res: Response) => {
   try {
     const { orderNumber } = req.params;
-    const isAdmin = await isAdminAuthenticated(req);
-    const accessToken = getOrderAccessTokenFromRequest(req);
-
-    if (!isAdmin && !accessToken) {
-      return orderAccessDenied(res);
-    }
 
     const order = await dbQuery(() => sql`
       SELECT * FROM orders 
@@ -301,11 +286,8 @@ router.get('/number/:orderNumber', async (req: Request, res: Response) => {
       LIMIT 1
     `, 'orders:q5');
 
-    if (
-      !order?.length ||
-      (!isAdmin && !orderAccessMatches(order[0].access_token_hash, accessToken!))
-    ) {
-      return orderAccessDenied(res);
+    if (!order?.length) {
+      return orderLookupDenied(res);
     }
 
     res.json({
@@ -325,7 +307,7 @@ router.get('/customer/:email', async (req: Request, res: Response) => {
       success: false,
       error: 'Access denied',
       message:
-        'Look up a single order using your order number and access token from your confirmation email.',
+        'Look up a single order using your order ID and checkout email on the Track Orders page.',
     });
   }
 
@@ -364,16 +346,10 @@ router.get('/customer/:email', async (req: Request, res: Response) => {
   }
 });
 
-// GET order by ID (UUID) — requires per-order access token unless admin
-router.get('/:id', async (req: Request, res: Response) => {
+// GET order by ID (UUID) — Admin only
+router.get('/:id', verifyAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const isAdmin = await isAdminAuthenticated(req);
-    const accessToken = getOrderAccessTokenFromRequest(req);
-
-    if (!isAdmin && !accessToken) {
-      return orderAccessDenied(res);
-    }
 
     const order = await dbQuery(() => sql`
       SELECT * FROM orders 
@@ -381,11 +357,8 @@ router.get('/:id', async (req: Request, res: Response) => {
       LIMIT 1
     `, 'orders:q8');
 
-    if (
-      !order?.length ||
-      (!isAdmin && !orderAccessMatches(order[0].access_token_hash, accessToken!))
-    ) {
-      return orderAccessDenied(res);
+    if (!order?.length) {
+      return orderLookupDenied(res);
     }
 
     res.json({

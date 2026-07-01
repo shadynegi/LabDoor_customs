@@ -256,22 +256,15 @@ export async function installStorefrontApiMocks(
 
     const orderAccessExchangeMatch = path.match(/^\/orders\/access-exchange\/([^/]+)$/);
     if (orderAccessExchangeMatch && method === 'GET') {
-      const code = decodeURIComponent(orderAccessExchangeMatch[1]);
-      if (code === 'EMAIL-LINK-CODE') {
-        return json(route, {
-          success: true,
-          data: {
-            orderNumber: 'GSS-EMAIL-TEST-ABC',
-            accessToken: 'a'.repeat(64),
-            serverOrderId: '00000000-0000-0000-0000-00000000ee01',
-          },
-        });
-      }
-      return json(route, { success: false, error: 'Invalid or expired tracking link' }, 404);
+      return json(route, {
+        success: false,
+        error: 'Tracking link format deprecated',
+        message: 'Use the Track Orders page with your order ID and checkout email.',
+      }, 410);
     }
 
     if (path === '/orders/lookup' && method === 'POST') {
-      let body: { orderNumber?: string; accessToken?: string } = {};
+      let body: { orderId?: string; email?: string } = {};
       try {
         body = route.request().postDataJSON() as typeof body;
       } catch {
@@ -279,15 +272,15 @@ export async function installStorefrontApiMocks(
       }
 
       if (
-        body.orderNumber === 'GSS-EMAIL-TEST-ABC' &&
-        body.accessToken === 'a'.repeat(64)
+        body.orderId === '00000000-0000-0000-0000-00000000ee01' &&
+        body.email === 'orders-ui@example.com'
       ) {
         return json(route, {
           success: true,
           data: {
             id: '00000000-0000-0000-0000-00000000ee01',
             order_number: 'GSS-EMAIL-TEST-ABC',
-            customer_email: 'buyer@example.com',
+            customer_email: 'orders-ui@example.com',
             customer_name: 'Test Buyer',
             shipping_address: {},
             items: [],
@@ -297,6 +290,34 @@ export async function installStorefrontApiMocks(
             total: 98,
             payment_status: 'completed',
             status: 'processing',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        });
+      }
+
+      if (
+        body.orderId === '00000000-0000-0000-0000-00000000ee02' &&
+        body.email === 'orders-ui@example.com'
+      ) {
+        return json(route, {
+          success: true,
+          data: {
+            id: '00000000-0000-0000-0000-00000000ee02',
+            order_number: 'GSS-SHIPPED-UI-1',
+            customer_email: 'orders-ui@example.com',
+            customer_name: 'Shipped Buyer',
+            shipping_address: {},
+            items: [],
+            subtotal: 120,
+            shipping_cost: 0,
+            tax: 0,
+            total: 120,
+            payment_status: 'completed',
+            status: 'shipped',
+            tracking_number: '1Z-UI-TEST',
+            tracking_url: 'https://track.example/ui-test',
+            carrier: 'UPS',
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           },

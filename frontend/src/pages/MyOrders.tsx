@@ -23,7 +23,7 @@ import {
   Filter,
   Hash,
   X,
-  KeyRound
+  Mail
 } from 'lucide-react';
 import { apiFetch } from '../config';
 import { Link } from 'react-router-dom';
@@ -31,9 +31,6 @@ import { REPLACEMENT_POLICY_PATH, REPLACEMENT_SUPPORT_EMAIL } from '../constants
 import { toast } from 'sonner';
 import { OrdersListSkeleton } from '../components/Skeletons';
 import { logError } from '../lib/logger';
-
-/** Dedupe legacy ?orderNumber=&token= deprecation toast (StrictMode / effect re-runs). */
-const legacyLinkToastShown = new Set<string>();
 
 interface Order {
   id: string;
@@ -101,8 +98,8 @@ const REFRESH_INTERVAL = 30000;
 const TRACKED_ORDERS_KEY = 'labdoor_tracked_orders';
 
 interface TrackedOrderRef {
-  orderNumber: string;
-  token: string;
+  orderId: string;
+  email: string;
 }
 
 function getTrackedOrders(): TrackedOrderRef[] {
@@ -115,16 +112,16 @@ function getTrackedOrders(): TrackedOrderRef[] {
 }
 
 function saveTrackedOrder(ref: TrackedOrderRef) {
-  const existing = getTrackedOrders().filter((o) => o.orderNumber !== ref.orderNumber);
+  const existing = getTrackedOrders().filter((o) => o.orderId !== ref.orderId);
   sessionStorage.setItem(TRACKED_ORDERS_KEY, JSON.stringify([ref, ...existing]));
 }
 
-async function lookupOrderByToken(orderNumber: string, token: string) {
+async function lookupOrderByCredentials(orderId: string, email: string) {
   const response = await apiFetch('/orders/lookup', {
     method: 'POST',
     body: JSON.stringify({
-      orderNumber: orderNumber.trim(),
-      accessToken: token.trim(),
+      orderId: orderId.trim(),
+      email: email.trim(),
     }),
   });
   const data = await response.json();
@@ -348,8 +345,8 @@ function OrderTimeline({ order, isMobile }: { order: Order; isMobile: boolean })
 
 export default function MyOrders() {
   const [searchParams] = useSearchParams();
-  const [orderNumber, setOrderNumber] = useState('');
-  const [accessToken, setAccessToken] = useState('');
+  const [orderId, setOrderId] = useState('');
+  const [customerEmail, setCustomerEmail] = useState('');
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -442,7 +439,7 @@ export default function MyOrders() {
     try {
       const results = await Promise.all(
         refs.map(async (ref) => {
-          const { response, data } = await lookupOrderByToken(ref.orderNumber, ref.token);
+          const { response, data } = await lookupOrderByCredentials(ref.orderId, ref.email);
           return {
             ref,
             ok: Boolean(response.ok && data.success && data.data),
@@ -452,21 +449,21 @@ export default function MyOrders() {
       );
 
       const fetchedOrders = results.filter((r) => r.order).map((r) => r.order!);
-      const failedOrderNumbers = results.filter((r) => !r.ok).map((r) => r.ref.orderNumber);
+      const failedOrderIds = results.filter((r) => !r.ok).map((r) => r.ref.orderId.slice(0, 8));
 
       if (!isRefresh && fetchedOrders.length === 0) {
-        setError('No orders found. Check your order number and access token.');
+        setError('No orders found. Check your order ID and email.');
         toast.info('No orders found', {
-          description: 'Verify your order number and access token from your confirmation email.',
+          description: 'Verify the order ID from your confirmation email and the email used at checkout.',
           duration: 5000,
         });
       }
 
       if (isRefresh) {
-        if (failedOrderNumbers.length > 0) {
-          setRefreshWarnings(failedOrderNumbers);
+        if (failedOrderIds.length > 0) {
+          setRefreshWarnings(failedOrderIds);
           toast.warning('Some orders could not be refreshed', {
-            description: `Still showing last known status for: ${failedOrderNumbers.join(', ')}`,
+            description: `Still showing last known status for order IDs starting with: ${failedOrderIds.join(', ')}`,
             duration: 6000,
           });
         } else {
@@ -507,18 +504,18 @@ export default function MyOrders() {
     }
   }, []);
 
-  const lookupOrder = useCallback(async (orderNum: string, token: string) => {
-    if (!orderNum.trim() || !token.trim()) return;
+  const lookupOrder = useCallback(async (id: string, email: string) => {
+    if (!id.trim() || !email.trim()) return;
 
     setLoading(true);
     setError(null);
     setSearched(true);
 
     try {
-      const { response, data } = await lookupOrderByToken(orderNum, token);
+      const { response, data } = await lookupOrderByCredentials(id, email);
 
       if (response.ok && data.success && data.data) {
-        const ref = { orderNumber: orderNum.trim(), token: token.trim() };
+        const ref = { orderId: id.trim(), email: email.trim() };
         saveTrackedOrder(ref);
         trackedOrdersRef.current = getTrackedOrders();
         const normalized = normalizeOrder(data.data);
@@ -529,7 +526,7 @@ export default function MyOrders() {
         setLastUpdated(new Date());
       } else {
         const errorMessage =
-          data.message || data.error || 'Invalid order number or access token';
+          data.message || data.error || 'Invalid order ID or email';
         setError(errorMessage);
         toast.error('Order not found', { description: errorMessage, duration: 6000 });
         setOrders([]);
@@ -546,52 +543,15 @@ export default function MyOrders() {
 
   useEffect(() => {
     trackedOrdersRef.current = getTrackedOrders();
-    const urlCode = searchParams.get('code');
-    const urlOrderNumber = searchParams.get('orderNumber');
-    const urlToken = searchParams.get('token');
+    const urlOrderId = searchParams.get('orderId');
 
-    const redeemEmailLink = async () => {
-      if (!urlCode) return false;
-      try {
-        const response = await apiFetch(`/orders/access-exchange/${encodeURIComponent(urlCode)}`);
-        const data = await response.json();
-        if (data.success && data.data) {
-          const { orderNumber: num, accessToken: token } = data.data;
-          setOrderNumber(num);
-          setAccessToken(token);
-          await lookupOrder(num, token);
-          window.history.replaceState({}, '', '/orders');
-          return true;
-        }
-        toast.error('Invalid or expired tracking link');
-      } catch (err) {
-        logError('Order access exchange failed:', err);
-        toast.error('Could not open tracking link');
-      }
-      return true;
-    };
-
-    void (async () => {
-      if (await redeemEmailLink()) return;
-
-      if (urlOrderNumber && urlToken) {
-        const legacyKey = `${urlOrderNumber}:${urlToken}`;
-        window.history.replaceState({}, '', '/orders');
-        if (!legacyLinkToastShown.has(legacyKey)) {
-          legacyLinkToastShown.add(legacyKey);
-          toast.warning('Legacy tracking link detected', {
-            description:
-              'Token links in the URL are deprecated. Enter your order number and access token below, or use the link from your latest confirmation email.',
-            duration: 10000,
-          });
-        }
-        setOrderNumber(urlOrderNumber);
-        setAccessToken(urlToken);
-      } else if (trackedOrdersRef.current.length > 0) {
-        void refreshTrackedOrders(false);
-      }
-    })();
-  }, [searchParams, lookupOrder, refreshTrackedOrders]);
+    if (urlOrderId?.trim()) {
+      setOrderId(urlOrderId.trim());
+      window.history.replaceState({}, '', '/orders');
+    } else if (trackedOrdersRef.current.length > 0) {
+      void refreshTrackedOrders(false);
+    }
+  }, [searchParams, refreshTrackedOrders]);
 
   // Auto-refresh effect
   useEffect(() => {
@@ -611,21 +571,21 @@ export default function MyOrders() {
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!orderNumber.trim()) {
-      toast.error('Order number required', {
-        description: 'Enter the order number from your confirmation email',
+    if (!orderId.trim()) {
+      toast.error('Order ID required', {
+        description: 'Enter the order ID from your confirmation email or WhatsApp message',
       });
       return;
     }
 
-    if (!accessToken.trim()) {
-      toast.error('Access token required', {
-        description: 'Enter the access token from your confirmation email',
+    if (!customerEmail.trim()) {
+      toast.error('Email required', {
+        description: 'Enter the email address you used at checkout',
       });
       return;
     }
 
-    await lookupOrder(orderNumber, accessToken);
+    await lookupOrder(orderId, customerEmail);
   };
 
   const handleManualRefresh = () => {
@@ -726,7 +686,7 @@ export default function MyOrders() {
             maxWidth: 600,
             margin: '0 auto',
           }}>
-            Enter your order number and access token from your confirmation email to track deliveries
+            Enter your order ID and the email you used at checkout to track deliveries
           </p>
           <p
             style={{
@@ -774,7 +734,7 @@ export default function MyOrders() {
               color: '#374151',
               marginBottom: 8,
             }}>
-              Order Number
+              Order ID
             </label>
             <div style={{ position: 'relative', marginBottom: 16 }}>
               <Hash style={{
@@ -786,9 +746,9 @@ export default function MyOrders() {
               }} size={20} />
               <input
                 type="text"
-                value={orderNumber}
-                onChange={(e) => setOrderNumber(e.target.value)}
-                placeholder="GSS-1234567890-ABCDEF"
+                value={orderId}
+                onChange={(e) => setOrderId(e.target.value)}
+                placeholder="00000000-0000-0000-0000-000000000000"
                 style={{
                   width: '100%',
                   padding: '12px 12px 12px 44px',
@@ -810,11 +770,11 @@ export default function MyOrders() {
               color: '#374151',
               marginBottom: 8,
             }}>
-              Access Token
+              Email
             </label>
             <div style={{ display: 'flex', gap: 12, flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
               <div style={{ flex: 1, position: 'relative', minWidth: isMobile ? '100%' : 'auto' }}>
-                <KeyRound style={{
+                <Mail style={{
                   position: 'absolute',
                   left: 12,
                   top: '50%',
@@ -822,10 +782,10 @@ export default function MyOrders() {
                   color: '#9ca3af',
                 }} size={20} />
                 <input
-                  type="text"
-                  value={accessToken}
-                  onChange={(e) => setAccessToken(e.target.value)}
-                  placeholder="Paste token from confirmation email"
+                  type="email"
+                  value={customerEmail}
+                  onChange={(e) => setCustomerEmail(e.target.value)}
+                  placeholder="you@example.com"
                   style={{
                     width: '100%',
                     padding: '12px 12px 12px 44px',
