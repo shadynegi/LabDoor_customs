@@ -182,7 +182,7 @@ CI does **not** open a live WhatsApp session. Complete these on **desktop and a 
 
 ### WhatsApp confirmation
 
-- [ ] Customer sends WhatsApp message; admin receives order number in message
+- [ ] Customer sends WhatsApp message; admin receives **Order ID** (UUID) in message
 - [ ] Admin **Mark paid** with payment reference updates order to `completed` / `processing`
 
 ---

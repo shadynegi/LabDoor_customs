@@ -25,7 +25,7 @@
 | ID | Behavior | Implementation | Test(s) | Status |
 |----|----------|----------------|---------|--------|
 | PAY-PLACE | Atomic place-order + stock reserve + WhatsApp URL | `checkout.ts`, `orderLifecycle.ts`, `whatsappCheckout.ts` | `checkout.test.ts`, `checkoutWhatsAppIntegration.test.ts`, `checkoutPricing.test.ts`, `whatsappCheckout.test.ts` | COVERED |
-| PAY-WA-MSG | WhatsApp message includes order number, items, totals | `whatsappCheckout.ts` | `whatsappCheckout.test.ts`, `checkoutWhatsAppIntegration.test.ts` | COVERED |
+| PAY-WA-MSG | WhatsApp message includes order id (UUID), items, totals | `whatsappCheckout.ts` | `whatsappCheckout.test.ts`, `checkoutWhatsAppIntegration.test.ts` | COVERED |
 | PAY-VOLUME | Volume discount 10%/20% in pricing | `checkoutPricing.ts` | `checkoutPricing.test.ts`, `couponValidateVolume.test.ts` | COVERED |
 | PAY-SHIPPING | Free shipping threshold $200 | `checkoutPricing.ts`, `pricing.ts` | `checkoutPricing.test.ts` | COVERED |
 | PAY-FE-TOTAL | Client compares server total before place-order | `Checkout.tsx`, `checkout.ts` | `checkout.test.ts` | COVERED |

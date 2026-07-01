@@ -28,7 +28,7 @@ Admin workflows for order fulfillment.
 5. Click **Notify shipped** (`POST /api/orders/:id/notify-shipped`) — requires tracking number.
 6. Use **Mark shipped** / **Mark delivered** for status transitions.
 
-Orders are paginated (50 per page). Use the search box to find orders by order number, customer email, or name — search runs server-side across the full order list (`GET /api/orders?search=`). The WhatsApp message includes the **order number** for easy lookup.
+Orders are paginated (50 per page). Use the search box to find orders by **order id** (UUID), order number, customer email, or name — search runs server-side across the full order list (`GET /api/orders?search=`). The WhatsApp message includes the **Order ID** (`orders.id` UUID) for lookup.
 
 Use **Cancel order** in the modal for cancellations (not bulk update).
 

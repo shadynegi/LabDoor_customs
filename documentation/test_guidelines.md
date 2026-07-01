@@ -367,7 +367,7 @@ Expect `success: true` with database and Redis status.
 
 ### WhatsApp checkout (manual)
 
-Place a test order on staging/production; confirm WhatsApp message contains order number; mark paid in admin.
+Place a test order on staging/production; confirm WhatsApp message **Order ID** matches `orders.id` (UUID); mark paid in admin.
 
 **Automated coverage:** `whatsappCheckout.test.ts`, `checkoutWhatsAppIntegration.test.ts`, `checkout.test.ts`, `checkout-place-order-ui.spec.ts` — see [Product catalog fixtures](#product-catalog-fixtures).
 

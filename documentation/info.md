@@ -191,7 +191,7 @@ Admin confirms payment → Mark paid in dashboard
 5. Claims **place_order** idempotency key (`X-Idempotency-Key` or fingerprint).
 6. Atomically inserts pending order (`payment_method=WhatsApp`, `payment_status=pending`, `status=pending`) and decrements stock.
 7. Reserves coupon usage when applicable.
-8. Returns `orderNumber`, `serverOrderId`, `total`, and `whatsappUrl`.
+8. Returns `orderNumber`, `serverOrderId`, `total`, and `whatsappUrl`. The WhatsApp message **Order ID** line is `serverOrderId` (`orders.id` UUID), not `orderNumber`.
 9. On failure after order creation: rolls back pending order, restores stock, marks idempotency failed.
 
 **WhatsApp phone:** `WHATSAPP_ORDER_PHONE` env var (default `919888514572`).
@@ -691,7 +691,7 @@ Any unmatched `/api/*` path returns **404** JSON `{ error: "Route not found" }`.
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | POST | `/api/orders` | — | **410 Gone** — use `POST /api/checkout/place-order` |
-| GET | `/api/orders` | Admin | List all orders (pagination, status filters, `?search=` on order number/email/name) |
+| GET | `/api/orders` | Admin | List all orders (pagination, status filters, `?search=` on order id, order number, email, name) |
 | GET | `/api/orders/access-exchange/:code` | Public | Redeem email tracking link (one-time) |
 | POST | `/api/orders/lookup` | Public + CSRF | Lookup order by `orderNumber` + `accessToken` in request body |
 | GET | `/api/orders/stats/summary` | Admin | Order/revenue summary stats |

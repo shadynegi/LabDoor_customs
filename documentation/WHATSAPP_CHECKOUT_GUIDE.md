@@ -14,7 +14,7 @@ See [`info.md`](info.md) for the full API reference.
 
 ## Admin flow
 
-1. Find the order by **order number** (e.g. `GSS-...`) from the WhatsApp message — server search supports `order_number`.
+1. Find the order by **Order ID** (the `orders.id` UUID from the WhatsApp message) — admin search supports `order_number`, email, name, and **order id**.
 2. When payment is confirmed, open the order → **Mark paid** with a payment reference (UPI ID, WhatsApp note, etc.) and admin note.
 3. Order moves to `payment_status=completed`, `status=processing`; confirmation email sends if Resend is configured.
 
@@ -32,11 +32,13 @@ See [`info.md`](info.md) for the full API reference.
 
 Response includes `orderNumber`, `serverOrderId`, `total`, and `whatsappUrl`.
 
+The pre-filled WhatsApp text uses **`Order ID: {serverOrderId}`** (`orders.id` UUID). The human-readable `orderNumber` (e.g. `GSS-...`) is returned in the API and shown on the order confirmation page, but is **not** included in the WhatsApp message.
+
 ## Automated tests
 
 | Layer | Files | Coverage |
 |-------|-------|----------|
-| Unit | `Tests/backend/whatsappCheckout.test.ts` | Message formatting, URL encoding, volume/coupon lines |
+| Unit | `Tests/backend/whatsappCheckout.test.ts` | Message formatting (`Order ID` = `orders.id` UUID), URL encoding, volume/coupon lines |
 | API | `Tests/api/checkout.test.ts`, `checkoutWhatsAppIntegration.test.ts` | Validation, happy path, `whatsappUrl` payload, idempotency cache |
 | UI | `Tests/frontend/checkout-place-order-ui.spec.ts` | Policy + form + Place Order → mocked `whatsappUrl` |
 

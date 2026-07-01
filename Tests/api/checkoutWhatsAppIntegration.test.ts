@@ -77,8 +77,9 @@ describe('POST /api/checkout/place-order WhatsApp integration', () => {
     const url = new URL(res.body.whatsappUrl as string);
     const message = decodeURIComponent(url.searchParams.get('text') ?? '');
 
-    expect(message).toContain(`Order ID: ${ORDER_NUMBER}`);
-    expect(message).toContain(`Reference: ${SERVER_ORDER_ID}`);
+    expect(message).toContain(`Order ID: ${SERVER_ORDER_ID}`);
+    expect(message).not.toContain(`Order ID: ${ORDER_NUMBER}`);
+    expect(message).not.toContain('Reference:');
     expect(message).toContain('Jane Buyer');
     expect(message).toContain('jane@example.com');
     expect(message).toContain(checkoutProduct.name);

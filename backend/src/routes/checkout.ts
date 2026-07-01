@@ -198,7 +198,6 @@ router.post('/place-order', async (req: Request, res: Response) => {
 
     const whatsappMessage = formatWhatsAppOrderMessage({
       orderId: pending.order.id as string,
-      orderNumber: pending.orderNumber,
       customer: customerInfo,
       lineItems,
       pricing,

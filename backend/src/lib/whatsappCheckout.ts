@@ -9,8 +9,8 @@ export function getWhatsAppOrderPhone(): string {
 }
 
 export interface WhatsAppOrderMessageInput {
+  /** `orders.id` (UUID) — shown as Order ID in the WhatsApp message. */
   orderId: string;
-  orderNumber: string;
   customer: {
     fullName: string;
     email: string;
@@ -31,8 +31,8 @@ function formatMoney(value: number): string {
 }
 
 export function formatWhatsAppOrderMessage(input: WhatsAppOrderMessageInput): string {
-  const { orderId, orderNumber, customer, lineItems, pricing, couponCode } = input;
-  const lines: string[] = ['New Order', '', `Order ID: ${orderNumber}`, `Reference: ${orderId}`, ''];
+  const { orderId, customer, lineItems, pricing, couponCode } = input;
+  const lines: string[] = ['New Order', '', `Order ID: ${orderId}`, ''];
 
   lines.push('Customer:');
   lines.push(`Name: ${customer.fullName}`);

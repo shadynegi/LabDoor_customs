@@ -146,6 +146,7 @@ router.get('/', verifyAdmin, async (req: Request, res: Response) => {
               order_number ILIKE ${searchPattern}
               OR customer_email ILIKE ${searchPattern}
               OR customer_name ILIKE ${searchPattern}
+              OR id::text ILIKE ${searchPattern}
             )`
             : sql`TRUE`}
         )
@@ -163,6 +164,7 @@ router.get('/', verifyAdmin, async (req: Request, res: Response) => {
               order_number ILIKE ${searchPattern}
               OR customer_email ILIKE ${searchPattern}
               OR customer_name ILIKE ${searchPattern}
+              OR id::text ILIKE ${searchPattern}
             )`
             : sql`TRUE`}
         )

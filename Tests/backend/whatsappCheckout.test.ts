@@ -9,7 +9,6 @@ describe('whatsappCheckout', () => {
   it('formats order message with totals and customer details', () => {
     const message = formatWhatsAppOrderMessage({
       orderId: 'uuid-123',
-      orderNumber: 'GSS-TEST-001',
       customer: {
         fullName: 'John Doe',
         email: 'john@example.com',
@@ -41,7 +40,9 @@ describe('whatsappCheckout', () => {
     });
 
     expect(message).toContain('New Order');
-    expect(message).toContain('Order ID: GSS-TEST-001');
+    expect(message).toContain('Order ID: uuid-123');
+    expect(message).not.toContain('GSS-TEST-001');
+    expect(message).not.toContain('Reference:');
     expect(message).toContain('John Doe');
     expect(message).toContain('Test Shoe');
     expect(message).toContain('Total: $125.00');
@@ -63,7 +64,6 @@ describe('whatsappCheckout', () => {
   it('includes volume discount, coupon, size, and free shipping in message', () => {
     const message = formatWhatsAppOrderMessage({
       orderId: 'uuid-456',
-      orderNumber: 'GSS-VOL-001',
       customer: {
         fullName: 'Alex Smith',
         email: 'alex@example.com',
@@ -101,7 +101,6 @@ describe('whatsappCheckout', () => {
   it('omits phone line when customer phone is blank', () => {
     const message = formatWhatsAppOrderMessage({
       orderId: 'uuid-789',
-      orderNumber: 'GSS-NOPHONE',
       customer: {
         fullName: 'No Phone User',
         email: 'nophone@example.com',
