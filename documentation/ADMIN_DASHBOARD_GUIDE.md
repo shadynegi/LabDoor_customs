@@ -69,7 +69,7 @@ Product list API responses are cached (60s TTL); writes invalidate cache.
 
 ### View and filter
 
-- **Search** — type in the search box to filter by order number, customer email, or name (debounced server-side query via `?search=`).
+- **Search** — type in the search box to filter by order id (UUID), order number, customer email, or name (debounced server-side query via `?search=`).
 - **Status filter** — dropdown filters by fulfillment status (`pending`, `processing`, `shipped`, `delivered`, `cancelled`).
 - **Pagination** — 50 orders per page with previous/next controls.
 
@@ -82,7 +82,7 @@ Click an order card to open fulfillment actions:
 - **Tracking** — save tracking number, carrier, optional tracking URL, and **estimated delivery** date (`PUT /api/orders/:id`)
 - **Notify shipped** — `POST /api/orders/:id/notify-shipped` (requires tracking number)
 - **Status** — Mark processing, shipped, or delivered (valid transitions enforced)
-- **Mark paid** — prompts for a reason, then `PATCH /api/orders/:id/payment-status` with `completed`, `admin_note` (≥3 chars), and `payment_id` (external reference or capture ID, ≥5 chars); logged to `activity_logs` as `admin_mark_paid`
+- **Mark paid** — prompts for a reason, then `PATCH /api/orders/:id/payment-status` with `completed`, `admin_note` (≥3 chars), and `payment_id` (external payment reference, ≥5 chars); logged to `activity_logs` as `admin_mark_paid`
 - **Edit customer details** — `PATCH /api/orders/:id/customer-details` (name, email, shipping address, admin notes; does not change paid line totals)
 - **Edit pending items** — `PATCH /api/orders/:id/pending-items` (unpaid pending orders only; adjusts inventory)
 - **Cancel order** — prompts for optional reason; dismiss the prompt to abort. Uses `POST /api/orders/:id/cancel` (**unpaid pending orders only** — no customer refunds)
@@ -124,7 +124,7 @@ API: `GET/POST/PUT/DELETE /api/coupons`
 
 ## Customers tab
 
-Aggregated customer data from the `customers` table (updated on order capture).
+Aggregated customer data from the `customers` table (updated when admin marks an order paid).
 
 - **Server-side search** and **pagination** (`GET /api/admin/customers?search=&page=&limit=`)
 - View customer list with order count, total spent, phone, first/last order dates (table on desktop, cards on mobile)

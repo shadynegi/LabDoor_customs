@@ -108,7 +108,7 @@ See [WHATSAPP_CHECKOUT_GUIDE.md](./WHATSAPP_CHECKOUT_GUIDE.md).
 
 - [ ] `WHATSAPP_ORDER_PHONE` set to the correct business number (or default verified)
 - [ ] Test **Place Order** on staging/production → WhatsApp opens with pre-filled message
-- [ ] Admin can find order by order number from the message
+- [ ] Admin can find order by **Order ID** (UUID from WhatsApp message) or order number
 - [ ] **Mark paid** moves order to `processing` and sends confirmation email (if Resend configured)
 
 ---

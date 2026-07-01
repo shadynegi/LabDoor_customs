@@ -6,14 +6,13 @@ How customers look up their orders.
 
 ---
 
-
 ## Current system behavior
 
 Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API (`backend/`), Vitest + Playwright tests (`Tests/`). Production runs one Express process serving `/api/*` and the built SPA; PostgreSQL is Supabase with backend **service_role** access — RLS and revoked grants block `anon`/`authenticated` PostgREST on 14 tables.
 
 | Area | How it works |
 |------|----------------|
-| **Checkout** | PayPal checkout exchange `?code=`; capture requires `serverOrderId` + `accessToken`. |
+| **Checkout** | **Place Order** → WhatsApp redirect; `Order ID` in message = `orders.id` UUID (not `GSS-...` order number). |
 | **Orders** | Email links: `GET /api/orders/access-exchange/:code`; legacy `?orderNumber=&token=` URLs stripped with warning. |
 | **Activity** | Consent-gated `POST /api/activity/batch`. |
 | **Reviews** | `POST /api/reviews/check` on email blur (storefront). |
@@ -25,20 +24,21 @@ Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_
 
 ## Customer flow
 
-1. After payment, the customer receives a confirmation email with a **one-time tracking link**.
-2. Preferred deep link: `{FRONTEND_URL}/orders?code={exchangeCode}` — redeemed via `GET /api/orders/access-exchange/:code` (returns `orderNumber` + `accessToken`).
-3. The customer can also visit `/orders` and enter the order number and access token manually (`POST /api/orders/lookup`).
-4. Multiple tracked orders are stored in browser `sessionStorage` and refreshed automatically; failed refreshes keep last-known status and show a warning.
-5. **Deprecated:** `{FRONTEND_URL}/orders?orderNumber=...&token=...` — URL is stripped on load; use email link or manual lookup instead.
+1. Customer places order via **Place Order** and completes payment off-site (WhatsApp).
+2. After admin **Mark paid**, the customer receives a confirmation email with a **one-time tracking link**.
+3. Preferred deep link: `{FRONTEND_URL}/orders?code={exchangeCode}` — redeemed via `GET /api/orders/access-exchange/:code` (returns `orderNumber` + `accessToken`).
+4. The customer can also visit `/orders` and enter the **order number** (`GSS-...`) and **access token** manually (`POST /api/orders/lookup`).
+5. Multiple tracked orders are stored in browser `sessionStorage` and refreshed automatically; failed refreshes keep last-known status and show a warning.
+6. **Deprecated:** `{FRONTEND_URL}/orders?orderNumber=...&token=...` — URL is stripped on load; use email link or manual lookup instead.
 
 ---
 
 ## Access token
 
-- Generated at order creation (64-character hex string).
-- Only a SHA-256 hash is stored in the database.
-- Required for order lookup, payment capture, and checkout context recovery.
-- Sent to the API in the **request body** (`POST /api/orders/lookup`), not in GET query strings.
+- Generated at place-order (64-character hex string).
+- Only a SHA-256 hash (and encrypted copy for email minting) is stored in the database.
+- Required for order lookup — sent in the **request body** (`POST /api/orders/lookup`), not in GET query strings.
+- Separate from the WhatsApp **Order ID** (which is the `orders.id` UUID for admin lookup).
 
 ---
 
@@ -51,17 +51,17 @@ POST /api/orders/lookup
 Content-Type: application/json
 
 {
-  "orderNumber": "LDC-2026-00001",
+  "orderNumber": "GSS-2026-00001",
   "accessToken": "64-char-hex-token"
 }
 ```
 
 Returns order details with items and shipping address. Secrets are stripped from the response.
 
-**Alternate lookup:** `GET /api/orders/number/:orderNumber` with `X-Order-Access-Token` header or `?aid={accessToken}` (prefer `POST /api/orders/lookup` so tokens stay out of URLs).
+**Alternate lookup:** `GET /api/orders/number/:orderNumber` with `X-Order-Access-Token` header (prefer `POST /api/orders/lookup` so tokens stay out of URLs).
 
 ---
 
 ## Admin lookup
 
-Admins can view any order without a customer token via the dashboard or `GET /api/orders/:id`.
+Admins can search by **order id UUID** (from WhatsApp message), order number, email, or name in the dashboard, or fetch any order via `GET /api/orders/:id`.

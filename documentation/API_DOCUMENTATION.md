@@ -62,7 +62,7 @@ Headers: `X-Idempotency-Key` (optional), `X-CSRF-Token`
 }
 ```
 
-The storefront redirects the browser to `whatsappUrl`. Order is created with `payment_status=pending`, `status=pending`, `payment_method=WhatsApp`. Admin confirms payment via **Mark paid**.
+The storefront redirects the browser to `whatsappUrl`. The pre-filled WhatsApp text uses **`Order ID: {serverOrderId}`** (`orders.id` UUID), not `orderNumber`. Order is created with `payment_status=pending`, `status=pending`, `payment_method=WhatsApp`. Admin confirms payment via **Mark paid**.
 
 ---
 
@@ -90,7 +90,7 @@ The storefront redirects the browser to `whatsappUrl`. Order is created with `pa
 | POST | `/` | — | **410 Gone** — use `POST /checkout/place-order` |
 | POST | `/lookup` | Public + CSRF | Lookup by `orderNumber` + `accessToken` in JSON body |
 | GET | `/access-exchange/:code` | Public | Redeem one-time email tracking link → `{ orderNumber, accessToken, serverOrderId }` |
-| GET | `/` | Admin | List orders — `?status=&payment_status=&page=&search=` (`search` matches order number, email, or name) |
+| GET | `/` | Admin | List orders — `?status=&payment_status=&page=&search=` (`search` matches order id UUID, order number, email, or name) |
 | GET | `/stats/summary` | Admin | Order/revenue statistics |
 | GET | `/number/:orderNumber` | Token or admin | Lookup by order number (`X-Order-Access-Token` header only) |
 | GET | `/customer/:email` | Admin | Customer order history |
@@ -121,7 +121,7 @@ Wrong order number, missing token, or invalid token all return **404** `{ "error
 {
   "payment_status": "completed",
   "admin_note": "Paid via bank transfer — ref #12345",
-  "payment_id": "CAPTURE_OR_EXTERNAL_REF_ID"
+  "payment_id": "EXTERNAL_PAYMENT_REFERENCE"
 }
 ```
 

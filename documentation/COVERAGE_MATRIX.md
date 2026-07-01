@@ -43,9 +43,9 @@
 | ORD-ENUM | Uniform 404 for bad number vs bad token | `orders.ts` `orderAccessDenied` | `security.test.ts` | COVERED |
 | ORD-ACCESS-EX | Email `?code=` → access exchange | `orderAccessExchange.ts`, `MyOrders.tsx` | `orderAccessExchange.test.ts`, `orders-ui.spec.ts` | COVERED |
 | ORD-EMAIL-LINK | Confirmation email one-time tracking link | `email.ts` `buildOrderPortalUrl` | `emailPortalUrl.test.ts` | COVERED |
-| ORD-EMAIL-WEBHOOK | Webhook/admin capture emails include exchange link | `orderAccessExchange.ts` `getOrderAccessTokenForEmail` | `orderAccessExchange.test.ts` | PARTIAL |
+| ORD-EMAIL-CONFIRM | Mark-paid confirmation emails include exchange link | `orderAccessExchange.ts` `getOrderAccessTokenForEmail` | `orderAccessExchange.test.ts`, `emailPortalUrl.test.ts` | COVERED |
 | ORD-MARK-PAID | Admin mark paid + activity log | `orders.ts`, `paymentReconciliation.ts` | `adminMarkPaid.test.ts` | COVERED |
-| ORD-TOKEN-STORE | Durable access token for post-capture email minting | `orders.access_token_encrypted` | `orderAccessExchange.test.ts` | COVERED |
+| ORD-TOKEN-STORE | Durable access token for post–mark-paid email minting | `orders.access_token_encrypted` | `orderAccessExchange.test.ts` | COVERED |
 
 ---
 
@@ -95,7 +95,7 @@
 
 | ID | Behavior | Implementation | Test(s) | Status |
 |----|----------|----------------|---------|--------|
-| DB-CHECKOUT-EX | `order_checkout_exchanges` in SQL migrations | `schema.sql`, `migration-order-checkout-exchange.sql` | — | COVERED |
+| DB-CHECKOUT-EX | Legacy `order_checkout_exchanges` in SQL migrations (maintenance cleanup only) | `schema.sql`, `migration-order-checkout-exchange.sql` | — | N/A |
 | DB-RLS-14 | All 14 RLS tables in operator runbook + audit SQL | `rlsMigration.ts`, `SUPABASE_SQL_TO_RUN.md` | `rlsMigration.test.ts` | COVERED |
 | DOC-RLS-COUNT | 14 RLS tables in functional guides | various | `rlsMigration.test.ts` | COVERED |
 

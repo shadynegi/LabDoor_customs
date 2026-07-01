@@ -20,7 +20,7 @@ Captured before the image optimization rollout (`vite build`):
 2. **/products** — grid thumbnails, search, filters
 3. **/product/:id** — hero image, spin toggle
 4. **/cart** — line-item thumbnails
-5. **/checkout** — thumbnails, country field, PayPal
+5. **/checkout** — thumbnails, country field, Place Order + policy checkbox
 6. **App header** — logos on all pages
 
 ### Scripts

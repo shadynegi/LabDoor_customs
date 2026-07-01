@@ -28,7 +28,7 @@ Lab Door Customs is a monorepo e-commerce platform for custom footwear sales.
 2. Cart stored in browser localStorage; each change triggers `POST /api/products/validate-cart` to refresh server prices and stock.
 3. Checkout calls `POST /api/checkout/place-order` — server validates cart, creates pending order, reserves stock and coupon, returns `whatsappUrl`.
 4. Browser redirects to WhatsApp with a pre-filled message; customer sends payment details off-site.
-5. Admin finds order by order number, **Mark paid** when payment confirmed; fulfills via dashboard — tracking, shipping notification, validated status transitions, bulk updates (max 500 IDs).
+5. Admin finds order by **Order ID** (UUID from WhatsApp message) or order number, **Mark paid** when payment confirmed; fulfills via dashboard — tracking, shipping notification, validated status transitions, bulk updates (max 500 IDs).
 
 ---
 

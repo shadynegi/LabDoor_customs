@@ -227,7 +227,7 @@ Statuses: `processing`, `completed`, `failed`. Stuck `processing` rows are reape
 | `payment_status` | Meaning |
 |------------------|---------|
 | `pending` | Awaiting payment confirmation (WhatsApp / manual) |
-| `completed` | Payment captured |
+| `completed` | Payment confirmed (admin mark paid) |
 | `failed` | Checkout failed or expired |
 | `refunded` | Fully refunded |
 
@@ -252,7 +252,7 @@ Statuses: `processing`, `completed`, `failed`. Stuck `processing` rows are reape
 
 ### Customer aggregates
 
-- `customers` table tracks `total_orders`, `total_spent`, dates — updated on **capture**, reversed on full refund, adjusted on partial refund.
+- `customers` table tracks `total_orders`, `total_spent`, dates — updated when payment is marked **completed**, reversed on full refund, adjusted on partial refund.
 - Soft delete supported (`is_deleted` flag).
 
 ### Admin order operations
@@ -287,7 +287,7 @@ Statuses: `processing`, `completed`, `failed`. Stuck `processing` rows are reape
   - `product` — only matching `applies_to_ids` product IDs
   - `category` — products in categories derived from seed product IDs
 - Minimum order, max uses, per-customer limits enforced server-side.
-- `POST /api/coupons/use` returns **410 Gone** — usage recorded only during payment capture/reservation.
+- `POST /api/coupons/use` returns **410 Gone** — usage recorded only during place-order reservation.
 
 ### Coupon reservation
 
@@ -362,14 +362,14 @@ At place-order, a row in `coupon_usage` reserves the coupon for the pending orde
 
 - Per-route limits via `express-rate-limit`.
 - Redis-backed store when `REDIS_URL` is set; in-memory fallback in development only — **production fails closed** if Redis is required but unavailable.
-- Notable limits: admin login (5 per 15 min), contact, reviews (submit/vote/admin/check), coupon validate, payment endpoints, order lookup, product search, checkout exchange, order access exchange, review eligibility check.
+- Notable limits: admin login (5 per 15 min), contact, reviews (submit/vote/admin/check), coupon validate, place-order, order lookup, product search, order access exchange, review eligibility check.
 
 ### Network and transport
 
 | Control | Detail |
 |---------|--------|
 | **Cloudflare** | `TRUST_CLOUDFLARE=true` required in production; blocks direct origin access; uses `CF-Connecting-IP` |
-| **CORS** | Whitelist `FRONTEND_URL` + localhost dev origins; **non-production:** private LAN IPs (any port) and localhost on ports 5173–5175, 3000, 4173 (Vite fallback when 5173 is busy); no-origin allowed in prod only for `/api/health` and webhook |
+| **CORS** | Whitelist `FRONTEND_URL` + localhost dev origins; **non-production:** private LAN IPs (any port) and localhost on ports 5173–5175, 3000, 4173 (Vite fallback when 5173 is busy); no-origin allowed in prod only for `/api/health` |
 | **Helmet** | CSP, HSTS in production, frameguard deny, noSniff, XSS filter |
 | **compression** | `compression` middleware — gzip/deflate responses **> 1 KB**; honors `x-no-compression`; level 6 |
 | **JSON body limit** | `express.json({ limit: '1mb' })` — large admin images use **Multer** multipart, not JSON |
@@ -402,7 +402,7 @@ Registered in `backend/src/server.ts` (simplified):
 - Order secrets stripped from API responses (`stripOrderSecrets` removes `access_token_hash` and `access_token_encrypted` — never returned in JSON).
 - Review PII stripped from public API responses (`toPublicReview` — no `customer_email` on storefront).
 - DB TLS verification in production (`DB_SSL_CA_PATH`; `rejectUnauthorized` defaults true).
-- Legacy `paypal_order_id` / `paypal_capture_id` columns retained for historical orders; partial unique indexes prevent duplicate binding on new captures.
+- Legacy `paypal_order_id` / `paypal_capture_id` columns retained for historical orders only; not written on new WhatsApp orders.
 - Product images: admin uploads via **`POST /api/admin/uploads/product-media`** (Multer multipart, images ≤20MB, MP4 ≤15MB) → stored under `uploads/products/` and served at `/uploads/products/*`. Create/update accepts HTTPS/relative URLs (max 2048 chars) or legacy JSON `data:image/*` ≤1MB (`lib/productImage.ts`, aligned with `express.json` 1MB limit). Optional **`UPLOAD_DIR`** env overrides storage path.
 - Supabase RLS at startup (`ensureRlsPolicies()`): all **14** application tables (including `order_access_exchanges`) use **service_role-only** policies; `anon` and `authenticated` grants are revoked — no public product read via PostgREST/GraphQL; all data access goes through Express. Boot is **non-destructive** when policies already exist (skips DROP/CREATE that caused pooler lock hangs). **Production Supabase:** all required SQL migrations applied (June 2026), including `migration-performance-linter-fixes.sql` (lint 0006 policy consolidation + FK indexes) and `migration-products-search-trgm.sql`.
 
@@ -621,8 +621,8 @@ A **correct** `DATABASE_URL` can still produce occasional maintenance warnings w
 
 | Table | Purpose |
 |-------|---------|
-| `payment_idempotency` | Create/capture deduplication with cached responses |
-| `processed_refund_events` | Refund webhook and admin refund deduplication |
+| `payment_idempotency` | Place-order deduplication with cached responses |
+| `processed_refund_events` | Legacy refund deduplication (historical PayPal orders) |
 
 ### Schema files
 
@@ -712,7 +712,7 @@ Any unmatched `/api/*` path returns **404** JSON `{ error: "Route not found" }`.
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | POST | `/api/coupons/validate` | Public + CSRF | Validate coupon code at checkout |
-| POST | `/api/coupons/use` | — | **410 Gone** — usage recorded at capture |
+| POST | `/api/coupons/use` | — | **410 Gone** — usage recorded at place-order |
 | GET | `/api/coupons` | Admin | List coupons |
 | GET | `/api/coupons/:id` | Admin | Single coupon |
 | POST | `/api/coupons` | Admin + CSRF | Create coupon |
@@ -888,7 +888,7 @@ Templates: `backend/env.template`, `frontend/env.template`
 | `REQUEST_LOG_SLOW_MS` | 3000 | Warn when a request exceeds this duration |
 | `DB_SLOW_QUERY_LOG_MS` | 2000 | Log slow database queries at warn |
 | `RESEND_API_KEY` | — | Email sender (required in production) |
-| `ORDER_TOKEN_ENCRYPTION_KEY` | — | AES-256-GCM key for checkout exchange token encryption (required in production) |
+| `ORDER_TOKEN_ENCRYPTION_KEY` | — | AES-256-GCM key for order access token encryption (required in production) |
 | `IP_SALT` | — | Activity log IP anonymization and review voter IDs (required in production) |
 | `DB_SSL_CA_PATH` | — | TLS CA bundle for production DB |
 | `SERVE_FRONTEND` | — | `false` disables static SPA hosting; auto-enabled in production when `frontend/dist` exists |

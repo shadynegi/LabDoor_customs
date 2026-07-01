@@ -1,3 +1,5 @@
+> **Historical snapshot (2026-06-08).** Current system uses WhatsApp checkout and **207** automated tests — see [`info.md`](info.md) and [`COVERAGE_MATRIX.md`](COVERAGE_MATRIX.md).
+
 # Lab Door Customs — Project Audit (2026-06-08)
 
 **One-time comprehensive review** of codebase vs [`info.md`](info.md).  
@@ -5,13 +7,13 @@
 
 **Review method:** Read `info.md` + operational guides; parallel audit of `backend/src`, `frontend/src`, `Tests/`, CI, env templates; spot-verify critical findings in source.
 
-**Automated tests at audit time:** 99 passing (61 unit + 16 API + 22 Playwright). **After remediation (`3dbdef9`):** 105. **After follow-up (`c6de967`):** 111. **After test sprint (`8303997`):** 127. **After core-gap sprint:** 141. **After audit test gaps:** 149. **After no-refund policy sprint:** 150. **Current:** **233** (113 unit + 75 API + 45 Playwright).
+**Automated tests at audit time:** 99 passing (61 unit + 16 API + 22 Playwright). **After remediation (`3dbdef9`):** 105. **After follow-up (`c6de967`):** 111. **After test sprint (`8303997`):** 127. **After core-gap sprint:** 141. **After audit test gaps:** 149. **After no-refund policy sprint:** 150. **After WhatsApp checkout migration:** **207** (103 unit + 61 API + 43 Playwright).
 
 ---
 
 ## Executive summary
 
-The platform is **production-viable** for core storefront checkout, admin fulfillment, and PayPal capture/webhooks. Recent frontend work closed major gaps (409 payment UI, checkout exchange errors, admin messages, review eligibility, cart retry).
+The platform is **production-viable** for core storefront checkout (WhatsApp place-order), admin fulfillment, and manual payment confirmation. PayPal capture/webhooks were removed; admin **Mark paid** is the payment confirmation path.
 
 **Remediation (2026-06-08):** Critical and high audit items **C1–C4, C6, H1–H8** in `3dbdef9`; follow-up **F-01–F-07, DB-01, FE-01–FE-06** in `c6de967`; maintenance resilience + docs in `5e3be15`; payment/UI test sprint in `8303997`+ (checkout-context, refund mismatch, webhook COMPLETED, mark-paid success, coupon scope, orders `?code=`, checkout total mismatch). See [`COVERAGE_MATRIX.md`](COVERAGE_MATRIX.md).
 
@@ -236,7 +238,7 @@ Sprint 4 — Admin/storefront polish
 |----|--------|---------|
 | **F-01** | Closed | `orders.access_token_encrypted` at create-payment; `getOrderAccessTokenForEmail()` reads durable store with checkout-exchange fallback |
 | **F-02** | Closed | `/coupons/validate` uses `computeCheckoutPricingForCart` (DB prices + volume + shipping) |
-| **FE-01** | Closed | Checkout blocks PayPal redirect when server `total` ≠ client total (> $0.01) |
+| **FE-01** | Closed | Checkout blocks place-order when server `total` ≠ client total (> $0.01) |
 | **FE-02** | Closed | `PaymentSuccess` error UI when PayPal `token` missing |
 | **FE-03** | Closed | 409 poll timeout shows terminal error + retry |
 | **FE-04** | Closed | Coupon cleared when cart signature changes |
