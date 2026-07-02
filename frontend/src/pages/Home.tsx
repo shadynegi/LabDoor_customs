@@ -1,11 +1,9 @@
 import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { motion, AnimatePresence, type Variants } from "framer-motion";
-import { ChevronLeft, ChevronRight, ShoppingCart, Check, X, HelpCircle, AlertTriangle, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, ShoppingCart, Check, X, HelpCircle, AlertTriangle } from "lucide-react";
 import { useCart, type SizeSystem } from "./CartContext";
 import { useNavigate, Link } from "react-router-dom";
 import { useProducts } from "../hooks/useProducts";
-import { useProductSearchSuggestions } from "../hooks/useProductSearchSuggestions";
-import ProductSearchBar from "../components/ProductSearchBar";
 import ErrorMessage from "../components/ErrorMessage";
 import LiquidButton from "../components/LiquidButton";
 import LiquidModal from "../components/LiquidModal";
@@ -15,6 +13,7 @@ import { buildResponsiveProductImg, PRODUCT_IMAGE_SIZES } from "../lib/responsiv
 import { resolveProductBackgroundForViewport } from "../lib/productImageMaps";
 import MetaTags from "../components/MetaTags";
 import { DEFAULT_META } from "../lib/site";
+import { SHOE_SIZE_OPTIONS } from "../constants/shoeSizes";
 import { useResponsive } from "../hooks/useResponsive";
 
 const ProductCarousel = lazy(() => import("../components/ProductCarousel"));
@@ -68,13 +67,6 @@ export default function Home() {
   const startX = useRef<number | null>(null);
   const startY = useRef<number | null>(null);
   const navigate = useNavigate();
-  const {
-    searchQuery,
-    setSearchQuery,
-    suggestions,
-    loading: searchLoading,
-    clearSearch,
-  } = useProductSearchSuggestions();
 
   const go = (dir: number) => {
     setIndex(([i]) => {
@@ -192,11 +184,7 @@ export default function Home() {
   }
 
   // Size options for each system
-  const sizeOptions = {
-    UK: ["5", "5.5", "6", "6.5", "7", "7.5", "8", "8.5", "9", "9.5", "10", "10.5", "11", "11.5", "12"],
-    US: ["6", "6.5", "7", "7.5", "8", "8.5", "9", "9.5", "10", "10.5", "11", "11.5", "12", "12.5", "13"],
-    EU: ["38", "39", "40", "41", "42", "43", "44", "45", "46", "47", "48"],
-  };
+  const sizeOptions = SHOE_SIZE_OPTIONS;
 
   const handleAddToCartClick = () => {
     setShowSizeModal(true);
@@ -419,37 +407,6 @@ export default function Home() {
           </Link>
         )}
       </header>
-
-      {/* Unified product search (Fuse.js — same catalog as /products) */}
-      <div
-        style={{
-          position: 'relative',
-          zIndex: 10,
-          padding: isMobile ? '0 16px 12px' : '0 24px 16px',
-          maxWidth: 560,
-          margin: '0 auto',
-          width: '100%',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-          <Search size={16} color="rgba(255,255,255,0.75)" aria-hidden />
-          <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.75)', fontWeight: 500 }}>
-            Search our collection
-          </span>
-        </div>
-        <ProductSearchBar
-          variant="hero"
-          isMobile={isMobile}
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          suggestions={suggestions}
-          loading={searchLoading}
-          clearSearch={clearSearch}
-          placeholder="Search shoes, colors, styles..."
-        />
-      </div>
-
-      {/* Hero / carousel section continues below */}
 
       {/* Main Content */}
       <div
@@ -791,43 +748,44 @@ export default function Home() {
         <ProductCarousel products={products} />
       </Suspense>
 
-      {/* Size Selection Modal */}
+      {/* Size Selection Modal — plain (no LiquidWeb) for smooth FPS on hero page */}
+      {showSizeModal && (
       <LiquidModal
         isOpen={showSizeModal}
         onClose={handleCloseSizeModal}
         maxWidth={500}
+        plain
         ariaLabel="Select Size"
-        contentStyle={{
-          padding: isMobile ? 24 : 32,
-        }}
       >
-              {/* Close Button */}
-              <LiquidButton
+              <button
+                type="button"
                 onClick={handleCloseSizeModal}
+                aria-label="Close modal"
                 style={{
                   position: "absolute",
                   top: 16,
                   right: 16,
-                  background: "rgba(255, 255, 255, 0.1)",
-                  backdropFilter: "blur(10px)",
-                  border: "1px solid rgba(255, 255, 255, 0.2)",
+                  background: "#f3f4f6",
+                  border: "none",
                   padding: 8,
                   borderRadius: 8,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
+                  cursor: "pointer",
+                  minWidth: 44,
+                  minHeight: 44,
                 }}
-                aria-label="Close modal"
               >
                 <X size={24} color="#6b7280" />
-              </LiquidButton>
+              </button>
 
-              {/* Title */}
               <h2 style={{
                 fontSize: isMobile ? 24 : 28,
                 fontWeight: 800,
                 color: "#1f2937",
                 marginBottom: 8,
+                paddingRight: 40,
               }}>
                 Select Size
               </h2>
@@ -839,7 +797,6 @@ export default function Home() {
                 Choose your size system and size
               </p>
 
-              {/* Size System Selector */}
               <div style={{ marginBottom: 24 }}>
                 <label style={{
                   display: "block",
@@ -853,14 +810,15 @@ export default function Home() {
                 <div style={{
                   display: "flex",
                   gap: 8,
-                  background: "rgba(243, 244, 246, 0.3)",
-                  backdropFilter: "blur(10px)",
+                  background: "#f3f4f6",
                   padding: 4,
                   borderRadius: 10,
                 }}>
                   {(["UK", "US", "EU"] as SizeSystem[]).map((system) => (
-                    <LiquidButton
+                    <button
                       key={system}
+                      type="button"
+                      aria-pressed={selectedSizeSystem === system}
                       onClick={() => {
                         setSelectedSizeSystem(system);
                         setSelectedSize(null);
@@ -869,26 +827,24 @@ export default function Home() {
                       style={{
                         flex: 1,
                         padding: "10px 16px",
-                        border: `1px solid ${selectedSizeSystem === system ? "rgba(156, 102, 73, 0.4)" : "transparent"}`,
+                        minHeight: 44,
+                        border: "none",
                         borderRadius: 8,
                         background: selectedSizeSystem === system
-                          ? "rgba(156, 102, 73, 0.2)"
+                          ? "linear-gradient(135deg, #361906 0%, #9c6649 100%)"
                           : "transparent",
-                        backdropFilter: "blur(10px)",
-                        color: selectedSizeSystem === system ? "#9c6649" : "#6b7280",
+                        color: selectedSizeSystem === system ? "white" : "#6b7280",
                         fontWeight: selectedSizeSystem === system ? 700 : 600,
                         fontSize: 15,
                         cursor: "pointer",
-                        transition: "all 0.2s",
                       }}
                     >
                       {system}
-                    </LiquidButton>
+                    </button>
                   ))}
                 </div>
               </div>
 
-              {/* Size Options */}
               <div style={{ marginBottom: 24 }}>
                 <label style={{
                   display: "block",
@@ -901,87 +857,74 @@ export default function Home() {
                 </label>
                 <div style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(60px, 1fr))",
+                  gridTemplateColumns: isMobile
+                    ? "repeat(auto-fill, minmax(52px, 1fr))"
+                    : "repeat(auto-fill, minmax(60px, 1fr))",
                   gap: 8,
                 }}>
                   {sizeOptions[selectedSizeSystem].map((size) => (
-                    <LiquidButton
+                    <button
                       key={size}
+                      type="button"
                       onClick={() => {
                         setSelectedSize(size);
                         setSizeError(null);
                       }}
                       style={{
-                        padding: "12px 8px",
+                        padding: isMobile ? "14px 8px" : "12px 8px",
+                        minHeight: isMobile ? 48 : 44,
                         border: selectedSize === size
-                          ? "2px solid rgba(156, 102, 73, 0.6)"
-                          : "1px solid rgba(209, 213, 219, 0.4)",
-                        borderRadius: 8,
-                        background: selectedSize === size 
-                          ? "rgba(237, 233, 254, 0.4)" 
-                          : "rgba(255, 255, 255, 0.2)",
-                        backdropFilter: "blur(10px)",
+                          ? "2px solid #9c6649"
+                          : "1px solid #d1d5db",
+                        borderRadius: 10,
+                        background: selectedSize === size ? "#f5e0d5" : "white",
                         color: selectedSize === size ? "#9c6649" : "#374151",
                         fontWeight: selectedSize === size ? 700 : 500,
-                        fontSize: 14,
+                        fontSize: isMobile ? 15 : 14,
                         cursor: "pointer",
-                        transition: "all 0.2s",
                       }}
                     >
                       {size}
-                    </LiquidButton>
+                    </button>
                   ))}
                 </div>
               </div>
 
-              {/* Error Message */}
               {sizeError && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
+                <div
                   style={{
                     padding: "12px 16px",
                     background: "#fee2e2",
                     borderRadius: 8,
                     marginBottom: 20,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
                   }}
                 >
                   <span style={{ color: "#dc2626", fontSize: 14, fontWeight: 500 }}>
                     {sizeError}
                   </span>
-                </motion.div>
+                </div>
               )}
 
-              {/* Add to Cart Button */}
-              <LiquidButton
+              <button
+                type="button"
                 onClick={handleConfirmAddToCart}
-                liquidOptions={{
-                  scale: 25,
-                  blur: 4,
-                  saturation: 180,
-                  aberration: 60,
-                  mode: 'prominent',
-                }}
                 style={{
                   width: "100%",
                   padding: "16px",
-                  background: "rgba(156, 102, 73, 0.2)",
-                  backdropFilter: "blur(10px)",
-                  color: "#9c6649",
-                  border: "1px solid rgba(156, 102, 73, 0.4)",
+                  minHeight: 48,
+                  background: "linear-gradient(135deg, #361906 0%, #9c6649 100%)",
+                  color: "white",
+                  border: "none",
                   borderRadius: 12,
                   fontSize: 16,
                   fontWeight: 700,
                   cursor: "pointer",
-                  transition: "all 0.2s",
                 }}
               >
                 Add to Cart
-              </LiquidButton>
+              </button>
       </LiquidModal>
+      )}
 
       {/* Mobile Navigation Bar */}
       {isMobile && (

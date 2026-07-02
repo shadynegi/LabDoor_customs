@@ -10,12 +10,18 @@ test.describe('Products UI', () => {
     await expect(page.getByText('$98').first()).toBeVisible();
   });
 
-  test('product detail shows add to cart for in-stock item', async ({ page }) => {
+  test('product detail disables add to cart until size is selected', async ({ page }) => {
     await page.goto(`/product/${TEST_PRODUCT_IDS.nikeBlue}`);
     await expect(page.getByRole('heading', { name: 'Nike Drops - Blue' })).toBeVisible({
       timeout: 15_000,
     });
-    await expect(page.getByRole('button', { name: 'Add to Cart' }).first()).toBeVisible();
+
+    const addToCart = page.getByRole('button', { name: 'Add to Cart' }).first();
+    await expect(page.getByRole('button', { name: 'Select a Size' }).first()).toBeVisible();
+    await expect(addToCart).toHaveCount(0);
+
+    await page.getByRole('button', { name: '10', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Add to Cart' }).first()).toBeEnabled();
   });
 
   test('product detail shows out of stock state', async ({ page }) => {

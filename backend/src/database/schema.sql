@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS products (
   size VARCHAR(50),                -- Shoe sizes: 'US 7', 'US 8', 'US 9', 'US 10', 'US 11', 'US 12', etc.
   color VARCHAR(100),              -- Primary color: 'Blue', 'Gold', 'Pink', 'Brown', 'Black', etc.
   stock INTEGER DEFAULT 0 CHECK (stock >= 0),
+  public_id UUID NOT NULL DEFAULT uuid_generate_v4() UNIQUE,
   rating DECIMAL(3, 2) DEFAULT 0.00 CHECK (rating >= 0 AND rating <= 5),
   review_count INTEGER DEFAULT 0 CHECK (review_count >= 0),
   view_count INTEGER DEFAULT 0,

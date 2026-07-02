@@ -5,7 +5,7 @@
 **Authoritative behavior:** [`info.md`](info.md)  
 **Full audit:** [`PROJECT_AUDIT.md`](PROJECT_AUDIT.md) (2026-06-08 initial + follow-up)
 
-**Test count marker (CI should match):** `<!-- tests: 233 -->` (114 unit + 73 API + 46 Playwright)
+**Test count marker (CI should match):** `<!-- tests: 409 -->` (120 unit + 74 API + 215 Playwright)
 
 ---
 
@@ -30,7 +30,7 @@
 | PAY-SHIPPING | Free shipping threshold $200 | `checkoutPricing.ts`, `pricing.ts` | `checkoutPricing.test.ts` | COVERED |
 | PAY-FE-TOTAL | Client compares server total before place-order | `Checkout.tsx`, `checkout.ts` | `checkout.test.ts` | COVERED |
 | PAY-POLICY | `policy_accepted: true` required on place-order | `checkout.ts`, `returnPolicy.ts`, `Checkout.tsx` | `checkout.test.ts`, `deep-flows-ui.spec.ts` | COVERED |
-| PAY-VALIDATE | Cart price/stock validation before checkout | `products.ts`, `CartContext.tsx` | `validateCart.test.ts` | COVERED |
+| PAY-VALIDATE | Cart price/stock/size validation before checkout (whole-number sizes) | `products.ts`, `cartLineSize.ts`, `CartContext.tsx` | `validateCart.test.ts`, `cartLineSize.test.ts` | COVERED |
 | POL-ADMIN | Admin refund route removed + paid-order cancel 403 | `orders.ts`, `returnPolicy.ts` | `orderPolicyAdmin.test.ts`, `security.test.ts` | COVERED |
 
 ---
@@ -78,7 +78,7 @@
 
 | ID | Behavior | Implementation | Test(s) | Status |
 |----|----------|----------------|---------|--------|
-| UI-SMOKE | Home, products, cart, checkout shell, contact | `Tests/frontend/*.spec.ts` | 43 tests | COVERED |
+| UI-SMOKE | Home, products, cart, checkout shell, contact | `Tests/frontend/*.spec.ts` | 39 desktop + 176 mobile tests | COVERED |
 | UI-ORDER-CONFIRM | Payment success / order received confirmation | `PaymentSuccess.tsx` | `deep-flows-ui.spec.ts` | COVERED |
 | UI-ORDERS | Orders page orderId + email lookup | `MyOrders.tsx` | `orders-ui.spec.ts` | COVERED |
 | UI-ORDERS-SHIP | Shipped order tracking link on orders page | `MyOrders.tsx` | `orders-ui.spec.ts` | COVERED |
@@ -89,6 +89,7 @@
 | UI-PRODUCT-POLICY | Product detail trust badges match no-refund policy | `ProductDetailPage.tsx`, `constants/returnPolicy.ts` | `deep-flows-ui.spec.ts` | COVERED |
 | UI-DEEP-FLOWS | Search, policy gate, coupon, cart qty, order confirmation | `deep-flows-ui.spec.ts`, `mock-api.ts` | `deep-flows-ui.spec.ts` | COVERED |
 | UI-RESPONSIVE | Mobile checkout/cart sticky CTA, overflow, admin login | `CartPage.tsx`, `MobileStickyCta.tsx`, `responsive.css` | `responsive-ui.spec.ts`, `mobile-ui.spec.ts` | COVERED |
+| UI-RESPONSIVE-PAGES | All storefront routes × 10 phone viewports; cart policy above sticky bar | `responsive-pages-ui.spec.ts`, `helpers/viewports.ts` | 168 tests (`mobile-chrome`) | COVERED |
 
 ---
 
@@ -108,7 +109,7 @@
 |----|----------|----------------|---------|--------|
 | CI-ENV | Production env validation in CI | `validate-env.mjs`, `ci.yml` | CI job | COVERED |
 | SEC-ORDER-SECRETS | `access_token_hash` + `access_token_encrypted` stripped from order JSON | `orderTokens.ts` `stripOrderSecrets` | `orderTokens.test.ts` | COVERED |
-| DOC-TESTS | Test count in `info.md` | `info.md` | `npm test` (233) | COVERED |
+| DOC-TESTS | Test count in `info.md` | `info.md` | `npm test` (409) | COVERED |
 | PERF-BUDGET | Frontend JS bundle budget contract | `frontend/scripts/build-budget.mjs` | `performanceBudgets.test.ts` | COVERED |
 | STAB-SMOKE | Parallel health + CSRF latency smoke | `server.ts`, `csrf.ts` | `stabilityConcurrency.test.ts` | COVERED |
 

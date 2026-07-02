@@ -3,6 +3,7 @@ import { getSiteUrl } from '../lib/site';
 
 export interface ProductJsonLdProps {
   id: number;
+  publicId?: string;
   name: string;
   description?: string;
   image?: string;
@@ -14,6 +15,7 @@ export interface ProductJsonLdProps {
 
 export default function ProductJsonLd({
   id,
+  publicId,
   name,
   description,
   image,
@@ -41,7 +43,7 @@ export default function ProductJsonLd({
       sku: String(id),
       offers: {
         '@type': 'Offer',
-        url: `${siteUrl}/product/${id}`,
+        url: `${siteUrl}/product/${publicId ?? id}`,
         priceCurrency: 'USD',
         price: price.toFixed(2),
         availability: inStock
@@ -67,7 +69,7 @@ export default function ProductJsonLd({
     return () => {
       document.getElementById('product-json-ld')?.remove();
     };
-  }, [id, name, description, image, price, inStock, rating, reviewCount, siteUrl]);
+  }, [id, publicId, name, description, image, price, inStock, rating, reviewCount, siteUrl]);
 
   return null;
 }

@@ -134,6 +134,19 @@ describe('validateCartItems', () => {
       expect(result.lineItems[0].product_id).toBe(product.id);
       expect(result.lineItems[0].price).toBe(100);
       expect(result.lineItems[0].product_name).toBe(product.name);
+      expect(result.lineItems[0].size_system).toBe('US');
+      expect(result.lineItems[0].size_value).toBe('10');
+    }
+  });
+
+  it('rejects cart lines without size', async () => {
+    const product = TEST_PRODUCTS.checkoutShoe;
+    const result = await validateCartItems([
+      { product_id: product.id, quantity: 1 },
+    ]);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toBe('Size required');
     }
   });
 });

@@ -31,11 +31,20 @@ export default function CartPage() {
 
   return (
     <div
-      className={isMobile && hasItems ? "has-mobile-sticky-cta" : undefined}
-      style={{ 
-      padding: isMobile ? "16px" : "24px", 
-      paddingBottom: isMobile && hasItems ? undefined : isMobile ? "max(16px, env(safe-area-inset-bottom))" : "24px",
-      maxWidth: 1000, 
+      className={
+        isMobile && hasItems ? "has-mobile-sticky-cta has-mobile-sticky-cta--stacked" : undefined
+      }
+      style={{
+      paddingTop: isMobile ? "16px" : "24px",
+      paddingLeft: isMobile ? "16px" : "24px",
+      paddingRight: isMobile ? "16px" : "24px",
+      paddingBottom:
+        isMobile && hasItems
+          ? undefined
+          : isMobile
+            ? "max(16px, env(safe-area-inset-bottom))"
+            : "24px",
+      maxWidth: 1000,
       margin: "0 auto",
       minHeight: "calc(100vh - 200px)"
     }}>
@@ -334,6 +343,7 @@ export default function CartPage() {
           </div>
 
           <p
+            data-testid="cart-policy-notice"
             style={{
               marginTop: 16,
               padding: 14,
@@ -450,6 +460,7 @@ export default function CartPage() {
               Continue Shopping
             </button>
           </div>
+          {isMobile && hasItems && <div className="cart-mobile-sticky-spacer" aria-hidden="true" />}
         </>
       )}
       {isMobile && hasItems && (

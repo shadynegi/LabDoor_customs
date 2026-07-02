@@ -1,5 +1,6 @@
 import sql from './db';
 import { InsufficientStockError } from './inventory';
+import { validateCartLineSize } from './cartLineSize';
 
 export const FREE_SHIPPING_THRESHOLD = 200;
 export const SHIPPING_COST = 25;
@@ -153,6 +154,11 @@ export async function validateCartItems(
       return { ok: false, error: 'Invalid item', message: 'Each cart item must include product_id and quantity' };
     }
 
+    const sizeCheck = validateCartLineSize(item.size_system, item.size_value);
+    if (!sizeCheck.ok) {
+      return sizeCheck;
+    }
+
     const result = await sql`
       SELECT id, name, price, image, stock, is_out_of_stock
       FROM products
@@ -178,8 +184,8 @@ export async function validateCartItems(
       product_image: product.image || undefined,
       quantity: item.quantity,
       price: parseFloat(product.price?.toString() || '0'),
-      size_system: item.size_system,
-      size_value: item.size_value,
+      size_system: sizeCheck.size_system,
+      size_value: sizeCheck.size_value,
     });
   }
 

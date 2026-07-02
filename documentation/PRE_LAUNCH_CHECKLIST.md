@@ -143,7 +143,7 @@ From repository root on Railway:
 - [ ] Start: `npm start`
 - [ ] Deploy logs show no missing-env exit
 - [ ] Deploy logs show RLS migration applied
-- [ ] CI on `main` is green (**233** automated tests + build + E2E smoke — see [`test_guidelines.md`](test_guidelines.md))
+- [ ] CI on `main` is green (**409** automated tests + build + E2E smoke — see [`test_guidelines.md`](test_guidelines.md))
 
 ---
 

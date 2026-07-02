@@ -98,21 +98,52 @@ export async function installStorefrontApiMocks(
     }
 
     if (path === '/products/validate-cart' && method === 'POST') {
-      let body: { items?: Array<{ product_id: number; quantity: number }> } = {};
+      type ValidateCartLine = {
+        product_id: number;
+        quantity: number;
+        size_system?: string;
+        size_value?: string;
+      };
+      let body: { items?: ValidateCartLine[] } = {};
       try {
         body = route.request().postDataJSON() as typeof body;
       } catch {
         body = {};
       }
 
+      const validSizeSystems = ['UK', 'US', 'EU'];
+      const isValidSize = (line: ValidateCartLine) => {
+        const system = line.size_system?.trim().toUpperCase();
+        const value = line.size_value?.trim();
+        return (
+          system &&
+          validSizeSystems.includes(system) &&
+          value &&
+          /^\d+$/.test(value)
+        );
+      };
+
+      for (const line of body.items ?? []) {
+        if (!isValidSize(line)) {
+          return json(route, {
+            success: false,
+            error: 'Size required',
+            message: 'Please select a size (system and value) for each cart item',
+          }, 400);
+        }
+      }
+
       const refreshed = (body.items ?? []).map((line) => {
         const product = products.find((p) => p.id === line.product_id);
+        const system = line.size_system!.trim().toUpperCase();
+        const value = line.size_value!.trim();
         return {
           id: line.product_id,
           name: product?.name ?? `Product ${line.product_id}`,
           image: product?.image ?? '/assets/blue-nike.png',
           price: product?.price ?? 98,
           quantity: line.quantity,
+          size: { system, value },
         };
       });
 
@@ -129,14 +160,18 @@ export async function installStorefrontApiMocks(
       });
     }
 
-    const singleProductMatch = path.match(/^\/products\/(\d+)$/);
+    const singleProductMatch = path.match(
+      /^\/products\/(\d+|[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i,
+    );
     if (singleProductMatch && method === 'GET') {
-      const id = parseInt(singleProductMatch[1], 10);
-      const product = products.find((p) => p.id === id);
+      const routeId = singleProductMatch[1];
+      const product =
+        products.find((p) => p.public_id === routeId) ??
+        products.find((p) => String(p.id) === routeId);
       if (!product) {
         return json(
           route,
-          { success: false, error: 'Product not found', message: `Product with ID ${id} does not exist` },
+          { success: false, error: 'Product not found', message: `Product with ID ${routeId} does not exist` },
           404,
         );
       }
@@ -326,7 +361,7 @@ export async function installStorefrontApiMocks(
 
       return json(
         route,
-        { success: false, error: 'Order not found or invalid credentials' },
+        { success: false, error: 'Order not found' },
         404,
       );
     }

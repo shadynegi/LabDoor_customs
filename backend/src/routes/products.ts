@@ -15,12 +15,41 @@ import {
 import { validateOptionalProductVideo360Url } from '../lib/productVideo';
 import { validateCartItems } from '../lib/checkoutPricing';
 import { setProductStockAbsolute } from '../lib/inventoryMovements';
+import { isNumericProductId, isProductPublicId } from '../lib/productPublicId';
 
 const router = Router();
+
+async function fetchProductByRouteId(routeId: string) {
+  const trimmed = routeId.trim();
+  if (isProductPublicId(trimmed)) {
+    const rows = await dbQuery(
+      () => sql`
+        SELECT * FROM products
+        WHERE public_id = ${trimmed}::uuid
+        LIMIT 1
+      `,
+      'products:singleByPublicId',
+    );
+    return rows[0] ?? null;
+  }
+  if (isNumericProductId(trimmed)) {
+    const rows = await dbQuery(
+      () => sql`
+        SELECT * FROM products
+        WHERE id = ${trimmed}
+        LIMIT 1
+      `,
+      'products:singleById',
+    );
+    return rows[0] ?? null;
+  }
+  return null;
+}
 
 // Types
 interface Product {
   id?: number;
+  public_id?: string;
   name: string;
   price: number;
   image: string;
@@ -130,18 +159,12 @@ router.post('/validate-cart', async (req: Request, res: Response) => {
   }
 });
 
-// GET available filter options (categories, sizes, colors, price range)
+// GET available filter options (sizes, colors, price range)
 router.get('/filters', async (_req: Request, res: Response) => {
   try {
-    // Parallel filter queries (independent reads) — chunked via Promise.all, not sequential
-    const [categories, sizes, priceRange, ratingStats] = await dbQuery(
+    const [sizes, priceRange, ratingStats] = await dbQuery(
       () =>
         Promise.all([
-          sql`
-        SELECT DISTINCT category FROM products 
-        WHERE category IS NOT NULL 
-        ORDER BY category ASC
-      `,
           sql`
         SELECT DISTINCT size FROM products 
         WHERE size IS NOT NULL 
@@ -161,7 +184,6 @@ router.get('/filters', async (_req: Request, res: Response) => {
     res.json({
       success: true,
       data: {
-        categories: categories.map(c => c.category),
         sizes: sizes.map(s => s.size),
         priceRange: {
           min: parseFloat(priceRange[0]?.min_price || '0'),
@@ -231,7 +253,7 @@ router.get('/sitemap-urls', async (_req: Request, res: Response) => {
   try {
     const products = await dbQuery(
       () => sql`
-      SELECT id, updated_at FROM products ORDER BY id ASC
+      SELECT id, public_id, updated_at FROM products ORDER BY id ASC
     `,
       'products:sitemapUrls'
     );
@@ -239,7 +261,8 @@ router.get('/sitemap-urls', async (_req: Request, res: Response) => {
       success: true,
       data: (products || []).map((p) => ({
         id: p.id,
-        path: `/product/${p.id}`,
+        public_id: p.public_id,
+        path: `/product/${p.public_id ?? p.id}`,
         updated_at: p.updated_at,
       })),
     });
@@ -249,22 +272,14 @@ router.get('/sitemap-urls', async (_req: Request, res: Response) => {
   }
 });
 
-// GET single product by ID
+// GET single product by public UUID or legacy numeric id
 router.get('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    const row = await cached(CACHE.productSingle(id), TTL.productSingle, async () => {
-      const product = await dbQuery(
-        () => sql`
-        SELECT * FROM products 
-        WHERE id = ${id}
-        LIMIT 1
-      `,
-        'products:single'
-      );
-      return product[0] ?? null;
-    });
+    const row = await cached(CACHE.productSingle(id), TTL.productSingle, () =>
+      fetchProductByRouteId(id),
+    );
 
     if (!row) {
       return res.status(404).json({
@@ -520,7 +535,6 @@ router.post('/search', async (req: Request, res: Response) => {
       query, 
       minPrice, 
       maxPrice, 
-      category,
       size,
       color,
       minRating,
@@ -542,7 +556,6 @@ router.post('/search', async (req: Request, res: Response) => {
 
     // Sanitize inputs
     const sanitizedQuery = query ? sanitizeSearchQuery(query) : '';
-    const sanitizedCategory = category ? sanitizeString(category) : null;
     const sanitizedSize = size ? sanitizeString(size) : null;
     const sanitizedColor = color ? sanitizeString(color) : null;
     const searchPattern = `%${sanitizedQuery}%`;
@@ -574,13 +587,12 @@ router.post('/search', async (req: Request, res: Response) => {
 
     // Build WHERE conditions
     const hasSearchQuery = sanitizedQuery.trim().length > 0;
-    const hasCategory = sanitizedCategory !== null;
     const hasSize = sanitizedSize !== null;
     const hasColor = sanitizedColor !== null;
     const hasPriceRange = priceMin !== null || priceMax !== null;
     const hasRating = ratingMin !== null;
 
-    if (!hasSearchQuery && !hasCategory && !hasSize && !hasColor && !hasPriceRange && !hasRating) {
+    if (!hasSearchQuery && !hasSize && !hasColor && !hasPriceRange && !hasRating) {
       products = await dbQuery(
         () => sql`
         SELECT * FROM products 
@@ -596,7 +608,6 @@ router.post('/search', async (req: Request, res: Response) => {
         SELECT * FROM products 
         WHERE 1=1
         ${hasSearchQuery ? sql`AND (name ILIKE ${searchPattern} OR description ILIKE ${searchPattern})` : sql``}
-        ${hasCategory ? sql`AND category = ${sanitizedCategory}` : sql``}
         ${hasSize ? sql`AND size = ${sanitizedSize}` : sql``}
         ${hasColor ? sql`AND color = ${sanitizedColor}` : sql``}
         ${priceMin !== null ? sql`AND price >= ${priceMin}` : sql``}
@@ -622,7 +633,6 @@ router.post('/search', async (req: Request, res: Response) => {
       },
       filters: {
         query: sanitizedQuery || null,
-        category: sanitizedCategory,
         size: sanitizedSize,
         color: sanitizedColor,
         minPrice: priceMin,

@@ -53,6 +53,30 @@ test.describe('Responsive storefront UI', () => {
     const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
     expect(scrollWidth).toBeLessThanOrEqual(clientWidth + 2);
   });
+
+  test('products sort dropdown fits narrow mobile viewports', async ({ page }) => {
+    for (const width of [320, 390]) {
+      await page.setViewportSize({ width, height: 844 });
+      await page.goto('/products');
+      await expect(page.getByRole('heading', { name: 'All Products' })).toBeVisible({
+        timeout: 15_000,
+      });
+
+      const sortSelect = page.getByLabel('Sort products');
+      await expect(sortSelect).toBeVisible();
+      await sortSelect.selectOption('price_asc');
+
+      const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+      const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
+      expect(scrollWidth, `horizontal overflow at ${width}px`).toBeLessThanOrEqual(clientWidth + 2);
+
+      const box = await sortSelect.boundingBox();
+      expect(box?.width ?? 0, `sort select width at ${width}px`).toBeGreaterThan(0);
+      expect(box!.x + box!.width, `sort select off-screen at ${width}px`).toBeLessThanOrEqual(
+        clientWidth + 2,
+      );
+    }
+  });
 });
 
 test.describe('Responsive admin UI', () => {

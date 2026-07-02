@@ -49,6 +49,17 @@ describe('POST /api/products/validate-cart', () => {
     expect(String(res.body.message || res.body.error)).toMatch(/out of stock|unavailable/i);
   });
 
+  it('rejects cart items without size', async () => {
+    const { agent, csrfToken } = await createCsrfAgent();
+    const res = await withCsrf(agent.post('/api/products/validate-cart'), csrfToken).send({
+      items: [{ product_id: inStockProduct.id, quantity: 1 }],
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
+    expect(String(res.body.message || res.body.error)).toMatch(/size/i);
+  });
+
   it('returns refreshed prices for valid cart', async () => {
     const { agent, csrfToken } = await createCsrfAgent();
     const res = await withCsrf(agent.post('/api/products/validate-cart'), csrfToken).send({

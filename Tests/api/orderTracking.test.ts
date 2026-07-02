@@ -22,7 +22,7 @@ describe('Order tracking API', () => {
       });
 
       expect(res.status).toBe(404);
-      expect(res.body.error).toBe('Order not found or invalid credentials');
+      expect(res.body.error).toBe('Order not found');
     });
 
     it('matches email case-insensitively', async () => {

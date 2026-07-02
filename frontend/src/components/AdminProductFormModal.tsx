@@ -7,6 +7,7 @@ import { apiUpload } from '../lib/apiUpload';
 import { logError } from '../lib/logger';
 import { clearProductCatalogCache } from '../lib/productCatalogCache';
 import { useResponsive } from '../hooks/useResponsive';
+import { US_SIZES_FOR_ADMIN } from '../constants/shoeSizes';
 
 export interface AdminProduct {
   id: number;
@@ -45,10 +46,6 @@ export interface ProductFormPayload {
 
 const CATEGORIES = ['Sneakers', 'Boots', 'Sandals', 'Loafers', 'Custom'];
 const COLORS = ['Black', 'White', 'Blue', 'Gold', 'Pink', 'Brown', 'Red', 'Green', 'Grey', 'Multi'];
-const US_SIZES = [
-  'US 6', 'US 6.5', 'US 7', 'US 7.5', 'US 8', 'US 8.5', 'US 9', 'US 9.5',
-  'US 10', 'US 10.5', 'US 11', 'US 11.5', 'US 12', 'US 12.5', 'US 13',
-];
 
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 const MAX_VIDEO_BYTES = 15 * 1024 * 1024;
@@ -429,7 +426,7 @@ export default function AdminProductFormModal({
               onChange={(e) => setField('size', e.target.value)}
               style={inputStyle}
             >
-              {US_SIZES.map((s) => (
+              {US_SIZES_FOR_ADMIN.map((s) => (
                 <option key={s} value={s}>{s}</option>
               ))}
             </select>
@@ -575,7 +572,7 @@ export default function AdminProductFormModal({
                 Each size becomes a separate product row with the same name, price, and images.
               </p>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                {US_SIZES.filter((s) => s !== form.size).map((size) => (
+                {US_SIZES_FOR_ADMIN.filter((s) => s !== form.size).map((size) => (
                   <label
                     key={size}
                     style={{

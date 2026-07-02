@@ -13,6 +13,8 @@ interface LiquidModalProps {
   overlayStyle?: CSSProperties;
   /** Accessible name for the dialog (required for screen readers when no visible title) */
   ariaLabel?: string;
+  /** Skip LiquidWeb glass effect — use for forms with many controls (better FPS on mobile) */
+  plain?: boolean;
 }
 
 const FOCUSABLE_SELECTOR =
@@ -27,6 +29,7 @@ const LiquidModal: React.FC<LiquidModalProps> = ({
   contentStyle = {},
   overlayStyle = {},
   ariaLabel = 'Dialog',
+  plain = false,
 }) => {
   const dialogRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
@@ -74,6 +77,32 @@ const LiquidModal: React.FC<LiquidModalProps> = ({
     };
   }, [isOpen, onClose]);
 
+  const panelInner = (
+    <div
+      style={
+        plain
+          ? {
+              background: '#ffffff',
+              borderRadius: 20,
+              padding: 'clamp(16px, 4vw, 32px)',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
+              border: '1px solid #e5e7eb',
+            }
+          : {
+              background: 'rgba(255, 255, 255, 0.95)',
+              backdropFilter: 'blur(20px)',
+              WebkitBackdropFilter: 'blur(20px)',
+              border: '1px solid rgba(255, 255, 255, 0.3)',
+              borderRadius: 20,
+              padding: 'clamp(16px, 4vw, 32px)',
+              boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)',
+            }
+      }
+    >
+      {children}
+    </div>
+  );
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -81,6 +110,7 @@ const LiquidModal: React.FC<LiquidModalProps> = ({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
+          transition={{ duration: plain ? 0.15 : 0.2 }}
           onClick={onClose}
           role="presentation"
           style={{
@@ -89,8 +119,9 @@ const LiquidModal: React.FC<LiquidModalProps> = ({
             left: 0,
             right: 0,
             bottom: 0,
-            background: 'rgba(0,0,0,0.5)',
-            backdropFilter: 'blur(8px)',
+            background: plain ? 'rgba(0, 0, 0, 0.45)' : 'rgba(0,0,0,0.5)',
+            backdropFilter: plain ? undefined : 'blur(8px)',
+            WebkitBackdropFilter: plain ? undefined : 'blur(8px)',
             zIndex: 1000,
             display: 'flex',
             alignItems: 'center',
@@ -104,9 +135,10 @@ const LiquidModal: React.FC<LiquidModalProps> = ({
             role="dialog"
             aria-modal="true"
             aria-label={ariaLabel}
-            initial={{ scale: 0.9, y: 20 }}
-            animate={{ scale: 1, y: 0 }}
-            exit={{ scale: 0.9, y: 20 }}
+            initial={plain ? { opacity: 0, y: 12 } : { scale: 0.9, y: 20 }}
+            animate={plain ? { opacity: 1, y: 0 } : { scale: 1, y: 0 }}
+            exit={plain ? { opacity: 0, y: 12 } : { scale: 0.9, y: 20 }}
+            transition={{ duration: plain ? 0.15 : 0.2 }}
             onClick={(e) => e.stopPropagation()}
             style={{
               maxWidth,
@@ -118,29 +150,21 @@ const LiquidModal: React.FC<LiquidModalProps> = ({
             }}
             className={className}
           >
-            <LiquidWeb
-              options={{
-                scale: 25,
-                blur: 4,
-                saturation: 180,
-                aberration: 60,
-                mode: 'prominent',
-              }}
-            >
-              <div
-                style={{
-                  background: 'rgba(255, 255, 255, 0.95)',
-                  backdropFilter: 'blur(20px)',
-                  WebkitBackdropFilter: 'blur(20px)',
-                  border: '1px solid rgba(255, 255, 255, 0.3)',
-                  borderRadius: 20,
-                  padding: 'clamp(16px, 4vw, 32px)',
-                  boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)',
+            {plain ? (
+              panelInner
+            ) : (
+              <LiquidWeb
+                options={{
+                  scale: 25,
+                  blur: 4,
+                  saturation: 180,
+                  aberration: 60,
+                  mode: 'prominent',
                 }}
               >
-                {children}
-              </div>
-            </LiquidWeb>
+                {panelInner}
+              </LiquidWeb>
+            )}
           </motion.div>
         </motion.div>
       )}

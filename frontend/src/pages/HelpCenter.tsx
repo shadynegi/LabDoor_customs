@@ -1,6 +1,13 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { Package, Shield, FileText, ChevronDown, ChevronUp } from "lucide-react";
 import { useResponsive } from "../hooks/useResponsive";
+import {
+  FREE_SHIPPING_MESSAGE,
+  SHIPPING_COST,
+} from "../utils/pricing";
+import { REPLACEMENT_SUPPORT_EMAIL } from "../constants/returnPolicy";
+import { SITE_EMAILS } from "../lib/site";
 
 type Section = "shipping" | "privacy" | "terms";
 
@@ -82,54 +89,86 @@ export default function HelpCenter() {
                 <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 16, color: "#1f2937" }}>
                   Shipping Information
                 </h3>
-                
+
                 <div style={{ marginBottom: 24 }}>
                   <h4 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8, color: "#4b5563" }}>
-                    Shipping Methods & Times
+                    Shipping rates
                   </h4>
                   <ul style={{ paddingLeft: 20, lineHeight: 1.8, color: "#6b7280" }}>
-                    <li><strong>Standard Shipping:</strong> 5-7 business days ($5.99)</li>
-                    <li><strong>Express Shipping:</strong> 2-3 business days ($12.99)</li>
-                    <li><strong>Overnight Shipping:</strong> 1 business day ($24.99)</li>
-                    <li><strong>Free Shipping:</strong> Orders over $100 qualify for free standard shipping</li>
+                    <li>
+                      <strong>Standard shipping:</strong> ${SHIPPING_COST} flat rate on all orders
+                    </li>
+                    <li>
+                      <strong>Free shipping:</strong> {FREE_SHIPPING_MESSAGE}
+                    </li>
                   </ul>
+                  <p style={{ lineHeight: 1.8, color: "#6b7280", marginTop: 12, marginBottom: 0 }}>
+                    Shipping is calculated at checkout from your cart subtotal (before volume or coupon
+                    discounts). Cart and checkout show the exact shipping charge before you place your order.
+                  </p>
                 </div>
 
                 <div style={{ marginBottom: 24 }}>
                   <h4 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8, color: "#4b5563" }}>
-                    Order Tracking
+                    Processing & delivery
                   </h4>
                   <p style={{ lineHeight: 1.8, color: "#6b7280", marginBottom: 12 }}>
-                    Once your order ships, you'll receive a confirmation email with a tracking number. 
-                    You can track your package using this number on our website or the carrier's website.
+                    After you complete checkout, our team confirms payment and prepares your custom order for
+                    shipment. You will receive email updates when your order status changes.
                   </p>
-                  <p style={{ lineHeight: 1.8, color: "#6b7280" }}>
-                    Tracking information typically updates within 24 hours of shipment. If you haven't 
-                    received tracking information within 2 business days of placing your order, please 
-                    contact our customer support team.
+                  <p style={{ lineHeight: 1.8, color: "#6b7280", margin: 0 }}>
+                    Delivery times depend on your location and carrier service once the package ships. Estimated
+                    delivery dates may appear on your order when available.
                   </p>
                 </div>
 
                 <div style={{ marginBottom: 24 }}>
                   <h4 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8, color: "#4b5563" }}>
-                    International Shipping
+                    Order tracking
                   </h4>
-                  <p style={{ lineHeight: 1.8, color: "#6b7280" }}>
-                    We ship to most countries worldwide. International shipping times vary by destination 
-                    (typically 7-14 business days). Customers are responsible for any customs fees, duties, 
-                    or taxes imposed by their country.
+                  <p style={{ lineHeight: 1.8, color: "#6b7280", marginBottom: 12 }}>
+                    Track your order anytime on the{" "}
+                    <Link to="/orders" style={{ color: "#9c6649", fontWeight: 600 }}>
+                      My Orders
+                    </Link>{" "}
+                    page with your <strong>order ID</strong> (UUID from your confirmation email or WhatsApp
+                    message) and the <strong>email address used at checkout</strong>.
+                  </p>
+                  <p style={{ lineHeight: 1.8, color: "#6b7280", marginBottom: 12 }}>
+                    Order confirmation and shipping notification emails include a link that pre-fills your order
+                    ID — enter your checkout email and click <strong>Search</strong> to view status, items, and
+                    tracking details.
+                  </p>
+                  <p style={{ lineHeight: 1.8, color: "#6b7280", margin: 0 }}>
+                    When your order ships, tracking number and carrier information appear on My Orders. If you
+                    shipped but do not see tracking within a few days, contact us with your order ID.
                   </p>
                 </div>
 
-                <div style={{ 
-                  padding: 16, 
-                  background: "#f9fafb", 
+                <div style={{ marginBottom: 24 }}>
+                  <h4 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8, color: "#4b5563" }}>
+                    Shipping address
+                  </h4>
+                  <p style={{ lineHeight: 1.8, color: "#6b7280", margin: 0 }}>
+                    Enter your full shipping address at checkout. We ship to the address you provide; please
+                    double-check it before placing your order. For questions about a specific destination,
+                    contact our support team.
+                  </p>
+                </div>
+
+                <div style={{
+                  padding: 16,
+                  background: "#f9fafb",
                   borderRadius: 10,
                   borderLeft: "4px solid #9c6649"
                 }}>
-                  <p style={{ margin: 0, color: "#4b5563", fontSize: 14 }}>
-                    <strong>Note:</strong> Shipping times are estimates and may vary due to weather, 
-                    holidays, or other unforeseen circumstances.
+                  <p style={{ margin: 0, color: "#4b5563", fontSize: 14, lineHeight: 1.7 }}>
+                    <strong>Note:</strong> Shipping times are estimates and may vary due to production,
+                    carrier delays, weather, or holidays. See our{" "}
+                    <Link to="/shipping-policy" style={{ color: "#9c6649", fontWeight: 600 }}>
+                      Shipping Policy
+                    </Link>{" "}
+                    for full details.
                   </p>
                 </div>
               </div>
@@ -172,88 +211,79 @@ export default function HelpCenter() {
             {activeSection === "privacy" && (
               <div style={{ padding: isMobile ? "20px" : "32px", color: "#374151" }}>
                 <p style={{ fontSize: 13, color: "#9ca3af", marginBottom: 24, fontStyle: "italic" }}>
-                  Last Updated: {new Date().toLocaleDateString()}
+                  Summary — see our full{" "}
+                  <Link to="/privacy-policy" style={{ color: "#9c6649", fontWeight: 600 }}>
+                    Privacy Policy
+                  </Link>{" "}
+                  for complete details.
                 </p>
 
                 <div style={{ marginBottom: 24 }}>
                   <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12, color: "#1f2937" }}>
-                    Information We Collect
+                    Information we collect
                   </h3>
                   <p style={{ lineHeight: 1.8, color: "#6b7280", marginBottom: 12 }}>
-                    We collect information you provide directly to us when you:
+                    We collect information you provide when you:
                   </p>
                   <ul style={{ paddingLeft: 20, lineHeight: 1.8, color: "#6b7280" }}>
-                    <li>Create an account or make a purchase</li>
-                    <li>Subscribe to our newsletter</li>
-                    <li>Contact customer support</li>
-                    <li>Participate in surveys or promotions</li>
+                    <li>Place an order (name, email, phone, shipping address, cart items, size selections)</li>
+                    <li>Look up an order on My Orders (order ID and checkout email)</li>
+                    <li>Submit the contact form or a product review</li>
+                    <li>Accept optional analytics cookies (page views and storefront actions, when consented)</li>
                   </ul>
-                  <p style={{ lineHeight: 1.8, color: "#6b7280", marginTop: 12 }}>
-                    This may include your name, email address, shipping address, phone number, 
-                    and payment information.
+                  <p style={{ lineHeight: 1.8, color: "#6b7280", marginTop: 12, marginBottom: 0 }}>
+                    Checkout completes payment via WhatsApp — we do not store card numbers on this website.
+                    Order and cart data may be saved in your browser (localStorage / sessionStorage) for convenience.
                   </p>
                 </div>
 
                 <div style={{ marginBottom: 24 }}>
                   <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12, color: "#1f2937" }}>
-                    How We Use Your Information
+                    How we use your information
                   </h3>
                   <ul style={{ paddingLeft: 20, lineHeight: 1.8, color: "#6b7280" }}>
-                    <li>Process and fulfill your orders</li>
-                    <li>Send order confirmations and shipping updates</li>
-                    <li>Respond to your questions and requests</li>
-                    <li>Send promotional emails (with your consent)</li>
-                    <li>Improve our products and services</li>
-                    <li>Detect and prevent fraud</li>
+                    <li>Process and fulfill orders (pricing validation, inventory, shipping)</li>
+                    <li>Send order confirmation and shipping emails (via Resend)</li>
+                    <li>Respond to contact messages and support requests</li>
+                    <li>Moderate product reviews</li>
+                    <li>Improve the storefront when analytics consent is granted</li>
+                    <li>Protect against fraud and abuse (rate limits, CSRF)</li>
                   </ul>
                 </div>
 
                 <div style={{ marginBottom: 24 }}>
                   <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12, color: "#1f2937" }}>
-                    Information Sharing
+                    Information sharing
                   </h3>
-                  <p style={{ lineHeight: 1.8, color: "#6b7280" }}>
-                    We do not sell or rent your personal information to third parties. We may share 
-                    your information with service providers who help us operate our business (e.g., 
-                    payment processors, shipping companies) under strict confidentiality agreements.
+                  <p style={{ lineHeight: 1.8, color: "#6b7280", margin: 0 }}>
+                    We do not sell your personal information. We share data only with service providers
+                    that help us operate the store (email delivery, hosting, database, WhatsApp messaging
+                    when configured) under confidentiality obligations.
                   </p>
                 </div>
 
                 <div style={{ marginBottom: 24 }}>
                   <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12, color: "#1f2937" }}>
-                    Data Security
-                  </h3>
-                  <p style={{ lineHeight: 1.8, color: "#6b7280" }}>
-                    We use industry-standard security measures to protect your information, including 
-                    encryption, secure servers, and regular security audits. However, no method of 
-                    transmission over the internet is 100% secure.
-                  </p>
-                </div>
-
-                <div style={{ marginBottom: 24 }}>
-                  <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12, color: "#1f2937" }}>
-                    Your Rights
+                    Data security & your rights
                   </h3>
                   <p style={{ lineHeight: 1.8, color: "#6b7280", marginBottom: 12 }}>
-                    You have the right to:
+                    We use industry-standard protections including HTTPS, HttpOnly admin sessions, and
+                    server-side validation. You may request access, correction, or deletion of your data
+                    where applicable, and you can reject non-essential cookies via the cookie banner.
                   </p>
-                  <ul style={{ paddingLeft: 20, lineHeight: 1.8, color: "#6b7280" }}>
-                    <li>Access and review your personal information</li>
-                    <li>Request corrections to inaccurate data</li>
-                    <li>Request deletion of your data (subject to legal requirements)</li>
-                    <li>Opt-out of marketing communications at any time</li>
-                  </ul>
                 </div>
 
-                <div style={{ 
-                  padding: 16, 
-                  background: "#f9fafb", 
+                <div style={{
+                  padding: 16,
+                  background: "#f9fafb",
                   borderRadius: 10,
                   borderLeft: "4px solid #9c6649"
                 }}>
-                  <p style={{ margin: 0, color: "#4b5563", fontSize: 14 }}>
-                    For privacy-related questions or to exercise your rights, contact us at 
-                    privacy@gaultiershoes.com
+                  <p style={{ margin: 0, color: "#4b5563", fontSize: 14, lineHeight: 1.7 }}>
+                    For privacy-related questions or to exercise your rights, contact{" "}
+                    <a href={`mailto:${SITE_EMAILS.privacy}`} style={{ color: "#9c6649", fontWeight: 600 }}>
+                      {SITE_EMAILS.privacy}
+                    </a>
                   </p>
                 </div>
               </div>
@@ -296,102 +326,94 @@ export default function HelpCenter() {
             {activeSection === "terms" && (
               <div style={{ padding: isMobile ? "20px" : "32px", color: "#374151" }}>
                 <p style={{ fontSize: 13, color: "#9ca3af", marginBottom: 24, fontStyle: "italic" }}>
-                  Last Updated: {new Date().toLocaleDateString()}
+                  Summary — see our full{" "}
+                  <Link to="/terms-of-service" style={{ color: "#9c6649", fontWeight: 600 }}>
+                    Terms of Service
+                  </Link>{" "}
+                  for complete details.
                 </p>
 
                 <div style={{ marginBottom: 24 }}>
                   <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12, color: "#1f2937" }}>
-                    Acceptance of Terms
+                    Acceptance of terms
                   </h3>
                   <p style={{ lineHeight: 1.8, color: "#6b7280" }}>
-                    By accessing and using Lab Door Customs' website and services, you agree to be 
-                    bound by these Terms and Conditions. If you do not agree with any part of these terms, 
-                    you may not use our services.
+                    By using Lab Door Customs (browsing, checkout, or order lookup), you agree to these
+                    terms and our store policies. If you do not agree, please do not use the site.
                   </p>
                 </div>
 
                 <div style={{ marginBottom: 24 }}>
                   <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12, color: "#1f2937" }}>
-                    Product Information & Pricing
+                    Orders & pricing
                   </h3>
                   <p style={{ lineHeight: 1.8, color: "#6b7280", marginBottom: 12 }}>
-                    We strive to provide accurate product descriptions and pricing. However:
+                    Product prices, shipping (${SHIPPING_COST} standard; {FREE_SHIPPING_MESSAGE.toLowerCase()}),
+                    volume discounts (10% off 2+ items, 20% off 5+ items), and coupons are calculated on
+                    the server at checkout. You must select a size before adding to cart. Placing an order
+                    opens WhatsApp to complete payment — your order stays pending until our team confirms
+                    payment.
                   </p>
                   <ul style={{ paddingLeft: 20, lineHeight: 1.8, color: "#6b7280" }}>
-                    <li>Colors may vary slightly due to monitor settings</li>
-                    <li>Prices are subject to change without notice</li>
-                    <li>We reserve the right to limit quantities</li>
-                    <li>We reserve the right to refuse any order</li>
+                    <li>Colors and images may vary slightly from your screen</li>
+                    <li>We may limit quantities or refuse orders at our discretion</li>
+                    <li>Server totals must match checkout before the order is saved</li>
                   </ul>
                 </div>
 
                 <div style={{ marginBottom: 24 }}>
                   <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12, color: "#1f2937" }}>
-                    No Refund & Replacement Policy
+                    No refund & replacement policy
                   </h3>
                   <p style={{ lineHeight: 1.8, color: "#6b7280", marginBottom: 12 }}>
                     <strong>All sales are final.</strong> We do not offer refunds or returns for fit, size,
-                    color, or change of mind.
+                    color, or change of mind. Checkout requires accepting this policy.
                   </p>
                   <ul style={{ paddingLeft: 20, lineHeight: 1.8, color: "#6b7280" }}>
                     <li>Replacements are available only for verified manufacturing defects</li>
-                    <li>Contact support within 30 days of delivery with your order number and photos</li>
+                    <li>Contact {REPLACEMENT_SUPPORT_EMAIL} within 30 days of delivery with your order ID and photos</li>
                     <li>Approved replacements ship the same item when stock is available</li>
-                    <li>See the full <a href="/returns-policy" style={{ color: "#9c6649" }}>Replacement Policy</a></li>
+                    <li>
+                      See the full{" "}
+                      <Link to="/returns-policy" style={{ color: "#9c6649", fontWeight: 600 }}>
+                        Replacement Policy
+                      </Link>
+                    </li>
                   </ul>
                 </div>
 
                 <div style={{ marginBottom: 24 }}>
                   <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12, color: "#1f2937" }}>
-                    Account Responsibilities
+                    Intellectual property
                   </h3>
                   <p style={{ lineHeight: 1.8, color: "#6b7280" }}>
-                    If you create an account with us, you are responsible for maintaining the 
-                    confidentiality of your account information and password. You agree to accept 
-                    responsibility for all activities that occur under your account.
+                    Site content, logos, and product imagery are owned by Lab Door Customs and may not be
+                    used without permission.
                   </p>
                 </div>
 
                 <div style={{ marginBottom: 24 }}>
                   <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12, color: "#1f2937" }}>
-                    Intellectual Property
+                    Limitation of liability
                   </h3>
                   <p style={{ lineHeight: 1.8, color: "#6b7280" }}>
-                    All content on this website, including text, graphics, logos, images, and software, 
-                    is the property of Lab Door Customs and is protected by copyright and trademark laws. 
-                    Unauthorized use is prohibited.
+                    Lab Door Customs is not liable for indirect or consequential damages from use of the
+                    site or products. Our liability is limited to the amount you paid for the product in
+                    question, to the extent permitted by law.
                   </p>
                 </div>
 
-                <div style={{ marginBottom: 24 }}>
-                  <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12, color: "#1f2937" }}>
-                    Limitation of Liability
-                  </h3>
-                  <p style={{ lineHeight: 1.8, color: "#6b7280" }}>
-                    Lab Door Customs shall not be liable for any indirect, incidental, special, or 
-                    consequential damages arising from your use of our website or products. Our total 
-                    liability shall not exceed the amount you paid for the product in question.
-                  </p>
-                </div>
-
-                <div style={{ marginBottom: 24 }}>
-                  <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12, color: "#1f2937" }}>
-                    Governing Law
-                  </h3>
-                  <p style={{ lineHeight: 1.8, color: "#6b7280" }}>
-                    These Terms and Conditions are governed by and construed in accordance with the laws 
-                    of the State of New York, United States, without regard to its conflict of law provisions.
-                  </p>
-                </div>
-
-                <div style={{ 
-                  padding: 16, 
-                  background: "#f9fafb", 
+                <div style={{
+                  padding: 16,
+                  background: "#f9fafb",
                   borderRadius: 10,
                   borderLeft: "4px solid #9c6649"
                 }}>
-                  <p style={{ margin: 0, color: "#4b5563", fontSize: 14 }}>
-                    For questions about these Terms & Conditions, contact us at legal@labdoorcustoms.com
+                  <p style={{ margin: 0, color: "#4b5563", fontSize: 14, lineHeight: 1.7 }}>
+                    For questions about these terms, contact{" "}
+                    <a href={`mailto:${SITE_EMAILS.legal}`} style={{ color: "#9c6649", fontWeight: 600 }}>
+                      {SITE_EMAILS.legal}
+                    </a>
                   </p>
                 </div>
               </div>

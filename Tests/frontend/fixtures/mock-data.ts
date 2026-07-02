@@ -1,9 +1,10 @@
 /** Stable product fixtures for Playwright API mocks (image paths match frontend imageMap keys). */
 
-import { TEST_PRODUCT_IDS, TEST_PRODUCTS } from '../../fixtures/products';
+import { TEST_PRODUCT_IDS, TEST_PRODUCTS, TEST_PRODUCT_PUBLIC_IDS } from '../../fixtures/products';
 
 export interface MockProduct {
   id: number;
+  public_id?: string;
   name: string;
   price: number;
   image: string;
@@ -24,6 +25,7 @@ export { TEST_PRODUCT_IDS };
 export const MOCK_PRODUCTS: MockProduct[] = [
   {
     id: TEST_PRODUCTS.nikeBlue.id,
+    public_id: TEST_PRODUCT_PUBLIC_IDS.nikeBlue,
     name: TEST_PRODUCTS.nikeBlue.name,
     price: TEST_PRODUCTS.nikeBlue.price as number,
     image: TEST_PRODUCTS.nikeBlue.image,
@@ -40,6 +42,7 @@ export const MOCK_PRODUCTS: MockProduct[] = [
   },
   {
     id: TEST_PRODUCTS.goldenEssence.id,
+    public_id: TEST_PRODUCT_PUBLIC_IDS.goldenEssence,
     name: TEST_PRODUCTS.goldenEssence.name,
     price: TEST_PRODUCTS.goldenEssence.price as number,
     image: TEST_PRODUCTS.goldenEssence.image,
@@ -57,7 +60,6 @@ export const MOCK_PRODUCTS: MockProduct[] = [
 ];
 
 export const MOCK_FILTERS = {
-  categories: ['Athletic', 'Lifestyle'],
   sizes: ['US 9', 'US 10'],
   priceRange: { min: 98, max: 98 },
   ratingRange: { min: 4.5, max: 4.8, avg: 4.65 },

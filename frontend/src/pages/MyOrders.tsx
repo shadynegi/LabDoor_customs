@@ -525,10 +525,9 @@ export default function MyOrders() {
         });
         setLastUpdated(new Date());
       } else {
-        const errorMessage =
-          data.message || data.error || 'Invalid order ID or email';
+        const errorMessage = 'Order not found';
         setError(errorMessage);
-        toast.error('Order not found', { description: errorMessage, duration: 6000 });
+        toast.error(errorMessage, { duration: 6000 });
         setOrders([]);
       }
     } catch (err) {

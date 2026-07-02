@@ -2,6 +2,21 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { SearchFilters, FilterOptions, SortOption } from '../types/productSearch';
+import { useResponsive } from '../hooks/useResponsive';
+
+const COMPACT_SORT_LABELS: Record<string, string> = {
+  Default: 'Default',
+  'Price: Low to High': 'Lowest price',
+  'Price: High to Low': 'Highest price',
+  'Highest Rated': 'Top rated',
+  'Newest First': 'Newest',
+  'Oldest First': 'Oldest',
+};
+
+function sortOptionLabel(label: string, compact: boolean): string {
+  if (!compact) return label;
+  return COMPACT_SORT_LABELS[label] ?? label;
+}
 
 interface ProductFiltersProps {
   filters: SearchFilters;
@@ -23,6 +38,8 @@ const ProductFilters: React.FC<ProductFiltersProps> = ({
   onPanelOpen,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const { isSmallMobile } = useResponsive();
+  const compactSortLabels = isMobile && isSmallMobile;
 
   // Price range state for slider
   const priceMin = filterOptions?.priceRange.min || 0;
@@ -37,41 +54,24 @@ const ProductFilters: React.FC<ProductFiltersProps> = ({
   ];
 
   return (
-    <div style={{
-      maxWidth: 1400,
-      margin: '0 auto 24px',
-      padding: '0 20px',
-    }}>
+    <div className="product-filters">
       {/* Filter Toggle Button & Sort Dropdown Row */}
-      <div style={{
-        display: 'flex',
-        flexDirection: isMobile ? 'column' : 'row',
-        gap: 12,
-        alignItems: isMobile ? 'stretch' : 'center',
-        justifyContent: 'space-between',
-        marginBottom: isExpanded ? 16 : 0,
-      }}>
+      <div
+        className="product-filters__toolbar"
+        style={{ marginBottom: isExpanded ? 16 : 0 }}
+      >
         {/* Filter Toggle Button - Touch-friendly */}
         <button
+          type="button"
+          className="product-filters__filters-btn"
           onClick={() => {
             if (!isExpanded) onPanelOpen?.();
             setIsExpanded(!isExpanded);
           }}
           style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: isMobile ? '12px 18px' : '10px 16px',
-            minHeight: isMobile ? 48 : 44,
             background: isExpanded ? 'linear-gradient(135deg, #361906 0%, #9c6649 100%)' : 'white',
             color: isExpanded ? 'white' : '#374151',
             border: isExpanded ? 'none' : '2px solid #e5e7eb',
-            borderRadius: 10,
-            fontSize: isMobile ? 15 : 14,
-            fontWeight: 600,
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
           }}
         >
           {/* Filter Icon */}
@@ -115,53 +115,37 @@ const ProductFilters: React.FC<ProductFiltersProps> = ({
           </motion.svg>
         </button>
 
-        {/* Sort Dropdown - Touch-friendly */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          width: isMobile ? '100%' : 'auto',
-        }}>
-          <span style={{ 
-            fontSize: isMobile ? 15 : 14, 
-            color: '#6b7280',
-            whiteSpace: 'nowrap',
-          }}>
+        {/* Sort Dropdown - responsive via responsive.css */}
+        <div className="product-filters__sort">
+          <label className="product-filters__sort-label" htmlFor="product-sort-by">
             Sort by:
-          </span>
+          </label>
           <select
+            id="product-sort-by"
+            className="product-filters__sort-select"
             value={filters.sortBy || 'default'}
             onChange={(e) => onFilterChange('sortBy', e.target.value as SortOption)}
-            style={{
-              padding: isMobile ? '12px 40px 12px 16px' : '10px 36px 10px 14px',
-              fontSize: isMobile ? 15 : 14,
-              fontWeight: 500,
-              color: '#374151',
-              background: 'white',
-              border: '2px solid #e5e7eb',
-              borderRadius: 10,
-              cursor: 'pointer',
-              outline: 'none',
-              appearance: 'none',
-              backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,
-              backgroundRepeat: 'no-repeat',
-              backgroundPosition: 'right 12px center',
-              minWidth: isMobile ? 'auto' : 160,
-              flex: isMobile ? 1 : 'none',
-              minHeight: isMobile ? 48 : 44,
-            }}
+            aria-label="Sort products"
           >
-            {filterOptions?.sortOptions.map(option => (
+            {filterOptions?.sortOptions.map((option) => (
               <option key={option.value} value={option.value}>
-                {option.label}
+                {sortOptionLabel(option.label, compactSortLabels)}
               </option>
             )) || (
               <>
                 <option value="default">Default</option>
-                <option value="price_asc">Price: Low to High</option>
-                <option value="price_desc">Price: High to Low</option>
-                <option value="rating_desc">Highest Rated</option>
-                <option value="newest">Newest First</option>
+                <option value="price_asc">
+                  {sortOptionLabel('Price: Low to High', compactSortLabels)}
+                </option>
+                <option value="price_desc">
+                  {sortOptionLabel('Price: High to Low', compactSortLabels)}
+                </option>
+                <option value="rating_desc">
+                  {sortOptionLabel('Highest Rated', compactSortLabels)}
+                </option>
+                <option value="newest">
+                  {sortOptionLabel('Newest First', compactSortLabels)}
+                </option>
               </>
             )}
           </select>
@@ -190,68 +174,6 @@ const ProductFilters: React.FC<ProductFiltersProps> = ({
                 gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(200px, 1fr))',
                 gap: isMobile ? 20 : 32,
               }}>
-                {/* Category Filter */}
-                <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: '#374151',
-                    marginBottom: 10,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px',
-                  }}>
-                    Category
-                  </label>
-                  <div style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: isMobile ? 10 : 8,
-                  }}>
-                    <button
-                      onClick={() => onFilterChange('category', undefined)}
-                      style={{
-                        padding: isMobile ? '10px 16px' : '8px 14px',
-                        minHeight: isMobile ? 44 : 36,
-                        fontSize: isMobile ? 14 : 13,
-                        fontWeight: 500,
-                        border: 'none',
-                        borderRadius: 20,
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease',
-                        background: !filters.category 
-                          ? 'linear-gradient(135deg, #361906 0%, #9c6649 100%)' 
-                          : '#f3f4f6',
-                        color: !filters.category ? 'white' : '#6b7280',
-                      }}
-                    >
-                      All
-                    </button>
-                    {filterOptions?.categories.map(category => (
-                      <button
-                        key={category}
-                        onClick={() => onFilterChange('category', category)}
-                        style={{
-                          padding: isMobile ? '10px 16px' : '8px 14px',
-                          minHeight: isMobile ? 44 : 36,
-                          fontSize: isMobile ? 14 : 13,
-                          fontWeight: 500,
-                          border: 'none',
-                          borderRadius: 20,
-                          cursor: 'pointer',
-                          transition: 'all 0.2s ease',
-                          background: filters.category === category 
-                            ? 'linear-gradient(135deg, #361906 0%, #9c6649 100%)' 
-                            : '#f3f4f6',
-                          color: filters.category === category ? 'white' : '#6b7280',
-                        }}
-                      >
-                        {category}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
                 {/* Size Filter */}
                 {filterOptions?.sizes && filterOptions.sizes.length > 0 && (
                   <div>

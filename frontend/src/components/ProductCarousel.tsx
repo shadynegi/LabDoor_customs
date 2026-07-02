@@ -28,14 +28,7 @@ const ProductCarousel: React.FC<ProductCarouselProps> = ({ products }) => {
   const cardHeight = isMobile ? 140 : 180;
 
   return (
-    <div style={{
-      width: '100%',
-      overflow: 'hidden',
-      position: 'relative',
-      padding: isMobile ? '24px 0' : '40px 0',
-      background: 'rgba(0,0,0,0.3)',
-      backdropFilter: 'blur(10px)',
-    }}>
+    <div className="home-product-carousel">
       {/* View All Products Button */}
       <div style={{
         position: 'absolute',

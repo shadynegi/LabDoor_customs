@@ -27,7 +27,7 @@ import { getRequestPath, getRequestTimeoutMs } from './lib/requestTiming';
 import { mountRateLimits } from './middleware/rateLimits';
 import { startMaintenanceJobs } from './lib/maintenanceJobs';
 import { ensureActivityLogsTable } from './lib/activitySchema';
-import { ensureProductVideo360Column, ensureAdminEnhancementSchema } from './lib/productSchema';
+import { ensureProductVideo360Column, ensureAdminEnhancementSchema, ensureProductPublicIdColumn } from './lib/productSchema';
 import { registerGracefulShutdown } from './lib/gracefulShutdown';
 import { ensureIdempotencyTable } from './lib/paymentIdempotency';
 import { warmCaches } from './lib/cacheWarm';
@@ -626,6 +626,7 @@ async function bootstrap(): Promise<void> {
   await runBootstrapTask('payment_idempotency', ensureIdempotencyTable);
   await runBootstrapTask('activity_logs', ensureActivityLogsTable);
   await runBootstrapTask('product_video_360', ensureProductVideo360Column);
+  await runBootstrapTask('product_public_id', ensureProductPublicIdColumn);
   await runBootstrapTask('admin_enhancements', ensureAdminEnhancementSchema);
   await runBootstrapTask('order_line_items_backfill', async () => {
     const { backfillOrderLineItems } = await import('./lib/orderLineItems');

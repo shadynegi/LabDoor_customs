@@ -1,17 +1,18 @@
-// ProductsPage - Main listing page with infinite scroll pagination, search, and filters
+// ProductsPage - Main listing page with infinite scroll pagination and filters
 import { useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePaginatedProducts } from '../hooks/usePaginatedProducts';
 import { useProductSearch } from '../hooks/useProductSearch';
-import ProductSearchBar from '../components/ProductSearchBar';
 import StarRating from '../components/StarRating';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
 import ProductFilters from '../components/ProductFilters';
 import { ProductGridSkeleton, SkeletonStyles } from '../components/Skeletons';
 import { buildResponsiveProductImg, PRODUCT_IMAGE_SIZES } from '../lib/responsiveImage';
+import { resolveProductBackgroundForViewport } from '../lib/productImageMaps';
 import MetaTags from '../components/MetaTags';
+import { getProductDetailPath } from '../lib/productPaths';
 import { useResponsive } from '../hooks/useResponsive';
 
 const ProductsPage = () => {
@@ -22,11 +23,9 @@ const ProductsPage = () => {
     searchQuery, 
     setSearchQuery, 
     results: searchResults,
-    suggestions,
     loading: searchLoading, 
     isSearching,
     isFiltering,
-    clearSearch,
     clearAll,
     filters,
     updateFilter,
@@ -112,20 +111,6 @@ const ProductsPage = () => {
           }} />
         </div>
         
-        {/* Search Bar Skeleton */}
-        <div style={{
-          maxWidth: 600,
-          margin: '0 auto 32px',
-          padding: '0 20px',
-        }}>
-          <div style={{
-            height: 52,
-            background: 'white',
-            borderRadius: 12,
-            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
-          }} />
-        </div>
-        
         {/* Products Grid Skeleton */}
         <div style={{ maxWidth: 1400, margin: '0 auto' }}>
           <ProductGridSkeleton count={isMobile ? 4 : 8} isMobile={isMobile} />
@@ -203,51 +188,14 @@ const ProductsPage = () => {
         </motion.p>
       </div>
 
-      {/* Search Bar */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-        style={{
-          maxWidth: 600,
-          margin: '0 auto 32px',
-          padding: '0 20px',
-        }}
-      >
-        <ProductSearchBar
-          variant="light"
-          isMobile={isMobile}
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          suggestions={suggestions}
-          loading={searchLoading}
-          clearSearch={clearSearch}
-          onSubmitSearch={(q) => navigate(`/products?q=${encodeURIComponent(q)}`, { replace: true })}
-          onCatalogNeeded={() => { void ensureCatalogLoaded(); }}
-        />
-
-        {searchError && (
+      {searchError && (
+        <div style={{ maxWidth: 600, margin: '0 auto 24px', padding: '0 20px' }}>
           <ErrorMessage
             message={searchError}
             onRetry={() => { void ensureCatalogLoaded(); }}
           />
-        )}
-
-        {isSearching && !searchLoading && !isFiltering && (
-          <p
-            style={{
-              marginTop: 12,
-              fontSize: 14,
-              color: '#6b7280',
-              textAlign: 'center',
-            }}
-          >
-            {searchResults.length === 0
-              ? `No products found for "${searchQuery}"`
-              : `Found ${searchResults.length} product${searchResults.length !== 1 ? 's' : ''} for "${searchQuery}"`}
-          </p>
-        )}
-      </motion.div>
+        </div>
+      )}
 
       {/* Advanced Filters */}
       <ProductFilters
@@ -331,13 +279,18 @@ const ProductsPage = () => {
         margin: '0 auto',
       }}>
         <div className="responsive-product-grid" style={{ marginBottom: 40 }}>
-          {displayProducts.map((product, index) => (
+          {displayProducts.map((product, index) => {
+            const cardBackgroundUrl = product.background
+              ? resolveProductBackgroundForViewport(product.background, isMobile ? 1280 : 1920)
+              : undefined;
+
+            return (
             <motion.div
               key={product.id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05 }}
-              onClick={() => navigate(`/product/${product.id}`)}
+              onClick={() => navigate(getProductDetailPath(product))}
               style={{
                 background: 'white',
                 borderRadius: 16,
@@ -354,9 +307,20 @@ const ProductsPage = () => {
               {/* Product Image */}
               <div style={{
                 position: 'relative',
-                paddingTop: '100%',
+                aspectRatio: '1',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: isMobile ? 10 : 14,
                 overflow: 'hidden',
-                background: 'linear-gradient(135deg, #361906 0%, #9c6649 100%)',
+                background: cardBackgroundUrl
+                  ? undefined
+                  : 'linear-gradient(135deg, #361906 0%, #9c6649 100%)',
+                backgroundImage: cardBackgroundUrl
+                  ? `linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url(${cardBackgroundUrl})`
+                  : undefined,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
               }}>
                 {(product.is_out_of_stock || product.stock === 0) && (
                   <span
@@ -384,16 +348,16 @@ const ProductsPage = () => {
                     height: 480,
                   })}
                   style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover',
+                    maxWidth: '100%',
+                    maxHeight: '100%',
+                    width: 'auto',
+                    height: 'auto',
+                    objectFit: 'contain',
+                    filter: 'drop-shadow(0 8px 16px rgba(0,0,0,0.35))',
                     transition: 'transform 0.3s ease',
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'scale(1.1)';
+                    e.currentTarget.style.transform = 'scale(1.05)';
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.transform = 'scale(1)';
@@ -429,26 +393,13 @@ const ProductsPage = () => {
                   fontSize: isMobile ? 18 : 22,
                   fontWeight: 800,
                   color: '#9c6649',
-                  marginBottom: 8,
                 }}>
                   ${product.price}
                 </div>
-
-                {/* Description */}
-                {product.description && (
-                  <p style={{
-                    fontSize: isMobile ? 11 : 13,
-                    color: '#6b7280',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}>
-                    {product.description}
-                  </p>
-                )}
               </div>
             </motion.div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Loading more indicator - only show for paginated products, not search/filter */}

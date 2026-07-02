@@ -20,7 +20,7 @@ Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API
 | Area | How it works |
 |------|----------------|
 | **Checkout** | Cart in localStorage; `policy_accepted` required; **Place Order** → WhatsApp redirect (`Order ID` = `orders.id` UUID); after admin mark paid → confirmation email + optional WhatsApp text to customer mobile. |
-| **Orders** | Track on `/orders` with order ID (UUID) + checkout email; email links pre-fill `?orderId=`; legacy access-exchange links return **410**. |
+| **Orders** | Email links pre-fill `?orderId=` on `/orders`; lookup via order ID + checkout email (`POST /api/orders/lookup`); tracked orders in sessionStorage; legacy access-exchange returns **410**; lookup failure message **Order not found**. |
 | **Admin** | Bulk updates max **500** IDs; **Mark paid** with external `payment_id` + admin note; paid orders cannot cancel or refund (no-refund policy); product cards on mobile. |
 | **Activity** | `POST /api/activity/batch` is CSRF-exempt and rate-limited; frontend sends only with analytics cookie consent; IPs anonymized with `IP_SALT`. |
 | **Reviews** | Public responses strip PII (`toPublicReview()`); admin shows email. Eligibility via `POST /api/reviews/check` (email in body). Votes on approved reviews only. |

@@ -3,7 +3,6 @@ export type SortOption = 'default' | 'price_asc' | 'price_desc' | 'rating_desc' 
 export interface SearchFilters {
   minPrice?: number;
   maxPrice?: number;
-  category?: string;
   size?: string;
   color?: string;
   minRating?: number;
@@ -11,7 +10,6 @@ export interface SearchFilters {
 }
 
 export interface FilterOptions {
-  categories: string[];
   sizes: string[];
   colors: string[];
   priceRange: { min: number; max: number };

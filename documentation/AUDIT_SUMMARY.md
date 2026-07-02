@@ -14,7 +14,7 @@ Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API
 | Area | How it works |
 |------|----------------|
 | **Checkout** | Cart validation with retry; `policy_accepted` required (no-refund policy); DB-backed coupon validate; client/server total compare before place-order; WhatsApp redirect; `checkout_complete` before redirect. |
-| **Orders** | `access_token_encrypted` for durable email links; `GET /api/orders/access-exchange/:code`; legacy `?orderNumber=&token=` stripped; uniform **404** on lookup; partial refresh keeps stale data + warning. |
+| **Orders** | Email links pre-fill `?orderId=` on `/orders`; lookup via order ID + checkout email (`POST /api/orders/lookup`); tracked orders in sessionStorage; legacy access-exchange returns **410**; lookup failure message **Order not found**. |
 | **Admin** | Server product search; products paginated (load more); coupons scope on create **and edit**; reviews admin response; estimated delivery; error/retry states; **Settings** tab (activity export, sessions, customer recompute); **no customer refunds** (cancel unpaid pending only). |
 | **Activity** | Consent-gated batch (`inserted`/`skipped` counts); `contact_submit`, `purchase_complete`, `size_select`, `quantity_change` wired. |
 | **Reviews** | `POST /api/reviews/check` on email blur (generic message, no product enumeration); pending-moderation copy; vote error toasts. |
@@ -22,14 +22,14 @@ Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API
 
 Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_ENCRYPTION_KEY`, `IP_SALT`, `ADMIN_PASSWORD_HASH`.
 
-**Automated tests:** 233 (114 backend unit + 73 API + 46 Playwright) — see [`test_guidelines.md`](test_guidelines.md).
+**Automated tests:** 409 (120 backend unit + 74 API + 215 Playwright) — see [`test_guidelines.md`](test_guidelines.md).
 
 ---
 
 ## Authentication
 
 - Admin: bcrypt password hash, HTTP-only session cookie, SHA-256 session hash in `admin_sessions`, 24h TTL
-- Customer orders: 64-char access token (SHA-256 hash + AES-256-GCM `access_token_encrypted` on order row); email links use one-time `order_access_exchanges` codes
+- Customer orders: lookup by order ID (UUID) + checkout email; email links pre-fill `?orderId=` on `/orders`; legacy `GET /api/orders/access-exchange/:code` returns **410**
 
 ## Request protection
 

@@ -32,7 +32,6 @@ export async function searchProductsApi({
 }: ProductSearchRequest): Promise<Product[]> {
   const hasQuery = query.trim().length > 0;
   const hasFilters =
-    filters.category ||
     filters.size ||
     filters.color ||
     filters.minPrice !== undefined ||
@@ -50,7 +49,6 @@ export async function searchProductsApi({
       query: query.trim() || undefined,
       minPrice: filters.minPrice,
       maxPrice: filters.maxPrice,
-      category: filters.category,
       size: filters.size,
       color: filters.color,
       minRating: filters.minRating,

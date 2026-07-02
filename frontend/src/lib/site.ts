@@ -6,6 +6,12 @@ export function getSiteUrl(): string {
 
 export const SITE_NAME = 'Lab Door Customs';
 
+export const SITE_EMAILS = {
+  privacy: 'privacy@labdoorcustoms.com',
+  support: 'support@labdoorcustoms.com',
+  legal: 'legal@labdoorcustoms.com',
+} as const;
+
 export const DEFAULT_META = {
   title: `${SITE_NAME} — Premium Custom Footwear`,
   description:

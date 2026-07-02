@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { computeCheckoutPricingForCart } from '../../backend/src/lib/checkoutPricing';
 import { sqlMock } from '../setup';
+import { DEFAULT_TEST_CART_SIZE } from '../fixtures/products';
 
 describe('computeCheckoutPricingForCart', () => {
   beforeEach(() => {
@@ -20,7 +21,7 @@ describe('computeCheckoutPricingForCart', () => {
     ]);
 
     const result = await computeCheckoutPricingForCart(
-      [{ product_id: 1, quantity: 2 }],
+      [{ product_id: 1, quantity: 2, ...DEFAULT_TEST_CART_SIZE }],
       undefined,
       'buyer@example.com'
     );

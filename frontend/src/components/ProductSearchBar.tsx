@@ -1,5 +1,6 @@
 import { useState, useRef, type KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { getProductDetailPath } from '../lib/productPaths';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Product } from '../hooks/useProducts';
 import { buildResponsiveProductImg, PRODUCT_IMAGE_SIZES } from '../lib/responsiveImage';
@@ -55,7 +56,7 @@ export default function ProductSearchBar({
     if (onSelectProduct) {
       onSelectProduct(product);
     } else {
-      navigate(`/product/${product.id}`);
+      navigate(getProductDetailPath(product));
     }
     setShowSuggestions(false);
     inputRef.current?.blur();

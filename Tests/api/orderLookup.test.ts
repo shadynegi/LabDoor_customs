@@ -41,7 +41,7 @@ describe('POST /api/orders/lookup', () => {
     });
 
     expect(res.status).toBe(404);
-    expect(res.body.error).toBe('Order not found or invalid credentials');
+    expect(res.body.error).toBe('Order not found');
   });
 
   it('returns uniform 404 for wrong email on known order', async () => {
@@ -54,7 +54,7 @@ describe('POST /api/orders/lookup', () => {
     });
 
     expect(res.status).toBe(404);
-    expect(res.body.error).toBe('Order not found or invalid credentials');
+    expect(res.body.error).toBe('Order not found');
   });
 
   it('returns order when orderId and email match', async () => {

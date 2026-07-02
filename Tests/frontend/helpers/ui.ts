@@ -10,7 +10,10 @@ export interface SeedCartItem {
   price: number;
   image: string;
   quantity: number;
+  size?: { system: 'UK' | 'US' | 'EU'; value: string };
 }
+
+const DEFAULT_SEED_CART_SIZE = { system: 'US' as const, value: '10' };
 
 /** Pre-accept cookies so the banner does not block interactions. */
 export async function preAcceptCookies(page: Page): Promise<void> {
@@ -45,11 +48,15 @@ export async function acceptAllCookies(page: Page): Promise<void> {
 }
 
 export async function seedCart(page: Page, items: SeedCartItem[]): Promise<void> {
-  const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const normalized = items.map((item) => ({
+    ...item,
+    size: item.size ?? DEFAULT_SEED_CART_SIZE,
+  }));
+  const total = normalized.reduce((sum, item) => sum + item.price * item.quantity, 0);
   await page.addInitScript(
     ({ storageKey, cartState }) => {
       localStorage.setItem(storageKey, JSON.stringify(cartState));
     },
-    { storageKey: CART_STORAGE_KEY, cartState: { items, total } },
+    { storageKey: CART_STORAGE_KEY, cartState: { items: normalized, total } },
   );
 }

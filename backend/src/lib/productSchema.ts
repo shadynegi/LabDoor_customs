@@ -14,6 +14,34 @@ export async function ensureProductVideo360Column(): Promise<void> {
   logger.info('products.video_360 column ready');
 }
 
+/** Stable UUID for public product URLs (see migration-products-public-id.sql). */
+export async function ensureProductPublicIdColumn(): Promise<void> {
+  if (!(await publicTableExists('products'))) {
+    return;
+  }
+  await sql`
+    ALTER TABLE products
+    ADD COLUMN IF NOT EXISTS public_id UUID
+  `;
+  await sql`
+    UPDATE products
+    SET public_id = uuid_generate_v4()
+    WHERE public_id IS NULL
+  `;
+  await sql`
+    ALTER TABLE products
+    ALTER COLUMN public_id SET NOT NULL
+  `;
+  await sql`
+    ALTER TABLE products
+    ALTER COLUMN public_id SET DEFAULT uuid_generate_v4()
+  `;
+  await sql`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_products_public_id ON products (public_id)
+  `;
+  logger.info('products.public_id column ready');
+}
+
 /** Admin enhancements: SKU, reorder, inventory_movements, order_line_items (see migration-admin-enhancements.sql). */
 export async function ensureAdminEnhancementSchema(): Promise<void> {
   if (!(await publicTableExists('products'))) {

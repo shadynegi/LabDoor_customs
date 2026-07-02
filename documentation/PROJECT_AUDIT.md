@@ -1,4 +1,4 @@
-> **Historical snapshot (2026-06-08).** Current system uses WhatsApp checkout and **207** automated tests — see [`info.md`](info.md) and [`COVERAGE_MATRIX.md`](COVERAGE_MATRIX.md).
+> **Historical snapshot (2026-06-08).** Current system uses WhatsApp checkout and **409** automated tests — see [`info.md`](info.md) and [`COVERAGE_MATRIX.md`](COVERAGE_MATRIX.md).
 
 # Lab Door Customs — Project Audit (2026-06-08)
 
@@ -197,7 +197,7 @@ The platform is **production-viable** for core storefront checkout (WhatsApp pla
 - Review PII stripping (`toPublicReview`), admin moderation UI, check endpoint anti-enumeration (product missing)
 - Storefront routes, cart validation + retry, client/server total compare, legacy order URL deprecation
 - Maintenance jobs with ping-first scheduling and transient-error handling (`dbErrors.ts`)
-- **233** automated tests (113 unit + 75 API + 45 Playwright) — see [`test_guidelines.md`](test_guidelines.md)
+- **409** automated tests (120 unit + 74 API + 215 Playwright) — see [`test_guidelines.md`](test_guidelines.md)
 
 ---
 

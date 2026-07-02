@@ -52,7 +52,6 @@ export const useProductSearch = (debounceMs: number = 300): UseProductSearchResu
     let count = 0;
     if (filters.minPrice !== undefined) count++;
     if (filters.maxPrice !== undefined) count++;
-    if (filters.category) count++;
     if (filters.size) count++;
     if (filters.color) count++;
     if (filters.minRating !== undefined) count++;
@@ -85,7 +84,6 @@ export const useProductSearch = (debounceMs: number = 300): UseProductSearchResu
     } catch (err) {
       logError('Error fetching filter options:', err);
       setFilterOptions({
-        categories: [],
         sizes: [],
         colors: [],
         priceRange: { min: 0, max: 500 },

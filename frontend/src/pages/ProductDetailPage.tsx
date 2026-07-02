@@ -13,11 +13,13 @@ import { resolveProductImage } from '../lib/productImageMaps';
 import { buildResponsiveProductImg, PRODUCT_IMAGE_SIZES } from '../lib/responsiveImage';
 import MetaTags from '../components/MetaTags';
 import ProductJsonLd from '../components/ProductJsonLd';
+import { SHOE_SIZE_OPTIONS } from '../constants/shoeSizes';
 import { logError } from '../lib/logger';
 import { useResponsive } from '../hooks/useResponsive';
 import MobileStickyCta from '../components/MobileStickyCta';
 import { trackProductView, trackSizeSelect } from '../utils/activityTracker';
 import { REPLACEMENT_POLICY_PATH } from '../constants/returnPolicy';
+import { getProductDetailPath } from '../lib/productPaths';
 import { FREE_SHIPPING_MESSAGE } from '../utils/pricing';
 
 const Product360Viewer = lazy(() =>
@@ -42,11 +44,7 @@ const ProductDetailPage: React.FC = () => {
   const [sizeError, setSizeError] = useState<string | null>(null);
   const [show360View, setShow360View] = useState(false);
 
-  const sizeOptions = {
-    UK: ["5", "5.5", "6", "6.5", "7", "7.5", "8", "8.5", "9", "9.5", "10", "10.5", "11", "11.5", "12"],
-    US: ["6", "6.5", "7", "7.5", "8", "8.5", "9", "9.5", "10", "10.5", "11", "11.5", "12", "12.5", "13"],
-    EU: ["38", "39", "40", "41", "42", "43", "44", "45", "46", "47", "48"],
-  };
+  const sizeOptions = SHOE_SIZE_OPTIONS;
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -71,6 +69,11 @@ const ProductDetailPage: React.FC = () => {
           };
           setProduct(productData);
           trackProductView(productData.id, productData.name);
+
+          const canonicalPath = getProductDetailPath(productData);
+          if (id && canonicalPath !== `/product/${id}`) {
+            navigate(canonicalPath, { replace: true });
+          }
         } else {
           throw new Error('Product not found');
         }
@@ -86,9 +89,11 @@ const ProductDetailPage: React.FC = () => {
     if (id) {
       fetchProduct();
     }
-  }, [id]);
+  }, [id, navigate]);
 
   const isOutOfStock = Boolean(product?.is_out_of_stock || product?.stock === 0);
+  const sizeSelected = Boolean(selectedSize);
+  const addToCartDisabled = isOutOfStock || !sizeSelected || addedToCart;
 
   const handleAddToCart = () => {
     if (!selectedSize) {
@@ -167,12 +172,13 @@ const ProductDetailPage: React.FC = () => {
           product.description ||
           `Shop ${product.name} — premium custom footwear from Lab Door Customs.`
         }
-        path={`/product/${product.id}`}
+        path={getProductDetailPath(product)}
         image={productImage}
         type="product"
       />
       <ProductJsonLd
         id={product.id}
+        publicId={product.public_id}
         name={product.name}
         description={product.description}
         image={productImage}
@@ -530,37 +536,44 @@ const ProductDetailPage: React.FC = () => {
             {/* Add to Cart — hidden on mobile when sticky CTA is shown */}
             {(!isMobile || isOutOfStock) && (
             <motion.button
-              onClick={isOutOfStock ? undefined : handleAddToCart}
-              disabled={isOutOfStock || addedToCart}
-              whileHover={isOutOfStock ? undefined : { scale: 1.02 }}
-              whileTap={isOutOfStock ? undefined : { scale: 0.98 }}
+              onClick={isOutOfStock || !sizeSelected ? undefined : handleAddToCart}
+              disabled={addToCartDisabled}
+              whileHover={addToCartDisabled ? undefined : { scale: 1.02 }}
+              whileTap={addToCartDisabled ? undefined : { scale: 0.98 }}
               style={{
                 width: '100%',
                 padding: isMobile ? '16px' : '20px',
                 background: isOutOfStock
                   ? '#fee2e2'
+                  : !sizeSelected
+                  ? '#e5e7eb'
                   : addedToCart
                   ? "linear-gradient(90deg, #10b981, #059669)"
                   : "linear-gradient(135deg, #361906 0%, #9c6649 100%)",
-                color: isOutOfStock ? '#dc2626' : 'white',
+                color: isOutOfStock ? '#dc2626' : !sizeSelected ? '#9ca3af' : 'white',
                 border: isOutOfStock ? '2px solid #fca5a5' : 'none',
                 borderRadius: 12,
                 fontSize: isMobile ? 16 : 18,
                 fontWeight: 700,
-                cursor: isOutOfStock ? 'not-allowed' : 'pointer',
+                cursor: addToCartDisabled ? 'not-allowed' : 'pointer',
                 opacity: isOutOfStock ? 0.9 : 1,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: 12,
                 marginBottom: 32,
-                boxShadow: isOutOfStock ? 'none' : '0 4px 12px rgba(102,126,234,0.4)',
+                boxShadow: addToCartDisabled ? 'none' : '0 4px 12px rgba(102,126,234,0.4)',
               }}
             >
               {isOutOfStock ? (
                 <>
                   <AlertTriangle size={20} />
                   Out of Stock
+                </>
+              ) : !sizeSelected ? (
+                <>
+                  <ShoppingCart size={20} />
+                  Select a Size
                 </>
               ) : addedToCart ? (
                 <>
@@ -619,9 +632,10 @@ const ProductDetailPage: React.FC = () => {
       {isMobile && !isOutOfStock && (
         <MobileStickyCta
           amount={`$${Number(product.price).toFixed(2)}`}
-          label={addedToCart ? 'Added to Cart' : 'Add to Cart'}
+          label={addedToCart ? 'Added to Cart' : sizeSelected ? 'Add to Cart' : 'Select a Size'}
           onClick={handleAddToCart}
-          disabled={addedToCart}
+          disabled={!sizeSelected || addedToCart}
+          hint={!sizeSelected ? 'Choose your size above to add this item' : undefined}
           ariaLabel="Product purchase actions"
         />
       )}

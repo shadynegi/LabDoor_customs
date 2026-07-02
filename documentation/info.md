@@ -101,16 +101,16 @@
 
 | Route | Purpose |
 |-------|---------|
-| `/` | Home — hero carousel, product search bar, featured products |
+| `/` | Home — hero carousel, featured products |
 | `/products` | Catalog — filters, server search (`POST /api/products/search`), pagination; supports `?q=` deep links |
-| `/product/:id` | Product detail — 360° viewer (real multi-angle or static placeholder), reviews, JSON-LD, meta tags; trust badges aligned with store policy (free shipping over $200, secure payment, **all sales final** with link to replacement policy) |
+| `/product/:id` | Product detail — `:id` = product `public_id` UUID (legacy numeric `products.id` still resolves); size selection required before **Add to Cart**; 360° viewer, reviews, JSON-LD, meta tags |
 | `/cart` | Shopping cart (localStorage via `CartContext`) |
 | `/checkout` | Customer/shipping form, coupon validation, no-refund policy checkbox, **Place Order** → WhatsApp redirect |
 | `/payment/success` | Optional confirmation page after WhatsApp redirect (order stored in sessionStorage) |
 | `/payment/cancel` | Abandoned checkout cleanup |
 | `/orders` | Customer order lookup — order ID + checkout email (`POST /api/orders/lookup`); email links pre-fill `?orderId=` |
 | `/contact` | Contact form with CSRF-protected POST |
-| `/about`, `/help` | Static content |
+| `/about`, `/help` | Static content — About covers custom footwear + WhatsApp checkout; Help summarizes shipping ($25 / free over $200), privacy (`privacy@labdoorcustoms.com`), and store policies |
 | `/privacy-policy`, `/terms-of-service`, `/returns-policy`, `/replacement-policy`, `/shipping-policy` | Legal pages (no-refund / manufacturing-defect replacement policy) |
 | `/admin` | Redirect — `/admin/login` if unauthenticated, `/adminshivamdashboard` if session valid |
 | `/admin/login` | Admin authentication |
@@ -119,12 +119,13 @@
 ### Search and catalog
 
 - **Server:** paginated product list, filters, single-product fetch, sitemap URL export — cached in Redis when available.
-- **Client:** Search and filters call `POST /api/products/search` (debounced, **10 results** per request); suggestions on Home use the same endpoint with `limit=10`. No full-catalog client download.
+- **Client:** Filters on `/products` (size, color, price, rating, sort) call `POST /api/products/search`. Optional `?q=` on `/products` still applies a text search without a visible search bar. No full-catalog client download.
 
 ### Cart and pricing display
 
 - Cart state persists in browser localStorage (synced across tabs via `BroadcastChannel`).
-- On every cart change, `POST /api/products/validate-cart` re-validates each line against the database (product exists, current price, stock) and refreshes displayed prices via `REFRESH_PRICES`.
+- On every cart change, `POST /api/products/validate-cart` re-validates each line against the database (product exists, current price, stock, **required size** `size_system` + `size_value`) and refreshes displayed prices via `REFRESH_PRICES`.
+- Product detail **Add to Cart** stays disabled until the shopper picks a size (UK/US/EU system + whole-number value — no half sizes); the same rule is enforced in `CartContext.addToCart` and on the server at validate-cart/checkout.
 - Cart page shows validation errors and a **Retry validation** button when network validation fails.
 - Server recalculates all totals at checkout; client totals are validated against server pricing before place-order.
 - Checkout syncs customer email to activity batches on field change/blur (when analytics consent is granted), not only on initial page load.
@@ -244,7 +245,7 @@ Statuses: `processing`, `completed`, `failed`. Stuck `processing` rows are reape
 - Customers track orders on `/orders` with **order ID** (`orders.id` UUID) and **checkout email** — no access tokens are issued or emailed.
 - Confirmation and shipping emails link to `/orders?orderId={uuid}` (order ID pre-filled; customer enters email on the page).
 - Customer lookup: `POST /api/orders/lookup` with `{ orderId, email }` in the JSON body (CSRF-protected).
-- Wrong order ID, wrong email, or invalid UUID all return **404** `{ "error": "Order not found or invalid credentials" }` (anti-enumeration).
+- Wrong order ID, wrong email, or invalid UUID all return **404** `{ "error": "Order not found" }` (anti-enumeration).
 - Tracked orders in `sessionStorage` (order ID + email) auto-refresh; partial refresh failures keep last-known order data and show a non-blocking warning.
 - `GET /api/orders/:id` and `GET /api/orders/number/:orderNumber` are **admin-only**.
 - `GET /api/orders/access-exchange/:code` returns **410 Gone** (legacy one-time links removed).
@@ -677,10 +678,10 @@ Any unmatched `/api/*` path returns **404** JSON `{ error: "Route not found" }`.
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | GET | `/api/products` | Public | List products (pagination, filters) |
-| GET | `/api/products/filters` | Public | Available filter facets |
+| GET | `/api/products/filters` | Public | Available filter facets (size, price range, rating, sort — no category) |
 | GET | `/api/products/sitemap-urls` | Public | Product IDs/paths for sitemap generation |
 | GET | `/api/products/category/:category` | Public | Products by category slug |
-| GET | `/api/products/:id` | Public | Single product by ID |
+| GET | `/api/products/:id` | Public | Single product by `public_id` UUID or legacy numeric `id` |
 | POST | `/api/products/search` | Public + CSRF | Product search and filters |
 | POST | `/api/products/validate-cart` | Public + CSRF | Validate cart lines (price, stock, existence) |
 | POST | `/api/products` | Admin + CSRF | Create product |
@@ -791,7 +792,7 @@ Any unmatched `/api/*` path returns **404** JSON `{ error: "Route not found" }`.
 |-----|----------------|-------|
 | `/` | `Home` | Landing page, carousel, featured products |
 | `/products` | `ProductsPage` | Catalog; optional query `?q=` for search |
-| `/product/:id` | `ProductDetailPage` | `:id` = numeric product ID; also in sitemap |
+| `/product/:id` | `ProductDetailPage` | `:id` = `products.public_id` UUID (numeric id supported for legacy links); sitemap uses `public_id` |
 | `/about` | `AboutUs` | About page |
 | `/contact` | `ContactUs` | Contact form |
 | `/help` | `HelpCenter` | Help / FAQ |
@@ -1006,9 +1007,9 @@ npm run links:check
 | Suite | Tool | Coverage |
 |-------|------|----------|
 | Backend unit/API | Vitest | **place-order** checkout (validation + WhatsApp integration happy path), WhatsApp message formatting, admin mark-paid, **admin analytics** (401, IST custom range, CSV export), **validate-cart** (empty/invalid/OOS), **products search** edge cases, **stability/concurrency smoke**, coupon scope, `computeCheckoutPricingForCart`, payment idempotency, order tokens, process error handlers, RLS table list + grant revoke, email portal URL, activity batch/log, order lookup, reviews check, **IST date helpers**, **build performance budgets**, sales analytics invalid-date fallback |
-| Frontend E2E / UI | Playwright | Storefront smoke + deep flows (search, policy gate, coupon, cart qty, order confirmation), **WhatsApp place-order UI**, checkout/contact/admin UI, mobile viewport |
+| Frontend E2E / UI | Playwright | Storefront smoke + deep flows, **responsive pages matrix** (10 phone viewports × all routes), checkout/contact/admin UI, mobile viewport |
 
-**Total automated tests:** 233 (114 backend unit + 73 API + 46 Playwright UI).
+**Total automated tests:** 409 (120 backend unit + 74 API + 215 Playwright UI).
 
 | Link check | Custom script | Documentation internal links |
 

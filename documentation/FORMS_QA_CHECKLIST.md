@@ -14,7 +14,7 @@ Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API
 | Area | How it works |
 |------|----------------|
 | **Checkout** | Cart validation with retry; `policy_accepted` required; **Place Order** → `POST /api/checkout/place-order` → WhatsApp redirect (`Order ID` in message = `orders.id` UUID); checkout email synced to activity on change/blur. |
-| **Orders** | Email links `GET /api/orders/access-exchange/:code`; legacy `?orderNumber=&token=` stripped; partial refresh keeps stale data + warning. 
+| **Orders** | Email links pre-fill `?orderId=` on `/orders`; lookup via order ID + checkout email (`POST /api/orders/lookup`); tracked orders in sessionStorage; legacy access-exchange returns **410**; lookup failure message **Order not found**. |
 | **Admin** | Dashboard search includes order id UUID, order number, email, name; **Mark paid** with external `payment_id` + admin note; **Settings** tab (activity export, sessions, customer recompute); coupons scope UI; reviews admin response; estimated delivery; error/retry states. |
 | **Activity** | Consent-gated batch; `contact_submit` on contact success; IPs anonymized with `IP_SALT`. |
 | **Reviews** | `POST /api/reviews/check` on email blur; pending-moderation copy; vote error toasts. |
@@ -64,6 +64,7 @@ On CSRF 403, `apiFetch` refreshes the token and retries once.
 - [ ] No-refund / replacement-only policy checkbox required; **Place Order** disabled until accepted
 - [ ] WhatsApp redirect occurs on valid submission (or mocked redirect in E2E)
 - [ ] Checkout email updates activity batch identity on change/blur (with consent)
+- [ ] Product detail **Add to Cart** disabled until whole-number size selected (UK/US/EU — no half sizes)
 - [ ] Cart validation failure shows **Retry validation** on cart and checkout pages (desktop + mobile sticky hint)
 - [ ] Server rejects tampered totals (amount mismatch)
 - [ ] Optional `/payment/success` shows order confirmation when returning from WhatsApp

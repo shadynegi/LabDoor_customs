@@ -380,6 +380,13 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // Helper functions
   const addToCart = (item: Omit<CartItem, 'quantity'>) => {
+    if (!item.size?.system?.trim() || !item.size?.value?.trim()) {
+      toast.error('Size required', {
+        description: 'Please select a size before adding this item to your cart.',
+        duration: 5000,
+      });
+      return;
+    }
     userActionRef.current = true;
     const itemWithNumberPrice = {
       ...item,

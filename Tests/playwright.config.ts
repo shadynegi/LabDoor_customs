@@ -28,6 +28,7 @@ export default defineConfig({
       testIgnore: [
         /mobile-ui\.spec\.ts/,
         /responsive-ui\.spec\.ts/,
+        /responsive-pages-ui\.spec\.ts/,
         /checkout-total-mismatch-ui\.spec\.ts/,
         /checkout-create-payment-ui\.spec\.ts/,
       ],
@@ -43,7 +44,7 @@ export default defineConfig({
     },
     {
       name: 'mobile-chrome',
-      testMatch: /mobile-ui\.spec\.ts|responsive-ui\.spec\.ts/,
+      testMatch: /mobile-ui\.spec\.ts|responsive-ui\.spec\.ts|responsive-pages-ui\.spec\.ts/,
       use: { ...devices['Pixel 5'] },
     },
   ],

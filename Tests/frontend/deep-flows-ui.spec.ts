@@ -5,7 +5,7 @@ import { PRIMARY_MOCK_PRODUCT, TEST_PRODUCT_IDS } from './fixtures/mock-data';
 test.describe('Deep storefront flows', () => {
   test('products?q= filters catalog to matching items', async ({ page }) => {
     await page.goto('/products?q=nike');
-    await expect(page.getByText(/Found 1 product for "nike"/i)).toBeVisible({
+    await expect(page.getByText(/Showing 1 product for "nike"/i)).toBeVisible({
       timeout: 15_000,
     });
     await expect(page.getByText('Nike Drops - Blue')).toBeVisible();

@@ -36,7 +36,7 @@ function parseOrderRow(order: Record<string, unknown>) {
 function orderLookupDenied(res: Response) {
   return res.status(404).json({
     success: false,
-    error: 'Order not found or invalid credentials',
+    error: 'Order not found',
   });
 }
 

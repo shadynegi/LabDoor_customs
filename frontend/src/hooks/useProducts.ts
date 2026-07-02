@@ -6,6 +6,7 @@ import { logError } from '../lib/logger';
 
 export interface Product {
   id: number;
+  public_id?: string;
   name: string;
   price: number;
   image: string;

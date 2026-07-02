@@ -1,7 +1,10 @@
 import { motion } from "framer-motion";
-import { Heart, Award, Truck, Shield, Users, MapPin } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Heart, Award, Truck, Shield, Package, MapPin } from "lucide-react";
 import MetaTags from "../components/MetaTags";
 import { useResponsive } from "../hooks/useResponsive";
+import { FREE_SHIPPING_MESSAGE, SHIPPING_COST } from "../utils/pricing";
+import { REPLACEMENT_SUPPORT_EMAIL } from "../constants/returnPolicy";
 
 export default function AboutUs() {
   const { isMobile } = useResponsive();
@@ -15,7 +18,7 @@ export default function AboutUs() {
     >
       <MetaTags
         title="About Us — Lab Door Customs"
-        description="Learn about Lab Door Customs — our story, craftsmanship, and commitment to premium custom footwear."
+        description="Learn about Lab Door Customs — custom footwear, craftsmanship, and how we fulfill orders from browse to delivery."
         path="/about"
       />
       {/* Hero Section */}
@@ -53,8 +56,8 @@ export default function AboutUs() {
             opacity: 0.95,
           }}
         >
-          Where style meets comfort. We bring you the finest collection of shoes
-          from around the world, crafted with passion and delivered with care.
+          Premium custom footwear — browse online, checkout securely, complete payment via WhatsApp,
+          and track your order from our workshop to your door.
         </motion.p>
       </motion.div>
 
@@ -97,7 +100,11 @@ export default function AboutUs() {
               marginBottom: 20,
             }}
           >
-            Lab Door Customs was founded and designed by Shivam Negi, a passionate sneaker enthusiast with a sharp eye for detail and originality. Built from a love for beautifully crafted custom footwear, the store celebrates unique design, premium comfort, and bold style. Every pair is curated to help you stand out — whether you're chasing everyday elegance or street-ready edge. At Lab Door Customs, sneakers aren't just shoes; they're a statement of identity
+            Lab Door Customs was founded and designed by Shivam Negi, a passionate sneaker enthusiast
+            with a sharp eye for detail and originality. Built from a love for beautifully crafted
+            custom footwear, the store celebrates unique design, premium comfort, and bold style.
+            Every pair is made to help you stand out — whether you are chasing everyday elegance or
+            street-ready edge.
           </p>
           <p
             style={{
@@ -106,10 +113,13 @@ export default function AboutUs() {
               lineHeight: 1.8,
             }}
           >
-            Our carefully curated collection features premium brands and exclusive
-            designs that combine contemporary fashion with timeless elegance. Every
-            shoe in our store is selected with meticulous attention to quality,
-            comfort, and style.
+            Shop our catalog online, select your size, and place your order through checkout. After
+            payment is confirmed, we prepare your custom order and keep you updated by email. Track
+            any order on{" "}
+            <Link to="/orders" style={{ color: "#9c6649", fontWeight: 600 }}>
+              My Orders
+            </Link>{" "}
+            with your order ID and checkout email.
           </p>
         </motion.div>
 
@@ -125,44 +135,42 @@ export default function AboutUs() {
           {[
             {
               icon: Award,
-              title: "Premium Quality",
+              title: "Custom Craftsmanship",
               description:
-                "Only the finest materials and craftsmanship make it to our collection.",
+                "Each design reflects attention to materials, fit, and finish — built for people who care about the details.",
               delay: 0.4,
             },
             {
               icon: Heart,
-              title: "Customer First",
-              description:
-                "Your satisfaction is our top priority. We're here to help every step of the way.",
+              title: "Customer Support",
+              description: `Questions about orders or manufacturing-defect replacements? Reach us at ${REPLACEMENT_SUPPORT_EMAIL}.`,
               delay: 0.5,
             },
             {
               icon: Truck,
-              title: "Fast Delivery",
-              description:
-                "Free shipping on orders over $1000. Quick and reliable delivery worldwide.",
+              title: "Straightforward Shipping",
+              description: `$${SHIPPING_COST} standard shipping on all orders. ${FREE_SHIPPING_MESSAGE}.`,
               delay: 0.6,
             },
             {
               icon: Shield,
-              title: "Secure Shopping",
+              title: "Secure Checkout",
               description:
-                "Shop with confidence. Your data is protected with industry-leading security.",
+                "Server-validated pricing, CSRF-protected forms, and payment completed via WhatsApp — card details are not stored on our site.",
               delay: 0.7,
             },
             {
-              icon: Users,
-              title: "Expert Team",
+              icon: Package,
+              title: "Order Tracking",
               description:
-                "Our passionate team of shoe enthusiasts is always ready to assist you.",
+                "Look up status, items, and carrier tracking on My Orders after your order ships.",
               delay: 0.8,
             },
             {
               icon: MapPin,
-              title: "Global Reach",
+              title: "Clear Store Policies",
               description:
-                "Delivering style to doorsteps across the world with care and precision.",
+                "All sales are final. Manufacturing-defect replacements within 30 days of delivery — see our Returns and Replacement policies.",
               delay: 0.9,
             },
           ].map((value, index) => (
@@ -254,10 +262,10 @@ export default function AboutUs() {
               opacity: 0.95,
             }}
           >
-            Explore our exclusive collection and find your perfect pair today.
+            Browse the catalog, pick your size, and checkout when you are ready.
           </p>
-          <a
-            href="/"
+          <Link
+            to="/products"
             style={{
               display: "inline-block",
               padding: isMobile ? "14px 32px" : "16px 40px",
@@ -279,11 +287,10 @@ export default function AboutUs() {
               e.currentTarget.style.boxShadow = "0 4px 6px -1px rgba(0,0,0,0.1)";
             }}
           >
-            Shop Now
-          </a>
+            Shop Products
+          </Link>
         </motion.div>
       </div>
     </div>
   );
 }
-

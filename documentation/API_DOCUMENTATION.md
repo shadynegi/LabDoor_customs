@@ -71,12 +71,12 @@ The storefront redirects the browser to `whatsappUrl`. The pre-filled WhatsApp t
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | GET | `/` | Public | Paginated list (cached) — `?page=&limit=` |
-| GET | `/filters` | Public | Available filter values |
+| GET | `/filters` | Public | Available filter facets (size, price range, rating range, sort options) |
 | GET | `/sitemap-urls` | Public | Product paths for sitemap |
 | GET | `/category/:category` | Public | Products by category name |
 | GET | `/:id` | Public | Single product (cached) |
 | POST | `/search` | Public | Search products |
-| POST | `/validate-cart` | Public + CSRF | Validate cart lines — `{ items: [{ product_id, quantity, size_system?, size_value? }] }`; returns refreshed prices and stock errors |
+| POST | `/validate-cart` | Public + CSRF | Validate cart lines — `{ items: [{ product_id, quantity, size_system, size_value }] }` (size required per line: UK/US/EU + whole-number value from the allowed size list — no half sizes); returns refreshed prices and stock/size errors |
 | POST | `/` | Admin | Create product (image/background URL or Multer-uploaded path; optional `video_360`; optional `sku`, `reorder_point`, `cost_price`) |
 | PUT | `/:id` | Admin | Update product (stock changes logged to `inventory_movements`) |
 | DELETE | `/:id` | Admin | Delete product |
@@ -113,7 +113,7 @@ The storefront redirects the browser to `whatsappUrl`. The pre-filled WhatsApp t
 }
 ```
 
-Wrong order ID, wrong email, or invalid UUID all return **404** `{ "error": "Order not found or invalid credentials" }` (anti-enumeration).
+Wrong order ID, wrong email, or invalid UUID all return **404** `{ "error": "Order not found" }` (anti-enumeration).
 
 ### Payment status body (manual mark paid)
 
