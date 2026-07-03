@@ -46,5 +46,5 @@ export const STOREFRONT_STATIC_PAGES: StorefrontPageSpec[] = [
   { path: '/orders', heading: 'Track Your Orders' },
   { path: '/admin/login', heading: 'Admin Portal' },
   { path: '/payment/success', heading: 'Order received' },
-  { path: '/payment/cancel', heading: 'Payment Cancelled' },
+  { path: '/payment/cancel', heading: 'Checkout Cancelled' },
 ];

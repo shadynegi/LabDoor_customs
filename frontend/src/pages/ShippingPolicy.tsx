@@ -1,14 +1,20 @@
 // src/pages/ShippingPolicy.tsx
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useResponsive } from '../hooks/useResponsive';
 import { ArrowLeft, Truck, Clock, Globe, Package, MapPin, AlertCircle } from 'lucide-react';
+import {
+  FREE_SHIPPING_MESSAGE,
+  FREE_SHIPPING_THRESHOLD,
+  SHIPPING_COST,
+} from '../utils/pricing';
+import { SITE_EMAILS } from '../lib/site';
 
 export default function ShippingPolicy() {
   const navigate = useNavigate();
   const { isMobile } = useResponsive();
 
-  const Section = ({ icon: Icon, title, children }: { icon: any; title: string; children: React.ReactNode }) => (
+  const Section = ({ icon: Icon, title, children }: { icon: React.ElementType; title: string; children: React.ReactNode }) => (
     <div style={{ marginBottom: 32 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
         <div style={{
@@ -30,30 +36,6 @@ export default function ShippingPolicy() {
     </div>
   );
 
-  const ShippingOption = ({ name, time, price }: { name: string; time: string; price: string }) => (
-    <div style={{
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      padding: '16px 20px',
-      background: '#f9fafb',
-      borderRadius: 12,
-      marginBottom: 12,
-    }}>
-      <div>
-        <div style={{ fontWeight: 600, color: '#1f2937', marginBottom: 4 }}>{name}</div>
-        <div style={{ fontSize: 14, color: '#6b7280' }}>{time}</div>
-      </div>
-      <div style={{
-        fontWeight: 700,
-        color: price === 'FREE' ? '#10b981' : '#1f2937',
-        fontSize: 16,
-      }}>
-        {price}
-      </div>
-    </div>
-  );
-
   return (
     <div style={{
       minHeight: '100vh',
@@ -61,7 +43,6 @@ export default function ShippingPolicy() {
       padding: isMobile ? '20px' : '40px',
     }}>
       <div style={{ maxWidth: 900, margin: '0 auto' }}>
-        {/* Back Button */}
         <button
           onClick={() => navigate(-1)}
           style={{
@@ -84,7 +65,6 @@ export default function ShippingPolicy() {
           Back
         </button>
 
-        {/* Header */}
         <div style={{
           background: 'linear-gradient(135deg, #361906 0%, #9c6649 100%)',
           borderRadius: 20,
@@ -97,81 +77,79 @@ export default function ShippingPolicy() {
           <h1 style={{ fontSize: isMobile ? 32 : 42, fontWeight: 800, marginBottom: 12 }}>
             Shipping Policy
           </h1>
-          <p style={{ opacity: 0.9, fontSize: 16 }}>
-            Free Shipping on Orders Over $100
+          <p style={{ opacity: 0.9, fontSize: 16 }} data-testid="shipping-policy-tagline">
+            {FREE_SHIPPING_MESSAGE}
           </p>
         </div>
 
-        {/* Content */}
         <div style={{
           background: 'white',
           borderRadius: 20,
           padding: isMobile ? 24 : 48,
           boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
         }}>
-          <Section icon={Truck} title="Shipping Options">
-            <p style={{ marginBottom: 20 }}>
-              We offer several shipping options to meet your needs:
-            </p>
-            <ShippingOption name="Standard Shipping" time="5-7 business days" price="$5.99" />
-            <ShippingOption name="Express Shipping" time="2-3 business days" price="$12.99" />
-            <ShippingOption name="Overnight Shipping" time="1 business day" price="$24.99" />
-            <ShippingOption name="Free Standard Shipping" time="Orders over $100" price="FREE" />
+          <Section icon={Truck} title="Shipping rates">
+            <div data-testid="shipping-policy-rates">
+              <ul style={{ paddingLeft: 20, marginBottom: 16 }}>
+                <li>
+                  <strong>Standard shipping:</strong> ${SHIPPING_COST} flat rate on all orders
+                </li>
+                <li>
+                  <strong>Free shipping:</strong> {FREE_SHIPPING_MESSAGE.toLowerCase()} (merchandise subtotal of ${FREE_SHIPPING_THRESHOLD}+ before volume or coupon discounts)
+                </li>
+              </ul>
+              <p style={{ margin: 0 }}>
+                Shipping is calculated at checkout from your cart subtotal. Cart and checkout show the exact
+                shipping charge before you place your order.
+              </p>
+            </div>
           </Section>
 
-          <Section icon={Clock} title="Processing Time">
+          <Section icon={Clock} title="Processing time">
             <ul style={{ paddingLeft: 20 }}>
-              <li>Orders are processed within 1-2 business days</li>
-              <li>Orders placed after 2 PM EST are processed the next business day</li>
-              <li>Processing times may be extended during sales or holidays</li>
-              <li>You'll receive a confirmation email when your order ships</li>
+              <li>After checkout, our team confirms payment and prepares your custom order for shipment</li>
+              <li>Orders are typically processed within 1–2 business days once payment is confirmed</li>
+              <li>Processing may take longer during peak periods or holidays</li>
+              <li>You will receive email updates when your order status changes</li>
             </ul>
           </Section>
 
-          <Section icon={Package} title="Order Tracking">
+          <Section icon={Package} title="Order tracking">
             <p style={{ marginBottom: 12 }}>
-              Once your order ships, you'll receive an email with tracking information. You can also:
+              Track your order anytime on the{' '}
+              <Link to="/orders" style={{ color: '#9c6649', fontWeight: 600 }}>
+                My Orders
+              </Link>{' '}
+              page with your <strong>order ID</strong> (UUID from your confirmation email or WhatsApp message)
+              and the <strong>email address used at checkout</strong>.
             </p>
             <ul style={{ paddingLeft: 20 }}>
-              <li>Track your order on our website using your email address</li>
-              <li>Track directly on the carrier's website using your tracking number</li>
-              <li>Contact our customer service for tracking assistance</li>
+              <li>Confirmation emails include a link that pre-fills your order ID</li>
+              <li>When your order ships, tracking details appear on My Orders when available</li>
+              <li>Contact {SITE_EMAILS.support} if you need help locating your order</li>
             </ul>
-            <p style={{ marginTop: 12 }}>
-              Tracking information typically updates within 24 hours of shipment.
-            </p>
           </Section>
 
-          <Section icon={Globe} title="International Shipping">
+          <Section icon={Globe} title="International orders">
             <p style={{ marginBottom: 12 }}>
-              We ship to most countries worldwide! For international orders:
+              We primarily ship within the United States. Checkout may accept other countries, but international
+              delivery is arranged case by case.
             </p>
             <ul style={{ paddingLeft: 20 }}>
-              <li>Delivery times: 7-14 business days (varies by destination)</li>
-              <li>International shipping rates calculated at checkout</li>
-              <li>Customers are responsible for customs fees, duties, or taxes</li>
-              <li>Tracking available for all international shipments</li>
+              <li>Contact us before ordering if you are outside the US</li>
+              <li>Additional shipping fees, customs duties, and taxes may apply</li>
+              <li>Delivery times vary by destination once the package ships</li>
             </ul>
           </Section>
 
-          <Section icon={MapPin} title="Shipping Destinations">
+          <Section icon={MapPin} title="Shipping destinations">
             <p style={{ marginBottom: 12 }}>
-              We currently ship to:
-            </p>
-            <ul style={{ paddingLeft: 20 }}>
-              <li>All 50 US states and territories</li>
-              <li>Canada</li>
-              <li>United Kingdom</li>
-              <li>European Union countries</li>
-              <li>Australia and New Zealand</li>
-              <li>Select countries in Asia</li>
-            </ul>
-            <p style={{ marginTop: 12 }}>
-              Don't see your country? Contact us and we'll try to accommodate your request.
+              Standard shipping is available to all 50 US states and territories. For other destinations, email{' '}
+              {SITE_EMAILS.support} and we will confirm whether we can fulfill your order.
             </p>
           </Section>
 
-          <Section icon={AlertCircle} title="Important Notes">
+          <Section icon={AlertCircle} title="Important notes">
             <div style={{
               padding: 20,
               background: '#fef3c7',
@@ -180,16 +158,16 @@ export default function ShippingPolicy() {
             }}>
               <ul style={{ paddingLeft: 20, margin: 0 }}>
                 <li style={{ marginBottom: 8 }}>
-                  Shipping times are estimates and may vary due to weather, holidays, or carrier delays
+                  Delivery times are estimates and may vary due to weather, holidays, or carrier delays
                 </li>
                 <li style={{ marginBottom: 8 }}>
-                  We are not responsible for delays caused by customs inspections
+                  We are not responsible for delays caused by customs inspections on international shipments
                 </li>
                 <li style={{ marginBottom: 8 }}>
-                  Please ensure your shipping address is correct - we cannot redirect packages in transit
+                  Please ensure your shipping address is correct — we cannot redirect packages in transit
                 </li>
                 <li>
-                  P.O. Boxes are supported for standard shipping only
+                  P.O. Boxes are supported where the carrier allows
                 </li>
               </ul>
             </div>
@@ -204,7 +182,7 @@ export default function ShippingPolicy() {
           }}>
             <p style={{ margin: 0, color: '#4b5563', fontSize: 14 }}>
               Questions about shipping? Contact us at{' '}
-              <strong>shipping@labdoorcustoms.com</strong>
+              <strong>{SITE_EMAILS.support}</strong>
             </p>
           </div>
         </div>

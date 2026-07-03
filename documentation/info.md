@@ -107,11 +107,11 @@
 | `/cart` | Shopping cart (localStorage via `CartContext`) |
 | `/checkout` | Customer/shipping form, coupon validation, no-refund policy checkbox, **Place Order** → WhatsApp redirect |
 | `/payment/success` | Optional confirmation page after WhatsApp redirect (order stored in sessionStorage) |
-| `/payment/cancel` | Abandoned checkout cleanup |
+| `/payment/cancel` | Abandoned checkout — **Checkout Cancelled** page; clears pending order storage; cart preserved |
 | `/orders` | Customer order lookup — order ID + checkout email (`POST /api/orders/lookup`); email links pre-fill `?orderId=` |
-| `/contact` | Contact form with CSRF-protected POST |
+| `/contact` | Contact form with CSRF-protected POST — support email from `SITE_EMAILS` |
 | `/about`, `/help` | Static content — About covers custom footwear + WhatsApp checkout; Help summarizes shipping ($25 / free over $200), privacy (`privacy@labdoorcustoms.com`), and store policies |
-| `/privacy-policy`, `/terms-of-service`, `/returns-policy`, `/replacement-policy`, `/shipping-policy` | Legal pages (no-refund / manufacturing-defect replacement policy) |
+| `/privacy-policy`, `/terms-of-service`, `/returns-policy`, `/replacement-policy`, `/shipping-policy` | Legal pages — shipping policy matches checkout pricing ($25 flat, free over $200); no-refund / manufacturing-defect replacement policy |
 | `/admin` | Redirect — `/admin/login` if unauthenticated, `/adminshivamdashboard` if session valid |
 | `/admin/login` | Admin authentication |
 | `/adminshivamdashboard` | Protected admin dashboard |
@@ -129,6 +129,23 @@
 - Cart page shows validation errors and a **Retry validation** button when network validation fails.
 - Server recalculates all totals at checkout; client totals are validated against server pricing before place-order.
 - Checkout syncs customer email to activity batches on field change/blur (when analytics consent is granted), not only on initial page load.
+
+### Customer-facing content and pricing
+
+- **Shipping rates** (single source of truth): `frontend/src/utils/pricing.ts` mirrors `backend/src/lib/checkoutPricing.ts` — **$25** flat shipping, **free over $200** merchandise subtotal (before volume/coupon discounts). Used on cart, checkout, Help, and About.
+- **`/shipping-policy`** imports the same constants; tracking copy matches **order ID + checkout email** lookup on `/orders`.
+- **`/contact`** displays support email from `frontend/src/lib/site.ts` (`SITE_EMAILS.support` → `support@labdoorcustoms.com`).
+- **`/payment/cancel`** shows **Checkout Cancelled** (WhatsApp checkout; clears pending order storage, cart preserved).
+- **360° placeholder** (no admin MP4): “Product photo — drag to explore” on product detail.
+
+### Mobile layout and scroll
+
+Global CSS in `frontend/src/index.css` (see [MOBILE_RESPONSIVE.md](MOBILE_RESPONSIVE.md)):
+
+- **`html`** is the single vertical scrollport (`overflow-y: auto`); **`body`** uses `height: auto` and `overflow-y: visible` (not fixed `height: 100%`).
+- **`#root`** is block layout (not flex) so nested app shells do not trap scroll.
+- **`AppShell`** keeps flex column + sticky footer; **`main`** uses `flex: 1 0 auto` so content height drives document scroll.
+- **Home** uses `overflow-x: hidden` only (not `overflow: hidden`) so the product carousel below the hero remains reachable.
 
 ---
 
@@ -316,6 +333,7 @@ At place-order, a row in `coupon_usage` reserves the coupon for the pending orde
 
 - `POST /api/contact` — rate-limited, CSRF-protected.
 - Stores message in `contact_messages` for audit; sends auto-reply via Resend.
+- Storefront `/contact` shows **`SITE_EMAILS.support`** (`support@labdoorcustoms.com`) from `frontend/src/lib/site.ts`.
 - Successful submit emits `contact_submit` activity event (consent-gated).
 - **No admin inbox** — contact messages are not listed or managed in the dashboard or via admin API.
 
@@ -794,18 +812,18 @@ Any unmatched `/api/*` path returns **404** JSON `{ error: "Route not found" }`.
 | `/products` | `ProductsPage` | Catalog; optional query `?q=` for search |
 | `/product/:id` | `ProductDetailPage` | `:id` = `products.public_id` UUID (numeric id supported for legacy links); sitemap uses `public_id` |
 | `/about` | `AboutUs` | About page |
-| `/contact` | `ContactUs` | Contact form |
-| `/help` | `HelpCenter` | Help / FAQ |
+| `/contact` | `ContactUs` | Contact form; support email from `SITE_EMAILS` |
+| `/help` | `HelpCenter` | Help / FAQ (shipping $25 / free over $200) |
 | `/privacy-policy` | `PrivacyPolicy` | Privacy policy |
 | `/terms-of-service` | `TermsOfService` | Terms of service |
 | `/returns-policy` | `ReturnsPolicy` | No-refund / manufacturing-defect replacement policy |
 | `/replacement-policy` | `ReturnsPolicy` | Alias for returns policy |
-| `/shipping-policy` | `ShippingPolicy` | Shipping policy |
+| `/shipping-policy` | `ShippingPolicy` | Shipping policy — matches checkout pricing ($25 / free over $200) |
 | `/cart` | `CartPage` | Shopping cart |
 | `/checkout` | `Checkout` | Checkout form + WhatsApp place-order |
 | `/orders` | `MyOrders` | Order lookup via POST body (`orderId` + email); email links pre-fill `?orderId=` only |
 | `/payment/success` | `PaymentSuccess` | Optional return after WhatsApp redirect; shows UUID Order ID + GSS order number from sessionStorage |
-| `/payment/cancel` | `Cancel` | Legacy cancel route (redirects home) |
+| `/payment/cancel` | `Cancel` | **Checkout Cancelled** — clears pending order storage |
 
 ### Admin routes
 
@@ -1007,9 +1025,9 @@ npm run links:check
 | Suite | Tool | Coverage |
 |-------|------|----------|
 | Backend unit/API | Vitest | **place-order** checkout (validation + WhatsApp integration happy path), WhatsApp message formatting, admin mark-paid, **admin analytics** (401, IST custom range, CSV export), **validate-cart** (empty/invalid/OOS), **products search** edge cases, **stability/concurrency smoke**, coupon scope, `computeCheckoutPricingForCart`, payment idempotency, order tokens, process error handlers, RLS table list + grant revoke, email portal URL, activity batch/log, order lookup, reviews check, **IST date helpers**, **build performance budgets**, sales analytics invalid-date fallback |
-| Frontend E2E / UI | Playwright | Storefront smoke + deep flows, **responsive pages matrix** (10 phone viewports × all routes), checkout/contact/admin UI, mobile viewport |
+| Frontend E2E / UI | Playwright | Storefront smoke + deep flows, **document scroll** smoke, **responsive pages matrix** (10 phone viewports × all routes), checkout/contact/admin UI, mobile viewport |
 
-**Total automated tests:** 409 (120 backend unit + 74 API + 215 Playwright UI).
+**Total automated tests:** 411 (120 backend unit + 74 API + 217 Playwright UI).
 
 | Link check | Custom script | Documentation internal links |
 

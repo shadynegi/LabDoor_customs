@@ -22,7 +22,7 @@
 | Admin | Server product search; order search by **id UUID**, order number, email, name; products paginated; **Settings** tab (activity export, sessions, customer recompute); coupon scope + edit; review admin response; estimated delivery; **no customer refunds** (cancel unpaid pending only) |
 | Store policy | All sales final; manufacturing-defect replacements within 30 days; `/returns-policy` + `/replacement-policy` |
 | Reviews | `POST /api/reviews/check` on email blur; pending-moderation copy; vote error toasts |
-| Mobile | Sticky CTAs, visualViewport keyboard offset, body scroll (`min-height` not fixed height), cart policy spacer, **responsive-pages-ui** Playwright matrix |
+| Mobile | Sticky CTAs, visualViewport keyboard offset, **document scroll** (`html` scrollport; `#root` block layout; Home `overflow-x` only), cart policy spacer, **responsive-pages-ui** Playwright matrix (411 tests total) |
 
 ---
 

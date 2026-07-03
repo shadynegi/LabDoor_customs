@@ -22,6 +22,7 @@ Run in the **Supabase SQL Editor** (or psql on port 5432). Scripts live in `back
 - [x] `migration-products-search-trgm.sql` (applied on production Supabase)
 - [x] `migration-products-video-360.sql` — `products.video_360`
 - [x] `migration-admin-enhancements.sql` — inventory, SKU, order line items, admin notes
+- [x] `migration-products-public-id.sql` — `products.public_id` for storefront URLs (`/product/{public_id}`; also bootstrapped via `ensureProductPublicIdColumn()`)
 - [x] Payment/checkout tables present (`order_checkout_exchanges`, `order_access_exchanges`, `payment_idempotency`, etc.)
 
 **After SQL:**
@@ -143,7 +144,7 @@ From repository root on Railway:
 - [ ] Start: `npm start`
 - [ ] Deploy logs show no missing-env exit
 - [ ] Deploy logs show RLS migration applied
-- [ ] CI on `main` is green (**409** automated tests + build + E2E smoke — see [`test_guidelines.md`](test_guidelines.md))
+- [ ] CI on `main` is green (**411** automated tests + build + E2E smoke — see [`test_guidelines.md`](test_guidelines.md))
 
 ---
 
@@ -163,9 +164,8 @@ CI does **not** open a live WhatsApp session. Complete these on **desktop and a 
 ### Order email and tracking
 
 - [ ] Order confirmation email received
-- [ ] **View Order Status** link uses `?code=` (not `?token=`)
-- [ ] Link opens `/orders` and shows the order without re-entering token
-- [ ] Manual lookup still works: order ID (UUID) + checkout email at `/orders`
+- [ ] **View Order Status** link pre-fills `?orderId=` on `/orders` (enter checkout email + Search)
+- [ ] Manual lookup works: order ID (UUID) + checkout email at `/orders`
 
 ### Admin (`/admin` or `/adminshivamdashboard`)
 

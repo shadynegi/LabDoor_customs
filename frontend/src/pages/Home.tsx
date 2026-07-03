@@ -232,7 +232,7 @@ export default function Home() {
         color: "#fff",
         display: "flex",
         flexDirection: "column",
-        overflow: "hidden"
+        overflowX: "hidden",
       }}
     >
       <MetaTags

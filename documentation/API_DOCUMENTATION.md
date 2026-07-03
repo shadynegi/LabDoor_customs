@@ -176,7 +176,7 @@ Public list/submit/vote responses use `toPublicReview()` — **`customer_email`,
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/` | Public | Submit contact form (stored in `contact_messages`; no admin list API) |
+| POST | `/` | Public | Submit contact form (stored in `contact_messages`; no admin list API). Storefront displays `SITE_EMAILS.support`. |
 
 ---
 

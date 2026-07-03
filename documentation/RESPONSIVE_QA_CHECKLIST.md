@@ -18,7 +18,7 @@ Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API
 | **Admin** | Dashboard search includes order id UUID, order number, email, name; **Mark paid** with external `payment_id` + admin note; **Settings** tab (no contact inbox). |
 | **Activity** | Consent-gated batch; `contact_submit` on contact success; IPs anonymized with `IP_SALT`. |
 | **Reviews** | `POST /api/reviews/check` on email blur; pending-moderation copy; vote error toasts. |
-| **Mobile** | Sticky CTAs with keyboard lift on checkout; cookie banner top on purchase routes; cart stacked CTA + policy spacer; whole-number shoe sizes; Playwright **responsive-pages-ui** (10 viewports); OOS hides product sticky bar; admin product cards on phones. |
+| **Mobile** | Sticky CTAs with keyboard lift on checkout; cookie banner top on purchase routes; cart stacked CTA + policy spacer; whole-number shoe sizes; **document scroll** on tall pages; Playwright **responsive-pages-ui** (10 viewports); OOS hides product sticky bar; admin product cards on phones. |
 
 Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_ENCRYPTION_KEY`, `IP_SALT`, `ADMIN_PASSWORD_HASH`.
 
@@ -50,7 +50,7 @@ Use browser DevTools device mode or resize the window to each width.
 ### Home (`/`)
 
 - [ ] Hero image fits without horizontal scroll at 320px
-- [ ] Hero carousel renders and swipes on touch
+- [ ] Hero carousel and **View All Products** reachable by vertical scroll on mobile (not clipped)
 - [ ] Navigation menu accessible
 
 ### Products (`/products`)
@@ -77,7 +77,11 @@ Use browser DevTools device mode or resize the window to each width.
 ### Policies and contact
 
 - [ ] Text readable without horizontal scroll
+- [ ] **Vertical scroll works** on `/contact`, `/shipping-policy`, `/help`, and other tall pages (wheel/touch)
+- [ ] `/shipping-policy` shows **$25** shipping and **free over $200** (not legacy tier table)
+- [ ] `/contact` shows **support@labdoorcustoms.com**
 - [ ] Contact form submits successfully
+- [ ] `/payment/cancel` heading reads **Checkout Cancelled**
 
 ---
 

@@ -22,7 +22,7 @@ Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API
 
 Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_ENCRYPTION_KEY`, `IP_SALT`, `ADMIN_PASSWORD_HASH`.
 
-**Automated tests:** 409 (120 backend unit + 74 API + 215 Playwright) — see [`test_guidelines.md`](test_guidelines.md).
+**Automated tests:** 411 (120 backend unit + 74 API + 217 Playwright) — see [`test_guidelines.md`](test_guidelines.md).
 
 ---
 

@@ -6,6 +6,7 @@ import { logError } from "../lib/logger";
 import { apiFetch } from "../config";
 import { trackContactSubmit } from "../utils/activityTracker";
 import { useResponsive } from "../hooks/useResponsive";
+import { SITE_EMAILS } from "../lib/site";
 
 export default function ContactUs() {
   const { isMobile } = useResponsive();
@@ -134,7 +135,12 @@ export default function ContactUs() {
                   <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 4, color: "#374151" }}>
                     Email
                   </h3>
-                  <p style={{ color: "#6b7280", margin: 0 }}>support@gaultiershoes.com</p>
+                  <p
+                    style={{ color: "#6b7280", margin: 0 }}
+                    data-testid="contact-support-email"
+                  >
+                    {SITE_EMAILS.support}
+                  </p>
                 </div>
               </div>
 

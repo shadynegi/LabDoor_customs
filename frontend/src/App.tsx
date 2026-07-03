@@ -373,7 +373,8 @@ function AppShell() {
       <Navigation />
 
       <main id="main-content" style={{
-        flex: 1,
+        flex: '1 0 auto',
+        width: '100%',
       }}>
         <PageViewTracker />
         <Suspense fallback={<PageLoader />}>

@@ -161,8 +161,8 @@ This single command runs all suites in order:
 |-------|------|-------|----------------|
 | Backend unit | Vitest | 120 | No (mocked) |
 | API integration | Vitest | 74 | No (mocked) |
-| Frontend UI | Playwright | 215 | No (mocked API + static preview) |
-| **Total** | | **409** | |
+| Frontend UI | Playwright | 217 | No (mocked API + static preview) |
+| **Total** | | **411** | |
 
 The runner auto-builds the frontend for UI tests if `frontend/dist` is missing and installs Playwright in `Tests/` on first run if needed.
 

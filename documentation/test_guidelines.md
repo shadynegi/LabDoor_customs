@@ -43,10 +43,10 @@ If the user did not mention testing, **skip** `npm test`, `npm run test:all`, Pl
 |-------|------|----------|-------|----------------|
 | Backend unit | Vitest | `Tests/backend/` | 32 files, 120 tests | No (mocked) |
 | API integration | Vitest + Supertest | `Tests/api/` | 19 files, 74 tests | No (mocked) |
-| Frontend E2E / UI | Playwright | `Tests/frontend/` | 15 files, 215 tests (39 desktop + 176 mobile project) | No (mocked `/api` + static preview) |
+| Frontend E2E / UI | Playwright | `Tests/frontend/` | 15 files, 217 tests (41 desktop + 176 mobile project) | No (mocked `/api` + static preview) |
 | Link checker | Custom script | repo root | — | No |
 
-**Total:** 409 automated tests — 120 backend unit + 74 API + 215 Playwright UI (39 desktop chromium + 176 mobile-chrome).
+**Total:** 411 automated tests — 120 backend unit + 74 API + 217 Playwright UI (41 desktop chromium + 176 mobile-chrome).
 
 Backend unit tests include: payment idempotency, order tokens, order token encryption, **cart line size validation** (`cartLineSize.test.ts` — whole-number UK/US/EU sizes), **product public_id** URL helpers, product image validation, admin session hashing, refund idempotency, checkout pricing, **WhatsApp message formatting** (`whatsappCheckout.test.ts` — totals, volume/coupon lines, size, free shipping, URL encoding), **WhatsApp payment confirmation** (`whatsappNotifications.test.ts`, `postPaymentCapture.test.ts`), coupon scope (`applies_to`), `computeCheckoutPricingForCart`, RLS table list + bootstrap contract, RLS grant revoke under `BOOTSTRAP_SKIP_DDL`, email portal URL (`buildOrderPortalUrl`), client IP, keep-alive, **admin analytics IST date helpers** (`adminAnalyticsDates.test.ts`), **build performance budgets** (`performanceBudgets.test.ts`), **sales analytics** invalid custom-date fallback.
 
@@ -54,7 +54,7 @@ API tests include: **place-order** checkout (validation — amount mismatch, pol
 
 Backend unit tests also cover: **sales analytics** period parsing + CSV export, **admin analytics cache** keys/TTL, inventory movement helpers (via integration paths), payment idempotency, order tokens, RLS, email portal URL, and related order utilities.
 
-Playwright includes: orders **orderId + email lookup** (`orders-ui.spec.ts` — email link prefill, sessionStorage persistence, lookup errors, shipped tracking link), legacy access-exchange deprecation, checkout country pre-select (native `<select>`), **WhatsApp place-order** (`checkout-place-order-ui.spec.ts` — policy + form + mocked `whatsappUrl`), **admin analytics custom range** (Apply-before-export, IST query params), admin login redirect + dashboard analytics smoke, **responsive UI** (`responsive-ui.spec.ts`: mobile checkout/cart sticky CTA, product overflow, admin login), **responsive pages matrix** (`responsive-pages-ui.spec.ts`: every storefront route at 10 phone viewports — iPhone SE/15 Pro/17/17 Pro/17 Pro Max, Galaxy S24/S25/S25 Ultra/A55, Pixel 9 Pro — overflow + cart policy above sticky bar), **deep flows** (`deep-flows-ui.spec.ts`: catalog `?q=` server search, product trust badges + reviews, checkout policy gate + coupon, cart quantity, order confirmation with UUID). Shared helpers: `Tests/frontend/helpers/viewports.ts`, `Tests/frontend/helpers/responsive.ts`. Checkout helpers live in `Tests/frontend/helpers/checkout.ts` (`clickPlaceOrderAndWaitForResponse`, `fillCheckoutCustomerForm`). Playwright product IDs come from `Tests/fixtures/products.ts` via `Tests/frontend/fixtures/mock-data.ts`. The storefront fixture warms `/api/csrf-token` on load to avoid first-test timeouts.
+Playwright includes: orders **orderId + email lookup** (`orders-ui.spec.ts` — email link prefill, sessionStorage persistence, lookup errors, shipped tracking link), legacy access-exchange deprecation (**Checkout Cancelled** heading on `/payment/cancel`), checkout country pre-select (native `<select>`), **WhatsApp place-order** (`checkout-place-order-ui.spec.ts` — policy + form + mocked `whatsappUrl`), **storefront content** (`storefront.spec.ts` — shipping policy $25/$200, document scroll; `contact-ui.spec.ts` — canonical support email), **admin analytics custom range** (Apply-before-export, IST query params), admin login redirect + dashboard analytics smoke, **responsive UI** (`responsive-ui.spec.ts`: mobile checkout/cart sticky CTA, product overflow, admin login), **responsive pages matrix** (`responsive-pages-ui.spec.ts`: every storefront route at 10 phone viewports — iPhone SE/15 Pro/17/17 Pro/17 Pro Max, Galaxy S24/S25/S25 Ultra/A55, Pixel 9 Pro — overflow + cart policy above sticky bar), **deep flows** (`deep-flows-ui.spec.ts`: catalog `?q=` server search, product trust badges + reviews, checkout policy gate + coupon, cart quantity, order confirmation with UUID). Shared helpers: `Tests/frontend/helpers/viewports.ts`, `Tests/frontend/helpers/responsive.ts`. Checkout helpers live in `Tests/frontend/helpers/checkout.ts` (`clickPlaceOrderAndWaitForResponse`, `fillCheckoutCustomerForm`). Playwright product IDs come from `Tests/fixtures/products.ts` via `Tests/frontend/fixtures/mock-data.ts`. The storefront fixture warms `/api/csrf-token` on load to avoid first-test timeouts.
 
 ---
 
@@ -247,7 +247,8 @@ API tests use `Tests/helpers/http.ts` for CSRF token flow with Supertest.
 
 | File | What it covers |
 |------|----------------|
-| `storefront.spec.ts` | Home, products, checkout route, contact page render |
+| `storefront.spec.ts` | Home, products, checkout route, contact page + canonical email, shipping policy rates, document scroll |
+| `contact-ui.spec.ts` | Contact form fields, submit mock, `SITE_EMAILS.support` on page |
 | `deep-flows-ui.spec.ts` | Search, policy gate, coupon, cart qty, order confirmation |
 | `checkout-ui.spec.ts` | Checkout form, country pre-select |
 | `checkout-place-order-ui.spec.ts` | Policy acceptance + place-order → mocked `whatsappUrl` |
@@ -257,7 +258,7 @@ API tests use `Tests/helpers/http.ts` for CSRF token flow with Supertest.
 | `admin-ui.spec.ts` | Admin login redirect + dashboard analytics smoke |
 | `mobile-ui.spec.ts` | Home/products/cart nav on Pixel 5 viewport |
 
-See `Tests/frontend/` for the full list (15 files, 215 tests across desktop + mobile Playwright projects).
+See `Tests/frontend/` for the full list (15 files, 217 tests across desktop + mobile Playwright projects).
 
 Individual smoke cases (`storefront.spec.ts`):
 
@@ -265,6 +266,8 @@ Individual smoke cases (`storefront.spec.ts`):
 2. **Products** — `/products` loads
 3. **Checkout** — `/checkout` loads; checkout/cart/empty text visible
 4. **Contact** — `/contact` loads
+5. **Shipping policy** — `/shipping-policy` shows $25 / $200 rates (not legacy $100 tiers)
+6. **Document scroll** — tall policy pages scroll (`window.scrollY > 0` after programmatic scroll)
 
 ---
 

@@ -17,7 +17,7 @@ Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API
 | **Admin** | `/admin` entry redirect; LAN dev CORS (private IP + Vite fallback ports); products paginated (load more); optional **360° MP4**; coupons **10/page**; reviews admin response; estimated delivery on orders; tab error/retry states; **Customers** card layout on mobile; **inventory** (SKU, reorder point, cost, movement history, low-stock alerts, bulk stock delta); **customer admin notes** + server search/pagination; **customer history modal** (orders 10/page); **sales analytics** by period with **IST custom calendar range** (Apply before export) + CSV export; **order search** by id UUID, order number, email, name; **order customer-details** + pending-item edits; **Settings** tab (activity export, admin sessions, customer recompute). **No contact inbox** (form still stores messages). |
 | **Activity** | Consent-gated batch; `contact_submit` on contact success; IPs anonymized with `IP_SALT`. |
 | **Reviews** | `POST /api/reviews/check` on email blur; pending-moderation success copy; vote error toasts; admin `admin_response` editable. |
-| **Mobile** | Sticky CTAs with keyboard lift on checkout; cookie banner top on purchase routes; cart stacked CTA + `.cart-mobile-sticky-spacer` (policy above bar); whole-number shoe sizes only; Playwright **responsive-pages-ui** (10 phone viewports); OOS hides product sticky bar; admin product cards on phones. |
+| **Mobile** | Sticky CTAs with keyboard lift on checkout; cookie banner top on purchase routes; cart stacked CTA + `.cart-mobile-sticky-spacer` (policy above bar); whole-number shoe sizes only; **document scroll** via single `html` scrollport (`index.css`); Playwright **responsive-pages-ui** (10 phone viewports); OOS hides product sticky bar; admin product cards on phones. |
 
 Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_ENCRYPTION_KEY`, `IP_SALT`, `ADMIN_PASSWORD_HASH`.
 
@@ -32,8 +32,9 @@ Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_
 - WhatsApp checkout with server-side pricing; coupon validation; **Place Order** button (no online payment processor)
 - Optional `/payment/success` confirmation page (reads `lastPlacedOrder` from sessionStorage)
 - Customer order lookup at `/orders` via `POST /api/orders/lookup`
-- Contact form; legal pages including no-refund / manufacturing-defect replacement policy (`/returns-policy`, `/replacement-policy`); cookie consent; GA4 and activity tracking (consent-gated)
-- Mobile sticky CTAs, checkout keyboard offset, responsive layouts, cart policy clearance — see [MOBILE_RESPONSIVE.md](./MOBILE_RESPONSIVE.md)
+- Contact form (`support@labdoorcustoms.com` via `SITE_EMAILS`); legal pages including no-refund / manufacturing-defect replacement policy (`/returns-policy`, `/replacement-policy`); **shipping policy aligned with checkout** ($25 / free over $200); cookie consent; GA4 and activity tracking (consent-gated)
+- **`/payment/cancel`** — Checkout Cancelled page (clears pending order storage)
+- Mobile sticky CTAs, checkout keyboard offset, responsive layouts, cart policy clearance, **document scroll on all tall pages** — see [MOBILE_RESPONSIVE.md](./MOBILE_RESPONSIVE.md)
 
 ---
 
@@ -102,7 +103,7 @@ See [WHATSAPP_CHECKOUT_GUIDE.md](./WHATSAPP_CHECKOUT_GUIDE.md).
 
 ## Testing
 
-- **409 automated tests** (120 backend unit + 74 API + 215 Playwright UI)
-- Playwright storefront smoke + deep flows, **responsive pages matrix** (`responsive-pages-ui.spec.ts` — 10 phone viewports × all routes), **admin analytics custom range**, **responsive mobile UI**, checkout/contact/admin UI
+- **411 automated tests** (120 backend unit + 74 API + 217 Playwright UI)
+- Playwright storefront smoke + deep flows, **shipping policy / contact email / document scroll** smoke, **responsive pages matrix** (`responsive-pages-ui.spec.ts` — 10 phone viewports × all routes), **admin analytics custom range**, **responsive mobile UI**, checkout/contact/admin UI
 
 See [`test_guidelines.md`](test_guidelines.md) for the full inventory and run commands.

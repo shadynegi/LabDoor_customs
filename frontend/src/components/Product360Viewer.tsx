@@ -233,7 +233,7 @@ export function Product360Viewer({
             whiteSpace: 'nowrap',
           }}
         >
-          Product photo — 360° view coming soon
+          Product photo — drag to explore
         </div>
       </div>
     );

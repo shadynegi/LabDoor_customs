@@ -65,7 +65,7 @@ export default function Cancel() {
             marginBottom: 12,
           }}
         >
-          Payment Cancelled
+          Checkout Cancelled
         </h1>
 
         <p
@@ -76,8 +76,8 @@ export default function Cancel() {
             lineHeight: 1.6,
           }}
         >
-          You left checkout before completing your order. Your cart items are still saved.
-          You can continue shopping or return to checkout when you are ready.
+          You left checkout before placing your order. Your cart items are still saved.
+          Return to checkout when you are ready, or keep shopping.
         </p>
 
         <div
