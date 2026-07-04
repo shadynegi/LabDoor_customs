@@ -5,7 +5,7 @@
 **Authoritative behavior:** [`info.md`](info.md)  
 **Full audit:** [`PROJECT_AUDIT.md`](PROJECT_AUDIT.md) (2026-06-08 initial + follow-up)
 
-**Test count marker (CI should match):** `<!-- tests: 422 -->` (118 unit + 71 API + 233 Playwright)
+**Test count marker (CI should match):** `<!-- tests: 423 -->` (119 unit + 71 API + 233 Playwright)
 
 ---
 
@@ -108,7 +108,7 @@
 |----|----------|----------------|---------|--------|
 | CI-ENV | Production env validation in CI | `validate-env.mjs`, `ci.yml` | CI job | COVERED |
 | SEC-ORDER-SECRETS | `access_token_hash` + `access_token_encrypted` stripped from order JSON | `orderTokens.ts` `stripOrderSecrets` | `orderTokens.test.ts` | COVERED |
-| DOC-TESTS | Test count in `info.md` | `info.md` | `npm test` (422) | COVERED |
+| DOC-TESTS | Test count in `info.md` | `info.md` | `npm test` (423) | COVERED |
 | UI-SCROLL | Document scroll on tall storefront pages | `frontend/src/index.css`, `App.tsx`, `Home.tsx` | `storefront.spec.ts` | COVERED |
 | UI-POLICY-CONTENT | Shipping policy matches checkout pricing; contact WhatsApp link | `ShippingPolicy.tsx`, `ContactUs.tsx`, `pricing.ts`, `whatsappContact.ts` | `storefront.spec.ts`, `contact-ui.spec.ts` | COVERED |
 | PERF-BUDGET | Frontend JS bundle budget contract | `frontend/scripts/build-budget.mjs` | `performanceBudgets.test.ts` | COVERED |

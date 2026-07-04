@@ -2,8 +2,8 @@ name: Keep Supabase Alive
 
 on:
   schedule:
-    # Runs at 09:00 UTC every 6 days
-    - cron: '0 9 */6 * *'
+    # Daily at 09:00 UTC — read-only SELECT 1 ping (Supabase free tier pauses after ~7 days idle)
+    - cron: '0 9 * * *'
 
   workflow_dispatch:
 
@@ -37,4 +37,4 @@ jobs:
       - name: Notify on failure
         if: failure()
         run: |
-          echo "::error title=Supabase Keep-Alive Failed::The keep-alive ping failed. Your Supabase project may be paused. Check the logs and restore it manually if needed."
+          echo "::error title=Supabase Keep-Alive Failed::Daily keep-alive ping failed. The Supabase project may be paused — restore it in the dashboard and verify the DATABASE_URL secret."

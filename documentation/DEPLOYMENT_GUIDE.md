@@ -93,4 +93,4 @@ Secrets: `PRODUCTION_API_BASE_URL`, `VITE_SENTRY_DSN`, `DATABASE_URL`.
 - **Logs:** Railway log drain or Pino JSON stdout
 - **Errors:** Sentry (backend + frontend)
 - **Uptime:** External ping on `/api/health`
-- **Supabase:** GitHub cron keep-alive every 6 days
+- **Supabase:** GitHub Actions keep-alive **daily** at 09:00 UTC — see [`SUPABASE_KEEP_ALIVE.md`](./SUPABASE_KEEP_ALIVE.md)

@@ -51,7 +51,9 @@ Use the **Direct connection** URI with port **5432** for running SQL scripts.
 
 ## GitHub keep-alive
 
-Set the pooler URL as `DATABASE_URL` secret for the keep-alive workflow.
+Set the pooler URL as the **`DATABASE_URL`** Actions secret for the daily keep-alive workflow.
+
+**Guide:** [`SUPABASE_KEEP_ALIVE.md`](./SUPABASE_KEEP_ALIVE.md) — schedule, manual run, read-only `SELECT 1` ping.
 
 ---
 

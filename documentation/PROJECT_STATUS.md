@@ -101,7 +101,7 @@ See [WHATSAPP_CHECKOUT_GUIDE.md](./WHATSAPP_CHECKOUT_GUIDE.md).
 
 ## Testing
 
-- **422 automated tests** (118 backend unit + 71 API + 233 Playwright UI)
+- **423 automated tests** (119 backend unit + 71 API + 233 Playwright UI)
 - Playwright storefront smoke + deep flows, **shipping policy / contact WhatsApp / document scroll** smoke, **responsive pages matrix** (`responsive-pages-ui.spec.ts` — 11 phone viewports × all routes, incl. 320px), **admin analytics custom range**, **responsive mobile UI**, checkout/contact/admin UI
 
 See [`test_guidelines.md`](test_guidelines.md) for the full inventory and run commands.

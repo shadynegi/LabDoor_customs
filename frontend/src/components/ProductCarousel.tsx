@@ -86,38 +86,56 @@ const ProductCarousel: React.FC<ProductCarouselProps> = ({ products }) => {
               height: cardHeight,
               borderRadius: isMobile ? 12 : 16,
               overflow: 'hidden',
-              position: 'relative',
+              display: 'flex',
+              flexDirection: 'column',
+              background: 'linear-gradient(135deg, #361906 0%, #9c6649 100%)',
               boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
               opacity: 0.6,
               filter: 'blur(1px)',
               transition: 'all 0.3s ease',
             }}
           >
-            <img
-              {...buildResponsiveProductImg(product.image, {
-                alt: product.name,
-                sizes: PRODUCT_IMAGE_SIZES.thumb,
-                width: 320,
-                height: 320,
-              })}
+            <div
               style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
+                flex: 1,
+                minHeight: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: isMobile ? 8 : 10,
               }}
-              draggable={false}
-            />
-            <div style={{
-              position: 'absolute',
-              bottom: 0,
-              left: 0,
-              right: 0,
-              background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)',
-              padding: '12px',
-              color: 'white',
-              fontSize: 14,
-              fontWeight: 600,
-            }}>
+            >
+              <img
+                {...buildResponsiveProductImg(product.image, {
+                  alt: product.name,
+                  sizes: PRODUCT_IMAGE_SIZES.thumb,
+                  width: 320,
+                  height: 320,
+                })}
+                style={{
+                  maxWidth: '100%',
+                  maxHeight: '100%',
+                  width: 'auto',
+                  height: 'auto',
+                  objectFit: 'contain',
+                  filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.35))',
+                }}
+                draggable={false}
+              />
+            </div>
+            <div
+              style={{
+                flexShrink: 0,
+                background: 'rgba(0,0,0,0.55)',
+                padding: isMobile ? '8px 10px' : '10px 12px',
+                color: 'white',
+                fontSize: isMobile ? 12 : 14,
+                fontWeight: 600,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
               {product.name}
             </div>
           </div>

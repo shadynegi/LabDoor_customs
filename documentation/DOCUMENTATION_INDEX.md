@@ -22,7 +22,7 @@
 | Activity | Consent-gated batch; `contact_submit`, `purchase_complete`, `size_select`, `quantity_change`; CSRF-exempt `/activity/batch`; IP anonymized |
 | Admin | Server product search; order search by **id UUID**, order number, email, name; products paginated (no category field); **Settings** tab (activity export, sessions, customer recompute); coupon scope (`all` / product IDs); estimated delivery; **no customer refunds** (cancel unpaid pending only) |
 | Store policy | All sales final; manufacturing-defect replacements within 30 days; `/returns-policy` + `/replacement-policy` |
-| Mobile | Sticky CTAs, visualViewport keyboard offset, **document scroll** (`html` scrollport; `#root` block layout; Home `overflow-x` only), cart policy spacer, LAN checkout idempotency (`createClientId`), **responsive-pages-ui** Playwright matrix (422 tests total; 193 mobile-chrome) |
+| Mobile | Sticky CTAs, visualViewport keyboard offset, **document scroll** (`html` scrollport; `#root` block layout; Home `overflow-x` only), home carousel `object-fit: contain`, cart policy spacer, LAN checkout idempotency (`createClientId`), **responsive-pages-ui** Playwright matrix (423 tests total; 193 mobile-chrome) |
 
 ---
 
@@ -86,6 +86,7 @@
 | [SEARCH_CONSOLE_SETUP.md](./SEARCH_CONSOLE_SETUP.md) | Google Search Console |
 | [RESTART_BACKEND.md](./RESTART_BACKEND.md) | Backend restart |
 | [GET_DATABASE_URL.md](./GET_DATABASE_URL.md) | Supabase connection string |
+| [SUPABASE_KEEP_ALIVE.md](./SUPABASE_KEEP_ALIVE.md) | Daily read-only DB ping (GitHub Actions) |
 
 ---
 
@@ -95,6 +96,7 @@
 |----------|---------|
 | [SUPABASE_SETUP_INSTRUCTIONS.md](./SUPABASE_SETUP_INSTRUCTIONS.md) | Supabase project setup |
 | [SUPABASE_SQL_TO_RUN.md](./SUPABASE_SQL_TO_RUN.md) | SQL scripts |
+| [SUPABASE_KEEP_ALIVE.md](./SUPABASE_KEEP_ALIVE.md) | Daily read-only DB ping (GitHub Actions) |
 | [STEP_BY_STEP_SQL.md](./STEP_BY_STEP_SQL.md) | Step-by-step SQL |
 | [RLS_OPTIMIZATION.md](./RLS_OPTIMIZATION.md) | Row-level security |
 

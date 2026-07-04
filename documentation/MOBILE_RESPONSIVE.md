@@ -50,7 +50,7 @@ Layouts are verified at these common viewport widths:
 
 ### Storefront
 
-- **Home:** Hero product image scales with `hero-product-img` (no fixed 350px overflow on 320px screens). Carousel controls use 44px touch targets.
+- **Home:** Hero product image scales with `hero-product-img` (no fixed 350px overflow on 320px screens). The scrolling **product carousel** (`ProductCarousel`) uses `object-fit: contain` with centered padding so full shoes are visible (matches the catalog grid); product names sit in a footer bar below the image. Carousel controls use 44px touch targets.
 - **Products:** `responsive-product-grid` uses `minmax(160px, 1fr)` on phones; two columns on very narrow (≤359px) screens. Product card titles use **2-line clamp** on mobile. Out-of-stock products show an **Out of Stock** badge on cards. **Sort by** uses `product-filters__sort` — full-width row on phones, label stacked above the select on ≤389px, 48px touch height, 16px font (avoids iOS zoom), shorter option labels on ≤389px widths.
 - **Product detail:** `Product360Viewer` uses CSS-based sizing (not Tailwind). When out of stock, add-to-cart is disabled (inline button hidden on mobile when sticky CTA is shown; sticky CTA also disabled).
 - **Cart / checkout / product detail:** Sticky bottom bar (`MobileStickyCta`) shows total + primary action on phones. Cart uses **stacked** layout with `.cart-mobile-sticky-spacer` plus `.has-mobile-sticky-cta--stacked` padding so **All sales final** policy text (`data-testid="cart-policy-notice"`) stays above the sticky bar when scrolled. **Continue Shopping** (desktop and mobile sticky) routes to `/products`. Product detail **omits** sticky bar when out of stock.

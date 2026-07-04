@@ -114,7 +114,7 @@ Customers complete payment off-site via WhatsApp after `POST /api/checkout/place
 |--------|---------|
 | `PRODUCTION_API_BASE_URL` | Sitemap job (live product URLs during CI) |
 | `VITE_SENTRY_DSN` | Monorepo production build |
-| `DATABASE_URL` | Supabase keep-alive cron |
+| `DATABASE_URL` | Supabase keep-alive workflow (daily cron) |
 
 ---
 

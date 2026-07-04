@@ -1,27 +1,32 @@
 #!/usr/bin/env node
 /**
- * Supabase Keep-Alive Script
+ * Supabase keep-alive — lightweight read-only ping (SELECT 1).
  *
- * Runs lightweight queries to prevent Supabase free-tier auto-pause (7 days inactivity).
- * Designed for GitHub Actions, cron, or any scheduler every 6 days.
+ * Prevents Supabase free-tier auto-pause after ~7 days of inactivity.
+ * Connection options mirror backend/src/lib/db.ts pooler detection (postgres.js + DATABASE_URL).
  *
  * Usage:
  *   node scripts/keep-alive.js
  *   npm run keep-alive
  *
- * Env vars required:
- *   DATABASE_URL - Postgres/Supabase connection string (session pooler :5432 recommended)
+ * Env:
+ *   DATABASE_URL            — required (pooler :6543 recommended)
+ *   KEEP_ALIVE_TIMEOUT_MS   — optional query timeout (default 30000)
+ *   DB_USE_POOLER           — optional, same as app
  *
- * Exit codes:
- *   0 - Success
- *   1 - Failure (DB unreachable, query failed, etc.)
+ * Exit: 0 success, 1 failure
  */
 
 const postgres = require('postgres');
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
-/** Supabase pooler host or transaction port requires prepare=false. */
+/** Read-only ping — no writes, minimal load. */
+const PING_QUERY = 'SELECT 1 AS ping';
+
+const DEFAULT_TIMEOUT_MS = 30_000;
+
+/** Supabase pooler host or transaction port requires prepare=false (see db.ts). */
 function usePoolerMode(url) {
   if (process.env.DB_USE_POOLER === 'true') return true;
   try {
@@ -45,43 +50,51 @@ function getConnectionOptions(databaseUrl) {
   };
 }
 
+function queryTimeout(ms) {
+  return new Promise((_, reject) => {
+    setTimeout(() => reject(new Error(`Keep-alive query timed out after ${ms}ms`)), ms);
+  });
+}
+
 async function runKeepAlive(databaseUrl = process.env.DATABASE_URL) {
-  if (!databaseUrl) {
-    console.error('❌ DATABASE_URL is not set. Check your .env or GitHub secrets.');
+  if (!databaseUrl?.trim()) {
+    console.error('Keep-alive failed: DATABASE_URL is not set.');
     process.exit(1);
   }
 
+  const timeoutMs = parseInt(process.env.KEEP_ALIVE_TIMEOUT_MS || String(DEFAULT_TIMEOUT_MS), 10);
   const startedAt = new Date().toISOString();
-  console.log(`🏓 [${startedAt}] Supabase keep-alive ping starting...`);
+  console.log(`Keep-alive started (${startedAt})`);
 
   const sql = postgres(databaseUrl, getConnectionOptions(databaseUrl));
 
   try {
-    const [versionRow] = await sql`SELECT version() AS version`;
-    const [countRow] = await sql`SELECT COUNT(*)::int AS count FROM products`;
-    const [nowRow] = await sql`SELECT NOW() AS server_time`;
+    const [row] = await Promise.race([
+      sql`SELECT 1 AS ping`,
+      queryTimeout(timeoutMs),
+    ]);
 
-    console.log('✅ Supabase is alive!');
-    console.log(`   📅 Server time:    ${nowRow.server_time.toISOString()}`);
-    console.log(`   🗄️  Postgres:       ${versionRow.version.split(',')[0]}`);
-    console.log(`   📦 Products count: ${countRow.count}`);
-    console.log(`   ⏱️  Completed at:   ${new Date().toISOString()}`);
+    console.log('Database connection successful');
+    console.log(`Query executed successfully (${PING_QUERY})`);
+    console.log(`Execution completed (ping=${row?.ping ?? 1})`);
 
-    await sql.end();
+    await sql.end({ timeout: 5 });
     return 0;
   } catch (err) {
-    console.error('❌ Keep-alive failed:');
-    console.error(`   Error: ${err.message}`);
-    console.error(`   Code:  ${err.code || 'N/A'}`);
+    console.error('Keep-alive failed:');
+    console.error(`  Message: ${err.message}`);
+    console.error(`  Code:    ${err.code || 'N/A'}`);
     if (err.code === 'ENOTFOUND') {
-      console.error('   💡 Hint: Project may already be paused. Restore it manually first.');
+      console.error('  Hint: Project may be paused — restore it in the Supabase dashboard.');
     }
     if (err.code === 'ETIMEDOUT' || err.code === 'CONNECT_TIMEOUT') {
-      console.error('   💡 Hint: Check network/firewall allows outbound PostgreSQL (5432/6543).');
+      console.error('  Hint: Check outbound PostgreSQL (5432/6543) and DATABASE_URL.');
     }
     try {
       await sql.end({ timeout: 5 });
-    } catch {}
+    } catch {
+      /* ignore close errors */
+    }
     return 1;
   }
 }
@@ -90,4 +103,10 @@ if (require.main === module) {
   runKeepAlive().then((code) => process.exit(code));
 }
 
-module.exports = { usePoolerMode, getConnectionOptions, runKeepAlive };
+module.exports = {
+  usePoolerMode,
+  getConnectionOptions,
+  runKeepAlive,
+  PING_QUERY,
+  DEFAULT_TIMEOUT_MS,
+};

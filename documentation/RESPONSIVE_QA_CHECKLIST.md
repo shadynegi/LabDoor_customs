@@ -50,6 +50,7 @@ Use browser DevTools device mode or resize the window to each width.
 
 - [ ] Hero image fits without horizontal scroll at 320px
 - [ ] Hero carousel and **View All Products** reachable by vertical scroll on mobile (not clipped)
+- [ ] Carousel shoe thumbnails show full product (`object-fit: contain`, not cropped)
 - [ ] Navigation menu accessible
 
 ### Products (`/products`)

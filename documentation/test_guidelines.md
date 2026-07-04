@@ -45,7 +45,7 @@ If the user did not mention testing, **skip** `npm test`, `npm run test:all`, Pl
 | Frontend E2E / UI | Playwright | `Tests/frontend/` | 15 files, 233 tests (40 desktop + 193 mobile project) | No (mocked `/api` + static preview) |
 | Link checker | Custom script | repo root | — | No |
 
-**Total:** 422 automated tests — 118 backend unit + 71 API + 233 Playwright UI (40 desktop chromium + 193 mobile-chrome).
+**Total:** 423 automated tests — 119 backend unit + 71 API + 233 Playwright UI (40 desktop chromium + 193 mobile-chrome).
 
 Backend unit tests include: payment idempotency, order tokens, order token encryption, **admin credentials** (`adminCredentials.test.ts` — primary + `ADMIN_ADDITIONAL_USERS`), **cart line size validation** (`cartLineSize.test.ts` — whole-number UK/US/EU sizes), **product public_id** URL helpers, product image validation, admin session hashing, checkout pricing, **WhatsApp message formatting** (`whatsappCheckout.test.ts` — totals, volume/coupon lines, size, free shipping, URL encoding), **WhatsApp payment confirmation** (`whatsappNotifications.test.ts`, `postPaymentCapture.test.ts`), coupon scope (`applies_to` all/product), `computeCheckoutPricingForCart`, RLS table list + bootstrap contract, RLS grant revoke under `BOOTSTRAP_SKIP_DDL`, order portal URL (`buildOrderPortalUrl` in `orderPortalUrl.ts`), client IP, keep-alive, **checkout client id** (`clientId.test.ts` — UUID fallback when `crypto.randomUUID` unavailable), **admin analytics IST date helpers** (`adminAnalyticsDates.test.ts`), **build performance budgets** (`performanceBudgets.test.ts`), **sales analytics** invalid custom-date fallback.
 
@@ -229,7 +229,7 @@ Production frontend builds run `optimize-assets` (WebP from source PNGs) and `bu
 | `analyticsIst.test.ts` | IST calendar boundaries for admin analytics |
 | `salesAnalytics.test.ts` | Analytics period parsing (incl. custom IST `from`/`to`, invalid-date fallback) and CSV export helpers |
 | `performanceBudgets.test.ts` | Frontend `build-budget.mjs` contract (JS bundle limits) |
-| `keepAlive.test.ts` | Supabase pooler keep-alive connection options |
+| `keepAlive.test.ts` | Supabase keep-alive pooler options + read-only `SELECT 1` query constant |
 
 See `Tests/backend/` for the full list (33 files, 121 tests).
 

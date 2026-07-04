@@ -157,6 +157,7 @@ Global CSS in `frontend/src/index.css` (see [MOBILE_RESPONSIVE.md](MOBILE_RESPON
 - **`#root`** is block layout (not flex) so nested app shells do not trap scroll.
 - **`AppShell`** keeps flex column + sticky footer; **`main`** uses `flex: 1 0 auto` so content height drives document scroll.
 - **Home** uses `overflow-x: hidden` only (not `overflow: hidden`) so the product carousel below the hero remains reachable.
+- **Home product carousel** (`ProductCarousel`): scrolling thumbnail cards use `object-fit: contain` (not `cover`) so shoe photos are not cropped; images are centered on the brand gradient with the product name in a dedicated footer.
 
 ---
 
@@ -930,7 +931,7 @@ Templates: `backend/env.template`, `frontend/env.template`
 
 ### Keep-alive (`.github/workflows/keep-supabase-alive.yml`)
 
-Cron every 6 days — pings database via `backend/scripts/keep-alive.js` (requires `DATABASE_URL` secret).
+Cron **daily** at 09:00 UTC — read-only `SELECT 1` via `backend/scripts/keep-alive.js` (requires `DATABASE_URL` GitHub secret). See [`SUPABASE_KEEP_ALIVE.md`](SUPABASE_KEEP_ALIVE.md).
 
 ### Dependabot
 
@@ -1009,7 +1010,7 @@ npm run links:check
 | Backend unit/API | Vitest | **place-order** checkout (validation + WhatsApp integration happy path), WhatsApp message formatting, admin mark-paid, **admin analytics** (401, IST custom range, CSV export), **validate-cart** (empty/invalid/OOS), **products search** edge cases, **stability/concurrency smoke**, coupon scope (`all` / `product`), `computeCheckoutPricingForCart`, payment idempotency, order tokens, process error handlers, RLS table list + grant revoke, order portal URL, activity batch/log, order lookup, **IST date helpers**, **build performance budgets**, sales analytics invalid-date fallback, **checkout client id** (`createClientId` LAN fallback) |
 | Frontend E2E / UI | Playwright | Storefront smoke + deep flows, **document scroll** smoke, **responsive pages matrix** (11 phone viewports × all routes, incl. 320px), checkout/contact/admin UI, mobile viewport |
 
-**Total automated tests:** 422 (118 backend unit + 71 API + 233 Playwright UI).
+**Total automated tests:** 423 (119 backend unit + 71 API + 233 Playwright UI).
 
 **Viewport overflow audit (optional):** With `frontend` built and preview on port 4173, run `node Tests/scripts/audit-viewport-overflow.mjs` — checks 12 widths × 16 storefront routes for horizontal overflow.
 
@@ -1035,6 +1036,7 @@ API and backend unit tests mock Postgres via `Tests/setup.ts`. Checkout/cart tes
 | [ADMIN_DASHBOARD_GUIDE.md](ADMIN_DASHBOARD_GUIDE.md) | Admin UI |
 | [WHATSAPP_CHECKOUT_GUIDE.md](WHATSAPP_CHECKOUT_GUIDE.md) | WhatsApp checkout and admin payment confirmation |
 | [DATABASE_SETUP.md](DATABASE_SETUP.md) | Schema and migrations |
+| [SUPABASE_KEEP_ALIVE.md](SUPABASE_KEEP_ALIVE.md) | Daily Supabase read-only ping (GitHub Actions) |
 | [PERFORMANCE_BASELINE.md](PERFORMANCE_BASELINE.md) | Bundle budgets, WebP pipeline, before/after metrics |
 | [MEDIA_ASSET_GUIDE.md](MEDIA_ASSET_GUIDE.md) | Product and static image conventions |
 
