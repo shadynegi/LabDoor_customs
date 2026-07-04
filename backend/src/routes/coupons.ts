@@ -26,7 +26,7 @@ interface Coupon {
   valid_from?: string;
   valid_until?: string;
   is_active?: boolean;
-  applies_to?: 'all' | 'category' | 'product';
+  applies_to?: 'all' | 'product';
   applies_to_ids?: number[];
   created_at?: string;
   updated_at?: string;
@@ -36,7 +36,13 @@ interface CouponValidationRequest {
   code: string;
   subtotal: number;
   customer_email?: string;
-  items?: Array<{ product_id: number; category?: string; quantity: number; price: number }>;
+  items?: Array<{
+    product_id: number;
+    quantity: number;
+    price?: number;
+    size_system?: string;
+    size_value?: string;
+  }>;
 }
 
 interface CouponValidationResult {
@@ -67,7 +73,12 @@ router.post('/validate', async (req: Request, res: Response) => {
 
     const cartInputs = (items || [])
       .filter((item) => item?.product_id && item.quantity > 0)
-      .map((item) => ({ product_id: item.product_id, quantity: item.quantity }));
+      .map((item) => ({
+        product_id: item.product_id,
+        quantity: item.quantity,
+        size_system: item.size_system,
+        size_value: item.size_value,
+      }));
 
     if (!cartInputs.length && (!subtotal || subtotal <= 0)) {
       return res.status(400).json({
@@ -84,7 +95,8 @@ router.post('/validate', async (req: Request, res: Response) => {
       code.trim(),
       cacheSubtotal,
       emailKey,
-      cartInputs.reduce((sum, item) => sum + item.quantity, 0)
+      cartInputs.reduce((sum, item) => sum + item.quantity, 0),
+      cartInputs.map((item) => item.product_id)
     );
 
     const result = await cached(cacheKey, TTL.couponValidate, async () => {

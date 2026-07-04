@@ -61,7 +61,7 @@ Create these accounts before or during first Railway deploy. None require paid p
 | 3 | **Supabase** | PostgreSQL (already in use) | **$0** | **$0** (Free) or **$25** (Pro) |
 | 4 | **Upstash** | Redis (required in prod) | **$0** | **$0** (Free tier) |
 | 5 | **Sentry** | Error tracking (required for prod build) | **$0** | **$0** (Developer) |
-| 6 | **Resend** | Order / transactional email | **$0** | **$0** (3k emails/mo) |
+| 6 | **WhatsApp Cloud API** | Automated customer texts (optional) | **$0** | Meta free tier for low volume |
 | 7 | **WhatsApp Business** | Customer order messages | **$0** | **$0** |
 | 8 | **GitHub** | Source + CI | **$0** | **$0** |
 | 9 | **Meta Business** | Instagram ads + Meta Pixel | **$0** | Ad spend only |
@@ -73,8 +73,7 @@ Create these accounts before or during first Railway deploy. None require paid p
 - [ ] Create Railway project linked to GitHub repo root
 - [ ] Create Upstash Redis database (same region as Supabase when possible)
 - [ ] Create Sentry projects (Express + React DSNs)
-- [ ] Create Resend account (domain verification after DNS is live)
-- [ ] Configure `WHATSAPP_ORDER_PHONE` on Railway (default `919888514572` if unset)
+- [ ] Configure `WHATSAPP_CONTACT_NUMBER` on Railway (E.164) and matching `VITE_WHATSAPP_CONTACT_NUMBER` on frontend build; optional Meta Cloud API vars for automated customer texts
 - [ ] Create **Meta Business Portfolio** + connect Instagram professional account
 - [ ] Create GA4 property + Search Console property for `www.labdoorcustoms.com`
 
@@ -91,7 +90,7 @@ Customer → Cloudflare → Railway (Express + React)
                       → Supabase (PostgreSQL pooler :6543)
                       → Upstash Redis
                       → WhatsApp (customer messages)
-                      → Resend
+                      → WhatsApp Cloud API
                       → Sentry
 ```
 
@@ -105,7 +104,7 @@ Deploy steps: [DEPLOYMENT.md](./DEPLOYMENT.md) · [CLOUDFLARE_RAILWAY.md](./CLOU
 | **Cloudflare** | $0 | $0 |
 | **Upstash Redis** | $0 (256 MB, 500k cmds/mo) | $0 → $0–10 if traffic spikes |
 | **Sentry** | $0 | $0 |
-| **Resend** | $0 | $0 (upgrade at 3k+ emails/mo) |
+| **WhatsApp Cloud API** | $0 | $0 (pay Meta only at high message volume) |
 | **Supabase** | $0 Free | **$25 Pro** (no 7-day pause, backups) |
 | **Domain (amortized)** | ~$0.87/mo | ~$0.87/mo |
 | **Monthly subtotal** | **~$5–6** | **~$31–38** |
@@ -139,7 +138,7 @@ Complete before spending on Instagram ads.
 | 8–12 organic posts (grid + Reels) | $0 | Phone or Canva |
 | Google Search Console | $0 | `VITE_GSC_VERIFICATION` |
 | GA4 after cookie consent | $0 | `VITE_GA4_MEASUREMENT_ID` |
-| Email on purchase | $0 | Resend via backend |
+| Email on purchase | $0 | WhatsApp (store contact + optional Cloud API) |
 
 **Gate for Phase D:** WhatsApp checkout works on mobile + desktop; product pages load fast; at least 3 strong creatives (static or Reels) ready for ads.
 
@@ -236,7 +235,7 @@ you accept intentional loss-leader spend for brand awareness with a fixed cap.
 | Week | Actions | Spend |
 |------|---------|-------|
 | 1 | Buy domain; Railway deploy; Cloudflare DNS; env vars | **~$11** + **$5** Railway |
-| 2 | WhatsApp checkout smoke test; Resend domain verify; smoke tests | **$5** Railway |
+| 2 | WhatsApp checkout smoke test; optional Cloud API setup; smoke tests | **$5** Railway |
 | 3 | Instagram organic content; GSC + GA4; Meta Pixel installed | **$5** Railway |
 | 4 | Fix checkout/mobile issues from real device testing | **$5** Railway |
 
@@ -292,7 +291,7 @@ Add **COGS/shipping** to margin planning — not included above.
 
 | Trigger | Upgrade | Extra cost |
 |---------|---------|------------|
-| >3,000 emails/month | Resend Pro | ~$20/mo |
+| High outbound message volume | Meta WhatsApp Cloud API pricing | Per Meta rate card |
 | >5,000 Sentry errors/month | Sentry Team | ~$26/mo |
 | Redis command limit exceeded | Upstash pay-as-you-go | ~$0–10/mo typical |
 | Supabase >500 MB or need no-pause | Supabase Pro | $25/mo |

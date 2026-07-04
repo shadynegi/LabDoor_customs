@@ -87,28 +87,6 @@ export function mountRateLimits(app: Express): void {
   );
 
   app.post(
-    '/api/reviews/admin',
-    rateLimit({
-      ...common,
-      store: storeFor('rl:reviews-admin'),
-      windowMs: 15 * 60 * 1000,
-      max: 30,
-      handler: rateLimit429('Too many review requests. Please try again later.'),
-    })
-  );
-
-  app.post(
-    '/api/reviews',
-    rateLimit({
-      ...common,
-      store: storeFor('rl:reviews'),
-      windowMs: 60 * 60 * 1000,
-      max: 5,
-      handler: rateLimit429('Too many reviews submitted. Please try again later.'),
-    })
-  );
-
-  app.post(
     '/api/coupons/validate',
     rateLimit({
       ...common,
@@ -142,17 +120,6 @@ export function mountRateLimits(app: Express): void {
   );
 
   app.post(
-    '/api/reviews/:id/vote',
-    rateLimit({
-      ...common,
-      store: storeFor('rl:review-vote'),
-      windowMs: 15 * 60 * 1000,
-      max: 30,
-      handler: rateLimit429('Too many review votes. Please try again later.'),
-    })
-  );
-
-  app.post(
     '/api/orders/lookup',
     rateLimit({
       ...common,
@@ -171,17 +138,6 @@ export function mountRateLimits(app: Express): void {
       windowMs: 15 * 60 * 1000,
       max: 60,
       handler: rateLimit429('Too many search requests. Please try again later.'),
-    })
-  );
-
-  app.post(
-    '/api/reviews/check',
-    rateLimit({
-      ...common,
-      store: storeFor('rl:review-check'),
-      windowMs: 15 * 60 * 1000,
-      max: 20,
-      handler: rateLimit429('Too many eligibility checks. Please try again later.'),
     })
   );
 

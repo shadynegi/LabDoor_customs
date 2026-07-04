@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CheckCircle2, MessageCircle } from 'lucide-react';
 import { useResponsive } from '../hooks/useResponsive';
+import { useCart } from './CartContext';
 
 interface LastPlacedOrder {
   orderNumber?: string;
@@ -12,9 +13,14 @@ interface LastPlacedOrder {
 
 export default function PaymentSuccess() {
   const { isMobile } = useResponsive();
+  const { clearCart } = useCart();
   const [order, setOrder] = useState<LastPlacedOrder | null>(null);
 
   useEffect(() => {
+    if (sessionStorage.getItem('ldc_clear_cart_after_order')) {
+      sessionStorage.removeItem('ldc_clear_cart_after_order');
+      clearCart();
+    }
     try {
       const raw = sessionStorage.getItem('lastPlacedOrder');
       if (raw) {
@@ -23,12 +29,12 @@ export default function PaymentSuccess() {
     } catch {
       setOrder(null);
     }
-  }, []);
+  }, [clearCart]);
 
   return (
     <div
       style={{
-        minHeight: '100vh',
+        minHeight: '100dvh',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',

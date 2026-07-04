@@ -4,7 +4,7 @@ import { Heart, Award, Truck, Shield, Package, MapPin } from "lucide-react";
 import MetaTags from "../components/MetaTags";
 import { useResponsive } from "../hooks/useResponsive";
 import { FREE_SHIPPING_MESSAGE, SHIPPING_COST } from "../utils/pricing";
-import { REPLACEMENT_SUPPORT_EMAIL } from "../constants/returnPolicy";
+import { getWhatsAppContactDisplay } from "../lib/whatsappContact";
 
 export default function AboutUs() {
   const { isMobile } = useResponsive();
@@ -12,7 +12,7 @@ export default function AboutUs() {
   return (
     <div
       style={{
-        minHeight: "100vh",
+        minHeight: "100dvh",
         background: "linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)",
       }}
     >
@@ -143,7 +143,7 @@ export default function AboutUs() {
             {
               icon: Heart,
               title: "Customer Support",
-              description: `Questions about orders or manufacturing-defect replacements? Reach us at ${REPLACEMENT_SUPPORT_EMAIL}.`,
+              description: `Questions about orders or manufacturing-defect replacements? Message us on WhatsApp at ${getWhatsAppContactDisplay()}.`,
               delay: 0.5,
             },
             {

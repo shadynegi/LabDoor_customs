@@ -1,6 +1,6 @@
 -- Enable RLS on sensitive tables (also applied at server boot via ensureRlsPolicies()).
 -- Safe to run in Supabase SQL Editor: skips tables that do not exist yet.
--- Runtime tables (payment_idempotency, processed_refund_events, order_checkout_exchanges)
+-- Runtime tables (payment_idempotency, order_access_exchanges)
 -- are created when the backend starts successfully — re-run this script after first boot if needed.
 
 DO $migrate$
@@ -11,8 +11,7 @@ DECLARE
     'coupons',
     'coupon_usage',
     'payment_idempotency',
-    'processed_refund_events',
-    'order_checkout_exchanges',
+    'order_access_exchanges',
     'customers',
     'activity_logs'
   ];

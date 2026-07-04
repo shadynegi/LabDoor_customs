@@ -136,7 +136,26 @@ export default function AdminProductSearchPicker({
         </div>
       )}
 
+      <label
+        htmlFor="admin-product-search"
+        style={{
+          position: 'absolute',
+          width: 1,
+          height: 1,
+          padding: 0,
+          margin: -1,
+          overflow: 'hidden',
+          clip: 'rect(0, 0, 0, 0)',
+          whiteSpace: 'nowrap',
+          border: 0,
+        }}
+      >
+        {placeholder || 'Search products by name'}
+      </label>
+
       <input
+        id="admin-product-search"
+        name="productSearch"
         type="text"
         value={mode === 'single' && value && !open ? `Product #${value}` : query}
         onChange={(e) => {
@@ -148,6 +167,7 @@ export default function AdminProductSearchPicker({
         onBlur={() => setTimeout(() => setOpen(false), 150)}
         disabled={disabled}
         placeholder={placeholder || 'Search products by name…'}
+        aria-label={placeholder || 'Search products by name'}
         style={
           inputStyle ?? {
             padding: '10px 12px',

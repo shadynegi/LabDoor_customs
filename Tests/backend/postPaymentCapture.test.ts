@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import * as email from '../../backend/src/lib/email';
 import * as whatsappNotifications from '../../backend/src/lib/whatsappNotifications';
 import { sendPostCaptureNotifications } from '../../backend/src/lib/postPaymentCapture';
 
@@ -8,10 +7,7 @@ describe('sendPostCaptureNotifications', () => {
     vi.restoreAllMocks();
   });
 
-  it('sends confirmation email and WhatsApp notification', async () => {
-    const sendOrderConfirmation = vi
-      .spyOn(email.emailService, 'sendOrderConfirmation')
-      .mockResolvedValue({ success: true });
+  it('sends WhatsApp payment confirmation', async () => {
     const sendWhatsApp = vi
       .spyOn(whatsappNotifications, 'sendWhatsAppPaymentConfirmation')
       .mockResolvedValue({ success: true });
@@ -38,13 +34,6 @@ describe('sendPostCaptureNotifications', () => {
       }),
     });
 
-    expect(sendOrderConfirmation).toHaveBeenCalledWith(
-      expect.objectContaining({
-        customerEmail: 'alex@example.com',
-        orderNumber: 'GSS-CAP-1',
-        orderId: '00000000-0000-4000-8000-000000000003',
-      }),
-    );
     expect(sendWhatsApp).toHaveBeenCalledWith(
       expect.objectContaining({
         orderId: '00000000-0000-4000-8000-000000000003',

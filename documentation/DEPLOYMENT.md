@@ -15,7 +15,7 @@ User → Cloudflare (DNS + proxy) → Railway (Express API + static SPA)
                                → Supabase PostgreSQL
                                → Redis
                                → WhatsApp (customer order messages)
-                               → Resend (email)
+                               → WhatsApp Cloud API (optional customer notifications)
                                → Sentry (errors)
 ```
 
@@ -43,15 +43,14 @@ User → Cloudflare (DNS + proxy) → Railway (Express API + static SPA)
 | `DATABASE_URL` | Supabase pooler URL (port 6543) |
 | `FRONTEND_URL` | `https://www.labdoorcustoms.com` (same public URL as the Railway service) |
 | `ADMIN_PASSWORD_HASH` | Bcrypt hash — `node backend/scripts/generate-admin-hash.mjs "password"` |
-| `ADMIN_USERNAME` | Admin login username |
-| `WHATSAPP_ORDER_PHONE` | Optional — digits only (default `919888514572`) |
+| `ADMIN_USERNAME` | Primary admin login username |
+| `WHATSAPP_CONTACT_NUMBER` | Store WhatsApp contact (required in production) |
 | `TRUST_CLOUDFLARE` | `true` |
 | `REDIS_URL` | Redis connection string |
 | `SENTRY_DSN` | Sentry backend DSN |
 | `JWT_SECRET` | 32+ characters with mixed case, number, and special character |
-| `RESEND_API_KEY` | Resend API key (required at startup) |
 | `ORDER_TOKEN_ENCRYPTION_KEY` | AES-256-GCM key for order access token encryption |
-| `IP_SALT` | Salt for activity IP anonymization and review voter IDs |
+| `IP_SALT` | Salt for activity IP anonymization |
 
 ### Required build-time variables (frontend Vite build)
 
@@ -62,6 +61,7 @@ Set these on the same Railway service so `npm run build` can compile the SPA:
 | `VITE_API_BASE_URL` | `/api` (same-origin API) |
 | `VITE_SITE_URL` | `https://www.labdoorcustoms.com` |
 | `VITE_SENTRY_DSN` | Sentry frontend DSN |
+| `VITE_WHATSAPP_CONTACT_NUMBER` | Same value as `WHATSAPP_CONTACT_NUMBER` |
 
 The frontend build runs `validate-env.mjs` → `generate-sitemap.mjs` → TypeScript → Vite. In production, Express automatically serves `frontend/dist` when `index.html` exists.
 
@@ -77,6 +77,7 @@ The frontend build runs `validate-env.mjs` → `generate-sitemap.mjs` → TypeSc
 | `FRONTEND_DIST_PATH` | Override path to built SPA (default: `frontend/dist`) |
 | `DB_SSL_CA_PATH` | Supabase CA certificate |
 | `VITE_GA4_MEASUREMENT_ID` | Google Analytics |
+| `ADMIN_ADDITIONAL_USERS` | Optional JSON array of extra admin accounts `[{"username","passwordHash"}]` |
 | `SITEMAP_REQUIRE_PRODUCTS` | Fail build if sitemap has zero products |
 
 Validate locally before deploy:
@@ -102,7 +103,7 @@ See [CLOUDFLARE_RAILWAY.md](./CLOUDFLARE_RAILWAY.md).
 
 Customers complete payment off-site via WhatsApp after `POST /api/checkout/place-order`. See [WHATSAPP_CHECKOUT_GUIDE.md](./WHATSAPP_CHECKOUT_GUIDE.md).
 
-- Set `WHATSAPP_ORDER_PHONE` if the business number differs from the default.
+- Set `WHATSAPP_CONTACT_NUMBER` (backend) and `VITE_WHATSAPP_CONTACT_NUMBER` (frontend build) to your store WhatsApp number (E.164).
 - Admin confirms payment via **Mark paid** in the dashboard.
 
 ---

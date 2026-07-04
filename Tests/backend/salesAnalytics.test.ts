@@ -65,7 +65,6 @@ describe('salesAnalytics', () => {
       ],
       top_sellers_by_units: [],
       top_sellers_by_revenue: [],
-      category_breakdown: [],
       revenue_time_series: [],
       best_period: null,
     });

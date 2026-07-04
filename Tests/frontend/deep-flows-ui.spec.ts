@@ -22,13 +22,6 @@ test.describe('Deep storefront flows', () => {
     await expect(page.getByText('Secure Payment', { exact: true })).toBeVisible();
   });
 
-  test('product detail lists approved public review', async ({ page }) => {
-    await page.goto(`/product/${TEST_PRODUCT_IDS.nikeBlue}`);
-    await expect(page.getByText('Customer Reviews')).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText('Alex')).toBeVisible();
-    await expect(page.getByText('Great quality')).toBeVisible();
-  });
-
   test('checkout blocks Place Order until no-refund policy is accepted', async ({ page }) => {
     const product = PRIMARY_MOCK_PRODUCT;
     await seedCart(page, [

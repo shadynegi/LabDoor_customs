@@ -1,15 +1,16 @@
 import React, { useState } from "react";
-import { Mail, Phone, MapPin, Send } from "lucide-react";
+import { MessageCircle, MapPin, Send } from "lucide-react";
 import { toast } from "sonner";
 import MetaTags from "../components/MetaTags";
 import { logError } from "../lib/logger";
 import { apiFetch } from "../config";
 import { trackContactSubmit } from "../utils/activityTracker";
 import { useResponsive } from "../hooks/useResponsive";
-import { SITE_EMAILS } from "../lib/site";
+import { buildWhatsAppContactUrl, getWhatsAppContactDisplay } from "../lib/whatsappContact";
+import { safeHorizontalPad } from "../lib/responsive";
 
 export default function ContactUs() {
-  const { isMobile } = useResponsive();
+  const { isMobile, isSmallMobile } = useResponsive();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -39,6 +40,9 @@ export default function ContactUs() {
           description: "We'll get back to you as soon as possible.",
           duration: 5000,
         });
+        if (typeof data.whatsappUrl === 'string' && data.whatsappUrl) {
+          window.open(data.whatsappUrl, '_blank', 'noopener,noreferrer');
+        }
         setTimeout(() => {
           setSubmitted(false);
           setFormData({ name: "", email: "", subject: "", message: "" });
@@ -73,10 +77,11 @@ export default function ContactUs() {
 
   return (
     <div style={{ 
-      minHeight: "100vh",
+      minHeight: "100dvh",
       background: "linear-gradient(135deg, #361906 0%, #9c6649 100%)",
-      padding: isMobile ? "40px 20px" : "60px 40px",
-      paddingBottom: isMobile ? "max(40px, env(safe-area-inset-bottom))" : "40px"
+      padding: isMobile ? `${isSmallMobile ? 24 : 32}px 0` : "60px 0",
+      paddingBottom: isMobile ? "max(32px, env(safe-area-inset-bottom))" : "60px",
+      ...safeHorizontalPad(),
     }}>
       <MetaTags
         title="Contact Us — Lab Door Customs"
@@ -88,13 +93,15 @@ export default function ContactUs() {
         margin: "0 auto",
         background: "white",
         borderRadius: 20,
-        padding: isMobile ? 30 : 50,
-        boxShadow: "0 20px 60px rgba(0,0,0,0.3)"
+        padding: isMobile ? (isSmallMobile ? 20 : 24) : 50,
+        boxSizing: "border-box",
+        width: "100%",
+        boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
       }}>
         {/* Header */}
         <div style={{ textAlign: "center", marginBottom: 50 }}>
           <h1 style={{
-            fontSize: isMobile ? 36 : 48,
+            fontSize: isSmallMobile ? 28 : (isMobile ? 32 : 48),
             fontWeight: 900,
             background: "linear-gradient(135deg, #361906 0%, #9c6649 100%)",
             WebkitBackgroundClip: "text",
@@ -129,37 +136,24 @@ export default function ContactUs() {
                   alignItems: "center",
                   justifyContent: "center"
                 }}>
-                  <Mail size={24} color="white" />
+                  <MessageCircle size={24} color="white" />
                 </div>
                 <div>
                   <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 4, color: "#374151" }}>
-                    Email
+                    WhatsApp
                   </h3>
-                  <p
-                    style={{ color: "#6b7280", margin: 0 }}
-                    data-testid="contact-support-email"
+                  <a
+                    href={buildWhatsAppContactUrl()}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: "#9c6649", margin: 0, fontWeight: 600, textDecoration: "none" }}
+                    data-testid="contact-support-whatsapp"
                   >
-                    {SITE_EMAILS.support}
+                    {getWhatsAppContactDisplay()}
+                  </a>
+                  <p style={{ color: "#6b7280", margin: "8px 0 0", fontSize: 14 }}>
+                    Chat with us for orders, support, and custom requests.
                   </p>
-                </div>
-              </div>
-
-              <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
-                <div style={{
-                  background: "linear-gradient(135deg, #361906 0%, #9c6649 100%)",
-                  padding: 12,
-                  borderRadius: 12,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center"
-                }}>
-                  <Phone size={24} color="white" />
-                </div>
-                <div>
-                  <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 4, color: "#374151" }}>
-                    Phone
-                  </h3>
-                  <p style={{ color: "#6b7280", margin: 0 }}>+1 (555) 123-4567</p>
                 </div>
               </div>
 
@@ -213,11 +207,12 @@ export default function ContactUs() {
             
             <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 20 }}>
               <div>
-                <label style={{ display: "block", fontSize: 14, fontWeight: 600, color: "#374151", marginBottom: 8 }}>
+                <label htmlFor="contact-name" style={{ display: "block", fontSize: 14, fontWeight: 600, color: "#374151", marginBottom: 8 }}>
                   Your Name
                 </label>
                 <input
                   type="text"
+                  id="contact-name"
                   name="name"
                   value={formData.name}
                   onChange={handleChange}
@@ -237,11 +232,12 @@ export default function ContactUs() {
               </div>
 
               <div>
-                <label style={{ display: "block", fontSize: 14, fontWeight: 600, color: "#374151", marginBottom: 8 }}>
+                <label htmlFor="contact-email" style={{ display: "block", fontSize: 14, fontWeight: 600, color: "#374151", marginBottom: 8 }}>
                   Email Address
                 </label>
                 <input
                   type="email"
+                  id="contact-email"
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
@@ -261,11 +257,12 @@ export default function ContactUs() {
               </div>
 
               <div>
-                <label style={{ display: "block", fontSize: 14, fontWeight: 600, color: "#374151", marginBottom: 8 }}>
+                <label htmlFor="contact-subject" style={{ display: "block", fontSize: 14, fontWeight: 600, color: "#374151", marginBottom: 8 }}>
                   Subject
                 </label>
                 <input
                   type="text"
+                  id="contact-subject"
                   name="subject"
                   value={formData.subject}
                   onChange={handleChange}
@@ -285,10 +282,11 @@ export default function ContactUs() {
               </div>
 
               <div>
-                <label style={{ display: "block", fontSize: 14, fontWeight: 600, color: "#374151", marginBottom: 8 }}>
+                <label htmlFor="contact-message" style={{ display: "block", fontSize: 14, fontWeight: 600, color: "#374151", marginBottom: 8 }}>
                   Message
                 </label>
                 <textarea
+                  id="contact-message"
                   name="message"
                   value={formData.message}
                   onChange={handleChange}

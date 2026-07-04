@@ -3,12 +3,12 @@ import { logger } from '../lib/logger';
 import { respond500 } from '../lib/safeError';
 import { Router, Request, Response } from 'express';
 import sql, { query as dbQuery } from '../lib/db';
-import { emailService } from '../lib/email';
 import { sanitizeContactForm } from '../utils/sanitize';
+import { buildWhatsAppContactUrl } from '../lib/whatsappContact';
 
 const router = Router();
 
-// POST submit contact form (public; messages stored for audit — no admin inbox API)
+// POST submit contact form (public; messages stored for audit)
 router.post('/', async (req: Request, res: Response) => {
   try {
     const sanitized = sanitizeContactForm(req.body);
@@ -98,18 +98,13 @@ router.post('/', async (req: Request, res: Response) => {
       RETURNING id, created_at
     `, 'contact:q1');
 
-    emailService.sendContactFormReply(
-      contactData.name,
-      contactData.email,
-      contactData.subject
-    ).catch(err => {
-      logger.error('Email sending failed (non-critical):', err);
-    });
-
     res.status(201).json({
       success: true,
       data: result[0],
       message: 'Thank you for contacting us. We will get back to you soon.',
+      whatsappUrl: buildWhatsAppContactUrl(
+        `Hi, I submitted a contact form.\n\nSubject: ${contactData.subject}\n\n${contactData.message}`,
+      ) || undefined,
     });
   } catch (error: unknown) {
     logger.error('Error submitting contact form:', error);

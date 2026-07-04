@@ -14,14 +14,24 @@ import {
   type CheckoutCartItemInput,
 } from '../lib/checkoutPricing';
 import {
-  buildCreatePaymentKey,
+  buildPlaceOrderKey,
   claimIdempotencyKey,
   completeIdempotencyKey,
   failIdempotencyKey,
   reclaimFailedIdempotencyKey,
 } from '../lib/paymentIdempotency';
 import { reserveCouponForOrder } from '../lib/couponReservation';
+import { InsufficientStockError } from '../lib/inventory';
 import { buildWhatsAppOrderUrl, formatWhatsAppOrderMessage } from '../lib/whatsappCheckout';
+
+async function rollbackPendingOrder(serverOrderId: string): Promise<boolean> {
+  try {
+    return await cancelPendingOrderAndRestoreStock(serverOrderId);
+  } catch (err) {
+    logger.error(`Rollback failed for order ${serverOrderId}:`, err);
+    return false;
+  }
+}
 
 const router = Router();
 const PLACE_ORDER_OP = 'place_order';
@@ -126,18 +136,23 @@ router.post('/place-order', async (req: Request, res: Response) => {
 
     const pricing = calculateCheckoutPricing(rawSubtotal, totalItemCount, couponDiscount);
 
-    if (body.amount) {
-      const clientTotal = parseFloat(body.amount);
-      if (!amountsMatch(pricing.total, clientTotal)) {
-        return res.status(400).json({
-          success: false,
-          error: 'Amount mismatch',
-          message: `Server total (${pricing.total.toFixed(2)}) does not match client total (${clientTotal.toFixed(2)})`,
-        });
-      }
+    if (!body.amount || Number.isNaN(parseFloat(body.amount))) {
+      return res.status(400).json({
+        success: false,
+        error: 'Amount is required',
+        message: 'Client total is required for checkout verification',
+      });
+    }
+    const clientTotal = parseFloat(body.amount);
+    if (!amountsMatch(pricing.total, clientTotal)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Amount mismatch',
+        message: `Server total (${pricing.total.toFixed(2)}) does not match client total (${clientTotal.toFixed(2)})`,
+      });
     }
 
-    idempotencyKey = buildCreatePaymentKey(
+    idempotencyKey = buildPlaceOrderKey(
       req.headers['x-idempotency-key'] as string | undefined,
       customerInfo.email,
       items.map((item) => ({ product_id: item.product_id, quantity: item.quantity })),
@@ -184,9 +199,19 @@ router.post('/place-order', async (req: Request, res: Response) => {
           pricing.couponDiscount
         );
       } catch (couponReserveError: unknown) {
-        await cancelPendingOrderAndRestoreStock(createdServerOrderId).catch((err) =>
-          logger.error('Rollback after coupon reservation failure:', err)
-        );
+        const rolledBack = await rollbackPendingOrder(createdServerOrderId);
+        if (!rolledBack) {
+          return res.status(503).json({
+            success: false,
+            error: 'Order rollback failed',
+            message: 'Coupon could not be applied and the order could not be rolled back. Contact support before retrying.',
+            serverOrderId: createdServerOrderId,
+          });
+        }
+        createdServerOrderId = undefined;
+        if (idempotencyKey) {
+          await failIdempotencyKey(idempotencyKey, PLACE_ORDER_OP).catch(() => {});
+        }
         const message =
           couponReserveError instanceof Error ? couponReserveError.message : 'Coupon unavailable';
         return res.status(400).json({
@@ -226,14 +251,33 @@ router.post('/place-order', async (req: Request, res: Response) => {
     res.json(responsePayload);
   } catch (error: unknown) {
     logger.error('Place order error:', error);
+
     if (createdServerOrderId) {
-      await cancelPendingOrderAndRestoreStock(createdServerOrderId).catch((err) =>
-        logger.error('Rollback after place-order error:', err)
-      );
+      const rolledBack = await rollbackPendingOrder(createdServerOrderId);
+      if (!rolledBack) {
+        return res.status(503).json({
+          success: false,
+          error: 'Order rollback failed',
+          message: 'Your order could not be finalized. Contact support before retrying.',
+          serverOrderId: createdServerOrderId,
+        });
+      }
+      createdServerOrderId = undefined;
     }
+
     if (idempotencyKey) {
       await failIdempotencyKey(idempotencyKey, PLACE_ORDER_OP).catch(() => {});
     }
+
+    if (error instanceof InsufficientStockError) {
+      return res.status(409).json({
+        success: false,
+        error: 'Insufficient stock',
+        message: 'One or more items are no longer available in the requested quantity.',
+        shortages: error.outOfStock,
+      });
+    }
+
     respond500(res, error, clientErrorMessage(error, 'Failed to place order'));
   }
 });

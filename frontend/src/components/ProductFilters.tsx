@@ -8,7 +8,6 @@ const COMPACT_SORT_LABELS: Record<string, string> = {
   Default: 'Default',
   'Price: Low to High': 'Lowest price',
   'Price: High to Low': 'Highest price',
-  'Highest Rated': 'Top rated',
   'Newest First': 'Newest',
   'Oldest First': 'Oldest',
 };
@@ -44,14 +43,6 @@ const ProductFilters: React.FC<ProductFiltersProps> = ({
   // Price range state for slider
   const priceMin = filterOptions?.priceRange.min || 0;
   const priceMax = filterOptions?.priceRange.max || 500;
-
-  const ratingOptions = [
-    { value: undefined, label: 'All Ratings' },
-    { value: 4, label: '4+ Stars' },
-    { value: 3, label: '3+ Stars' },
-    { value: 2, label: '2+ Stars' },
-    { value: 1, label: '1+ Star' },
-  ];
 
   return (
     <div className="product-filters">
@@ -122,6 +113,7 @@ const ProductFilters: React.FC<ProductFiltersProps> = ({
           </label>
           <select
             id="product-sort-by"
+            name="sortBy"
             className="product-filters__sort-select"
             value={filters.sortBy || 'default'}
             onChange={(e) => onFilterChange('sortBy', e.target.value as SortOption)}
@@ -139,9 +131,6 @@ const ProductFilters: React.FC<ProductFiltersProps> = ({
                 </option>
                 <option value="price_desc">
                   {sortOptionLabel('Price: High to Low', compactSortLabels)}
-                </option>
-                <option value="rating_desc">
-                  {sortOptionLabel('Highest Rated', compactSortLabels)}
                 </option>
                 <option value="newest">
                   {sortOptionLabel('Newest First', compactSortLabels)}
@@ -174,68 +163,6 @@ const ProductFilters: React.FC<ProductFiltersProps> = ({
                 gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(200px, 1fr))',
                 gap: isMobile ? 20 : 32,
               }}>
-                {/* Size Filter */}
-                {filterOptions?.sizes && filterOptions.sizes.length > 0 && (
-                  <div>
-                    <label style={{
-                      display: 'block',
-                      fontSize: 13,
-                      fontWeight: 600,
-                      color: '#374151',
-                      marginBottom: 10,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px',
-                    }}>
-                      Size
-                    </label>
-                    <div style={{
-                      display: 'flex',
-                      flexWrap: 'wrap',
-                      gap: 8,
-                    }}>
-                      <button
-                        onClick={() => onFilterChange('size', undefined)}
-                        style={{
-                          padding: '8px 14px',
-                          fontSize: 13,
-                          fontWeight: 500,
-                          border: 'none',
-                          borderRadius: 20,
-                          cursor: 'pointer',
-                          transition: 'all 0.2s ease',
-                          background: !filters.size 
-                            ? 'linear-gradient(135deg, #361906 0%, #9c6649 100%)' 
-                            : '#f3f4f6',
-                          color: !filters.size ? 'white' : '#6b7280',
-                        }}
-                      >
-                        All
-                      </button>
-                      {filterOptions.sizes.map(size => (
-                        <button
-                          key={size}
-                          onClick={() => onFilterChange('size', size)}
-                          style={{
-                            padding: '8px 14px',
-                            fontSize: 13,
-                            fontWeight: 500,
-                            border: 'none',
-                            borderRadius: 20,
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease',
-                            background: filters.size === size 
-                              ? 'linear-gradient(135deg, #361906 0%, #9c6649 100%)' 
-                              : '#f3f4f6',
-                            color: filters.size === size ? 'white' : '#6b7280',
-                          }}
-                        >
-                          {size}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
                 {/* Color Filter */}
                 {filterOptions?.colors && filterOptions.colors.length > 0 && (
                   <div>
@@ -338,7 +265,10 @@ const ProductFilters: React.FC<ProductFiltersProps> = ({
                         fontSize: 14,
                       }}>$</span>
                       <input
+                        id="filter-min-price"
+                        name="minPrice"
                         type="number"
+                        aria-label="Minimum price"
                         placeholder={`${priceMin}`}
                         value={filters.minPrice ?? ''}
                         onChange={(e) => onFilterChange('minPrice', e.target.value ? Number(e.target.value) : undefined)}
@@ -366,7 +296,10 @@ const ProductFilters: React.FC<ProductFiltersProps> = ({
                         fontSize: 14,
                       }}>$</span>
                       <input
+                        id="filter-max-price"
+                        name="maxPrice"
                         type="number"
+                        aria-label="Maximum price"
                         placeholder={`${priceMax}`}
                         value={filters.maxPrice ?? ''}
                         onChange={(e) => onFilterChange('maxPrice', e.target.value ? Number(e.target.value) : undefined)}
@@ -383,61 +316,6 @@ const ProductFilters: React.FC<ProductFiltersProps> = ({
                         }}
                       />
                     </div>
-                  </div>
-                </div>
-
-                {/* Rating Filter */}
-                <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: '#374151',
-                    marginBottom: 10,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px',
-                  }}>
-                    Minimum Rating
-                  </label>
-                  <div style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: 8,
-                  }}>
-                    {ratingOptions.map(option => (
-                      <button
-                        key={option.label}
-                        onClick={() => onFilterChange('minRating', option.value)}
-                        style={{
-                          padding: '8px 14px',
-                          fontSize: 13,
-                          fontWeight: 500,
-                          border: 'none',
-                          borderRadius: 20,
-                          cursor: 'pointer',
-                          transition: 'all 0.2s ease',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 4,
-                          background: filters.minRating === option.value 
-                            ? 'linear-gradient(135deg, #361906 0%, #9c6649 100%)' 
-                            : '#f3f4f6',
-                          color: filters.minRating === option.value ? 'white' : '#6b7280',
-                        }}
-                      >
-                        {option.value && (
-                          <svg 
-                            width={14} 
-                            height={14} 
-                            viewBox="0 0 24 24" 
-                            fill="currentColor"
-                          >
-                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                          </svg>
-                        )}
-                        {option.label}
-                      </button>
-                    ))}
                   </div>
                 </div>
               </div>

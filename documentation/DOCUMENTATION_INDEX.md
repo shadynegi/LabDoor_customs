@@ -14,15 +14,15 @@
 |------|----------|
 | Monorepo | `frontend/` (React/Vite), `backend/` (Express), `Tests/` (Vitest + Playwright) |
 | Production | One Express process: `/api/*` + built SPA; Supabase PostgreSQL via service_role |
-| Checkout | Server-side place-order; `policy_accepted` required; WhatsApp redirect (`Order ID` = `orders.id` UUID in message); email synced to activity on change/blur |
-| Cart | `POST /api/products/validate-cart` on item changes with retry; catalog search via `POST /api/products/search` (no full-catalog client cache) |
+| Checkout | Server-side place-order; `policy_accepted` required; `createClientId()` idempotency key (HTTP LAN safe); WhatsApp redirect (`Order ID` = `orders.id` UUID in message); email synced to activity on change/blur |
+| Cart | `POST /api/products/validate-cart` on item changes with retry; catalog search via `POST /api/products/search` (no categories; no full-catalog client cache) |
 | Orders | Email `?orderId=` pre-fill on `/orders`; lookup via order ID + checkout email |
-| RLS | 14 tables service_role-only; no public PostgREST product read |
+| RLS | **10** tables with revoked `anon`/`authenticated` grants + service_role-only policies; no public PostgREST product read |
+| Form a11y | `id`/`name` on all controls; `htmlFor` or `aria-label`; `audit-form-labels.mjs` + Chrome DevTools Issues QA |
 | Activity | Consent-gated batch; `contact_submit`, `purchase_complete`, `size_select`, `quantity_change`; CSRF-exempt `/activity/batch`; IP anonymized |
-| Admin | Server product search; order search by **id UUID**, order number, email, name; products paginated; **Settings** tab (activity export, sessions, customer recompute); coupon scope + edit; review admin response; estimated delivery; **no customer refunds** (cancel unpaid pending only) |
+| Admin | Server product search; order search by **id UUID**, order number, email, name; products paginated (no category field); **Settings** tab (activity export, sessions, customer recompute); coupon scope (`all` / product IDs); estimated delivery; **no customer refunds** (cancel unpaid pending only) |
 | Store policy | All sales final; manufacturing-defect replacements within 30 days; `/returns-policy` + `/replacement-policy` |
-| Reviews | `POST /api/reviews/check` on email blur; pending-moderation copy; vote error toasts |
-| Mobile | Sticky CTAs, visualViewport keyboard offset, **document scroll** (`html` scrollport; `#root` block layout; Home `overflow-x` only), cart policy spacer, **responsive-pages-ui** Playwright matrix (411 tests total) |
+| Mobile | Sticky CTAs, visualViewport keyboard offset, **document scroll** (`html` scrollport; `#root` block layout; Home `overflow-x` only), cart policy spacer, LAN checkout idempotency (`createClientId`), **responsive-pages-ui** Playwright matrix (422 tests total; 193 mobile-chrome) |
 
 ---
 
@@ -105,8 +105,9 @@
 | Document | Purpose |
 |----------|---------|
 | [PRE_LAUNCH_CHECKLIST.md](./PRE_LAUNCH_CHECKLIST.md) | Production go-live (env, DB, WhatsApp checkout, smoke tests) |
-| [RESPONSIVE_QA_CHECKLIST.md](./RESPONSIVE_QA_CHECKLIST.md) | Responsive layout QA |
-| [FORMS_QA_CHECKLIST.md](./FORMS_QA_CHECKLIST.md) | Forms and CSRF QA |
+| [RESPONSIVE_QA_CHECKLIST.md](./RESPONSIVE_QA_CHECKLIST.md) | Responsive layout QA (includes form Issues cross-check) |
+| [MOBILE_RESPONSIVE.md](./MOBILE_RESPONSIVE.md) | Mobile breakpoints, safe areas, sticky CTAs, Playwright matrix |
+| [FORMS_QA_CHECKLIST.md](./FORMS_QA_CHECKLIST.md) | Forms, CSRF, validation, form accessibility (`audit-form-labels.mjs`, Chrome DevTools) |
 
 ---
 

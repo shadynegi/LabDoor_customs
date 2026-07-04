@@ -120,8 +120,27 @@ export default function ProductSearchBar({
         </svg>
       </div>
 
+      <label
+        htmlFor="product-search"
+        style={{
+          position: 'absolute',
+          width: 1,
+          height: 1,
+          padding: 0,
+          margin: -1,
+          overflow: 'hidden',
+          clip: 'rect(0, 0, 0, 0)',
+          whiteSpace: 'nowrap',
+          border: 0,
+        }}
+      >
+        Search products
+      </label>
+
       <input
         ref={inputRef}
+        id="product-search"
+        name="q"
         type="search"
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
@@ -284,7 +303,6 @@ export default function ProductSearchBar({
                     </div>
                     <div style={{ fontSize: 13, color: '#6b7280' }}>
                       ${Number(product.price).toFixed(2)}
-                      {product.category ? ` · ${product.category}` : ''}
                       {outOfStock ? ' · Out of Stock' : ''}
                     </div>
                   </div>

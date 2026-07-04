@@ -53,6 +53,7 @@ interface CartContextType {
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 const CART_STORAGE_KEY = 'labdoor_cart';
+const CART_CLEAR_AFTER_ORDER_KEY = 'ldc_clear_cart_after_order';
 
 // Load cart from localStorage
 const loadCartFromStorage = (): CartState => {
@@ -295,6 +296,11 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   useEffect(() => {
     hydratedRef.current = true;
+    if (sessionStorage.getItem(CART_CLEAR_AFTER_ORDER_KEY)) {
+      sessionStorage.removeItem(CART_CLEAR_AFTER_ORDER_KEY);
+      userActionRef.current = true;
+      dispatch({ type: 'CLEAR_CART' });
+    }
   }, []);
 
   const itemsSignature = state.items
@@ -303,6 +309,7 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const [validationNonce, setValidationNonce] = useState(0);
   const itemsRef = useRef(state.items);
+  const validationSeqRef = useRef(0);
   itemsRef.current = state.items;
 
   const validateCartPrices = useCallback(async () => {
@@ -313,6 +320,7 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return;
     }
 
+    const seq = ++validationSeqRef.current;
     setIsCartValidating(true);
     try {
       const response = await apiFetch('/products/validate-cart', {
@@ -329,6 +337,8 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       const data = await response.json().catch(() => ({}));
 
+      if (seq !== validationSeqRef.current) return;
+
       if (!response.ok || !data.success) {
         const message =
           data.message || data.error || 'Some items in your cart are unavailable. Please review your cart.';
@@ -343,10 +353,13 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         dispatch({ type: 'REFRESH_PRICES', payload: data.items });
       }
     } catch (error) {
+      if (seq !== validationSeqRef.current) return;
       logError('Cart price validation failed:', error);
       setCartValidationError('Unable to validate cart. Check your connection and try again.');
     } finally {
-      setIsCartValidating(false);
+      if (seq === validationSeqRef.current) {
+        setIsCartValidating(false);
+      }
     }
   }, []);
 

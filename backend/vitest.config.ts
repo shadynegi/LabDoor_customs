@@ -12,8 +12,7 @@ export default defineConfig({
       ADMIN_USERNAME: 'admin',
       ADMIN_PASSWORD_HASH: '$2b$12$ci.placeholder.hash.for.validation.only',
       FRONTEND_URL: 'http://localhost:5173',
-      WHATSAPP_ORDER_PHONE: '919888514572',
-      RESEND_API_KEY: 're_test_key',
+      WHATSAPP_CONTACT_NUMBER: '+919888514572',
     },
   },
 });

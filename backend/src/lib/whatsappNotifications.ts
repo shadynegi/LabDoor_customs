@@ -1,4 +1,4 @@
-import { buildOrderPortalUrl } from './email';
+import { buildOrderPortalUrl } from './orderPortalUrl';
 import { logger } from './logger';
 
 export interface PaymentConfirmationWhatsAppInput {
@@ -25,7 +25,7 @@ export function normalizeCustomerPhoneForWhatsApp(
     return `1${digits}`;
   }
 
-  // Default country code for the store's primary market (matches WHATSAPP_ORDER_PHONE default).
+  // Default country code for the store's primary market (WHATSAPP_CONTACT_NUMBER).
   return `91${digits}`;
 }
 
@@ -127,4 +127,99 @@ export async function sendWhatsAppPaymentConfirmation(input: {
   });
 
   return sendWhatsAppTextMessage(toPhone, message);
+}
+
+export interface ShippingWhatsAppInput {
+  orderId: string;
+  orderNumber: string;
+  customerName: string;
+  trackingNumber: string;
+  trackingUrl?: string;
+  carrier?: string;
+  estimatedDelivery?: string;
+  shippingAddress: Record<string, unknown> | null;
+}
+
+export function formatShippingWhatsAppMessage(input: ShippingWhatsAppInput): string {
+  const trackUrl = input.trackingUrl ?? buildOrderPortalUrl({ orderId: input.orderId });
+  const lines = [
+    `Hi ${input.customerName || 'there'},`,
+    '',
+    `Your order ${input.orderNumber} has shipped!`,
+    `Tracking: ${input.trackingNumber}`,
+  ];
+  if (input.carrier?.trim()) lines.push(`Carrier: ${input.carrier.trim()}`);
+  if (input.estimatedDelivery?.trim()) {
+    lines.push(`Estimated delivery: ${input.estimatedDelivery.trim()}`);
+  }
+  lines.push('', `Track your order: ${trackUrl}`);
+  return lines.join('\n');
+}
+
+export async function sendWhatsAppShippingNotification(
+  input: ShippingWhatsAppInput,
+): Promise<{ success: boolean; skipped?: boolean; error?: unknown }> {
+  const phoneRaw =
+    (input.shippingAddress?.phone as string | undefined) ??
+    (input.shippingAddress?.mobile as string | undefined);
+  const country = input.shippingAddress?.country as string | undefined;
+  const toPhone = normalizeCustomerPhoneForWhatsApp(phoneRaw, country);
+
+  if (!toPhone) {
+    logger.warn('No valid customer phone on order; skipping WhatsApp shipping notification', {
+      orderId: input.orderId,
+    });
+    return { success: false, skipped: true };
+  }
+
+  const message = formatShippingWhatsAppMessage(input);
+  return sendWhatsAppTextMessage(toPhone, message);
+}
+
+function parseShippingAddress(value: unknown): Record<string, unknown> | null {
+  if (value == null) return null;
+  if (typeof value === 'string') {
+    try {
+      return JSON.parse(value) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  }
+  if (typeof value === 'object') return value as Record<string, unknown>;
+  return null;
+}
+
+/** Fire-and-forget shipping WhatsApp when order status becomes shipped. */
+export function queueShippingWhatsAppNotification(order: {
+  id?: unknown;
+  order_number?: string | null;
+  customer_name: string;
+  tracking_number?: string | null;
+  tracking_url?: string | null;
+  carrier?: string | null;
+  estimated_delivery?: string | null;
+  shipping_address: unknown;
+}): void {
+  if (!order.id || !order.tracking_number) return;
+
+  sendWhatsAppShippingNotification({
+    orderId: String(order.id),
+    orderNumber: String(order.order_number ?? ''),
+    customerName: order.customer_name,
+    trackingNumber: order.tracking_number,
+    trackingUrl: order.tracking_url ?? undefined,
+    carrier: order.carrier ?? undefined,
+    estimatedDelivery: order.estimated_delivery ?? undefined,
+    shippingAddress: parseShippingAddress(order.shipping_address),
+  })
+    .then((result) => {
+      if (result.success) {
+        logger.info('WhatsApp shipping notification sent for order:', order.order_number);
+      } else if (!result.skipped) {
+        logger.error('Failed to send WhatsApp shipping notification:', result.error);
+      }
+    })
+    .catch((err) => {
+      logger.error('Error sending WhatsApp shipping notification:', err);
+    });
 }

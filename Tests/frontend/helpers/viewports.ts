@@ -12,6 +12,7 @@ export type MobileViewportProfile = {
 
 /** Narrowest common phones through large Android flagships. */
 export const POPULAR_MOBILE_VIEWPORTS: MobileViewportProfile[] = [
+  { id: 'iphone-se-1', label: 'iPhone SE (1st gen)', viewport: { width: 320, height: 568 } },
   { id: 'iphone-se-3', label: 'iPhone SE (3rd gen)', viewport: { width: 375, height: 667 } },
   { id: 'iphone-15-pro', label: 'iPhone 15 Pro', viewport: { width: 393, height: 659 } },
   { id: 'iphone-17', label: 'iPhone 17', viewport: { width: 393, height: 852 } },

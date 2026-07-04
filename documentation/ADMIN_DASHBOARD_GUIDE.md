@@ -15,9 +15,9 @@ How to use the Lab Door Customs admin dashboard.
 | Dashboard URL | `/adminshivamdashboard` |
 | Session | HttpOnly cookie, 24 hours |
 
-Login with admin username and password. Sessions are stored server-side in `admin_sessions` as **SHA-256 hashes** of the session token (the raw token is never persisted).
+Login with admin username and password. The primary account uses `ADMIN_USERNAME` + `ADMIN_PASSWORD_HASH`; optional extra accounts use `ADMIN_ADDITIONAL_USERS` (JSON array of `{ username, passwordHash }`). Sessions are stored server-side in `admin_sessions` as **SHA-256 hashes** of the session token (the raw token is never persisted).
 
-Generate a production password hash locally with `node backend/scripts/generate-admin-hash.mjs "your-password"` and set `ADMIN_PASSWORD_HASH` on the backend. The `/api/admin/generate-hash` route is development-only.
+Generate a production password hash locally with `node backend/scripts/generate-admin-hash.mjs "your-password"` and set `ADMIN_PASSWORD_HASH` (or add an entry to `ADMIN_ADDITIONAL_USERS`). The `/api/admin/generate-hash` route is development-only.
 
 ---
 
@@ -52,8 +52,8 @@ If the analytics API fails, the tab shows an error message with a **Retry** butt
 - **Search** — debounced server-side query via `POST /api/products/search` (searches full catalog, not only loaded pages)
 - **Load more** — paginated list via `GET /api/products?limit=50&page=` when not searching
 - Error banner with **Retry** if the product list fails to load
-- **Coupons / Reviews** — product scope uses **server search** (`AdminProductSearchPicker` → `POST /api/products/search`), not a fixed product list
-- Create new products (name, price, images via **file upload** (Multer, max 20 MB) or URL, optional **360° MP4 video**, **SKU**, **reorder point**, optional **cost price**, category, size, color, stock)
+- **Coupons** — product scope uses **server search** (`AdminProductSearchPicker` → `POST /api/products/search`), not a fixed product list
+- Create new products (name, price, images via **file upload** (Multer, max 20 MB) or URL, optional **360° MP4 video**, **SKU**, **reorder point**, optional **cost price**, size, color, stock)
 - Edit existing products (stock changes are logged to `inventory_movements`)
 - Delete products
 - **Bulk stock** — set absolute stock or apply delta for selected products via `POST /api/admin/products/bulk-update` (`stock`, `stock_delta`, or `is_out_of_stock`)
@@ -93,7 +93,7 @@ Bulk status dropdown supports processing, shipped, and delivered only. **Cancell
 
 ### Cancel orders
 
-**Store policy:** All sales are final — no customer refunds. Manufacturing-defect replacements are handled manually via support email (see `/returns-policy` on the storefront).
+**Store policy:** All sales are final — no customer refunds. Manufacturing-defect replacements are handled manually via WhatsApp contact (`WHATSAPP_CONTACT_NUMBER` / `VITE_WHATSAPP_CONTACT_NUMBER`; see `/returns-policy` on the storefront).
 
 **Pending (unpaid) orders:** Cancel restores inventory automatically.
 
@@ -110,8 +110,8 @@ Bulk status dropdown supports processing, shipped, and delivered only. **Cancell
 Manage discount codes used at checkout (server-side billing via `resolveCouponDiscount`).
 
 - **Quick presets** — create `SAVE5`, `SAVE10`, `SAVE20`, `SAVE25`, `SAVE50` (percentage off, entire order)
-- **Custom coupon** — any code + 5–50% discount + **scope**: entire order, specific product IDs, or category IDs (`applies_to` / `applies_to_ids` on `POST /api/coupons`)
-- **Edit** — pencil icon opens a modal to update description, max uses, valid-until date, **applies_to scope** (all / product / category IDs), and active status (`PUT /api/coupons/:id`)
+- **Custom coupon** — any code + 5–50% discount + **scope**: entire order or specific product IDs (`applies_to` / `applies_to_ids` on `POST /api/coupons`)
+- **Edit** — pencil icon opens a modal to update description, max uses, valid-until date, **applies_to scope** (all / product IDs), and active status (`PUT /api/coupons/:id`)
 - **Activate / deactivate** — toggle `is_active` without deleting
 - **Delete** — remove unused coupons
 - **Pagination** — 10 coupons per page (Previous/Next)
@@ -143,23 +143,6 @@ Operational tools without a dedicated data grid:
 - **Activity log export** — download all storefront activity as NDJSON via `GET /api/activity/export`; optional **From** / **To** date filters
 - **Admin sessions** — list recent sessions (`GET /api/admin/sessions`, last 50) with active/expired counts; **Clean up expired** calls `POST /api/admin/sessions/cleanup`
 - **Customer aggregates** — **Recompute customer aggregates** runs `POST /api/admin/customers/recompute` (refresh order counts and spend from completed orders)
-
----
-
-## Reviews tab
-
-Manage customer reviews from the **Reviews** tab.
-
-- **Customer email is admin-only** — the public product page and public review API never expose `customer_email`; only this tab and admin API routes include it.
-- View all reviews with **customer name**, **email**, rating, product, status, and text
-- Filter by status (pending, approved, rejected, flagged)
-- **Quick Approve / Reject** for pending reviews
-- Pagination — 50 reviews per page
-- **Create Review** — modal to add a review with customer name, optional email, product, rating, title, body, status, and verified-purchase badge
-- **Edit** — update any review field, status, or **admin response** (customer-visible reply on the storefront)
-- **Delete** — remove a review permanently
-
-API: `GET /api/reviews`, `POST /api/reviews/admin`, `PATCH /api/reviews/:id`, `DELETE /api/reviews/:id`
 
 ---
 

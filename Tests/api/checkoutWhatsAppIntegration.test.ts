@@ -86,9 +86,9 @@ describe('POST /api/checkout/place-order WhatsApp integration', () => {
     expect(message).toContain('Total: $125.00');
   });
 
-  it('uses WHATSAPP_ORDER_PHONE env for wa.me link', async () => {
-    const prev = process.env.WHATSAPP_ORDER_PHONE;
-    process.env.WHATSAPP_ORDER_PHONE = '+44 7700 900123';
+  it('uses WHATSAPP_CONTACT_NUMBER env for wa.me link', async () => {
+    const prev = process.env.WHATSAPP_CONTACT_NUMBER;
+    process.env.WHATSAPP_CONTACT_NUMBER = '+44 7700 900123';
 
     const { agent, csrfToken } = await createCsrfAgent();
     const res = await withCsrf(agent.post('/api/checkout/place-order'), csrfToken).send(
@@ -98,7 +98,7 @@ describe('POST /api/checkout/place-order WhatsApp integration', () => {
     expect(res.status).toBe(200);
     expect(res.body.whatsappUrl).toMatch(/^https:\/\/wa\.me\/447700900123\?text=/);
 
-    process.env.WHATSAPP_ORDER_PHONE = prev;
+    process.env.WHATSAPP_CONTACT_NUMBER = prev;
   });
 
   it('returns cached place-order payload for duplicate idempotency key', async () => {

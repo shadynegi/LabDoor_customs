@@ -159,7 +159,7 @@ export default function Home() {
   // Show error state with retry
   if (error && products.length === 0) {
     return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)" }}>
+      <div style={{ minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)" }}>
         <ErrorMessage message={error} onRetry={refetch} />
       </div>
     );
@@ -168,7 +168,7 @@ export default function Home() {
   // Show empty state
   if (products.length === 0) {
     return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", background: "linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)" }}>
+      <div style={{ minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", background: "linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)" }}>
         <div style={{ textAlign: "center", maxWidth: 500 }}>
           <h2 style={{ fontSize: 32, fontWeight: 800, color: "#1f2937", marginBottom: 16 }}>No Products Available</h2>
           <p style={{ fontSize: 16, color: "#6b7280", marginBottom: 24 }}>Check back soon for our latest collection!</p>
@@ -227,7 +227,7 @@ export default function Home() {
     <div
       style={{
         position: "relative",
-        minHeight: "100vh",
+        minHeight: "100dvh",
         width: "100%",
         color: "#fff",
         display: "flex",
@@ -936,7 +936,8 @@ export default function Home() {
             right: 0,
             background: "#000000",
             backdropFilter: "blur(10px)",
-            padding: "12px 20px",
+            padding: "12px max(20px, env(safe-area-inset-right, 0px))",
+            paddingLeft: "max(20px, env(safe-area-inset-left, 0px))",
             paddingBottom: "max(12px, env(safe-area-inset-bottom))",
             display: "flex",
             justifyContent: "space-between",

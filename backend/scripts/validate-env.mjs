@@ -13,7 +13,7 @@ const requiredProduction = [
   'JWT_SECRET',
   'REDIS_URL',
   'SENTRY_DSN',
-  'RESEND_API_KEY',
+  'WHATSAPP_CONTACT_NUMBER',
   'ORDER_TOKEN_ENCRYPTION_KEY',
   'IP_SALT',
 ];

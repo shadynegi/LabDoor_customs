@@ -19,7 +19,6 @@ describe('POST /api/products/search', () => {
             name: 'Blue Nike Custom',
             price: '199.00',
             description: 'Hand-painted design',
-            category: 'Sneakers',
             stock: 5,
           },
         ];

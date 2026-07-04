@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { catalogFetch } from '../config';
 import { toast } from 'sonner';
 import { logError } from '../lib/logger';
+import { normalizeProduct } from '../lib/productCatalogCache';
 
 export interface Product {
   id: number;
@@ -12,13 +13,10 @@ export interface Product {
   image: string;
   description?: string;
   background?: string;
-  category?: string;
   size?: string;
   color?: string;
   created_at?: string;
   stock?: number;
-  rating?: number;
-  review_count?: number;
   view_count?: number;
   cart_count?: number;
   is_out_of_stock?: boolean;
@@ -57,10 +55,7 @@ export const useProducts = (): UseProductsResult => {
       const data = await response.json();
 
       if (data.success && data.data) {
-        const productsWithImages = data.data.map((product: Product) => ({
-          ...product,
-          price: typeof product.price === 'string' ? parseFloat(product.price) : product.price,
-        }));
+        const productsWithImages = data.data.map((product: Product) => normalizeProduct(product));
         setProducts(productsWithImages);
       } else {
         throw new Error('Invalid response format');

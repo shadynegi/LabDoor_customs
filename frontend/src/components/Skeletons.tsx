@@ -147,7 +147,7 @@ interface ProductDetailSkeletonProps {
 
 export const ProductDetailSkeleton: React.FC<ProductDetailSkeletonProps> = ({ isMobile = false }) => (
   <div style={{
-    minHeight: '100vh',
+    minHeight: '100dvh',
     background: 'linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)',
   }}>
     <SkeletonStyles />
@@ -381,7 +381,7 @@ interface HomePageSkeletonProps {
 
 export const HomePageSkeleton: React.FC<HomePageSkeletonProps> = ({ isMobile = false }) => (
   <div style={{
-    minHeight: '100vh',
+    minHeight: '100dvh',
     background: 'linear-gradient(135deg, #361906 0%, #9c6649 100%)',
     display: 'flex',
     flexDirection: 'column',
@@ -478,7 +478,7 @@ interface DashboardSkeletonProps {
 
 export const DashboardSkeleton: React.FC<DashboardSkeletonProps> = ({ isMobile = false }) => (
   <div style={{
-    minHeight: '100vh',
+    minHeight: '100dvh',
     background: 'linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)',
     padding: isMobile ? 16 : 32,
   }}>
@@ -585,7 +585,7 @@ interface CartSkeletonProps {
 
 export const CartSkeleton: React.FC<CartSkeletonProps> = ({ isMobile = false }) => (
   <div style={{
-    minHeight: '100vh',
+    minHeight: '100dvh',
     background: 'linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)',
     padding: isMobile ? 20 : 40,
   }}>
@@ -653,35 +653,8 @@ export const CartSkeleton: React.FC<CartSkeletonProps> = ({ isMobile = false }) 
 );
 
 // ============================================
-// REVIEW LIST SKELETON
+// DEFAULT EXPORT
 // ============================================
-export const ReviewListSkeleton: React.FC = () => (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-    {[1, 2, 3].map((i) => (
-      <div
-        key={i}
-        style={{
-          background: 'white',
-          borderRadius: 16,
-          padding: 20,
-          boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-        }}
-      >
-        <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
-          <Skeleton width={40} height={40} borderRadius="50%" />
-          <div style={{ flex: 1 }}>
-            <Skeleton width="40%" height={16} style={{ marginBottom: 8 }} />
-            <Skeleton width="25%" height={14} />
-          </div>
-        </div>
-        <Skeleton width="70%" height={18} style={{ marginBottom: 8 }} />
-        <Skeleton width="100%" height={14} style={{ marginBottom: 6 }} />
-        <Skeleton width="90%" height={14} />
-      </div>
-    ))}
-  </div>
-);
-
 export default {
   Skeleton,
   SkeletonStyles,
@@ -693,5 +666,4 @@ export default {
   HomePageSkeleton,
   DashboardSkeleton,
   CartSkeleton,
-  ReviewListSkeleton,
 };

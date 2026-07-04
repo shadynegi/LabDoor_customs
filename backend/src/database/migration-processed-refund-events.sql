@@ -1,3 +1,4 @@
+-- DEPRECATED (July 2026): PayPal refunds removed — use migration-drop-paypal.sql.
 -- Deduplicate PayPal refund webhooks and admin refund sync events
 CREATE TABLE IF NOT EXISTS processed_refund_events (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

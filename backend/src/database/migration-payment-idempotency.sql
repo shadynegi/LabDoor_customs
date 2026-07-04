@@ -5,7 +5,6 @@ CREATE TABLE IF NOT EXISTS payment_idempotency (
   operation VARCHAR(32) NOT NULL,
   status VARCHAR(32) NOT NULL DEFAULT 'processing',
   server_order_id UUID,
-  paypal_order_id VARCHAR(128),
   response_json JSONB,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   expires_at TIMESTAMPTZ NOT NULL

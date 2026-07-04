@@ -17,8 +17,8 @@ Lab Door Customs is a monorepo e-commerce platform for custom footwear:
 - **Storefront:** React 19 + Vite (`frontend/`)
 - **Server:** Express API + static SPA hosting (`backend/`)
 - WhatsApp checkout (`POST /api/checkout/place-order`); pending orders confirmed manually by admin; **no-refund store policy** with manufacturing-defect replacements only
-- Admin dashboard (products, orders, coupons, customers, reviews, analytics, settings; bulk limits 500 IDs)
-- Product reviews (server-derived voter IDs, `can_review` eligibility), coupons, contact form
+- Admin dashboard (products, orders, coupons, customers, analytics, settings; bulk limits 500 IDs)
+- Coupons, contact form (WhatsApp support from env), activity tracking
 - Activity tracking (consent-gated batch endpoint, IP anonymization)
 - Cart price validation on every change (`POST /api/products/validate-cart`)
 - Redis caching, rate limits, CSRF protection (activity batch exempt), Sentry monitoring

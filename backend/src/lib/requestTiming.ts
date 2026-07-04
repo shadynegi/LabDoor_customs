@@ -23,7 +23,6 @@ function isCatalogReadPath(path: string, method: string): boolean {
   ) {
     return true;
   }
-  if (path.startsWith('/api/products/category/')) return true;
   return /^\/api\/products\/[^/]+$/.test(path);
 }
 

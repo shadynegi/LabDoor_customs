@@ -143,12 +143,11 @@ const LiquidModal: React.FC<LiquidModalProps> = ({
             style={{
               maxWidth,
               width: '100%',
-              maxHeight: '90vh',
               overflowY: 'auto',
               position: 'relative',
               ...contentStyle,
             }}
-            className={className}
+            className={`modal-max-h ${className}`.trim()}
           >
             {plain ? (
               panelInner

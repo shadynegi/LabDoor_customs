@@ -4,7 +4,6 @@ import { respond500 } from '../lib/safeError';
 import { Router, Request, Response } from 'express';
 import sql, { query as dbQuery } from '../lib/db';
 import { upsertCustomerFromOrder } from '../lib/customers';
-import { emailService } from '../lib/email';
 import { parsePagination, paginationMeta } from '../lib/pagination';
 import {
   stripOrderSecrets,
@@ -19,17 +18,29 @@ import { patchOrderCustomerDetails, patchPendingOrderItems } from '../lib/adminO
 import type { ValidatedLineItem } from '../lib/orderLifecycle';
 import { completeOrderPaymentCapture } from '../lib/paymentReconciliation';
 import { sendPostCaptureNotifications } from '../lib/postPaymentCapture';
+import {
+  queueShippingWhatsAppNotification,
+  sendWhatsAppShippingNotification,
+} from '../lib/whatsappNotifications';
 
 const router = Router();
+
+function safeJsonParse<T>(value: unknown, fallback: T): T {
+  if (typeof value !== 'string') {
+    return (value as T) ?? fallback;
+  }
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return fallback;
+  }
+}
 
 function parseOrderRow(order: Record<string, unknown>) {
   return stripOrderSecrets({
     ...order,
-    items: typeof order.items === 'string' ? JSON.parse(order.items as string) : order.items,
-    shipping_address:
-      typeof order.shipping_address === 'string'
-        ? JSON.parse(order.shipping_address as string)
-        : order.shipping_address,
+    items: safeJsonParse(order.items, order.items),
+    shipping_address: safeJsonParse(order.shipping_address, order.shipping_address),
   });
 }
 
@@ -100,8 +111,6 @@ interface Order {
   payment_status: 'pending' | 'completed' | 'failed' | 'refunded';
   payment_method: string;
   payment_id?: string;
-  paypal_order_id?: string;
-  paypal_capture_id?: string;
   status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
   tracking_number?: string;
   tracking_url?: string;
@@ -390,7 +399,7 @@ router.put('/:id', verifyAdmin, async (req: Request, res: Response) => {
     const currentStatus = currentOrder[0].status as OrderStatus;
     const wasShipped = currentStatus === 'shipped';
     const willBeShipped = updates.status === 'shipped';
-    const shouldSendShippingEmail = !wasShipped && willBeShipped;
+    const shouldSendShippingNotification = !wasShipped && willBeShipped;
 
     // Validate status transition if status is being changed
     if (updates.status && updates.status !== currentStatus) {
@@ -429,48 +438,9 @@ router.put('/:id', verifyAdmin, async (req: Request, res: Response) => {
 // Parse JSON fields if they are strings
 const parsedResult = parseOrderRow(result[0] as Record<string, unknown>) as Order;
 
-    // Send shipping notification email automatically when status changes to shipped
-    if (shouldSendShippingEmail && parsedResult.tracking_number) {
-      try {
-        const emailData = {
-          customerName: parsedResult.customer_name,
-          customerEmail: parsedResult.customer_email,
-          orderNumber: parsedResult.order_number!,
-          orderId: parsedResult.id as string,
-          items: parsedResult.items.map((item: any) => ({
-            product_name: item.product_name,
-            product_image: item.product_image || item.image,
-            quantity: item.quantity,
-            price: parseFloat(item.price?.toString() || '0'),
-            size_value: item.size_value,
-            size_system: item.size_system,
-          })),
-          subtotal: parseFloat(parsedResult.subtotal?.toString() || '0'),
-          shipping_cost: parseFloat(parsedResult.shipping_cost?.toString() || '0'),
-          tax: parseFloat(parsedResult.tax?.toString() || '0'),
-          total: parseFloat(parsedResult.total?.toString() || '0'),
-          shippingAddress: parsedResult.shipping_address,
-          trackingNumber: parsedResult.tracking_number,
-          trackingUrl: parsedResult.tracking_url || `https://www.bluedart.com/web/guest/trackdartresult?trackFor=0&trackNo=${parsedResult.tracking_number}`,
-          carrier: parsedResult.carrier || 'Blue Dart',
-          estimatedDelivery: parsedResult.estimated_delivery,
-        };
-        
-        // Send email asynchronously
-        emailService.sendShippingNotification(emailData)
-          .then(result => {
-            if (result.success) {
-              logger.info('✅ Shipping notification email sent for order:', parsedResult.order_number);
-            } else {
-              logger.error('❌ Failed to send shipping notification email:', result.error);
-            }
-          })
-          .catch(err => {
-            logger.error('❌ Error sending shipping notification email:', err);
-          });
-      } catch (emailError) {
-        logger.error('❌ Error preparing shipping notification email:', emailError);
-      }
+    // Send shipping WhatsApp when status changes to shipped
+    if (shouldSendShippingNotification && parsedResult.tracking_number) {
+      queueShippingWhatsAppNotification(parsedResult);
     }
 
     res.json({
@@ -531,7 +501,7 @@ router.patch('/:id/status', verifyAdmin, async (req: Request, res: Response) => 
 
     const wasShipped = currentStatus === 'shipped';
     const willBeShipped = status === 'shipped';
-    const shouldSendShippingEmail = !wasShipped && willBeShipped;
+    const shouldSendShippingNotification = !wasShipped && willBeShipped;
 
     const result = await dbQuery(() => sql`
       UPDATE orders SET
@@ -551,48 +521,9 @@ router.patch('/:id/status', verifyAdmin, async (req: Request, res: Response) => 
 // Parse JSON fields if they are strings
 const parsedResult = parseOrderRow(result[0] as Record<string, unknown>) as Order;
 
-    // Send shipping notification email automatically when status changes to shipped
-    if (shouldSendShippingEmail && parsedResult.tracking_number) {
-      try {
-        const emailData = {
-          customerName: parsedResult.customer_name,
-          customerEmail: parsedResult.customer_email,
-          orderNumber: parsedResult.order_number!,
-          orderId: parsedResult.id as string,
-          items: parsedResult.items.map((item: any) => ({
-            product_name: item.product_name,
-            product_image: item.product_image || item.image,
-            quantity: item.quantity,
-            price: parseFloat(item.price?.toString() || '0'),
-            size_value: item.size_value,
-            size_system: item.size_system,
-          })),
-          subtotal: parseFloat(parsedResult.subtotal?.toString() || '0'),
-          shipping_cost: parseFloat(parsedResult.shipping_cost?.toString() || '0'),
-          tax: parseFloat(parsedResult.tax?.toString() || '0'),
-          total: parseFloat(parsedResult.total?.toString() || '0'),
-          shippingAddress: parsedResult.shipping_address,
-          trackingNumber: parsedResult.tracking_number,
-          trackingUrl: parsedResult.tracking_url || `https://www.bluedart.com/web/guest/trackdartresult?trackFor=0&trackNo=${parsedResult.tracking_number}`,
-          carrier: parsedResult.carrier || 'Blue Dart',
-          estimatedDelivery: parsedResult.estimated_delivery,
-        };
-        
-        // Send email asynchronously
-        emailService.sendShippingNotification(emailData)
-          .then(result => {
-            if (result.success) {
-              logger.info('✅ Shipping notification email sent for order:', parsedResult.order_number);
-            } else {
-              logger.error('❌ Failed to send shipping notification email:', result.error);
-            }
-          })
-          .catch(err => {
-            logger.error('❌ Error sending shipping notification email:', err);
-          });
-      } catch (emailError) {
-        logger.error('❌ Error preparing shipping notification email:', emailError);
-      }
+    // Send shipping WhatsApp when status changes to shipped
+    if (shouldSendShippingNotification && parsedResult.tracking_number) {
+      queueShippingWhatsAppNotification(parsedResult);
     }
 
     res.json({
@@ -636,7 +567,7 @@ router.patch('/:id/payment-status', verifyAdmin, async (req: Request, res: Respo
     }
 
     const currentOrder = await dbQuery(() => sql`
-      SELECT payment_status, order_number, total, paypal_order_id, paypal_capture_id
+      SELECT payment_status, order_number, total
       FROM orders WHERE id = ${id}
     `, 'orders:q13');
     if (!currentOrder.length) {
@@ -772,17 +703,11 @@ router.patch('/:id/payment-status', verifyAdmin, async (req: Request, res: Respo
       });
     }
 
-    const captureIdForUpdate =
-      payment_status === 'completed' && payment_id
-        ? String(payment_id).trim()
-        : null;
-
     const result = await dbQuery(
       () => sql`
       UPDATE orders SET
         payment_status = ${payment_status},
         payment_id = COALESCE(${payment_id || null}, payment_id),
-        paypal_capture_id = COALESCE(${captureIdForUpdate}, paypal_capture_id),
         updated_at = NOW()
       WHERE id = ${id}
       RETURNING *
@@ -885,13 +810,20 @@ router.post('/:id/cancel', verifyAdmin, async (req: Request, res: Response) => {
   }
 });
 
-// DELETE order (Admin only)
+// DELETE order (Admin only) — restores stock + releases coupon reservations before delete
 router.delete('/:id', verifyAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
+    if (!isValidOrderId(id)) {
+      return res.status(404).json({
+        success: false,
+        error: 'Order not found',
+      });
+    }
+
     const existing = await dbQuery(() => sql`
-      SELECT id, payment_status FROM orders WHERE id = ${id}
+      SELECT id, payment_status, status FROM orders WHERE id = ${id}
     `, 'orders:q18');
 
     if (!existing.length) {
@@ -909,7 +841,11 @@ router.delete('/:id', verifyAdmin, async (req: Request, res: Response) => {
       });
     }
 
-    const result = await dbQuery(() => sql`
+    if (existing[0].payment_status === 'pending') {
+      await cancelPendingOrderAndRestoreStock(id);
+    }
+
+    await dbQuery(() => sql`
       DELETE FROM orders 
       WHERE id = ${id}
       RETURNING id
@@ -950,37 +886,36 @@ router.post('/:id/notify-shipped', verifyAdmin, async (req: Request, res: Respon
       });
     }
 
-    // Parse JSON fields if they are strings
-    const items = typeof orderData.items === 'string' ? JSON.parse(orderData.items) : orderData.items;
-    const shippingAddress = typeof orderData.shipping_address === 'string' ? JSON.parse(orderData.shipping_address) : orderData.shipping_address;
+    const shippingAddress =
+      typeof orderData.shipping_address === 'string'
+        ? JSON.parse(orderData.shipping_address)
+        : orderData.shipping_address;
 
-    const emailData = {
-      customerName: orderData.customer_name,
-      customerEmail: orderData.customer_email,
-      orderNumber: orderData.order_number,
+    const result = await sendWhatsAppShippingNotification({
       orderId: orderData.id as string,
-      items: items,
-      subtotal: parseFloat(orderData.subtotal),
-      shipping_cost: parseFloat(orderData.shipping_cost),
-      tax: parseFloat(orderData.tax),
-      total: parseFloat(orderData.total),
-      shippingAddress: shippingAddress,
+      orderNumber: orderData.order_number,
+      customerName: orderData.customer_name,
       trackingNumber: orderData.tracking_number,
-      trackingUrl: orderData.tracking_url,
-      estimatedDelivery: orderData.estimated_delivery,
-    };
-
-    const result = await emailService.sendShippingNotification(emailData);
+      trackingUrl: orderData.tracking_url ?? undefined,
+      carrier: orderData.carrier ?? undefined,
+      estimatedDelivery: orderData.estimated_delivery ?? undefined,
+      shippingAddress,
+    });
 
     if (result.success) {
       res.json({
         success: true,
-        message: 'Shipping notification sent successfully',
+        message: 'Shipping notification sent via WhatsApp',
+      });
+    } else if (result.skipped) {
+      res.status(503).json({
+        success: false,
+        error: 'WhatsApp not configured or customer phone missing',
       });
     } else {
       res.status(500).json({
         success: false,
-        error: 'Failed to send email',
+        error: 'Failed to send WhatsApp notification',
       });
     }
   } catch (error: unknown) {

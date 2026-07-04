@@ -9,20 +9,19 @@ Security implementation overview for Lab Door Customs.
 
 ## Current system behavior
 
-Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API (`backend/`), Vitest + Playwright tests (`Tests/`). Production runs one Express process serving `/api/*` and the built SPA; PostgreSQL is Supabase with backend **service_role** access — RLS and revoked grants block `anon`/`authenticated` PostgREST on **14** tables.
+Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API (`backend/`), Vitest + Playwright tests (`Tests/`). Production runs one Express process serving `/api/*` and the built SPA; PostgreSQL is Supabase with backend **service_role** access — RLS and revoked grants block `anon`/`authenticated` PostgREST on **10** tables.
 
 | Area | How it works |
 |------|----------------|
-| **Checkout** | Cart validation with retry; `policy_accepted` required (no-refund policy); DB-backed coupon validate; client/server total compare before place-order; WhatsApp redirect; `checkout_complete` before redirect. |
+| **Checkout** | Cart validation with retry; `policy_accepted` required (no-refund policy); DB-backed coupon validate; client/server total compare before place-order; `createClientId()` idempotency key; WhatsApp redirect; `checkout_complete` before redirect. |
 | **Orders** | Email links pre-fill `?orderId=` on `/orders`; lookup via order ID + checkout email (`POST /api/orders/lookup`); tracked orders in sessionStorage; legacy access-exchange returns **410**; lookup failure message **Order not found**. |
-| **Admin** | Server product search; products paginated (load more); coupons scope on create **and edit**; reviews admin response; estimated delivery; error/retry states; **Settings** tab (activity export, sessions, customer recompute); **no customer refunds** (cancel unpaid pending only). |
+| **Admin** | Server product search; products paginated (load more, no category field); coupons scope `all` / product IDs on create **and edit**; estimated delivery; error/retry states; **Settings** tab (activity export, sessions, customer recompute); **no customer refunds** (cancel unpaid pending only). |
 | **Activity** | Consent-gated batch (`inserted`/`skipped` counts); `contact_submit`, `purchase_complete`, `size_select`, `quantity_change` wired. |
-| **Reviews** | `POST /api/reviews/check` on email blur (generic message, no product enumeration); pending-moderation copy; vote error toasts. |
 | **Maintenance** | Ping-first scheduled jobs; transient pool errors (`CONNECT_TIMEOUT`, `ENOTFOUND`) skip with one log line — not a wrong `DATABASE_URL` if bootstrap succeeded. |
 
 Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_ENCRYPTION_KEY`, `IP_SALT`, `ADMIN_PASSWORD_HASH`.
 
-**Automated tests:** 411 (120 backend unit + 74 API + 217 Playwright) — see [`test_guidelines.md`](test_guidelines.md).
+**Automated tests:** 422 (118 backend unit + 71 API + 233 Playwright) — see [`test_guidelines.md`](test_guidelines.md).
 
 ---
 
@@ -40,7 +39,7 @@ Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_
 
 ## Database access
 
-- Supabase PostgreSQL via Express `service_role` only; RLS on **14** tables with no anon/authenticated PostgREST access
+- Supabase PostgreSQL via Express `service_role` only; RLS on **12** tables with no anon/authenticated PostgREST access
 - `ensureClientGrantsRevoked()` always runs (even when `BOOTSTRAP_SKIP_DDL=true`); production startup **fails** if client grants remain
 - Order access tokens SHA-256 hashed; `access_token_encrypted` uses AES-256-GCM (`ORDER_TOKEN_ENCRYPTION_KEY`)
 
@@ -54,7 +53,6 @@ Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_
 ## Data protection
 
 - Secrets stripped from API responses (access tokens, password hashes)
-- Review PII: `toPublicReview()` on public routes; `POST /api/reviews/check` (email in body, generic eligibility)
 - Order tracking: one-time `order_access_exchanges` codes in email links (no long-lived token in URL)
 - `schema.sql` + boot migrations apply service_role-only RLS; `ensureRlsPolicies()` non-destructive when policies exist
 - Manual mark paid: admin note + external payment reference required; logged to activity

@@ -9,7 +9,6 @@ import dotenv from "dotenv";
 import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import compression from "compression";
-import { emailService } from './lib/email';
 import sql, {
   getPoolStats,
   runBootstrapTask,
@@ -47,7 +46,6 @@ import ordersRouter from "./routes/orders";
 import contactRouter from "./routes/contact";
 import adminRouter, { verifyAdmin } from "./routes/admin";
 import activityRouter from "./routes/activity";
-import reviewsRouter from "./routes/reviews";
 import couponsRouter from "./routes/coupons";
 import checkoutRouter from "./routes/checkout";
 
@@ -67,7 +65,7 @@ const validateEnvVars = () => {
     'JWT_SECRET',
     'REDIS_URL',
     'SENTRY_DSN',
-    'RESEND_API_KEY',
+    'WHATSAPP_CONTACT_NUMBER',
     'ORDER_TOKEN_ENCRYPTION_KEY',
     'IP_SALT',
   ];
@@ -106,7 +104,7 @@ const validateEnvVars = () => {
       }
     }
   } else {
-    const recommended = ['ADMIN_USERNAME', 'JWT_SECRET', 'RESEND_API_KEY'];
+    const recommended = ['ADMIN_USERNAME', 'JWT_SECRET', 'WHATSAPP_CONTACT_NUMBER'];
     const missingRecommended = recommended.filter((v) => !process.env[v]?.trim());
     if (missingRecommended.length > 0) {
       logger.warn({ missing: missingRecommended }, 'Missing recommended environment variables');
@@ -401,7 +399,6 @@ app.use("/api/orders", ordersRouter);
 app.use("/api/contact", contactRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/activity", activityRouter);
-app.use("/api/reviews", reviewsRouter);
 app.use("/api/coupons", couponsRouter);
 app.use("/api/checkout", checkoutRouter);
 

@@ -14,13 +14,9 @@ export const CLIENT_REVOKED_TABLES = [
   'products',
   'orders',
   'contact_messages',
-  'reviews',
-  'review_votes',
   'coupons',
   'coupon_usage',
   'payment_idempotency',
-  'processed_refund_events',
-  'order_checkout_exchanges',
   'order_access_exchanges',
   'customers',
   'activity_logs',
@@ -32,14 +28,10 @@ const SERVICE_ROLE_ONLY_TABLES = [
   'coupons',
   'coupon_usage',
   'payment_idempotency',
-  'processed_refund_events',
-  'order_checkout_exchanges',
   'order_access_exchanges',
   'customers',
   'activity_logs',
   'admin_sessions',
-  'reviews',
-  'review_votes',
 ] as const;
 
 const ALL_RLS_TABLES = new Set<string>([
@@ -142,13 +134,10 @@ async function dropLegacyPolicies(): Promise<void> {
     ['activity_logs', 'Service role can update activity logs'],
     ['activity_logs', 'Service role can delete activity logs'],
     ['activity_logs', 'Service role can manage activity logs'],
-    ['reviews', 'Anyone can view approved reviews'],
-    ['reviews', 'Service role can manage all reviews'],
     ['admin_sessions', 'Service role can manage admin sessions'],
     ['admin_sessions', 'Allow inserting admin sessions'],
     ['admin_sessions', 'Allow reading admin sessions'],
     ['admin_sessions', 'Allow deleting admin sessions'],
-    ['review_votes', 'Service role can manage review votes'],
   ];
 
   for (const [table, policy] of drops) {
@@ -165,43 +154,6 @@ async function ensureRlsIndexes(): Promise<void> {
       CREATE INDEX IF NOT EXISTS idx_coupon_usage_order_id ON coupon_usage(order_id)
     `;
   }
-  if (await tableExists('reviews')) {
-    await sql`
-      CREATE INDEX IF NOT EXISTS idx_reviews_order_id ON reviews(order_id)
-    `;
-  }
-}
-
-async function ensureUpdateProductRatingFunction(): Promise<void> {
-  await sql`
-    CREATE OR REPLACE FUNCTION public.update_product_rating()
-    RETURNS TRIGGER
-    LANGUAGE plpgsql
-    SET search_path = public
-    AS $fn$
-    DECLARE
-      avg_rating DECIMAL(3,2);
-      total_reviews INTEGER;
-    BEGIN
-      SELECT
-        COALESCE(AVG(rating)::DECIMAL(3,2), 0),
-        COUNT(*)
-      INTO avg_rating, total_reviews
-      FROM public.reviews
-      WHERE product_id = COALESCE(NEW.product_id, OLD.product_id)
-        AND status = 'approved';
-
-      UPDATE public.products
-      SET
-        rating = avg_rating,
-        review_count = total_reviews,
-        updated_at = NOW()
-      WHERE id = COALESCE(NEW.product_id, OLD.product_id);
-
-      RETURN COALESCE(NEW, OLD);
-    END;
-    $fn$
-  `;
 }
 
 async function assertNoClientGrantsRemaining(): Promise<void> {
@@ -272,7 +224,6 @@ export async function ensureRlsPolicies(): Promise<void> {
     await assertNoClientGrantsRemaining();
 
     await ensureRlsIndexes();
-    await ensureUpdateProductRatingFunction();
 
     logger.info('RLS policy migration applied');
   } catch (error) {

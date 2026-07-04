@@ -22,7 +22,7 @@ if (!c.includes("from '../lib/orderStatus'")) {
   );
 }
 
-if (!c.includes('payment_id (PayPal capture ID) is required')) {
+if (!c.includes('payment_id (payment reference) is required')) {
   c = c.replace(
     `    if (
       payment_status === 'completed' &&
@@ -47,7 +47,7 @@ if (!c.includes('payment_id (PayPal capture ID) is required')) {
       if (!payment_id || String(payment_id).trim().length < 5) {
         return res.status(400).json({
           success: false,
-          error: 'payment_id (PayPal capture ID) is required when marking an order paid',
+          error: 'payment_id (payment reference) is required when marking an order paid',
         });
       }
     }`

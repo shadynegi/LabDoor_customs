@@ -2,7 +2,7 @@
 -- Run AFTER schema.sql in Supabase SQL Editor.
 -- DO NOT run in production unless you intend to load demo catalog data.
 
-INSERT INTO products (name, price, image, description, background, category, size, color, stock, rating, review_count)
+INSERT INTO products (name, price, image, description, background, size, color, stock, rating, review_count)
 VALUES
   (
     'Nike Drops - Blue',
@@ -10,7 +10,6 @@ VALUES
     '/assets/blue-nike.png',
     'Custom blue Nike-inspired drop with premium finish.',
     '/assets/blue-bg.png',
-    'Sneakers',
     'US 10',
     'Blue',
     25,
@@ -23,7 +22,6 @@ VALUES
     '/assets/gold-black-nike.png',
     'Gold and black custom sneaker with metallic accents.',
     '/assets/gold-bg.png',
-    'Sneakers',
     'US 10',
     'Gold',
     20,
@@ -36,7 +34,6 @@ VALUES
     '/assets/pink-nike.png',
     'Bold pink custom design for standout style.',
     '/assets/pink-bg.png',
-    'Sneakers',
     'US 9',
     'Pink',
     30,
@@ -49,7 +46,6 @@ VALUES
     '/assets/black-brown-nike.png',
     'Black and brown two-tone custom build.',
     '/assets/brown-bg.png',
-    'Sneakers',
     'US 11',
     'Brown',
     18,
@@ -62,7 +58,6 @@ VALUES
     '/assets/brown-pink-nike.png',
     'Brown base with pink highlights — limited style.',
     '/assets/brown-pink-bg.png',
-    'Sneakers',
     'US 10',
     'Pink',
     22,

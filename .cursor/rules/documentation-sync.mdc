@@ -13,11 +13,12 @@ Update documentation in the **same change** whenever you modify:
 
 - API routes, auth, or request/response shapes → `documentation/info.md`, `documentation/API_DOCUMENTATION.md`
 - Admin dashboard tabs or workflows → `documentation/info.md`, `documentation/ADMIN_DASHBOARD_GUIDE.md`, `documentation/ORDER_MANAGEMENT_GUIDE.md`
-- PayPal/checkout/payment flow → `documentation/info.md`, `documentation/PAYPAL_TESTING_GUIDE.md`, `documentation/diagnose-paypal-issue.md`
+- Checkout/payment flow → `documentation/info.md`, `documentation/WHATSAPP_CHECKOUT_GUIDE.md`
 - Environment variables, CI, or deploy topology → `documentation/info.md`, `documentation/DEPLOYMENT.md`, `documentation/QUICK_START.md`, `backend/env.template`, `frontend/env.template`, root `package.json`, `railway.json`
 - Security controls → `documentation/info.md`, `documentation/AUDIT_SUMMARY.md`
 - Database/schema/RLS → `documentation/info.md`, `documentation/SUPABASE_SQL_TO_RUN.md`, `documentation/RLS_OPTIMIZATION.md`
 - Tests added/removed → `documentation/info.md`, `documentation/test_guidelines.md`
+- Storefront/admin form fields or label/accessibility conventions → `documentation/info.md`, `documentation/FORMS_QA_CHECKLIST.md`, `documentation/RESPONSIVE_QA_CHECKLIST.md`
 
 ## Update order
 

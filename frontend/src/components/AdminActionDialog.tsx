@@ -106,7 +106,10 @@ export default function AdminActionDialog({
               </span>
               <input
                 ref={primaryRef}
+                id="admin-dialog-primary"
+                name="primary"
                 type="text"
+                aria-label={inputLabel}
                 value={primary}
                 onChange={(e) => setPrimary(e.target.value)}
                 placeholder={inputPlaceholder}
@@ -128,8 +131,10 @@ export default function AdminActionDialog({
                 {secondInputLabel}
               </span>
               <input
+                id="admin-dialog-secondary"
+                name="secondary"
                 type="text"
-                value={secondary}
+                aria-label={secondInputLabel}
                 onChange={(e) => setSecondary(e.target.value)}
                 placeholder={secondInputPlaceholder}
                 required={secondaryRequired}

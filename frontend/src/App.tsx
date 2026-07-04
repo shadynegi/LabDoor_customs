@@ -11,6 +11,7 @@ import CookieConsent, { openCookiePreferences } from "./components/CookieConsent
 import { trackGaPageView } from "./lib/analytics";
 import { logo_all_pages, logo_all_pages_text } from "./lib/productImageMaps";
 import { useResponsive } from "./hooks/useResponsive";
+import { stickyHeaderPad } from "./lib/responsive";
 
 // Lazy load pages for better performance (code splitting for 1000+ users)
 const Home = lazy(() => import("./pages/Home"));
@@ -38,7 +39,7 @@ const PageLoader = () => (
     aria-live="polite"
     aria-label="Loading page"
     style={{ 
-    minHeight: '100vh', 
+    minHeight: '100dvh', 
     display: 'flex', 
     alignItems: 'center', 
     justifyContent: 'center',
@@ -69,7 +70,7 @@ function ProtectedAdminRoute({ children }: { children: React.ReactNode }) {
     // Loading state
     return (
       <div style={{ 
-        minHeight: '100vh', 
+        minHeight: '100dvh', 
         display: 'flex', 
         alignItems: 'center', 
         justifyContent: 'center',
@@ -94,7 +95,7 @@ function AdminEntryRedirect() {
   if (isAuthenticated === null) {
     return (
       <div style={{
-        minHeight: '100vh',
+        minHeight: '100dvh',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -139,7 +140,6 @@ function Navigation() {
   return (
     <div 
       style={{ 
-        padding: isMobile ? "10px 12px" : "16px 24px", 
         borderBottom: "1px solid #e5e7eb", 
         display: "flex", 
         justifyContent: "space-between",
@@ -150,6 +150,7 @@ function Navigation() {
         zIndex: 100,
         boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
         minHeight: isMobile ? 56 : 70,
+        ...stickyHeaderPad(isMobile),
       }}
     >
       {/* Left Logo */}

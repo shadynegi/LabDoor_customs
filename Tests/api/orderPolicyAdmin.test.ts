@@ -22,16 +22,6 @@ describe('no-refund store policy (admin)', () => {
     sqlMock.mockReset();
   });
 
-  it('POST /api/paypal/refund/:captureId route is removed', async () => {
-    const { agent, csrfToken } = await createCsrfAgent();
-    const res = await withCsrf(
-      agent.post('/api/paypal/refund/CAPTURE-PAID-1'),
-      csrfToken
-    ).send({ amount: '10.00', currency: 'USD' });
-
-    expect(res.status).toBe(404);
-  });
-
   it('POST /api/orders/:id/cancel returns 403 for paid orders', async () => {
     const orderId = '00000000-0000-0000-0000-00000000aa01';
 

@@ -13,7 +13,7 @@ Mutating requests require CSRF token (`X-CSRF-Token` header + cookie) except `PO
 | Actor | Method |
 |-------|--------|
 | Admin | HttpOnly `admin_session` cookie after `POST /api/admin/login` |
-| Customer orders | `POST /api/orders/lookup` with `{ orderId, email }` (CSRF-protected); confirmation emails link to `/orders?orderId={uuid}` |
+| Customer orders | `POST /api/orders/lookup` with `{ orderId, email }` (CSRF-protected); WhatsApp confirmations link to `/orders?orderId={uuid}` |
 | Public | No auth (rate-limited) |
 
 ---
@@ -42,7 +42,7 @@ Mutating requests require CSRF token (`X-CSRF-Token` header + cookie) except `PO
   "customerInfo": { "fullName", "email", "phone", "address", "city", "state", "zipCode", "country" },
   "items": [{ "product_id", "quantity", "size_system", "size_value" }],
   "coupon_code": "optional",
-  "amount": "optional client total for validation"
+  "amount": "required client total string (must match server within $0.01)"
 }
 ```
 
@@ -71,9 +71,8 @@ The storefront redirects the browser to `whatsappUrl`. The pre-filled WhatsApp t
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | GET | `/` | Public | Paginated list (cached) — `?page=&limit=` |
-| GET | `/filters` | Public | Available filter facets (size, price range, rating range, sort options) |
+| GET | `/filters` | Public | Available filter facets (size, price range, sort options) |
 | GET | `/sitemap-urls` | Public | Product paths for sitemap |
-| GET | `/category/:category` | Public | Products by category name |
 | GET | `/:id` | Public | Single product (cached) |
 | POST | `/search` | Public | Search products |
 | POST | `/validate-cart` | Public + CSRF | Validate cart lines — `{ items: [{ product_id, quantity, size_system, size_value }] }` (size required per line: UK/US/EU + whole-number value from the allowed size list — no half sizes); returns refreshed prices and stock/size errors |
@@ -97,12 +96,12 @@ The storefront redirects the browser to `whatsappUrl`. The pre-filled WhatsApp t
 | GET | `/:id` | Admin | Single order by UUID |
 | PUT | `/:id` | Admin | Update fulfillment fields including `estimated_delivery` (not payment_status) |
 | PATCH | `/:id/customer-details` | Admin + CSRF | Edit customer name, email, shipping address, admin notes |
-| PATCH | `/:id/pending-items` | Admin + CSRF | Edit line items on unpaid pending orders (inventory adjusted) |
+| PATCH | `/:id/pending-items` | Admin + CSRF | Edit line items on unpaid pending orders (inventory adjusted; totals recalculated with volume/coupon pricing) |
 | PATCH | `/:id/status` | Admin | Update order status |
-| PATCH | `/:id/payment-status` | Admin | Mark paid: `admin_note` + `payment_id` (external reference); sends confirmation email (Resend) + WhatsApp text to customer mobile (Cloud API when configured); logged to activity |
+| PATCH | `/:id/payment-status` | Admin | Mark paid: `admin_note` + `payment_id` (external reference); sends WhatsApp text to customer mobile (Cloud API when configured); logged to activity |
 | POST | `/:id/cancel` | Admin | Cancel **unpaid pending** orders only; paid orders return **403** |
-| DELETE | `/:id` | Admin | Delete order (blocked if paid) |
-| POST | `/:id/notify-shipped` | Admin | Send shipping email |
+| DELETE | `/:id` | Admin | Delete unpaid order — restores stock + releases coupon for pending orders, then deletes row (blocked if paid) |
+| POST | `/:id/notify-shipped` | Admin | Send shipping notification via WhatsApp |
 
 ### Order lookup body
 
@@ -147,7 +146,7 @@ Paid orders return **403** (no-refund store policy).
 | POST | `/use` | — | **410 Gone** |
 | GET | `/` | Admin | List coupons |
 | GET | `/:id` | Admin | Single coupon |
-| POST | `/` | Admin | Create coupon (`applies_to`: `all` \| `product` \| `category`, optional `applies_to_ids`) |
+| POST | `/` | Admin | Create coupon (`applies_to`: `all` \| `product`, optional `applies_to_ids`) |
 | PUT | `/:id` | Admin | Update coupon (code, description, discount, `max_uses`, `valid_until`, `is_active`, etc.) |
 | PATCH | `/:id/toggle` | Admin | Toggle active |
 | DELETE | `/:id` | Admin | Delete coupon |
@@ -155,28 +154,11 @@ Paid orders return **403** (no-refund store policy).
 
 ---
 
-## Reviews (`/reviews`)
-
-Public list/submit/vote responses use `toPublicReview()` — **`customer_email`, `order_id`, and `status` are never returned** to the storefront. Admin routes return full rows including `customer_email`.
-
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/product/:productId` | Public | Approved reviews (PII stripped) |
-| POST | `/` | Public | Submit review — always `pending`; response PII stripped |
-| POST | `/:id/vote` | Public + CSRF | Vote on **approved** reviews only (rate-limited; voter ID derived server-side from IP) |
-| POST | `/check` | Public + CSRF | Body: `{ product_id, email }` → `{ can_review, message }` — called from storefront ReviewForm on email blur |
-| GET | `/` | Admin | All reviews **including `customer_email`** |
-| POST | `/admin` | Admin + CSRF | Create review |
-| PATCH | `/:id` | Admin + CSRF | Edit fields or approve/reject |
-| DELETE | `/:id` | Admin | Delete review |
-
----
-
 ## Contact (`/contact`)
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/` | Public | Submit contact form (stored in `contact_messages`; no admin list API). Storefront displays `SITE_EMAILS.support`. |
+| POST | `/` | Public | Submit contact form (stored in `contact_messages`). Storefront displays WhatsApp contact from `VITE_WHATSAPP_CONTACT_NUMBER`. |
 
 ---
 
@@ -242,10 +224,9 @@ How the React SPA uses these APIs (see also [`info.md`](info.md)):
 |------|-------------------|
 | Cart | `POST /products/validate-cart` on cart changes; **Retry validation** on network failure — API tests: `Tests/api/validateCart.test.ts` |
 | Checkout | `setUserEmail` on email change/blur (consent-gated); `POST /checkout/place-order`; redirect to `whatsappUrl`; optional `/payment/success` reads `lastPlacedOrder` from sessionStorage (shows UUID as Order ID) |
-| Orders | Email/confirmation links pre-fill `?orderId=` on `/orders`; customer enters checkout email; `POST /orders/lookup`; tracked orders in `sessionStorage`; legacy `GET /orders/access-exchange/:code` returns **410** |
-| Reviews | `POST /reviews/check` on email blur; submit shows pending-moderation copy; vote errors via toast |
+| Orders | WhatsApp/confirmation links pre-fill `?orderId=` on `/orders`; customer enters checkout email; `POST /orders/lookup`; order details clear on full page reload (re-enter ID + email); in-session auto/manual refresh while page stays open; legacy `GET /orders/access-exchange/:code` returns **410** |
 | Contact | `POST /contact` + `contact_submit` activity when consented |
-| Admin | Products 50/page load-more; **Multer** media upload (`POST /admin/uploads/product-media`, max **20 MB** images); coupons `applies_to` on create **and edit**; `admin_response` on review edit; `estimated_delivery` on order PUT; **Settings** tab: activity export, sessions, customer recompute |
+| Admin | Products 50/page load-more; **Multer** media upload (`POST /admin/uploads/product-media`, max **20 MB** images); coupons `applies_to` on create **and edit**; `estimated_delivery` on order PUT; **Settings** tab: activity export, sessions, customer recompute |
 
 ---
 
@@ -254,8 +235,9 @@ How the React SPA uses these APIs (see also [`info.md`](info.md)):
 Applied per IP. Uses Redis when `REDIS_URL` is set; in production, rate limiting fails closed if Redis is required but unavailable. Notable limits:
 
 - Admin login: 5 attempts / 15 minutes
-- Contact, reviews (submit/vote/admin), coupon validate: per-route limits
-- Checkout place-order, order lookup (`POST /orders/lookup`), product search (`POST /products/search`), review eligibility check
+- Contact, coupon validate: per-route limits
+- Checkout place-order, order lookup (`POST /orders/lookup`), product search (`POST /products/search`)
+- Place-order returns **409** when stock is insufficient after validation; **503** when rollback fails after a partial create
 
 ---
 

@@ -55,12 +55,9 @@ interface Product {
   image: string;
   description?: string;
   background?: string;
-  category?: string;
   size?: string;
   color?: string;
   stock?: number;
-  rating?: number;
-  review_count?: number;
   view_count?: number;
   cart_count?: number;
   is_out_of_stock?: boolean;
@@ -162,7 +159,7 @@ router.post('/validate-cart', async (req: Request, res: Response) => {
 // GET available filter options (sizes, colors, price range)
 router.get('/filters', async (_req: Request, res: Response) => {
   try {
-    const [sizes, priceRange, ratingStats] = await dbQuery(
+    const [sizes, priceRange] = await dbQuery(
       () =>
         Promise.all([
           sql`
@@ -172,10 +169,6 @@ router.get('/filters', async (_req: Request, res: Response) => {
       `,
           sql`
         SELECT MIN(price) as min_price, MAX(price) as max_price FROM products
-      `,
-          sql`
-        SELECT MIN(rating) as min_rating, MAX(rating) as max_rating, AVG(rating) as avg_rating
-        FROM products
       `,
         ]),
       'products:filters'
@@ -189,16 +182,10 @@ router.get('/filters', async (_req: Request, res: Response) => {
           min: parseFloat(priceRange[0]?.min_price || '0'),
           max: parseFloat(priceRange[0]?.max_price || '1000')
         },
-        ratingRange: {
-          min: parseFloat(ratingStats[0]?.min_rating || '0'),
-          max: parseFloat(ratingStats[0]?.max_rating || '5'),
-          avg: parseFloat(ratingStats[0]?.avg_rating || '0')
-        },
         sortOptions: [
           { value: 'default', label: 'Default' },
           { value: 'price_asc', label: 'Price: Low to High' },
           { value: 'price_desc', label: 'Price: High to Low' },
-          { value: 'rating_desc', label: 'Highest Rated' },
           { value: 'newest', label: 'Newest First' },
           { value: 'oldest', label: 'Oldest First' }
         ]
@@ -207,44 +194,6 @@ router.get('/filters', async (_req: Request, res: Response) => {
   } catch (error: unknown) {
     logger.error('Error fetching filter options:', error);
     respond500(res, error, 'Request failed');
-  }
-});
-
-// GET products by category (must be registered before /:id)
-router.get('/category/:category', async (req: Request, res: Response) => {
-  try {
-    const { category } = req.params;
-    const parsed = parsePagination(req.query);
-    if (!parsed.ok) {
-      return res.status(parsed.status).json({ success: false, error: parsed.error });
-    }
-    const { limit, offset } = parsed.params;
-
-    const [products, countResult] = await dbQuery(
-      () =>
-        Promise.all([
-          sql`
-        SELECT * FROM products 
-        WHERE category = ${category}
-        ORDER BY id ASC
-        LIMIT ${limit}
-        OFFSET ${offset}
-      `,
-          sql`SELECT COUNT(*) as total FROM products WHERE category = ${category}`,
-        ]),
-      'products:byCategory'
-    );
-    const total = parseInt(countResult[0]?.total || '0');
-
-    res.json({
-      success: true,
-      data: products || [],
-      count: products?.length || 0,
-      pagination: paginationMeta(total, parsed.params),
-    });
-  } catch (error: any) {
-    logger.error('Error fetching products by category:', error);
-    respond500(res, error, "Request failed");
   }
 });
 
@@ -352,19 +301,16 @@ router.post('/', verifyAdmin, async (req: Request, res: Response) => {
 
     const result = await dbQuery(
       () => sql`
-      INSERT INTO products (name, price, image, description, background, category, size, color, stock, rating, review_count, video_360, sku, reorder_point, reorder_alert_enabled, cost_price)
+      INSERT INTO products (name, price, image, description, background, size, color, stock, video_360, sku, reorder_point, reorder_alert_enabled, cost_price)
       VALUES (
         ${productData.name},
         ${productData.price},
         ${imageResult.value},
         ${productData.description || null},
         ${backgroundResult.value},
-        ${productData.category || null},
         ${productData.size || null},
         ${productData.color || null},
         ${productData.stock || 0},
-        ${productData.rating || 0},
-        ${productData.review_count || 0},
         ${videoResult.value},
         ${productData.sku?.trim() || null},
         ${productData.reorder_point ?? 5},
@@ -459,7 +405,6 @@ router.put('/:id', verifyAdmin, async (req: Request, res: Response) => {
         image = COALESCE(${imageValue}, image),
         description = COALESCE(${updates.description || null}, description),
         background = COALESCE(${backgroundValue !== undefined ? backgroundValue : null}, background),
-        category = COALESCE(${updates.category || null}, category),
         size = COALESCE(${updates.size || null}, size),
         color = COALESCE(${updates.color || null}, color),
         is_out_of_stock = COALESCE(${isOutOfStock}, is_out_of_stock),
@@ -537,7 +482,6 @@ router.post('/search', async (req: Request, res: Response) => {
       maxPrice, 
       size,
       color,
-      minRating,
       sortBy = 'default',
       page = 1,
       limit: bodyLimit = 20,
@@ -563,10 +507,8 @@ router.post('/search', async (req: Request, res: Response) => {
     // Validate numeric filters
     const priceMin = minPrice !== undefined && minPrice !== null ? Number(minPrice) : null;
     const priceMax = maxPrice !== undefined && maxPrice !== null ? Number(maxPrice) : null;
-    const ratingMin = minRating !== undefined && minRating !== null ? Number(minRating) : null;
 
-    // Validate sortBy option
-    const validSortOptions = ['default', 'price_asc', 'price_desc', 'rating_desc', 'newest', 'oldest'];
+    const validSortOptions = ['default', 'price_asc', 'price_desc', 'newest', 'oldest'];
     const sortOption = validSortOptions.includes(sortBy) ? sortBy : 'default';
 
     // Build dynamic query using SQL template literals
@@ -578,7 +520,6 @@ router.post('/search', async (req: Request, res: Response) => {
       switch (sortOption) {
         case 'price_asc': return sql`ORDER BY price ASC`;
         case 'price_desc': return sql`ORDER BY price DESC`;
-        case 'rating_desc': return sql`ORDER BY rating DESC NULLS LAST`;
         case 'newest': return sql`ORDER BY created_at DESC`;
         case 'oldest': return sql`ORDER BY created_at ASC`;
         default: return sql`ORDER BY id ASC`;
@@ -590,9 +531,8 @@ router.post('/search', async (req: Request, res: Response) => {
     const hasSize = sanitizedSize !== null;
     const hasColor = sanitizedColor !== null;
     const hasPriceRange = priceMin !== null || priceMax !== null;
-    const hasRating = ratingMin !== null;
 
-    if (!hasSearchQuery && !hasSize && !hasColor && !hasPriceRange && !hasRating) {
+    if (!hasSearchQuery && !hasSize && !hasColor && !hasPriceRange) {
       products = await dbQuery(
         () => sql`
         SELECT * FROM products 
@@ -612,7 +552,6 @@ router.post('/search', async (req: Request, res: Response) => {
         ${hasColor ? sql`AND color = ${sanitizedColor}` : sql``}
         ${priceMin !== null ? sql`AND price >= ${priceMin}` : sql``}
         ${priceMax !== null ? sql`AND price <= ${priceMax}` : sql``}
-        ${hasRating ? sql`AND rating >= ${ratingMin}` : sql``}
         ${getSortOrder()}
         LIMIT ${limit}
         OFFSET ${offset}
@@ -637,7 +576,6 @@ router.post('/search', async (req: Request, res: Response) => {
         color: sanitizedColor,
         minPrice: priceMin,
         maxPrice: priceMax,
-        minRating: ratingMin,
         sortBy: sortOption
       }
     });

@@ -176,4 +176,3 @@ export async function clickPlaceOrderAndWaitForResponse(page: Page): Promise<{
 }
 
 /** @deprecated Use clickPlaceOrderAndWaitForResponse */
-export const clickPayPalAndWaitForCreatePayment = clickPlaceOrderAndWaitForResponse;

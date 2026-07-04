@@ -8,7 +8,7 @@ import {
   FREE_SHIPPING_THRESHOLD,
   SHIPPING_COST,
 } from '../utils/pricing';
-import { SITE_EMAILS } from '../lib/site';
+import { buildWhatsAppContactUrl, getWhatsAppContactDisplay } from '../lib/whatsappContact';
 
 export default function ShippingPolicy() {
   const navigate = useNavigate();
@@ -38,7 +38,7 @@ export default function ShippingPolicy() {
 
   return (
     <div style={{
-      minHeight: '100vh',
+      minHeight: '100dvh',
       background: 'linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)',
       padding: isMobile ? '20px' : '40px',
     }}>
@@ -120,13 +120,19 @@ export default function ShippingPolicy() {
               <Link to="/orders" style={{ color: '#9c6649', fontWeight: 600 }}>
                 My Orders
               </Link>{' '}
-              page with your <strong>order ID</strong> (UUID from your confirmation email or WhatsApp message)
+              page with your <strong>order ID</strong> (UUID from your confirmation WhatsApp message)
               and the <strong>email address used at checkout</strong>.
             </p>
             <ul style={{ paddingLeft: 20 }}>
-              <li>Confirmation emails include a link that pre-fills your order ID</li>
+              <li>WhatsApp confirmations include a tracking link that pre-fills your order ID</li>
               <li>When your order ships, tracking details appear on My Orders when available</li>
-              <li>Contact {SITE_EMAILS.support} if you need help locating your order</li>
+              <li>
+                Message us on{' '}
+                <a href={buildWhatsAppContactUrl()} target="_blank" rel="noopener noreferrer" style={{ color: '#9c6649', fontWeight: 600 }}>
+                  {getWhatsAppContactDisplay()}
+                </a>{' '}
+                if you need help locating your order
+              </li>
             </ul>
           </Section>
 
@@ -144,8 +150,11 @@ export default function ShippingPolicy() {
 
           <Section icon={MapPin} title="Shipping destinations">
             <p style={{ marginBottom: 12 }}>
-              Standard shipping is available to all 50 US states and territories. For other destinations, email{' '}
-              {SITE_EMAILS.support} and we will confirm whether we can fulfill your order.
+              Standard shipping is available to all 50 US states and territories. For other destinations, message us on WhatsApp at{' '}
+              <a href={buildWhatsAppContactUrl()} target="_blank" rel="noopener noreferrer" style={{ color: '#9c6649', fontWeight: 600 }}>
+                {getWhatsAppContactDisplay()}
+              </a>{' '}
+              and we will confirm whether we can fulfill your order.
             </p>
           </Section>
 
@@ -181,8 +190,10 @@ export default function ShippingPolicy() {
             textAlign: 'center',
           }}>
             <p style={{ margin: 0, color: '#4b5563', fontSize: 14 }}>
-              Questions about shipping? Contact us at{' '}
-              <strong>{SITE_EMAILS.support}</strong>
+              Questions about shipping? Message us on WhatsApp at{' '}
+              <a href={buildWhatsAppContactUrl()} target="_blank" rel="noopener noreferrer" style={{ color: '#9c6649', fontWeight: 600 }}>
+                {getWhatsAppContactDisplay()}
+              </a>
             </p>
           </div>
         </div>

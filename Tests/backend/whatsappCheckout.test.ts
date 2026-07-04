@@ -54,11 +54,11 @@ describe('whatsappCheckout', () => {
     expect(url).toContain(encodeURIComponent('Hello World'));
   });
 
-  it('uses WHATSAPP_ORDER_PHONE when set', () => {
-    const prev = process.env.WHATSAPP_ORDER_PHONE;
-    process.env.WHATSAPP_ORDER_PHONE = '+1 555 123 4567';
+  it('uses WHATSAPP_CONTACT_NUMBER when set', () => {
+    const prev = process.env.WHATSAPP_CONTACT_NUMBER;
+    process.env.WHATSAPP_CONTACT_NUMBER = '+1 555 123 4567';
     expect(getWhatsAppOrderPhone()).toBe('15551234567');
-    process.env.WHATSAPP_ORDER_PHONE = prev;
+    process.env.WHATSAPP_CONTACT_NUMBER = prev;
   });
 
   it('includes volume discount, coupon, size, and free shipping in message', () => {

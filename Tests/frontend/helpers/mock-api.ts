@@ -2,9 +2,6 @@ import type { Page, Route } from '@playwright/test';
 import {
   MOCK_FILTERS,
   MOCK_PRODUCTS,
-  MOCK_PUBLIC_REVIEW,
-  MOCK_REVIEWS_STATS,
-  TEST_PRODUCT_IDS,
   type MockProduct,
 } from '../fixtures/mock-data';
 
@@ -151,14 +148,6 @@ export async function installStorefrontApiMocks(
       return json(route, { success: true, items: refreshed, subtotal });
     }
 
-    if (path.startsWith('/products/category/') && method === 'GET') {
-      const category = decodeURIComponent(path.replace('/products/category/', ''));
-      const filtered = products.filter((p) => p.category === category);
-      return json(route, {
-        ...paginateProducts(filtered, route.request().url()),
-        count: filtered.length,
-      });
-    }
 
     const singleProductMatch = path.match(
       /^\/products\/(\d+|[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i,
@@ -198,29 +187,6 @@ export async function installStorefrontApiMocks(
 
     if (path.startsWith('/products') && method === 'GET') {
       return json(route, paginateProducts(products, route.request().url()));
-    }
-
-    const reviewsMatch = path.match(/^\/reviews\/product\/(\d+)$/);
-    if (reviewsMatch && method === 'GET') {
-      const productId = parseInt(reviewsMatch[1], 10);
-      const reviews = productId === TEST_PRODUCT_IDS.nikeBlue ? [MOCK_PUBLIC_REVIEW] : [];
-      return json(route, {
-        success: true,
-        data: {
-          reviews,
-          stats: {
-            ...MOCK_REVIEWS_STATS,
-            total_reviews: reviews.length,
-          },
-          pagination: {
-            page: 1,
-            limit: 10,
-            total: reviews.length,
-            totalPages: 1,
-            hasMore: false,
-          },
-        },
-      });
     }
 
     if (path === '/contact' && method === 'POST') {

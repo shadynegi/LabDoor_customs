@@ -32,11 +32,11 @@ export async function syncOrderLineItemsForOrder(orderId: string): Promise<numbe
   const productMeta =
     productIds.length > 0
       ? await sql`
-          SELECT id, category, size, color FROM products WHERE id = ANY(${productIds})
+          SELECT id, size, color FROM products WHERE id = ANY(${productIds})
         `
       : [];
   const metaById = new Map(
-    productMeta.map((p) => [Number(p.id), p as { category?: string; size?: string; color?: string }])
+    productMeta.map((p) => [Number(p.id), p as { size?: string; color?: string }])
   );
 
   return sql.begin(async (tx) => {
@@ -52,7 +52,7 @@ export async function syncOrderLineItemsForOrder(orderId: string): Promise<numbe
       await tx`
         INSERT INTO order_line_items (
           order_id, product_id, product_name, quantity, unit_price, line_total,
-          category, size, color
+          size, color
         ) VALUES (
           ${orderId}::uuid,
           ${item.product_id},
@@ -60,7 +60,6 @@ export async function syncOrderLineItemsForOrder(orderId: string): Promise<numbe
           ${qty},
           ${unitPrice},
           ${unitPrice * qty},
-          ${meta?.category ?? null},
           ${meta?.size ?? item.size_value ?? null},
           ${meta?.color ?? null}
         )

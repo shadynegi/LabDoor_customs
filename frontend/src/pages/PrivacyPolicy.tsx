@@ -1,8 +1,9 @@
 // src/pages/PrivacyPolicy.tsx
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Shield, Mail, Lock, Eye, Database, UserCheck } from 'lucide-react';
+import { ArrowLeft, Shield, MessageCircle, Lock, Eye, Database, UserCheck } from 'lucide-react';
 import { useResponsive } from '../hooks/useResponsive';
+import { buildWhatsAppContactUrl, getWhatsAppContactDisplay } from '../lib/whatsappContact';
 
 export default function PrivacyPolicy() {
   const navigate = useNavigate();
@@ -32,7 +33,7 @@ export default function PrivacyPolicy() {
 
   return (
     <div style={{
-      minHeight: '100vh',
+      minHeight: '100dvh',
       background: 'linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)',
       padding: isMobile ? '20px' : '40px',
     }}>
@@ -109,9 +110,8 @@ export default function PrivacyPolicy() {
           <Section icon={Eye} title="How We Use Your Information">
             <ul style={{ paddingLeft: 20 }}>
               <li>Process and fulfill your orders</li>
-              <li>Send order confirmations and shipping updates</li>
+              <li>Send order confirmations and shipping updates via WhatsApp (when configured)</li>
               <li>Respond to your questions and requests</li>
-              <li>Send promotional emails (with your consent)</li>
               <li>Improve our products and services</li>
               <li>Detect and prevent fraud</li>
             </ul>
@@ -140,14 +140,14 @@ export default function PrivacyPolicy() {
               <li>Access and review your personal information</li>
               <li>Request corrections to inaccurate data</li>
               <li>Request deletion of your data (subject to legal requirements)</li>
-              <li>Opt-out of marketing communications at any time</li>
+              <li>Opt-out of marketing messages at any time</li>
               <li>Data portability - receive a copy of your data in a structured format</li>
             </ul>
           </Section>
 
-          <Section icon={Mail} title="Contact Us">
+          <Section icon={MessageCircle} title="Contact Us">
             <p>
-              For privacy-related questions or to exercise your rights, please contact us at:
+              For privacy-related questions or to exercise your rights, message us on WhatsApp:
             </p>
             <div style={{
               marginTop: 16,
@@ -157,7 +157,9 @@ export default function PrivacyPolicy() {
               borderLeft: '4px solid #9c6649',
             }}>
               <p style={{ margin: 0, fontWeight: 600, color: '#1f2937' }}>
-                Email: privacy@labdoorcustoms.com
+                <a href={buildWhatsAppContactUrl()} target="_blank" rel="noopener noreferrer" style={{ color: '#9c6649' }}>
+                  {getWhatsAppContactDisplay()}
+                </a>
               </p>
             </div>
           </Section>

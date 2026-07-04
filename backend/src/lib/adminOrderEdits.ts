@@ -2,6 +2,12 @@ import sql from './db';
 import { logger } from './logger';
 import { applyStockDeltaInTx } from './inventoryMovements';
 import type { ValidatedLineItem } from './orderLifecycle';
+import {
+  calculateCheckoutPricing,
+  calculateVolumeDiscount,
+  resolveCouponDiscount,
+} from './checkoutPricing';
+import { getCouponForOrder } from './couponReservation';
 
 export interface OrderCustomerDetailsInput {
   customer_name?: string;
@@ -68,6 +74,54 @@ export async function patchPendingOrderItems(
     return { ok: false, status: 400, error: 'At least one line item is required' };
   }
 
+  const precheck = await sql`SELECT * FROM orders WHERE id = ${orderId}::uuid LIMIT 1`;
+  if (!precheck.length) {
+    return { ok: false, status: 404, error: 'Order not found' };
+  }
+
+  const order = precheck[0];
+  if (order.payment_status !== 'pending' || order.status !== 'pending') {
+    return { ok: false, status: 400, error: 'Only pending unpaid orders can have items edited' };
+  }
+
+  let rawSubtotal = 0;
+  let totalItemCount = 0;
+  for (const item of lineItems) {
+    if (!item.product_id || item.quantity < 1) {
+      return { ok: false, status: 400, error: 'Each line item requires product_id and quantity >= 1' };
+    }
+    rawSubtotal += item.price * item.quantity;
+    totalItemCount += item.quantity;
+  }
+
+  let couponDiscount = 0;
+  const couponInfo = await getCouponForOrder(orderId);
+  if (couponInfo) {
+    const codeRows = await sql`SELECT code FROM coupons WHERE id = ${couponInfo.coupon_id} LIMIT 1`;
+    const couponCode = codeRows[0]?.code as string | undefined;
+    if (couponCode) {
+      const volume = calculateVolumeDiscount(rawSubtotal, totalItemCount);
+      const couponSubtotal = Math.max(0, rawSubtotal - volume.amount);
+      try {
+        const resolved = await resolveCouponDiscount(
+          couponCode,
+          couponSubtotal,
+          String(order.customer_email),
+          lineItems.map((item) => ({
+            product_id: item.product_id,
+            price: item.price,
+            quantity: item.quantity,
+          }))
+        );
+        couponDiscount = resolved.discount;
+      } catch {
+        couponDiscount = 0;
+      }
+    }
+  }
+
+  const pricing = calculateCheckoutPricing(rawSubtotal, totalItemCount, couponDiscount);
+
   const result = await sql.begin(async (tx) => {
     const locked = await tx`
       SELECT * FROM orders WHERE id = ${orderId}::uuid FOR UPDATE
@@ -76,15 +130,15 @@ export async function patchPendingOrderItems(
       return { error: 'not_found' as const };
     }
 
-    const order = locked[0];
-    if (order.payment_status !== 'pending' || order.status !== 'pending') {
+    const lockedOrder = locked[0];
+    if (lockedOrder.payment_status !== 'pending' || lockedOrder.status !== 'pending') {
       return { error: 'not_pending' as const };
     }
 
     const oldItems =
-      typeof order.items === 'string'
-        ? (JSON.parse(order.items) as ValidatedLineItem[])
-        : (order.items as ValidatedLineItem[]);
+      typeof lockedOrder.items === 'string'
+        ? (JSON.parse(lockedOrder.items) as ValidatedLineItem[])
+        : (lockedOrder.items as ValidatedLineItem[]);
 
     const oldMap = new Map<number, number>();
     for (const item of oldItems) {
@@ -93,9 +147,6 @@ export async function patchPendingOrderItems(
 
     const newMap = new Map<number, number>();
     for (const item of lineItems) {
-      if (!item.product_id || item.quantity < 1) {
-        return { error: 'invalid_item' as const };
-      }
       newMap.set(item.product_id, (newMap.get(item.product_id) ?? 0) + item.quantity);
     }
 
@@ -131,25 +182,27 @@ export async function patchPendingOrderItems(
       }
     }
 
-    let subtotal = 0;
-    for (const item of lineItems) {
-      subtotal += item.price * item.quantity;
-    }
-    const shipping = parseFloat(String(order.shipping_cost ?? 0));
-    const tax = parseFloat(String(order.tax ?? 0));
-    const total = subtotal + shipping + tax;
-
     const updated = await tx`
       UPDATE orders SET
         items = ${JSON.stringify(lineItems)}::jsonb,
-        subtotal = ${subtotal},
-        total = ${total},
+        subtotal = ${pricing.subtotal},
+        shipping_cost = ${pricing.shipping},
+        tax = ${pricing.tax},
+        total = ${pricing.total},
         admin_edited_at = NOW(),
         admin_edited_by = ${adminUsername},
         updated_at = NOW()
       WHERE id = ${orderId}::uuid
       RETURNING *
     `;
+
+    if (couponInfo && couponDiscount >= 0) {
+      await tx`
+        UPDATE coupon_usage
+        SET discount_amount = ${pricing.couponDiscount}
+        WHERE order_id = ${orderId}::uuid
+      `;
+    }
 
     return { order: updated[0] };
   });
@@ -160,9 +213,6 @@ export async function patchPendingOrderItems(
     }
     if (result.error === 'not_pending') {
       return { ok: false, status: 400, error: 'Only pending unpaid orders can have items edited' };
-    }
-    if (result.error === 'invalid_item') {
-      return { ok: false, status: 400, error: 'Each line item requires product_id and quantity >= 1' };
     }
     if (result.error === 'insufficient_stock') {
       return { ok: false, status: 409, error: 'Insufficient stock for updated quantities' };

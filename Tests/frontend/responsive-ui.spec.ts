@@ -47,7 +47,9 @@ test.describe('Responsive storefront UI', () => {
 
   test('product detail avoids horizontal overflow on mobile', async ({ page }) => {
     await page.goto(`/product/${TEST_PRODUCT_IDS.nikeBlue}`);
-    await expect(page.getByText('Customer Reviews')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('heading', { name: PRIMARY_MOCK_PRODUCT.name })).toBeVisible({
+      timeout: 15_000,
+    });
 
     const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
     const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
@@ -55,7 +57,7 @@ test.describe('Responsive storefront UI', () => {
   });
 
   test('products sort dropdown fits narrow mobile viewports', async ({ page }) => {
-    for (const width of [320, 390]) {
+    for (const width of [320, 360, 390]) {
       await page.setViewportSize({ width, height: 844 });
       await page.goto('/products');
       await expect(page.getByRole('heading', { name: 'All Products' })).toBeVisible({

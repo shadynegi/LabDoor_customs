@@ -70,7 +70,6 @@ const RLS_MARKER_TABLES = [
   'products',
   'orders',
   'contact_messages',
-  'reviews',
   'admin_sessions',
   'activity_logs',
 ] as const;

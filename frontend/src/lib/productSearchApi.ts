@@ -1,21 +1,7 @@
 import { catalogFetch } from '../config';
 import type { Product } from '../hooks/useProducts';
+import { normalizeProduct } from './productCatalogCache';
 import type { SearchFilters } from '../types/productSearch';
-
-export function normalizeSearchProduct(product: Product): Product {
-  return {
-    ...product,
-    price: typeof product.price === 'string' ? parseFloat(product.price) : product.price,
-    rating:
-      typeof product.rating === 'string'
-        ? parseFloat(String(product.rating))
-        : product.rating || 0,
-    review_count:
-      typeof product.review_count === 'string'
-        ? parseInt(String(product.review_count), 10)
-        : product.review_count || 0,
-  };
-}
 
 export interface ProductSearchRequest {
   query?: string;
@@ -32,11 +18,9 @@ export async function searchProductsApi({
 }: ProductSearchRequest): Promise<Product[]> {
   const hasQuery = query.trim().length > 0;
   const hasFilters =
-    filters.size ||
     filters.color ||
     filters.minPrice !== undefined ||
     filters.maxPrice !== undefined ||
-    filters.minRating !== undefined ||
     (filters.sortBy !== undefined && filters.sortBy !== 'default');
 
   if (!hasQuery && !hasFilters) {
@@ -49,9 +33,7 @@ export async function searchProductsApi({
       query: query.trim() || undefined,
       minPrice: filters.minPrice,
       maxPrice: filters.maxPrice,
-      size: filters.size,
       color: filters.color,
-      minRating: filters.minRating,
       sortBy: filters.sortBy ?? 'default',
       page,
       limit,
@@ -67,7 +49,7 @@ export async function searchProductsApi({
     throw new Error(data.error || 'Invalid search response');
   }
 
-  return data.data.map(normalizeSearchProduct);
+  return data.data.map(normalizeProduct);
 }
 
 export const SUGGESTION_LIMIT = 10;

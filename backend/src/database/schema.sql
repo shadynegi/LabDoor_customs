@@ -12,7 +12,6 @@ CREATE TABLE IF NOT EXISTS products (
   image TEXT,
   description TEXT,
   background TEXT,
-  category VARCHAR(100),
   size VARCHAR(50),                -- Shoe sizes: 'US 7', 'US 8', 'US 9', 'US 10', 'US 11', 'US 12', etc.
   color VARCHAR(100),              -- Primary color: 'Blue', 'Gold', 'Pink', 'Brown', 'Black', etc.
   stock INTEGER DEFAULT 0 CHECK (stock >= 0),
@@ -42,9 +41,6 @@ CREATE TABLE IF NOT EXISTS orders (
   payment_status VARCHAR(50) DEFAULT 'pending' CHECK (payment_status IN ('pending', 'completed', 'failed', 'refunded')),
   payment_method VARCHAR(50) NOT NULL,
   payment_id VARCHAR(255),
-  paypal_order_id VARCHAR(255),
-  paypal_capture_id VARCHAR(255),
-  refunded_amount DECIMAL(10, 2) NOT NULL DEFAULT 0,
   access_token_hash VARCHAR(64),
   access_token_encrypted TEXT,
   status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'shipped', 'delivered', 'cancelled')),
@@ -131,8 +127,8 @@ CREATE TABLE IF NOT EXISTS coupons (
   valid_from TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   valid_until TIMESTAMP WITH TIME ZONE,
   is_active BOOLEAN DEFAULT TRUE,
-  applies_to VARCHAR(20) DEFAULT 'all' CHECK (applies_to IN ('all', 'category', 'product')),
-  applies_to_ids INTEGER[],          -- Product or category IDs if applicable
+  applies_to VARCHAR(20) DEFAULT 'all' CHECK (applies_to IN ('all', 'product')),
+  applies_to_ids INTEGER[],          -- Product IDs when applies_to = 'product'
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -148,7 +144,6 @@ CREATE TABLE IF NOT EXISTS coupon_usage (
 );
 
 -- Create indexes for better query performance
-CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);
 CREATE INDEX IF NOT EXISTS idx_products_size ON products(size);
 CREATE INDEX IF NOT EXISTS idx_products_color ON products(color);
 CREATE INDEX IF NOT EXISTS idx_products_created_at ON products(created_at);
@@ -158,9 +153,6 @@ CREATE INDEX IF NOT EXISTS idx_orders_order_number ON orders(order_number);
 CREATE INDEX IF NOT EXISTS idx_orders_payment_status ON orders(payment_status);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at);
-CREATE INDEX IF NOT EXISTS idx_orders_paypal_order_id ON orders(paypal_order_id);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_paypal_order_id_unique ON orders(paypal_order_id) WHERE paypal_order_id IS NOT NULL;
-CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_paypal_capture_id_unique ON orders(paypal_capture_id) WHERE paypal_capture_id IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_contact_status ON contact_messages(status);
 CREATE INDEX IF NOT EXISTS idx_contact_created_at ON contact_messages(created_at);
@@ -223,12 +215,12 @@ CREATE TRIGGER update_contact_messages_updated_at
   EXECUTE FUNCTION update_updated_at_column();
 
 -- Insert sample products (optional - based on your frontend)
-INSERT INTO products (name, price, image, description, background, category, size, color, stock, rating, review_count) VALUES
-  ('Nike Drops - Blue', 98.00, '/assets/blue-nike.png', 'Self-lacing basketball shoe', '/assets/blue-bg.png', 'Athletic', 'US 9', 'Blue', 50, 4.5, 128),
-  ('Golden ESSENCE', 98.00, '/assets/gold-black-nike.png', 'Premium athletic footwear', '/assets/gold-bg.png', 'Luxury', 'US 10', 'Gold', 30, 4.8, 94),
-  ('Pink Panda Runners', 129.00, '/assets/pink-nike.png', 'Lightweight running shoe', '/assets/pink-bg.png', 'Running', 'US 8', 'Pink', 40, 4.3, 156),
-  ('Browny CLASSIC', 89.00, '/assets/black-brown-nike.png', 'Timeless design classic', '/assets/brown-bg.png', 'Casual', 'US 11', 'Brown', 60, 4.6, 203),
-  ('LAB DOOR SPORT', 89.00, '/assets/brown-pink-nike.png', 'Sport performance shoe', '/assets/brown-pink-bg.png', 'Athletic', 'US 9', 'Brown', 45, 4.4, 87)
+INSERT INTO products (name, price, image, description, background, size, color, stock, rating, review_count) VALUES
+  ('Nike Drops - Blue', 98.00, '/assets/blue-nike.png', 'Self-lacing basketball shoe', '/assets/blue-bg.png', 'US 9', 'Blue', 50, 4.5, 128),
+  ('Golden ESSENCE', 98.00, '/assets/gold-black-nike.png', 'Premium athletic footwear', '/assets/gold-bg.png', 'US 10', 'Gold', 30, 4.8, 94),
+  ('Pink Panda Runners', 129.00, '/assets/pink-nike.png', 'Lightweight running shoe', '/assets/pink-bg.png', 'US 8', 'Pink', 40, 4.3, 156),
+  ('Browny CLASSIC', 89.00, '/assets/black-brown-nike.png', 'Timeless design classic', '/assets/brown-bg.png', 'US 11', 'Brown', 60, 4.6, 203),
+  ('LAB DOOR SPORT', 89.00, '/assets/brown-pink-nike.png', 'Sport performance shoe', '/assets/brown-pink-bg.png', 'US 9', 'Brown', 45, 4.4, 87)
 ON CONFLICT DO NOTHING;
 
 -- Row Level Security: service_role only (Express API is the sole data path)

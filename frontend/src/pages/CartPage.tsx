@@ -46,7 +46,7 @@ export default function CartPage() {
             : "24px",
       maxWidth: 1000,
       margin: "0 auto",
-      minHeight: "calc(100vh - 200px)"
+      minHeight: "calc(100dvh - 200px)"
     }}>
       <h2 style={{ 
         fontSize: isMobile ? 24 : 32, 
@@ -238,7 +238,9 @@ export default function CartPage() {
                       </button>
                     </div>
                     <button 
+                      type="button"
                       onClick={() => removeFromCart(item.id, item.size)}
+                      aria-label={`Remove ${item.name} from cart`}
                       style={{ 
                         padding: isMobile ? "12px 16px" : "10px 18px",
                         minHeight: isMobile ? 44 : 36,

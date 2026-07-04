@@ -228,38 +228,6 @@ async function computeEligibleSubtotal(
     return eligible.reduce((sum, item) => sum + item.price * item.quantity, 0);
   }
 
-  if (appliesTo === 'category') {
-    const seedProducts = await sql`
-      SELECT DISTINCT category FROM products WHERE id = ANY(${appliesToIds}::int[])
-    `;
-    const allowedCategories = new Set(
-      seedProducts.map((row) => row.category).filter((cat): cat is string => Boolean(cat))
-    );
-
-    if (allowedCategories.size === 0) {
-      throw new Error('This coupon is not configured correctly');
-    }
-
-    const cartProductIds = lineItems.map((item) => item.product_id);
-    const cartProducts = await sql`
-      SELECT id, category FROM products WHERE id = ANY(${cartProductIds}::int[])
-    `;
-    const categoryByProduct = new Map<number, string | null>(
-      cartProducts.map((row) => [row.id as number, (row.category as string) || null])
-    );
-
-    const eligible = lineItems.filter((item) => {
-      const category = categoryByProduct.get(item.product_id);
-      return category != null && allowedCategories.has(category);
-    });
-
-    if (eligible.length === 0) {
-      throw new Error('This coupon does not apply to items in your cart');
-    }
-
-    return eligible.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  }
-
   return 0;
 }
 

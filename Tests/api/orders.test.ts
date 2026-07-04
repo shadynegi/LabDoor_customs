@@ -28,7 +28,7 @@ const validOrderPayload = {
   shipping_cost: 10,
   tax: 8,
   total: 117,
-  payment_method: 'PayPal',
+  payment_method: 'WhatsApp',
   payment_status: 'completed',
   status: 'shipped',
 };

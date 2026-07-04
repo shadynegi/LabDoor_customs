@@ -1,11 +1,9 @@
 import type { ValidatedLineItem } from './orderLifecycle';
 import type { PricingBreakdown } from './checkoutPricing';
-
-const DEFAULT_WHATSAPP_PHONE = '919888514572';
+import { getWhatsAppContactDigits } from './whatsappContact';
 
 export function getWhatsAppOrderPhone(): string {
-  const raw = process.env.WHATSAPP_ORDER_PHONE?.trim() || DEFAULT_WHATSAPP_PHONE;
-  return raw.replace(/\D/g, '');
+  return getWhatsAppContactDigits();
 }
 
 export interface WhatsAppOrderMessageInput {

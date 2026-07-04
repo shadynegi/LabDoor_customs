@@ -15,11 +15,7 @@ DECLARE
     'coupons',
     'coupon_usage',
     'payment_idempotency',
-    'processed_refund_events',
-    'order_checkout_exchanges',
-    'order_access_exchanges',
-    'reviews',
-    'review_votes'
+    'order_access_exchanges'
   ];
 BEGIN
   FOREACH tbl IN ARRAY tables
@@ -37,32 +33,3 @@ BEGIN
   END LOOP;
 END
 $migrate$;
-
--- Lint 0011: function search_path must be fixed (mutable search_path)
-CREATE OR REPLACE FUNCTION public.update_product_rating()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-SET search_path = public
-AS $$
-DECLARE
-  avg_rating DECIMAL(3,2);
-  total_reviews INTEGER;
-BEGIN
-  SELECT
-    COALESCE(AVG(rating)::DECIMAL(3,2), 0),
-    COUNT(*)
-  INTO avg_rating, total_reviews
-  FROM public.reviews
-  WHERE product_id = COALESCE(NEW.product_id, OLD.product_id)
-    AND status = 'approved';
-
-  UPDATE public.products
-  SET
-    rating = avg_rating,
-    review_count = total_reviews,
-    updated_at = NOW()
-  WHERE id = COALESCE(NEW.product_id, OLD.product_id);
-
-  RETURN COALESCE(NEW, OLD);
-END;
-$$;

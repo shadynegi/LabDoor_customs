@@ -53,6 +53,8 @@ export function Product360Viewer({
   useEffect(() => {
     if (images.length === 0) return;
 
+    const timeouts: ReturnType<typeof setTimeout>[] = [];
+
     const preloadImage = (index: number) => {
       const img = new Image();
       img.onload = () => {
@@ -65,9 +67,13 @@ export function Product360Viewer({
     preloadImage(0);
     images.forEach((_, index) => {
       if (index !== 0) {
-        setTimeout(() => preloadImage(index), index * 50);
+        timeouts.push(setTimeout(() => preloadImage(index), index * 50));
       }
     });
+
+    return () => {
+      timeouts.forEach((t) => clearTimeout(t));
+    };
   }, [images]);
 
   useEffect(() => {

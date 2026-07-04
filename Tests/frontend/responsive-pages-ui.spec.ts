@@ -64,10 +64,8 @@ for (const device of POPULAR_MOBILE_VIEWPORTS) {
 
     test('/product/:id fits viewport without horizontal overflow', async ({ page }) => {
       await page.goto(`/product/${TEST_PRODUCT_IDS.nikeBlue}`);
-      await expect(page.getByText('Customer Reviews')).toBeVisible({ timeout: 15_000 });
       const heading = page.getByRole('heading', { name: PRIMARY_MOCK_PRODUCT.name });
-      await expect(heading).toBeVisible();
-      await heading.scrollIntoViewIfNeeded();
+      await expect(heading).toBeVisible({ timeout: 15_000 });
       await assertHeadingInViewport(page, heading, `${ctx} product detail`);
       await assertNoHorizontalOverflow(page, `${ctx} product detail`);
     });

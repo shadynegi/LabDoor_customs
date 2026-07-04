@@ -5,7 +5,7 @@
 **Authoritative behavior:** [`info.md`](info.md)  
 **Full audit:** [`PROJECT_AUDIT.md`](PROJECT_AUDIT.md) (2026-06-08 initial + follow-up)
 
-**Test count marker (CI should match):** `<!-- tests: 411 -->` (120 unit + 74 API + 217 Playwright)
+**Test count marker (CI should match):** `<!-- tests: 422 -->` (118 unit + 71 API + 233 Playwright)
 
 ---
 
@@ -24,7 +24,7 @@
 
 | ID | Behavior | Implementation | Test(s) | Status |
 |----|----------|----------------|---------|--------|
-| PAY-PLACE | Atomic place-order + stock reserve + WhatsApp URL | `checkout.ts`, `orderLifecycle.ts`, `whatsappCheckout.ts` | `checkout.test.ts`, `checkoutWhatsAppIntegration.test.ts`, `checkoutPricing.test.ts`, `whatsappCheckout.test.ts` | COVERED |
+| PAY-PLACE | Atomic place-order + stock reserve + WhatsApp URL | `checkout.ts`, `orderLifecycle.ts`, `whatsappCheckout.ts` | `checkout.test.ts`, `checkoutWhatsAppIntegration.test.ts`, `checkoutPricing.test.ts`, `whatsappCheckout.test.ts`, `clientId.test.ts` | COVERED |
 | PAY-WA-MSG | WhatsApp message includes order id (UUID), items, totals | `whatsappCheckout.ts` | `whatsappCheckout.test.ts`, `checkoutWhatsAppIntegration.test.ts` | COVERED |
 | PAY-VOLUME | Volume discount 10%/20% in pricing | `checkoutPricing.ts` | `checkoutPricing.test.ts`, `couponValidateVolume.test.ts` | COVERED |
 | PAY-SHIPPING | Free shipping threshold $200 | `checkoutPricing.ts`, `pricing.ts` | `checkoutPricing.test.ts` | COVERED |
@@ -43,8 +43,8 @@
 | ORD-ENUM | Uniform 404 for bad id vs bad email | `orders.ts` | `orderLookup.test.ts`, `orderTracking.test.ts` | COVERED |
 | ORD-TRACK-SHIP | Shipped order tracking fields in lookup | `orders.ts` | `orderTracking.test.ts` | COVERED |
 | ORD-ACCESS-DEP | Deprecated access-exchange links return 410 | `orders.ts` | `orderTracking.test.ts`, `security.test.ts` | COVERED |
-| ORD-EMAIL-LINK | Confirmation email tracking URL with orderId | `email.ts` `buildOrderPortalUrl` | `emailPortalUrl.test.ts` | COVERED |
-| ORD-MARK-PAID | Admin mark paid + email/WhatsApp notifications + activity log | `orders.ts`, `paymentReconciliation.ts`, `postPaymentCapture.ts` | `adminMarkPaid.test.ts`, `postPaymentCapture.test.ts`, `whatsappPaymentConfirmation.test.ts` | COVERED |
+| ORD-PORTAL-LINK | Order tracking URL with orderId | `orderPortalUrl.ts` `buildOrderPortalUrl` | `emailPortalUrl.test.ts` | COVERED |
+| ORD-MARK-PAID | Admin mark paid + WhatsApp notifications + activity log | `orders.ts`, `paymentReconciliation.ts`, `postPaymentCapture.ts` | `adminMarkPaid.test.ts`, `postPaymentCapture.test.ts`, `whatsappPaymentConfirmation.test.ts` | COVERED |
 | WA-PAY-CONFIRM | WhatsApp Cloud API payment confirmation text | `whatsappNotifications.ts`, `postPaymentCapture.ts` | `whatsappNotifications.test.ts`, `whatsappPaymentConfirmation.test.ts` | COVERED |
 
 ---
@@ -53,20 +53,19 @@
 
 | ID | Behavior | Implementation | Test(s) | Status |
 |----|----------|----------------|---------|--------|
-| SEC-RLS | 14 tables service_role-only + grant revoke | `rlsMigration.ts` | `rlsMigration.test.ts`, `rlsGrantRevoke.test.ts` | COVERED |
+| SEC-RLS | 10 client-revoked tables + service_role-only RLS + grant revoke | `rlsMigration.ts` | `rlsMigration.test.ts`, `rlsGrantRevoke.test.ts` | COVERED |
 | SEC-BOOTSTRAP | `BOOTSTRAP_SKIP_DDL` must not skip grant revoke | `rlsMigration.ts` | `rlsMigration.test.ts`, `rlsGrantRevoke.test.ts` | COVERED |
 | SEC-CSRF | Double-submit + activity batch exempt | `csrf.ts`, `activity.ts` | `security.test.ts` (incl. logout CSRF) | COVERED |
+| SEC-ADMIN-USERS | Primary + optional additional admin logins | `adminCredentials.ts`, `admin.ts` | `adminCredentials.test.ts` | COVERED |
 | SEC-RATE | Redis fail-closed rate limits | `rateLimits.ts`, `rateLimitStore.ts` | `security.test.ts` | COVERED |
 
 ---
 
-## Reviews, coupons, activity
+## Coupons, activity
 
 | ID | Behavior | Implementation | Test(s) | Status |
 |----|----------|----------------|---------|--------|
-| REV-CHECK | `POST /reviews/check` no enumeration | `reviews.ts` `checkReviewEligibility` | `reviewsCheck.test.ts` | COVERED |
-| REV-PUBLIC | `toPublicReview()` strips PII | `reviewHelpers.ts` | `reviewHelpers.test.ts` | COVERED |
-| CPN-SCOPE | Coupon `applies_to` at checkout | `checkoutPricing.ts`, `coupons.ts` | `couponScope.test.ts` | COVERED |
+| CPN-SCOPE | Coupon `applies_to` (`all` / `product`) at checkout | `checkoutPricing.ts`, `coupons.ts` | `couponScope.test.ts` | COVERED |
 | CPN-VALIDATE | Validate matches place-order pricing | `coupons.ts`, `checkoutPricing.ts` | `couponValidateVolume.test.ts`, `computeCheckoutPricingForCart.test.ts` | COVERED |
 | ACT-BATCH | Activity batch allowed action types | `activity.ts` | `activityBatch.test.ts` | COVERED |
 | ACT-CONTACT | Contact form submit tracked | `activityTracker.ts`, `ContactUs.tsx` | `activityBatch.test.ts` | COVERED |
@@ -78,7 +77,7 @@
 
 | ID | Behavior | Implementation | Test(s) | Status |
 |----|----------|----------------|---------|--------|
-| UI-SMOKE | Home, products, cart, checkout shell, contact | `Tests/frontend/*.spec.ts` | 39 desktop + 176 mobile tests | COVERED |
+| UI-SMOKE | Home, products, cart, checkout shell, contact | `Tests/frontend/*.spec.ts` | 40 desktop + 193 mobile tests | COVERED |
 | UI-ORDER-CONFIRM | Payment success / order received confirmation | `PaymentSuccess.tsx` | `deep-flows-ui.spec.ts` | COVERED |
 | UI-ORDERS | Orders page orderId + email lookup | `MyOrders.tsx` | `orders-ui.spec.ts` | COVERED |
 | UI-ORDERS-SHIP | Shipped order tracking link on orders page | `MyOrders.tsx` | `orders-ui.spec.ts` | COVERED |
@@ -89,7 +88,7 @@
 | UI-PRODUCT-POLICY | Product detail trust badges match no-refund policy | `ProductDetailPage.tsx`, `constants/returnPolicy.ts` | `deep-flows-ui.spec.ts` | COVERED |
 | UI-DEEP-FLOWS | Search, policy gate, coupon, cart qty, order confirmation | `deep-flows-ui.spec.ts`, `mock-api.ts` | `deep-flows-ui.spec.ts` | COVERED |
 | UI-RESPONSIVE | Mobile checkout/cart sticky CTA, overflow, admin login | `CartPage.tsx`, `MobileStickyCta.tsx`, `responsive.css` | `responsive-ui.spec.ts`, `mobile-ui.spec.ts` | COVERED |
-| UI-RESPONSIVE-PAGES | All storefront routes × 10 phone viewports; cart policy above sticky bar | `responsive-pages-ui.spec.ts`, `helpers/viewports.ts` | 168 tests (`mobile-chrome`) | COVERED |
+| UI-RESPONSIVE-PAGES | All storefront routes × 11 phone viewports (incl. 320px); cart policy above sticky bar | `responsive-pages-ui.spec.ts`, `helpers/viewports.ts` | 193 tests (`mobile-chrome`) | COVERED |
 
 ---
 
@@ -109,9 +108,9 @@
 |----|----------|----------------|---------|--------|
 | CI-ENV | Production env validation in CI | `validate-env.mjs`, `ci.yml` | CI job | COVERED |
 | SEC-ORDER-SECRETS | `access_token_hash` + `access_token_encrypted` stripped from order JSON | `orderTokens.ts` `stripOrderSecrets` | `orderTokens.test.ts` | COVERED |
-| DOC-TESTS | Test count in `info.md` | `info.md` | `npm test` (411) | COVERED |
+| DOC-TESTS | Test count in `info.md` | `info.md` | `npm test` (422) | COVERED |
 | UI-SCROLL | Document scroll on tall storefront pages | `frontend/src/index.css`, `App.tsx`, `Home.tsx` | `storefront.spec.ts` | COVERED |
-| UI-POLICY-CONTENT | Shipping policy matches checkout pricing; contact canonical email | `ShippingPolicy.tsx`, `ContactUs.tsx`, `pricing.ts`, `site.ts` | `storefront.spec.ts`, `contact-ui.spec.ts` | COVERED |
+| UI-POLICY-CONTENT | Shipping policy matches checkout pricing; contact WhatsApp link | `ShippingPolicy.tsx`, `ContactUs.tsx`, `pricing.ts`, `whatsappContact.ts` | `storefront.spec.ts`, `contact-ui.spec.ts` | COVERED |
 | PERF-BUDGET | Frontend JS bundle budget contract | `frontend/scripts/build-budget.mjs` | `performanceBudgets.test.ts` | COVERED |
 | STAB-SMOKE | Parallel health + CSRF latency smoke | `server.ts`, `csrf.ts` | `stabilityConcurrency.test.ts` | COVERED |
 

@@ -1,5 +1,6 @@
--- Reviews System Migration
--- Run this in your Supabase SQL Editor
+-- DEPRECATED (July 2026): Product reviews removed. Do not run on new databases.
+-- Use migration-drop-reviews.sql on existing DBs that already ran this file.
+-- Reviews System Migration (historical)
 
 -- Reviews table
 CREATE TABLE IF NOT EXISTS reviews (

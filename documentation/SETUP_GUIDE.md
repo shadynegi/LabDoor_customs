@@ -26,6 +26,7 @@ LabDoor_customs/
 │   ├── backend/
 │   ├── api/
 │   └── frontend/
+├── scripts/          dev.mjs (npm run dev), link-check.mjs
 └── documentation/
 ```
 
@@ -57,7 +58,7 @@ Run `backend/src/database/schema.sql` in the Supabase SQL editor, then apply mig
 
 ### WhatsApp checkout
 
-Optional `WHATSAPP_ORDER_PHONE` (digits only, default `919888514572`). Customers complete payment off-site; admin confirms via **Mark paid**.
+`WHATSAPP_CONTACT_NUMBER` (E.164) is required in production. Set matching `VITE_WHATSAPP_CONTACT_NUMBER` for the frontend build. Customers complete payment off-site; admin confirms via **Mark paid**.
 
 See [WHATSAPP_CHECKOUT_GUIDE.md](./WHATSAPP_CHECKOUT_GUIDE.md).
 
@@ -83,19 +84,10 @@ Set `ADMIN_PASSWORD_HASH` in production (not plaintext `ADMIN_PASSWORD`).
 
 ```
 ORDER_TOKEN_ENCRYPTION_KEY=your_32_char_key_for_aes_gcm_checkout_exchange
-IP_SALT=random_salt_for_ip_anonymization_and_review_votes
+IP_SALT=random_salt_for_ip_anonymization
 ```
 
-Both are required in production (`validate-env.mjs`). `ORDER_TOKEN_ENCRYPTION_KEY` encrypts order access tokens at rest; `IP_SALT` salts activity IP anonymization and review voter ID derivation.
-
-### Email (Resend)
-
-```
-RESEND_API_KEY=re_xxx
-SENDER_EMAIL=noreply@yourdomain.com
-COMPANY_NAME=Lab Door Customs
-COMPANY_SUPPORT_EMAIL=support@yourdomain.com
-```
+Both are required in production (`validate-env.mjs`). `ORDER_TOKEN_ENCRYPTION_KEY` encrypts order access tokens at rest; `IP_SALT` salts activity IP anonymization.
 
 ### Redis (optional locally, required in production)
 
@@ -142,7 +134,7 @@ Strict env validation (`validate-env.mjs`) runs when `CI=true` or `NODE_ENV=prod
 
 | Command | Location | Purpose |
 |---------|----------|---------|
-| `npm run dev` | root | API (5000) + Vite (5173) in parallel |
+| `npm run dev` | root | API (5000) + Vite (5173) via `scripts/dev.mjs`; single `Ctrl+C` stops both |
 | `npm run build` | root | Frontend build, then backend compile |
 | `npm start` | root | Express server (API + static SPA in production) |
 | `npm test` | root | Vitest (backend) |
@@ -160,7 +152,7 @@ Workspace-specific commands: `npm run dev -w backend`, `npm run build -w fronten
 |-------|-------|
 | CORS errors | `FRONTEND_URL` matches the browser origin |
 | CSRF 403 | Call `/api/csrf-token` first; cookies enabled |
-| WhatsApp redirect fails | `WHATSAPP_ORDER_PHONE` digits-only; check place-order response |
+| WhatsApp redirect fails | `WHATSAPP_CONTACT_NUMBER` set; check place-order `whatsappUrl` response |
 | DB connection | Pooler URL, SSL settings, Supabase status |
 | Empty products | Run schema.sql and seed data |
 | SPA routes 404 in production | Run `npm run build`; check `frontend/dist` exists |

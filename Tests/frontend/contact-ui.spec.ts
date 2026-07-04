@@ -4,7 +4,10 @@ test.describe('Contact UI', () => {
   test('renders contact form fields', async ({ page }) => {
     await page.goto('/contact');
     await expect(page.getByRole('heading', { name: 'Contact Us' })).toBeVisible();
-    await expect(page.getByTestId('contact-support-email')).toHaveText('support@labdoorcustoms.com');
+    await expect(page.getByTestId('contact-support-whatsapp')).toHaveAttribute(
+      'href',
+      expect.stringMatching(/^https:\/\/wa\.me\/\d+/),
+    );
     await expect(page.locator('input[name="name"]')).toBeVisible();
     await expect(page.locator('input[name="email"]')).toBeVisible();
     await expect(page.locator('input[name="subject"]')).toBeVisible();

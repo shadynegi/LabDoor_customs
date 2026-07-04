@@ -21,6 +21,7 @@ import { istYmd } from '../lib/analyticsIst';
 import { getAdminAnalytics, fetchSalesAnalytics, parseAnalyticsDateRange, salesAnalyticsToCsv } from '../lib/adminAnalytics';
 import { getProductInventoryMovements, getLowStockProducts, setProductStockAbsolute, applyStockDeltaInTx } from '../lib/inventoryMovements';
 import { buildUploadedMediaUrls, handleProductMediaUpload } from '../lib/productUpload';
+import { authenticateAdminUser } from '../lib/adminCredentials';
 
 const router = Router();
 
@@ -46,31 +47,8 @@ const getJwtSecret = (): string => {
   return secret;
 };
 
-const getAdminCredentials = (): { username: string; passwordHash: string } => {
-  const username = process.env.ADMIN_USERNAME;
-  const passwordHash = process.env.ADMIN_PASSWORD_HASH;
-
-  if (!username) {
-    logger.error('ERROR: ADMIN_USERNAME must be set');
-    throw new Error('Invalid admin credentials configuration');
-  }
-
-  if (!passwordHash) {
-    logger.error('ERROR: ADMIN_PASSWORD_HASH must be set (plaintext ADMIN_PASSWORD is not allowed)');
-    throw new Error('Invalid admin credentials configuration');
-  }
-
-  return { username, passwordHash };
-};
-
-// Utility function to generate password hash (for setup)
 const generatePasswordHash = async (password: string): Promise<string> => {
   return bcrypt.hash(password, BCRYPT_ROUNDS);
-};
-
-// Verify password against hash or plaintext (for migration)
-const verifyPassword = async (password: string, credentials: ReturnType<typeof getAdminCredentials>): Promise<boolean> => {
-  return bcrypt.compare(password, credentials.passwordHash);
 };
 
 // Clean up expired admin sessions
@@ -258,15 +236,12 @@ router.post('/login', async (req: Request, res: Response) => {
       });
     }
 
-    const adminCreds = getAdminCredentials();
+    const matchedAdmin = await authenticateAdminUser(username, password);
 
     const ipAddress = getClientIp(req);
     const userAgent = req.get('user-agent') || 'unknown';
 
-    // Verify username and password using bcrypt
-    const isValidPassword = await verifyPassword(password, adminCreds);
-    
-    if (username !== adminCreds.username || !isValidPassword) {
+    if (!matchedAdmin) {
       // Log failed login attempt
       await dbQuery(
         () =>
@@ -283,21 +258,21 @@ router.post('/login', async (req: Request, res: Response) => {
       });
     }
 
-    const token = generateToken(username);
+    const token = generateToken(matchedAdmin.username);
     const tokenHash = hashAdminSessionToken(token);
 
     // Clean up expired sessions (runs on each login)
     await cleanupExpiredSessions();
     
     // Clean up old sessions for this user (keep only 5 most recent)
-    await cleanupUserSessions(username, 5);
+    await cleanupUserSessions(matchedAdmin.username, 5);
 
     // Store session in database
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
     await dbQuery(
       () => sql`
       INSERT INTO admin_sessions (token, username, ip_address, user_agent, expires_at)
-      VALUES (${tokenHash}, ${username}, ${ipAddress}, ${userAgent}, ${expiresAt})
+      VALUES (${tokenHash}, ${matchedAdmin.username}, ${ipAddress}, ${userAgent}, ${expiresAt})
     `,
       'admin:storeSession'
     );
@@ -306,7 +281,7 @@ router.post('/login', async (req: Request, res: Response) => {
     await dbQuery(
       () => sql`
       INSERT INTO activity_logs (action_type, metadata, ip_address, user_agent)
-      VALUES ('admin_login_success', ${JSON.stringify({ username })}, ${ipAddress}, ${userAgent})
+      VALUES ('admin_login_success', ${JSON.stringify({ username: matchedAdmin.username })}, ${ipAddress}, ${userAgent})
     `,
       'admin:loginSuccess'
     ).catch(() => {});
@@ -957,24 +932,6 @@ router.post('/orders/bulk-update', verifyAdmin, async (req: Request, res: Respon
       if (!allowed.includes(status as OrderStatus)) {
         return res.status(400).json({ success: false, error: 'Invalid order status' });
       }
-
-      const currentOrders = await dbQuery(() => sql`
-        SELECT id, status FROM orders WHERE id = ANY(${orderIds}::uuid[])
-      `, 'admin:q12');
-
-      for (const order of currentOrders) {
-        const check = validateStatusTransition(
-          order.status as OrderStatus,
-          status as OrderStatus
-        );
-        if (!check.valid) {
-          return res.status(400).json({
-            success: false,
-            error: check.message,
-            orderId: order.id,
-          });
-        }
-      }
     }
 
     const BULK_CHUNK = 10;
@@ -982,6 +939,21 @@ router.post('/orders/bulk-update', verifyAdmin, async (req: Request, res: Respon
       dbQuery(
         () =>
           sql.begin(async (txn) => {
+            if (status !== null) {
+              const locked = await txn`
+                SELECT id, status FROM orders WHERE id = ANY(${chunk}::uuid[]) FOR UPDATE
+              `;
+              for (const order of locked) {
+                const check = validateStatusTransition(
+                  order.status as OrderStatus,
+                  status as OrderStatus
+                );
+                if (!check.valid) {
+                  return { error: check.message, orderId: order.id };
+                }
+              }
+            }
+
             const rows = await txn`
           UPDATE orders SET
             status = COALESCE(${status}, status),
@@ -989,13 +961,26 @@ router.post('/orders/bulk-update', verifyAdmin, async (req: Request, res: Respon
           WHERE id = ANY(${chunk}::uuid[])
           RETURNING id
         `;
-            return rows;
+            return { rows };
           }),
         'admin:bulkOrdersTxn'
       )
     );
 
-    const updatedCount = chunkResults.reduce((sum, rows) => sum + rows.length, 0);
+    for (const chunk of chunkResults) {
+      if (chunk && 'error' in chunk && chunk.error) {
+        return res.status(400).json({
+          success: false,
+          error: chunk.error,
+          orderId: chunk.orderId,
+        });
+      }
+    }
+
+    const updatedCount = chunkResults.reduce(
+      (sum, chunk) => sum + ('rows' in chunk && Array.isArray(chunk.rows) ? chunk.rows.length : 0),
+      0
+    );
 
     res.json({
       success: true,

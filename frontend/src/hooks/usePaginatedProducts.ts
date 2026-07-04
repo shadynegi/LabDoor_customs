@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { catalogFetch } from '../config';
 import type { Product } from './useProducts';
+import { normalizeProduct } from '../lib/productCatalogCache';
 import { toast } from 'sonner';
 import { logError } from '../lib/logger';
 
@@ -48,13 +49,7 @@ export const usePaginatedProducts = (limit: number = 10): UsePaginatedProductsRe
       const data = await response.json();
 
       if (data.success && data.data) {
-        // Map database image paths to actual imported images and convert price to number
-        const productsWithImages = data.data.map((product: Product) => ({
-          ...product,
-          price: typeof product.price === 'string' ? parseFloat(product.price) : product.price,
-          rating: typeof product.rating === 'string' ? parseFloat(product.rating) : (product.rating || 0),
-          review_count: typeof product.review_count === 'string' ? parseInt(product.review_count) : (product.review_count || 0),
-        }));
+        const productsWithImages = data.data.map((product: Product) => normalizeProduct(product));
         
         if (append) {
           setProducts(prev => [...prev, ...productsWithImages]);

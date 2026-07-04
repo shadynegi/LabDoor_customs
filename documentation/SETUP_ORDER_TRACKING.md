@@ -10,7 +10,7 @@ Configure customer order lookup.
 
 Customers track orders on `/orders` with:
 
-- **Order ID** — `orders.id` UUID (shown in WhatsApp message and confirmation email link)
+- **Order ID** — `orders.id` UUID (shown in WhatsApp message and track-order link `/orders?orderId={uuid}`)
 - **Email** — address used at checkout
 
 No access tokens are generated or emailed. The server verifies `orderId` + `email` match a single order row.
@@ -43,7 +43,7 @@ Lookup uses `POST /api/orders/lookup` (credentials in JSON body, not URL query s
 
 | Channel | Config | Content |
 |---------|--------|---------|
-| Email | `RESEND_API_KEY`, `SENDER_EMAIL` | Payment confirmed; order number + Order ID (UUID); **Track order** link `/orders?orderId={uuid}` |
+| WhatsApp | `WHATSAPP_CONTACT_NUMBER`, optional `WHATSAPP_CLOUD_*` | Payment confirmed; order number + Order ID (UUID); **Track order** link `/orders?orderId={uuid}` |
 | WhatsApp | `WHATSAPP_CLOUD_ACCESS_TOKEN`, `WHATSAPP_CLOUD_PHONE_NUMBER_ID` | Payment confirmation text to customer mobile from checkout (optional — skipped when not configured) |
 
-Customer enters checkout email on `/orders` after following the email link.
+Customer enters checkout email on `/orders` after following a WhatsApp or track-order link that pre-fills `?orderId=`.

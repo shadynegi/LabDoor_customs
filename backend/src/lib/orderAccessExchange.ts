@@ -75,19 +75,7 @@ export async function getOrderAccessTokenForEmail(orderId: string): Promise<stri
     if (token) return token;
   }
 
-  const checkoutRows = await sql`
-    SELECT access_token FROM order_checkout_exchanges
-    WHERE order_id = ${orderId}
-    ORDER BY created_at DESC
-    LIMIT 1
-  `;
-  if (!checkoutRows.length) return null;
-
-  const fallback = decryptOrderAccessToken(checkoutRows[0].access_token as string);
-  if (!fallback) {
-    logger.warn('Could not decrypt order access token for tracking link', { orderId });
-  }
-  return fallback;
+  return null;
 }
 
 /** Mint a tracking link from stored order access token (webhook/admin capture paths). */

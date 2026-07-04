@@ -27,7 +27,9 @@ import {
 } from 'lucide-react';
 import { apiFetch } from '../config';
 import { Link } from 'react-router-dom';
-import { REPLACEMENT_POLICY_PATH, REPLACEMENT_SUPPORT_EMAIL } from '../constants/returnPolicy';
+import { REPLACEMENT_POLICY_PATH } from '../constants/returnPolicy';
+import { buildWhatsAppContactUrl, getWhatsAppContactDisplay } from '../lib/whatsappContact';
+import { safeHorizontalPad } from '../lib/responsive';
 import { toast } from 'sonner';
 import { OrdersListSkeleton } from '../components/Skeletons';
 import { logError } from '../lib/logger';
@@ -95,25 +97,16 @@ const TIMELINE_STEPS: TimelineStep[] = [
 // Auto-refresh interval (30 seconds)
 const REFRESH_INTERVAL = 30000;
 
-const TRACKED_ORDERS_KEY = 'labdoor_tracked_orders';
-
 interface TrackedOrderRef {
   orderId: string;
   email: string;
 }
 
-function getTrackedOrders(): TrackedOrderRef[] {
-  try {
-    const raw = sessionStorage.getItem(TRACKED_ORDERS_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveTrackedOrder(ref: TrackedOrderRef) {
-  const existing = getTrackedOrders().filter((o) => o.orderId !== ref.orderId);
-  sessionStorage.setItem(TRACKED_ORDERS_KEY, JSON.stringify([ref, ...existing]));
+function upsertTrackedOrderRef(
+  refs: TrackedOrderRef[],
+  ref: TrackedOrderRef
+): TrackedOrderRef[] {
+  return [ref, ...refs.filter((o) => o.orderId !== ref.orderId)];
 }
 
 async function lookupOrderByCredentials(orderId: string, email: string) {
@@ -516,8 +509,7 @@ export default function MyOrders() {
 
       if (response.ok && data.success && data.data) {
         const ref = { orderId: id.trim(), email: email.trim() };
-        saveTrackedOrder(ref);
-        trackedOrdersRef.current = getTrackedOrders();
+        trackedOrdersRef.current = upsertTrackedOrderRef(trackedOrdersRef.current, ref);
         const normalized = normalizeOrder(data.data);
         setOrders((prev) => {
           const without = prev.filter((o) => o.id !== normalized.id);
@@ -528,7 +520,6 @@ export default function MyOrders() {
         const errorMessage = 'Order not found';
         setError(errorMessage);
         toast.error(errorMessage, { duration: 6000 });
-        setOrders([]);
       }
     } catch (err) {
       logError('Error fetching order:', err);
@@ -541,16 +532,22 @@ export default function MyOrders() {
   }, []);
 
   useEffect(() => {
-    trackedOrdersRef.current = getTrackedOrders();
-    const urlOrderId = searchParams.get('orderId');
+    trackedOrdersRef.current = [];
+    setOrders([]);
+    setSearched(false);
+    setError(null);
+    setLastUpdated(null);
+    setRefreshWarnings([]);
+    setCustomerEmail('');
 
+    const urlOrderId = searchParams.get('orderId');
     if (urlOrderId?.trim()) {
       setOrderId(urlOrderId.trim());
       window.history.replaceState({}, '', '/orders');
-    } else if (trackedOrdersRef.current.length > 0) {
-      void refreshTrackedOrders(false);
+    } else {
+      setOrderId('');
     }
-  }, [searchParams, refreshTrackedOrders]);
+  }, [searchParams]);
 
   // Auto-refresh effect
   useEffect(() => {
@@ -572,7 +569,7 @@ export default function MyOrders() {
 
     if (!orderId.trim()) {
       toast.error('Order ID required', {
-        description: 'Enter the order ID from your confirmation email or WhatsApp message',
+        description: 'Enter the order ID from your confirmation WhatsApp message',
       });
       return;
     }
@@ -647,9 +644,11 @@ export default function MyOrders() {
 
   return (
     <div style={{
-      minHeight: '100vh',
+      minHeight: '100dvh',
       background: 'linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)',
-      padding: isMobile ? '20px' : '40px 20px',
+      padding: isMobile ? '20px 0' : '40px 20px',
+      paddingBottom: isMobile ? 'max(20px, env(safe-area-inset-bottom, 0px))' : undefined,
+      ...safeHorizontalPad(),
     }}>
       <div style={{ maxWidth: 1000, margin: '0 auto' }}>
         {/* Header */}
@@ -704,9 +703,14 @@ export default function MyOrders() {
             <Link to={REPLACEMENT_POLICY_PATH} style={{ color: '#9c6649', fontWeight: 600 }}>
               Replacement Policy
             </Link>{' '}
-            or email{' '}
-            <a href={`mailto:${REPLACEMENT_SUPPORT_EMAIL}`} style={{ color: '#9c6649' }}>
-              {REPLACEMENT_SUPPORT_EMAIL}
+            or message us on{' '}
+            <a
+              href={buildWhatsAppContactUrl()}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: '#9c6649' }}
+            >
+              {getWhatsAppContactDisplay()}
             </a>
             .
           </p>
@@ -726,7 +730,7 @@ export default function MyOrders() {
           }}
         >
           <form onSubmit={handleSearch}>
-            <label style={{
+            <label htmlFor="order-lookup-id" style={{
               display: 'block',
               fontSize: 14,
               fontWeight: 600,
@@ -744,12 +748,15 @@ export default function MyOrders() {
                 color: '#9ca3af',
               }} size={20} />
               <input
+                id="order-lookup-id"
+                name="orderId"
                 type="text"
                 value={orderId}
                 onChange={(e) => setOrderId(e.target.value)}
-                placeholder="00000000-0000-0000-0000-000000000000"
+                placeholder="a1b2c3d4-e5f6-7890-abcd-ef1234567890"
                 style={{
                   width: '100%',
+                  boxSizing: 'border-box',
                   padding: '12px 12px 12px 44px',
                   border: '2px solid #e5e7eb',
                   borderRadius: 8,
@@ -762,7 +769,7 @@ export default function MyOrders() {
               />
             </div>
 
-            <label style={{
+            <label htmlFor="order-lookup-email" style={{
               display: 'block',
               fontSize: 14,
               fontWeight: 600,
@@ -781,6 +788,8 @@ export default function MyOrders() {
                   color: '#9ca3af',
                 }} size={20} />
                 <input
+                  id="order-lookup-email"
+                  name="customerEmail"
                   type="email"
                   value={customerEmail}
                   onChange={(e) => setCustomerEmail(e.target.value)}
@@ -934,7 +943,7 @@ export default function MyOrders() {
               >
                 {/* Order Number Search */}
                 <div>
-                  <label style={{
+                  <label htmlFor="order-filter-number" style={{
                     display: 'block',
                     fontSize: 13,
                     fontWeight: 600,
@@ -952,8 +961,9 @@ export default function MyOrders() {
                       color: '#9ca3af',
                     }} size={18} />
                     <input
+                      id="order-filter-number"
+                      name="orderNumber"
                       type="text"
-                      value={orderNumberFilter}
                       onChange={(e) => setOrderNumberFilter(e.target.value)}
                       placeholder="Search by order #"
                       style={{
@@ -970,7 +980,7 @@ export default function MyOrders() {
 
                 {/* Status Filter */}
                 <div>
-                  <label style={{
+                  <label htmlFor="order-filter-status" style={{
                     display: 'block',
                     fontSize: 13,
                     fontWeight: 600,
@@ -980,6 +990,8 @@ export default function MyOrders() {
                     Status
                   </label>
                   <select
+                    id="order-filter-status"
+                    name="status"
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value)}
                     style={{
@@ -1001,7 +1013,7 @@ export default function MyOrders() {
 
                 {/* Date Range Filter */}
                 <div>
-                  <label style={{
+                  <label htmlFor="order-filter-date-range" style={{
                     display: 'block',
                     fontSize: 13,
                     fontWeight: 600,
@@ -1011,6 +1023,8 @@ export default function MyOrders() {
                     Date Range
                   </label>
                   <select
+                    id="order-filter-date-range"
+                    name="dateRange"
                     value={dateRange}
                     onChange={(e) => setDateRange(e.target.value)}
                     style={{
@@ -1099,7 +1113,7 @@ export default function MyOrders() {
             
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               {/* Auto-refresh toggle */}
-              <label style={{
+              <label htmlFor="orders-auto-refresh" style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: 8,
@@ -1107,8 +1121,26 @@ export default function MyOrders() {
                 fontSize: 14,
                 color: '#6b7280',
               }}>
-                <div 
-                  onClick={() => setAutoRefresh(!autoRefresh)}
+                <input
+                  id="orders-auto-refresh"
+                  name="autoRefresh"
+                  type="checkbox"
+                  checked={autoRefresh}
+                  onChange={(e) => setAutoRefresh(e.target.checked)}
+                  style={{
+                    position: 'absolute',
+                    width: 1,
+                    height: 1,
+                    padding: 0,
+                    margin: -1,
+                    overflow: 'hidden',
+                    clip: 'rect(0,0,0,0)',
+                    whiteSpace: 'nowrap',
+                    border: 0,
+                  }}
+                />
+                <span
+                  aria-hidden="true"
                   style={{
                     width: 44,
                     height: 24,
@@ -1116,7 +1148,7 @@ export default function MyOrders() {
                     background: autoRefresh ? '#10b981' : '#e5e7eb',
                     position: 'relative',
                     transition: 'background 0.2s ease',
-                    cursor: 'pointer',
+                    flexShrink: 0,
                   }}
                 >
                   <motion.div
@@ -1133,7 +1165,7 @@ export default function MyOrders() {
                       boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
                     }}
                   />
-                </div>
+                </span>
                 <span>Auto-refresh</span>
               </label>
               
@@ -1352,7 +1384,7 @@ export default function MyOrders() {
                       }}>
                         Tracking Number
                       </div>
-                      <div style={{ 
+                      <div className="text-break-safe" style={{ 
                         fontSize: 18, 
                         fontWeight: 700, 
                         color: '#1f2937',

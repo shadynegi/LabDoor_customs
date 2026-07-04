@@ -17,7 +17,7 @@ Lab Door Customs is a monorepo e-commerce platform for custom footwear sales.
 | Database | Supabase PostgreSQL | Products, orders, customers, sessions |
 | Checkout | WhatsApp ordering | Place-order API + admin payment confirmation |
 | Cache | Redis | Product cache, distributed rate limits |
-| Email | Resend | Order confirmations, shipping, contact replies |
+| Customer messaging | WhatsApp | Order confirmations, shipping updates, contact |
 | Monitoring | Pino + Sentry | Structured logs and error tracking |
 
 ---
@@ -35,8 +35,8 @@ Lab Door Customs is a monorepo e-commerce platform for custom footwear sales.
 ## Security model
 
 - **Admin:** HttpOnly session cookie, bcrypt password (`ADMIN_PASSWORD_HASH`), SHA-256 hashed sessions in DB.
-- **Customers:** Per-order access tokens (SHA-256 hashed + AES-256-GCM encrypted at rest); email links use one-time `order_access_exchanges` codes.
-- **Database:** Supabase PostgreSQL with service_role-only RLS on 14 tables; anon/authenticated PostgREST access revoked.
+- **Customers:** Order lookup via `POST /api/orders/lookup` with order ID (UUID) + checkout email; anti-enumeration uniform 404; legacy `order_access_exchanges` returns **410**.
+- **Database:** Supabase PostgreSQL with service_role-only RLS on **10** client-revoked tables; anon/authenticated PostgREST access revoked.
 - **API:** CSRF on mutating requests (except activity batch), rate limits, CORS whitelist, Cloudflare proxy in production.
 - **Activity:** Consent-gated on frontend; IP anonymized with `IP_SALT`; batch endpoint CSRF-exempt.
 - **Checkout:** Server-side pricing validation; place-order idempotency; pending order expiry.

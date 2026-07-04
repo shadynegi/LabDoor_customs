@@ -108,7 +108,6 @@ export interface SalesAnalyticsPayload {
   }>;
   top_sellers_by_units: Array<{ product_id: number | null; product_name: string; units_sold: number }>;
   top_sellers_by_revenue: Array<{ product_id: number | null; product_name: string; revenue: number }>;
-  category_breakdown: Array<{ category: string; units_sold: number; revenue: number }>;
   revenue_time_series: Array<{ period_start: string; orders: number; revenue: number; units_sold: number }>;
   best_period: { period_start: string; revenue: number; orders: number } | null;
 }
@@ -120,7 +119,6 @@ async function aggregateFromLineItems(
 ): Promise<{
   summary: SalesAnalyticsPayload['summary'];
   revenue_by_product: SalesAnalyticsPayload['revenue_by_product'];
-  category_breakdown: SalesAnalyticsPayload['category_breakdown'];
   revenue_time_series: SalesAnalyticsPayload['revenue_time_series'];
   best_period: SalesAnalyticsPayload['best_period'];
 }> {
@@ -133,7 +131,7 @@ async function aggregateFromLineItems(
           ? sql`date_trunc('month', li.created_at)`
           : sql`date_trunc('day', li.created_at)`;
 
-  const [summaryRows, productRows, categoryRows, seriesRows] = await Promise.all([
+  const [summaryRows, productRows, seriesRows] = await Promise.all([
     salesQuery('summary', () => sql`
       SELECT
         COALESCE(SUM(li.quantity), 0)::int AS total_units_sold,
@@ -173,20 +171,6 @@ async function aggregateFromLineItems(
       GROUP BY li.product_id, li.product_name
       ORDER BY revenue DESC
       LIMIT 50
-    `),
-    salesQuery('by_category', () => sql`
-      SELECT
-        COALESCE(NULLIF(TRIM(li.category), ''), 'Uncategorized') AS category,
-        SUM(li.quantity)::int AS units_sold,
-        SUM(li.line_total)::float AS revenue
-      FROM order_line_items li
-      JOIN orders o ON o.id = li.order_id
-      WHERE o.payment_status = 'completed'
-        AND li.created_at >= ${from}
-        AND li.created_at <= ${to}
-      GROUP BY 1
-      ORDER BY revenue DESC
-      LIMIT 20
     `),
     salesQuery('time_series', () => sql`
       SELECT
@@ -250,11 +234,6 @@ async function aggregateFromLineItems(
       estimated_gross_profit: hasProfit ? parseFloat(String(profitRaw ?? 0)) : null,
     },
     revenue_by_product,
-    category_breakdown: categoryRows.map((r) => ({
-      category: String(r.category),
-      units_sold: Number(r.units_sold ?? 0),
-      revenue: parseFloat(String(r.revenue ?? 0)),
-    })),
     revenue_time_series,
     best_period,
   };
@@ -289,7 +268,6 @@ async function aggregateFromOrdersJson(
   };
 
   const byProduct = new Map<string, ProductAgg>();
-  const byCategory = new Map<string, { units_sold: number; revenue: number }>();
   const byPeriod = new Map<string, { orders: number; revenue: number; units_sold: number }>();
 
   let totalUnits = 0;
@@ -368,10 +346,6 @@ async function aggregateFromOrdersJson(
       estimated_gross_profit: null,
     },
     revenue_by_product,
-    category_breakdown: [...byCategory.entries()].map(([category, v]) => ({
-      category,
-      ...v,
-    })),
     revenue_time_series,
     best_period,
   };
@@ -425,7 +399,6 @@ export async function fetchSalesAnalytics(range: AnalyticsDateRange): Promise<Sa
       product_name: r.product_name,
       revenue: r.revenue,
     })),
-    category_breakdown: core.category_breakdown,
     revenue_time_series: core.revenue_time_series,
     best_period: core.best_period,
   };

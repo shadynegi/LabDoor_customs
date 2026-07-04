@@ -6,7 +6,34 @@
   --touch-min: 44px;
   --sticky-footer-height: 88px;
   --sticky-footer-height-stacked: 190px;
+  --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
+.min-h-app {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.text-break-safe {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.product-card__title {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.modal-max-h {
+  max-height: 90vh;
+  max-height: 90dvh;
 }
 
 .responsive-table-wrap {
@@ -152,7 +179,7 @@
   }
 
   .has-cookie-banner-top {
-    padding-top: calc(120px + env(safe-area-inset-top, 0px));
+    padding-top: calc(120px + var(--safe-top));
   }
 }
 
@@ -314,34 +341,6 @@
   border: 2px solid rgba(255, 255, 255, 0.2);
   border-top-color: #fff;
   border-radius: 50%;
-}
-
-/* Review stats — stack on narrow phones */
-.review-stats-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 20px;
-  padding: clamp(16px, 4vw, 24px);
-}
-
-@media (min-width: 480px) {
-  .review-stats-grid {
-    grid-template-columns: auto 1fr;
-    gap: 32px;
-  }
-
-  .review-stats-average {
-    border-right: 1px solid #e5e7eb;
-    padding-right: 32px;
-    border-bottom: none;
-    padding-bottom: 0;
-  }
-}
-
-.review-stats-average {
-  text-align: center;
-  border-bottom: 1px solid #e5e7eb;
-  padding-bottom: 20px;
 }
 
 /* Admin order modal stats */

@@ -1,3 +1,4 @@
+-- DEPRECATED (July 2026): PayPal removed — use migration-drop-paypal.sql on existing DBs.
 -- PayPal ID uniqueness + cumulative refund tracking
 ALTER TABLE orders
   ADD COLUMN IF NOT EXISTS refunded_amount DECIMAL(10, 2) NOT NULL DEFAULT 0;

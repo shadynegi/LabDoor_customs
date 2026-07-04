@@ -14,7 +14,7 @@ PostgreSQL schema and migrations for Lab Door Customs on Supabase.
 | Migrations / admin | 5432 | Direct connection |
 
 ```
-DATABASE_URL=postgresql://postgres:PASSWORD@db.PROJECT.supabase.co:6543/postgres?pgbouncer=true
+DATABASE_URL=postgresql://postgres.PROJECT_REF:PASSWORD@aws-1-REGION.pooler.supabase.com:6543/postgres?pgbouncer=true
 ```
 
 Production TLS: set `DB_SSL_CA_PATH` to Supabase CA bundle.
@@ -34,12 +34,12 @@ Production TLS: set `DB_SSL_CA_PATH` to Supabase CA bundle.
 
 | Table | Purpose |
 |-------|---------|
-| `products` | Catalog — price, stock, category, size, color, ratings |
-| `orders` | Orders — JSONB items/shipping, legacy PayPal ID columns (optional), payment/status enums |
+| `products` | Catalog — price, stock, size, color, optional `video_360` |
+| `orders` | Orders — JSONB items/shipping, `payment_id`, payment/status enums |
 | `customers` | Aggregated stats — total_orders, total_spent, soft delete |
-| `coupons` | Discount rules — type, limits, scope (`applies_to`) |
+| `coupons` | Discount rules — type, limits, scope (`applies_to`: `all` or `product` + IDs) |
 | `coupon_usage` | Per-order coupon reservations |
-| `contact_messages` | Contact form submissions (no admin API) |
+| `contact_messages` | Contact form submissions |
 | `activity_logs` | Client activity (anonymized IP) |
 | `admin_sessions` | Admin session token hashes (SHA-256) |
 
@@ -47,19 +47,19 @@ Production TLS: set `DB_SSL_CA_PATH` to Supabase CA bundle.
 
 ## Payment tables
 
-Created at server startup via `ensureIdempotencyTable()`, `ensureOrderPaymentSchema()`, and `ensureCheckoutExchangeTable()`:
+Created at server startup via `ensureIdempotencyTable()`, `ensureOrderPaymentSchema()`, and `ensureOrderAccessExchangeTable()`:
 
 | Table | Purpose |
 |-------|---------|
-| `payment_idempotency` | Place-order / legacy capture deduplication |
-| `processed_refund_events` | Legacy refund deduplication |
-| `order_checkout_exchanges` | Legacy one-time checkout codes (maintenance cleanup only) |
+| `payment_idempotency` | Place-order deduplication |
+| `order_access_exchanges` | One-time order tracking link codes (email) |
 
 Migration files:
 
 - `migration-payment-idempotency.sql` — table + indexes (including partial index for reaper)
-- `migration-paypal-unique-refunds.sql`
-- `migration-processed-refund-events.sql`
+- `migration-remove-product-category.sql` — drop shoe category columns; coupon scope `all` / `product` only (**applied on production Supabase**, July 2026)
+- `migration-drop-reviews.sql` — drop `reviews` / `review_votes` and rating trigger (**run on existing DBs** after reviews feature removal)
+- `migration-drop-paypal.sql` — legacy payment cleanup (**applied on production Supabase**, July 2026)
 
 Boot creates missing indexes via `ensureIdempotencyIndexes()` even when `BOOTSTRAP_SKIP_DDL=true`.
 
@@ -69,22 +69,11 @@ Boot creates missing indexes via `ensureIdempotencyIndexes()` even when `BOOTSTR
 
 | Column | Purpose |
 |--------|---------|
-| `paypal_order_id` | Legacy PayPal checkout order ID (unique when set; not written on new orders) |
-| `paypal_capture_id` | Legacy PayPal capture ID (unique when set; not written on new orders) |
-| `refunded_amount` | Cumulative refunded total |
+| `payment_id` | External payment reference (admin **Mark paid** for WhatsApp orders) |
 | `access_token_hash` | SHA-256 hash of customer access token |
+| `access_token_encrypted` | Encrypted token for durable tracking-link minting |
 | `items` | JSONB line items |
 | `shipping_address` | JSONB shipping details |
-
----
-
-## Reviews
-
-Applied via `migration-reviews.sql`:
-
-- `reviews` — rating, content, moderation status, verified purchase
-- `review_votes` — helpful/not helpful votes
-- Trigger updates product `rating` and `review_count`
 
 ---
 
@@ -92,7 +81,7 @@ Applied via `migration-reviews.sql`:
 
 `ensureRlsPolicies()` runs at startup (`backend/src/lib/rlsMigration.ts`; see also `migration-rls-tighten.sql`, `migration-rls-sensitive-tables.sql`, `migration-revoke-graphql-client-roles.sql`).
 
-- **14 tables** have RLS with service_role-only policies (including `order_access_exchanges`).
+- **10 tables** have RLS with service_role-only policies (including `order_access_exchanges`).
 - **`anon` and `authenticated` grants are revoked** — no public product catalog via PostgREST/GraphQL.
 - Boot is **non-destructive** when policies exist. **Production Supabase:** all required migrations applied (June 2026), including performance linter fixes and product search indexes.
 - The Express backend connects with **service_role** credentials for all API operations.
@@ -111,14 +100,8 @@ Scheduled after **core** bootstrap (`maintenanceJobs.ts`); initial run deferred 
 |----------|--------|
 | Once after defer | DB ping → expire stale orders → reap stuck idempotency keys |
 | Every 15 min | Ping → stuck idempotency reaper (silent when nothing to reap) |
-| Every 1 hour | Ping → idempotency cleanup → stale orders → checkout exchange cleanup → order access exchange cleanup |
+| Every 1 hour | Ping → idempotency cleanup → stale orders → order access exchange cleanup |
 
 Each scheduled run **pings the database first**. If the pooler is temporarily unreachable (`CONNECT_TIMEOUT`, `ENOTFOUND` after sleep or offline), you get one compact `Maintenance: skipped (database unreachable)` line — not a sign of a wrong `DATABASE_URL` if bootstrap and API traffic already succeeded.
 
-Env tuning: `MAINTENANCE_DB_RETRIES` (default 2), `MAINTENANCE_DB_RETRY_MS` (default 1000). Full behavior: [`info.md` — Maintenance jobs](info.md#maintenance-jobs).
-
-## Keep-alive
-
-GitHub Actions cron (every 6 days) runs `backend/scripts/keep-alive.js` to prevent Supabase free-tier pausing. Requires `DATABASE_URL` secret.
-
-See [SUPABASE_SETUP_INSTRUCTIONS.md](./SUPABASE_SETUP_INSTRUCTIONS.md), [GET_DATABASE_URL.md](./GET_DATABASE_URL.md).
+See [`info.md` — Maintenance warnings vs wrong DATABASE_URL](info.md#maintenance-warnings-vs-wrong-database_url).

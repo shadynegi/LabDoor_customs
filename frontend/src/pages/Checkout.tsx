@@ -16,6 +16,7 @@ import {
 import { toast } from "sonner";
 import { getFriendlyError } from "../utils/errorMessages";
 import { logError } from "../lib/logger";
+import { createClientId } from "../lib/clientId";
 import { useResponsive } from "../hooks/useResponsive";
 import MobileStickyCta from "../components/MobileStickyCta";
 import { setUserEmail, trackCheckoutStart } from "../utils/activityTracker";
@@ -171,12 +172,12 @@ const InputField = React.memo(({
 InputField.displayName = 'InputField';
 
 export default function Checkout() {
-  const { state, cartValidationError, isCartValidating, retryCartValidation, clearCart } = useCart();
+  const { state, cartValidationError, isCartValidating, retryCartValidation } = useCart();
   const navigate = useNavigate();
   const { isMobile } = useResponsive();
   const [isProcessing, setIsProcessing] = useState(false);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
-  const paymentIdempotencyKey = useRef(crypto.randomUUID());
+  const paymentIdempotencyKey = useRef(createClientId());
   const checkoutBlocked = Boolean(cartValidationError) || isCartValidating;
   const [errors, setErrors] = useState<FormErrors>({});
   
@@ -258,6 +259,8 @@ export default function Checkout() {
             product_id: item.id,
             quantity: item.quantity,
             price: item.price,
+            size_system: item.size?.system,
+            size_value: item.size?.value,
           })),
         }),
       });
@@ -434,6 +437,11 @@ export default function Checkout() {
     const validation = validateForm();
     if (!validation.isValid) {
       const firstErrorField = Object.keys(validation.errors)[0] as FormField;
+      const firstMessage = validation.errors[firstErrorField];
+      toast.error('Please complete all required fields', {
+        description: firstMessage,
+        duration: 6000,
+      });
       const scrollTargetId = firstErrorField === "country" ? "country-input" : firstErrorField;
       const element = document.getElementById(scrollTargetId);
       element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -464,7 +472,7 @@ export default function Checkout() {
         }),
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => ({} as Record<string, unknown>));
 
       if (!response.ok) {
         const friendlyError = getFriendlyError(data.error || data.message || 'Order placement failed');
@@ -486,7 +494,7 @@ export default function Checkout() {
         return;
       }
 
-      if (!data.whatsappUrl) {
+      if (typeof data.whatsappUrl !== 'string' || !data.whatsappUrl) {
         throw new Error('WhatsApp redirect URL missing');
       }
 
@@ -496,11 +504,11 @@ export default function Checkout() {
         total: serverTotal ?? total,
         timestamp: new Date().toISOString(),
       }));
-      clearCart();
+      sessionStorage.setItem('ldc_clear_cart_after_order', '1');
       window.location.href = data.whatsappUrl;
     } catch (error) {
       logError('Place order error:', error);
-      paymentIdempotencyKey.current = crypto.randomUUID();
+      paymentIdempotencyKey.current = createClientId();
       if (error instanceof Error && error.message !== 'Order placement failed') {
         const friendlyError = getFriendlyError(error);
         toast.error(friendlyError.message, {
@@ -525,7 +533,7 @@ export default function Checkout() {
           : undefined
       }
       style={{
-        minHeight: "100vh",
+        minHeight: "100dvh",
         background: "linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)",
         padding: isMobile ? "20px" : "40px 20px",
         paddingBottom: isMobile
@@ -901,6 +909,7 @@ export default function Checkout() {
               {/* Coupon Input */}
               <div style={{ marginBottom: 20 }}>
                 <label
+                  htmlFor="coupon-code"
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -963,6 +972,8 @@ export default function Checkout() {
                 ) : (
                   <div style={{ display: "flex", gap: 8 }}>
                     <input
+                      id="coupon-code"
+                      name="couponCode"
                       type="text"
                       value={couponCode}
                       onChange={(e) => {
@@ -1191,6 +1202,8 @@ export default function Checkout() {
                 }}
               >
                 <input
+                  id="policy-accepted"
+                  name="policyAccepted"
                   type="checkbox"
                   checked={policyAccepted}
                   onChange={(e) => {
@@ -1320,6 +1333,8 @@ export default function Checkout() {
                 }}
               >
                 <input
+                  id="policy-accepted-mobile"
+                  name="policyAccepted"
                   type="checkbox"
                   checked={policyAccepted}
                   onChange={(e) => {

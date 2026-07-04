@@ -4,7 +4,6 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePaginatedProducts } from '../hooks/usePaginatedProducts';
 import { useProductSearch } from '../hooks/useProductSearch';
-import StarRating from '../components/StarRating';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
 import ProductFilters from '../components/ProductFilters';
@@ -80,7 +79,7 @@ const ProductsPage = () => {
   if (loading && products.length === 0 && !isUsingSearchOrFilters) {
     return (
       <div style={{
-        minHeight: '100vh',
+        minHeight: '100dvh',
         background: 'linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)',
         padding: isMobile ? '20px' : '40px 60px',
       }}>
@@ -143,13 +142,13 @@ const ProductsPage = () => {
 
   return (
     <div style={{
-      minHeight: '100vh',
+      minHeight: '100dvh',
       background: 'linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)',
       padding: isMobile ? '20px' : '40px 60px',
     }}>
       <MetaTags
         title="Shop Custom Shoes — Lab Door Customs"
-        description="Browse our collection of premium custom footwear. Filter by style, size, and price."
+        description="Browse our collection of premium custom footwear. Filter by color and price."
         path="/products"
       />
       {/* Page Header */}
@@ -367,26 +366,23 @@ const ProductsPage = () => {
 
               {/* Product Info */}
               <div style={{ padding: isMobile ? 12 : 16 }}>
-                <h3 style={{
+                <h3
+                  className={isMobile ? 'product-card__title' : undefined}
+                  style={{
                   fontSize: isMobile ? 14 : 16,
                   fontWeight: 700,
                   color: '#1f2937',
                   marginBottom: 8,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
+                  ...(isMobile
+                    ? {}
+                    : {
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }),
                 }}>
                   {product.name}
                 </h3>
-
-                {/* Rating */}
-                <div style={{ marginBottom: 8 }}>
-                  <StarRating 
-                    rating={product.rating || 0} 
-                    reviewCount={product.review_count || 0}
-                    size={isMobile ? 12 : 14}
-                  />
-                </div>
 
                 {/* Price */}
                 <div style={{

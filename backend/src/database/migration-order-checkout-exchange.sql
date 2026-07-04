@@ -1,3 +1,4 @@
+-- DEPRECATED (July 2026): PayPal checkout exchange removed — use migration-drop-paypal.sql.
 -- One-time PayPal return exchange codes (30-minute TTL, single use).
 CREATE TABLE IF NOT EXISTS order_checkout_exchanges (
   code_hash VARCHAR(64) PRIMARY KEY,

@@ -58,29 +58,6 @@ describe('security hardening', () => {
     expect(blocked.body.retryAfter).toBeDefined();
   });
 
-  it('rate limits review submissions (5 per hour)', async () => {
-    const testIp = `203.0.114.${Math.floor(Math.random() * 200) + 1}`;
-    const { agent, csrfToken } = await createCsrfAgent();
-
-    for (let i = 0; i < 5; i++) {
-      const res = await withCsrf(
-        agent.post('/api/reviews').set('X-Forwarded-For', testIp),
-        csrfToken
-      ).send({});
-
-      expect(res.status).toBe(400);
-    }
-
-    const blocked = await withCsrf(
-      agent.post('/api/reviews').set('X-Forwarded-For', testIp),
-      csrfToken
-    ).send({});
-
-    expect(blocked.status).toBe(429);
-    expect(blocked.body.error).toMatch(/too many reviews submitted/i);
-    expect(blocked.body.retryAfter).toBeDefined();
-  });
-
   it('rate limits coupon validation (20 per 15 minutes)', async () => {
     const testIp = `203.0.115.${Math.floor(Math.random() * 200) + 1}`;
     const { agent, csrfToken } = await createCsrfAgent();

@@ -1,7 +1,5 @@
 /** Store return / replacement policy — all sales final; replacements for manufacturing defects only. */
 
-export const REPLACEMENT_SUPPORT_EMAIL = 'support@labdoorcustoms.com';
-
 export const NO_REFUND_POLICY_SHORT =
   'All sales are final. We do not offer refunds, returns for preference or fit, or exchanges for size or color.';
 

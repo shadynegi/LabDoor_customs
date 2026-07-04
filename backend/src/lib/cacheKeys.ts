@@ -6,8 +6,14 @@ export { invalidateCachePrefix };
 export const CACHE = {
   productsList: (page: number, limit: number) => `products:list:${page}:${limit}`,
   productSingle: (id: string | number) => `products:single:${id}`,
-  couponValidate: (code: string, subtotal: number, email: string, itemCount = 0) =>
-    `coupon:validate:${code.toUpperCase()}:${subtotal}:${email.toLowerCase()}:${itemCount}`,
+  couponValidate: (
+    code: string,
+    subtotal: number,
+    email: string,
+    itemCount = 0,
+    productIds: number[] = []
+  ) =>
+    `coupon:validate:${code.toUpperCase()}:${subtotal}:${email.toLowerCase()}:${itemCount}:${[...productIds].sort((a, b) => a - b).join(',')}`,
   adminAnalytics: (periodKey = 'default') => `admin:analytics:${periodKey}`,
   productsPrefix: 'products:',
   couponsValidatePrefix: 'coupon:validate:',

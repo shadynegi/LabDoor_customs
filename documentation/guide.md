@@ -10,8 +10,7 @@ Sequential commands from a fresh clone through running the app and executing the
 
 - **Node.js 20+**
 - **PostgreSQL** (Supabase free tier works) — required for local dev with a real database
-- **WhatsApp** — business phone for order messages (optional `WHATSAPP_ORDER_PHONE`; default in code)
-- **Resend API key** — optional for email; contact form and order emails need it in production
+- **WhatsApp** — `WHATSAPP_CONTACT_NUMBER` (backend) and `VITE_WHATSAPP_CONTACT_NUMBER` (frontend build)
 
 ---
 
@@ -54,20 +53,19 @@ PORT=5000
 NODE_ENV=development
 FRONTEND_URL=http://localhost:5173
 DATABASE_URL=postgresql://postgres:PASSWORD@db.PROJECT.supabase.co:6543/postgres?pgbouncer=true
-WHATSAPP_ORDER_PHONE=919888514572
+WHATSAPP_CONTACT_NUMBER=+919888514572
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD_HASH=$2b$12$your_bcrypt_hash_here
 JWT_SECRET=your_secure_jwt_secret_at_least_32_characters_long
 ORDER_TOKEN_ENCRYPTION_KEY=your_32_char_encryption_key_for_checkout_tokens
 IP_SALT=random_salt_for_ip_anonymization
-RESEND_API_KEY=re_xxx
-SENDER_EMAIL=noreply@yourdomain.com
 ```
 
 **`frontend/.env`:**
 
 ```env
 VITE_API_BASE_URL=/api
+VITE_WHATSAPP_CONTACT_NUMBER=+919888514572
 ```
 
 Vite proxies `/api` to the backend during development.
@@ -126,7 +124,7 @@ From the repository root:
 npm run dev
 ```
 
-This starts both:
+This starts both (orchestrated by `scripts/dev.mjs` + `concurrently`; single `Ctrl+C` stops both on Windows):
 
 | Service | URL |
 |---------|-----|
@@ -142,7 +140,7 @@ This starts both:
 | API health (direct) | http://localhost:5000/api/health |
 | Admin login | http://localhost:5173/admin/login |
 
-Stop dev servers with `Ctrl+C` when you are done manually testing.
+Stop dev servers with `Ctrl+C` when you are done manually testing (exit code 0 when stopped intentionally).
 
 ---
 
@@ -159,10 +157,10 @@ This single command runs all suites in order:
 
 | Suite | Tool | Tests | Needs live DB? |
 |-------|------|-------|----------------|
-| Backend unit | Vitest | 120 | No (mocked) |
-| API integration | Vitest | 74 | No (mocked) |
-| Frontend UI | Playwright | 217 | No (mocked API + static preview) |
-| **Total** | | **411** | |
+| Backend unit | Vitest | 118 | No (mocked) |
+| API integration | Vitest | 71 | No (mocked) |
+| Frontend UI | Playwright | 233 | No (mocked API + static preview) |
+| **Total** | | **422** | |
 
 The runner auto-builds the frontend for UI tests if `frontend/dist` is missing and installs Playwright in `Tests/` on first run if needed.
 

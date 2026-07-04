@@ -1,12 +1,11 @@
 // ProductDetailPage - Individual product page with full details
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, ShoppingCart, Package, Shield, Truck, Check, RotateCcw, Image, AlertTriangle } from 'lucide-react';
 import { catalogFetch } from '../config';
 import type { Product } from '../hooks/useProducts';
 import { useCart, type SizeSystem } from './CartContext';
-import StarRating from '../components/StarRating';
 import ErrorMessage from '../components/ErrorMessage';
 import { generatePlaceholder360Images } from '../utils/product360Images';
 import { resolveProductImage } from '../lib/productImageMaps';
@@ -20,12 +19,12 @@ import MobileStickyCta from '../components/MobileStickyCta';
 import { trackProductView, trackSizeSelect } from '../utils/activityTracker';
 import { REPLACEMENT_POLICY_PATH } from '../constants/returnPolicy';
 import { getProductDetailPath } from '../lib/productPaths';
+import { normalizeProduct } from '../lib/productCatalogCache';
 import { FREE_SHIPPING_MESSAGE } from '../utils/pricing';
 
 const Product360Viewer = lazy(() =>
   import('../components/Product360Viewer').then((m) => ({ default: m.Product360Viewer }))
 );
-const ProductReviews = lazy(() => import('../components/ProductReviews'));
 import { ProductDetailSkeleton } from '../components/Skeletons';
 
 const ProductDetailPage: React.FC = () => {
@@ -43,16 +42,29 @@ const ProductDetailPage: React.FC = () => {
   const [addedToCart, setAddedToCart] = useState(false);
   const [sizeError, setSizeError] = useState<string | null>(null);
   const [show360View, setShow360View] = useState(false);
+  const addedToCartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const sizeOptions = SHOE_SIZE_OPTIONS;
 
   useEffect(() => {
+    return () => {
+      if (addedToCartTimerRef.current) {
+        clearTimeout(addedToCartTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!id) return;
+
+    const controller = new AbortController();
+
     const fetchProduct = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        const response = await catalogFetch(`/products/${id}`);
+        const response = await catalogFetch(`/products/${id}`, { signal: controller.signal });
         
         if (!response.ok) {
           throw new Error('Failed to fetch product');
@@ -60,17 +72,13 @@ const ProductDetailPage: React.FC = () => {
 
         const data = await response.json();
 
-        if (data.success && data.data) {
-          const productData = {
-            ...data.data,
-            price: typeof data.data.price === 'string' ? parseFloat(data.data.price) : data.data.price,
-            rating: typeof data.data.rating === 'string' ? parseFloat(data.data.rating) : (data.data.rating || 0),
-            review_count: typeof data.data.review_count === 'string' ? parseInt(data.data.review_count) : (data.data.review_count || 0),
-          };
-          setProduct(productData);
-          trackProductView(productData.id, productData.name);
+        if (controller.signal.aborted) return;
 
-          const canonicalPath = getProductDetailPath(productData);
+        if (data.success && data.data) {
+          setProduct(normalizeProduct(data.data));
+          trackProductView(data.data.id, data.data.name);
+
+          const canonicalPath = getProductDetailPath(data.data);
           if (id && canonicalPath !== `/product/${id}`) {
             navigate(canonicalPath, { replace: true });
           }
@@ -78,17 +86,19 @@ const ProductDetailPage: React.FC = () => {
           throw new Error('Product not found');
         }
       } catch (err) {
+        if (controller.signal.aborted) return;
         logError('Error fetching product:', err);
         const errorMsg = err instanceof Error ? err.message : 'Failed to load product';
         setError(errorMsg);
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
       }
     };
 
-    if (id) {
-      fetchProduct();
-    }
+    void fetchProduct();
+    return () => controller.abort();
   }, [id, navigate]);
 
   const isOutOfStock = Boolean(product?.is_out_of_stock || product?.stock === 0);
@@ -120,7 +130,10 @@ const ProductDetailPage: React.FC = () => {
     });
     setAddedToCart(true);
     setSizeError(null);
-    setTimeout(() => setAddedToCart(false), 2000);
+    if (addedToCartTimerRef.current) {
+      clearTimeout(addedToCartTimerRef.current);
+    }
+    addedToCartTimerRef.current = setTimeout(() => setAddedToCart(false), 2000);
   };
 
   if (loading) {
@@ -163,7 +176,7 @@ const ProductDetailPage: React.FC = () => {
     <div
       className={isMobile && !isOutOfStock ? 'has-mobile-sticky-cta' : undefined}
       style={{
-      minHeight: '100vh',
+      minHeight: '100dvh',
       background: 'linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)',
     }}>
       <MetaTags
@@ -184,8 +197,6 @@ const ProductDetailPage: React.FC = () => {
         image={productImage}
         price={product.price}
         inStock={!isOutOfStock}
-        rating={product.rating}
-        reviewCount={product.review_count}
       />
       {/* Back Button */}
       <div style={{ 
@@ -361,24 +372,6 @@ const ProductDetailPage: React.FC = () => {
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.2 }}
           >
-            {/* Category Badge */}
-            {product.category && (
-              <div style={{
-                display: 'inline-block',
-                padding: '6px 12px',
-                background: '#f5e0d5',
-                color: '#9c6649',
-                borderRadius: 8,
-                fontSize: 12,
-                fontWeight: 700,
-                marginBottom: 16,
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px'
-              }}>
-                {product.category}
-              </div>
-            )}
-
             {/* Product Name */}
             <h1 style={{
               fontSize: isMobile ? 28 : 42,
@@ -389,15 +382,6 @@ const ProductDetailPage: React.FC = () => {
             }}>
               {product.name}
             </h1>
-
-            {/* Rating */}
-            <div style={{ marginBottom: 24 }}>
-              <StarRating 
-                rating={product.rating || 0} 
-                reviewCount={product.review_count || 0}
-                size={isMobile ? 16 : 18}
-              />
-            </div>
 
             {/* Price */}
             <div style={{
@@ -620,14 +604,6 @@ const ProductDetailPage: React.FC = () => {
             </div>
           </motion.div>
         </div>
-
-        {/* Customer Reviews Section */}
-        <Suspense fallback={<div style={{ padding: 24 }}>Loading reviews…</div>}>
-          <ProductReviews 
-            productId={product.id} 
-            productName={product.name}
-          />
-        </Suspense>
       </div>
       {isMobile && !isOutOfStock && (
         <MobileStickyCta

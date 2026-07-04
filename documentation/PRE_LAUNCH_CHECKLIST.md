@@ -11,19 +11,21 @@ Tick every item before pointing production traffic at Lab Door Customs.
 Run in the **Supabase SQL Editor** (or psql on port 5432). Scripts live in `backend/src/database/`. **Production:** all required migrations are applied — see [SUPABASE_SQL_TO_RUN.md](./SUPABASE_SQL_TO_RUN.md).
 
 - [x] Base schema applied (`schema.sql` on fresh DB, or already present from prior setup)
-- [x] `migration-reviews.sql` (if reviews not yet enabled)
+- [ ] Run `migration-drop-reviews.sql` in Supabase SQL Editor (drops `reviews` / `review_votes`)
+- [x] Run `migration-drop-paypal.sql` in Supabase SQL Editor (legacy payment cleanup)
 - [x] `migration-activity-logs.sql`
 - [x] `migration-rls-tighten.sql` (reference; policies active via boot + performance migration)
 - [x] `migration-rls-sensitive-tables.sql`
 - [x] `migration-rls-drop-authenticated-policies.sql` (if applicable)
 - [x] `migration-revoke-graphql-client-roles.sql`
-- [x] `migration-order-access-exchange.sql` — order email tracking links
+- [x] `migration-order-access-exchange.sql` — legacy order tracking exchange table (lookup now uses `POST /api/orders/lookup`)
 - [x] `migration-performance-linter-fixes.sql` (applied on production Supabase)
 - [x] `migration-products-search-trgm.sql` (applied on production Supabase)
 - [x] `migration-products-video-360.sql` — `products.video_360`
 - [x] `migration-admin-enhancements.sql` — inventory, SKU, order line items, admin notes
+- [x] `migration-remove-product-category.sql` — dropped shoe category columns; coupon scope `all` / `product` only
 - [x] `migration-products-public-id.sql` — `products.public_id` for storefront URLs (`/product/{public_id}`; also bootstrapped via `ensureProductPublicIdColumn()`)
-- [x] Payment/checkout tables present (`order_checkout_exchanges`, `order_access_exchanges`, `payment_idempotency`, etc.)
+- [x] Payment/checkout tables present (`order_access_exchanges`, `payment_idempotency`, etc.)
 
 **After SQL:**
 
@@ -48,15 +50,14 @@ Set on the **Railway service** (repository root). The server **exits on boot** i
 - [ ] `ADMIN_USERNAME` — admin login username
 - [ ] `ADMIN_PASSWORD_HASH` — bcrypt hash from `node backend/scripts/generate-admin-hash.mjs "YourSecurePassword"` (**not** plain text)
 - [ ] `ORDER_TOKEN_ENCRYPTION_KEY` — 32+ chars (`openssl rand -base64 32`)
-- [ ] `IP_SALT` — random salt for activity anonymization and review voter IDs
-- [ ] `WHATSAPP_ORDER_PHONE` — optional; digits only (default `919888514572`)
-- [ ] `RESEND_API_KEY` — transactional email
+- [ ] `IP_SALT` — random salt for activity anonymization
+- [ ] `WHATSAPP_CONTACT_NUMBER` — store WhatsApp contact (E.164, required in production)
 - [ ] `SENTRY_DSN` — backend error tracking
 
 ### Recommended
 
-- [ ] `SENDER_EMAIL` — verified sender in Resend (e.g. `orders@yourdomain.com`)
-- [ ] `COMPANY_NAME`, `COMPANY_SUPPORT_EMAIL`
+- [ ] `WHATSAPP_CLOUD_ACCESS_TOKEN` + `WHATSAPP_CLOUD_PHONE_NUMBER_ID` — automated customer payment/shipping texts
+- [ ] `ADMIN_ADDITIONAL_USERS` — optional extra admin logins (JSON array; see `backend/env.template`)
 - [ ] `SUPABASE_URL` + `SUPABASE_KEY` (service_role) if used by tooling
 - [ ] `DB_SSL_CA_PATH` if your host requires explicit CA bundle
 - [ ] `LOG_LEVEL=info`
@@ -82,6 +83,7 @@ Set on the **same Railway service** so `npm run build` succeeds.
 - [ ] `VITE_API_BASE_URL=/api`
 - [ ] `VITE_SITE_URL` — same public URL as `FRONTEND_URL`
 - [ ] `VITE_SENTRY_DSN` — frontend Sentry (required in CI/production builds)
+- [ ] `VITE_WHATSAPP_CONTACT_NUMBER` — same value as `WHATSAPP_CONTACT_NUMBER` (storefront contact links)
 
 ### Optional (SEO / analytics)
 
@@ -107,22 +109,15 @@ See [SSL_DNS_CHECKLIST.md](./SSL_DNS_CHECKLIST.md) and [CLOUDFLARE_RAILWAY.md](.
 
 See [WHATSAPP_CHECKOUT_GUIDE.md](./WHATSAPP_CHECKOUT_GUIDE.md).
 
-- [ ] `WHATSAPP_ORDER_PHONE` set to the correct business number (or default verified)
+- [ ] `WHATSAPP_CONTACT_NUMBER` set to the correct business number
+- [ ] `VITE_WHATSAPP_CONTACT_NUMBER` matches backend value (frontend build)
 - [ ] Test **Place Order** on staging/production → WhatsApp opens with pre-filled message
 - [ ] Admin can find order by **Order ID** (UUID from WhatsApp message) or order number
-- [ ] **Mark paid** moves order to `processing` and sends confirmation email (if Resend configured)
+- [ ] **Mark paid** moves order to `processing` and sends WhatsApp confirmation (when Cloud API configured)
 
 ---
 
-## Phase 6 — Email (Resend)
-
-- [ ] Resend domain verified (SPF/DKIM)
-- [ ] `SENDER_EMAIL` uses verified domain
-- [ ] Test order confirmation delivers (not spam) after first real order
-
----
-
-## Phase 7 — Redis and monitoring
+## Phase 6 — Redis and monitoring
 
 - [ ] Redis provisioned and `REDIS_URL` reachable from Railway
 - [ ] Sentry project receives backend + frontend events
@@ -144,7 +139,7 @@ From repository root on Railway:
 - [ ] Start: `npm start`
 - [ ] Deploy logs show no missing-env exit
 - [ ] Deploy logs show RLS migration applied
-- [ ] CI on `main` is green (**411** automated tests + build + E2E smoke — see [`test_guidelines.md`](test_guidelines.md))
+- [ ] CI on `main` is green (**401** automated tests + build + E2E smoke — see [`test_guidelines.md`](test_guidelines.md))
 
 ---
 
@@ -160,11 +155,12 @@ CI does **not** open a live WhatsApp session. Complete these on **desktop and a 
 - [ ] **Place Order** completes → WhatsApp opens with order details
 - [ ] Cart cleared after successful place-order
 - [ ] Out-of-stock product shows badge and disabled add-to-cart
+- [ ] Chrome DevTools **Issues** (desktop): no form-field `id`/`name` or label warnings on `/checkout`, `/contact`, `/orders`, `/products`
+- [ ] `node frontend/scripts/audit-form-labels.mjs` reports `count 0` (see [`FORMS_QA_CHECKLIST.md`](FORMS_QA_CHECKLIST.md))
 
-### Order email and tracking
+### Order tracking
 
-- [ ] Order confirmation email received
-- [ ] **View Order Status** link pre-fills `?orderId=` on `/orders` (enter checkout email + Search)
+- [ ] WhatsApp confirmation includes tracking link with `?orderId=` on `/orders` (enter checkout email + Search)
 - [ ] Manual lookup works: order ID (UUID) + checkout email at `/orders`
 
 ### Admin (`/admin` or `/adminshivamdashboard`)
@@ -175,10 +171,9 @@ CI does **not** open a live WhatsApp session. Complete these on **desktop and a 
 - [ ] Update order status (e.g. processing → shipped) if applicable
 - [ ] Products tab: stock/OOS toggle works; catalog refreshes on storefront
 
-### Reviews and contact (optional but recommended)
+### Contact (optional but recommended)
 
-- [ ] Submit contact form; confirm submission succeeds (stored in `contact_messages`; no admin inbox tab — check Supabase or email notifications if configured)
-- [ ] Submit product review (pending); approve in Reviews tab; visible on storefront **without** customer email
+- [ ] Submit contact form; confirm submission succeeds (stored in `contact_messages`)
 
 ### WhatsApp confirmation
 
@@ -206,10 +201,9 @@ Do **not** go live if any of these are true:
 | `validate-env` fails | Fix missing/invalid env vars |
 | `/api/health` returns 503 | Fix DB or Redis |
 | Boot log: RLS migration failed | Run SQL migrations; check Supabase URL |
-| PayPal env vars still set | Remove `PAYPAL_*` — no longer used |
 | `TRUST_CLOUDFLARE` not `true` | Set before production traffic |
 | Admin password is plain text in env | Use `ADMIN_PASSWORD_HASH` only |
-| No WhatsApp number | Set `WHATSAPP_ORDER_PHONE` or verify default |
+| No WhatsApp number | Set `WHATSAPP_CONTACT_NUMBER` and `VITE_WHATSAPP_CONTACT_NUMBER` |
 
 ---
 

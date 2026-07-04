@@ -16,7 +16,6 @@ export interface AdminProduct {
   image: string;
   description?: string;
   background?: string;
-  category?: string;
   size?: string;
   color?: string;
   stock: number;
@@ -33,7 +32,6 @@ export interface ProductFormPayload {
   image: string;
   description?: string;
   background?: string;
-  category?: string;
   size?: string;
   color?: string;
   stock: number;
@@ -44,7 +42,6 @@ export interface ProductFormPayload {
   cost_price?: number | null;
 }
 
-const CATEGORIES = ['Sneakers', 'Boots', 'Sandals', 'Loafers', 'Custom'];
 const COLORS = ['Black', 'White', 'Blue', 'Gold', 'Pink', 'Brown', 'Red', 'Green', 'Grey', 'Multi'];
 
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
@@ -56,7 +53,6 @@ const emptyForm = (): ProductFormPayload => ({
   image: '',
   description: '',
   background: '',
-  category: 'Sneakers',
   size: 'US 10',
   color: 'Black',
   stock: 0,
@@ -138,7 +134,6 @@ export default function AdminProductFormModal({
         image: product.image || '',
         description: product.description || '',
         background: product.background || '',
-        category: product.category || 'Sneakers',
         size: product.size || 'US 10',
         color: product.color || '',
         stock: product.stock,
@@ -248,7 +243,6 @@ export default function AdminProductFormModal({
         image: (uploaded.image ?? form.image.trim()),
         background: (uploaded.background ?? form.background?.trim()) || undefined,
         description: form.description?.trim() || undefined,
-        category: form.category?.trim() || undefined,
         size: form.size?.trim() || undefined,
         color: form.color?.trim() || undefined,
         is_out_of_stock: form.stock === 0 ? true : form.is_out_of_stock,
@@ -331,8 +325,10 @@ export default function AdminProductFormModal({
 
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16 }}>
           <div style={{ gridColumn: '1 / -1' }}>
-            <label style={labelStyle}>Name *</label>
+            <label htmlFor="admin-product-name" style={labelStyle}>Name *</label>
             <input
+              id="admin-product-name"
+              name="name"
               type="text"
               value={form.name}
               onChange={(e) => setField('name', e.target.value)}
@@ -343,8 +339,10 @@ export default function AdminProductFormModal({
           </div>
 
           <div>
-            <label style={labelStyle}>Price (USD) *</label>
+            <label htmlFor="admin-product-price" style={labelStyle}>Price (USD) *</label>
             <input
+              id="admin-product-price"
+              name="price"
               type="number"
               min={0.01}
               step={0.01}
@@ -355,8 +353,10 @@ export default function AdminProductFormModal({
           </div>
 
           <div>
-            <label style={labelStyle}>Stock *</label>
+            <label htmlFor="admin-product-stock" style={labelStyle}>Stock *</label>
             <input
+              id="admin-product-stock"
+              name="stock"
               type="number"
               min={0}
               step={1}
@@ -367,8 +367,10 @@ export default function AdminProductFormModal({
           </div>
 
           <div>
-            <label style={labelStyle}>SKU</label>
+            <label htmlFor="admin-product-sku" style={labelStyle}>SKU</label>
             <input
+              id="admin-product-sku"
+              name="sku"
               type="text"
               value={form.sku || ''}
               onChange={(e) => setField('sku', e.target.value)}
@@ -379,8 +381,10 @@ export default function AdminProductFormModal({
           </div>
 
           <div>
-            <label style={labelStyle}>Reorder point</label>
+            <label htmlFor="admin-product-reorder-point" style={labelStyle}>Reorder point</label>
             <input
+              id="admin-product-reorder-point"
+              name="reorder_point"
               type="number"
               min={0}
               step={1}
@@ -391,8 +395,10 @@ export default function AdminProductFormModal({
           </div>
 
           <div>
-            <label style={labelStyle}>Cost price (USD)</label>
+            <label htmlFor="admin-product-cost-price" style={labelStyle}>Cost price (USD)</label>
             <input
+              id="admin-product-cost-price"
+              name="cost_price"
               type="number"
               min={0}
               step={0.01}
@@ -407,21 +413,10 @@ export default function AdminProductFormModal({
           </div>
 
           <div>
-            <label style={labelStyle}>Category</label>
+            <label htmlFor="admin-product-size" style={labelStyle}>Primary size</label>
             <select
-              value={form.category || ''}
-              onChange={(e) => setField('category', e.target.value)}
-              style={inputStyle}
-            >
-              {CATEGORIES.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label style={labelStyle}>Primary size</label>
-            <select
+              id="admin-product-size"
+              name="size"
               value={form.size || ''}
               onChange={(e) => setField('size', e.target.value)}
               style={inputStyle}
@@ -433,8 +428,10 @@ export default function AdminProductFormModal({
           </div>
 
           <div>
-            <label style={labelStyle}>Color</label>
+            <label htmlFor="admin-product-color" style={labelStyle}>Color</label>
             <select
+              id="admin-product-color"
+              name="color"
               value={form.color || ''}
               onChange={(e) => setField('color', e.target.value)}
               style={inputStyle}
@@ -446,8 +443,10 @@ export default function AdminProductFormModal({
           </div>
 
           <div style={{ gridColumn: '1 / -1' }}>
-            <label style={labelStyle}>Description</label>
+            <label htmlFor="admin-product-description" style={labelStyle}>Description</label>
             <textarea
+              id="admin-product-description"
+              name="description"
               value={form.description || ''}
               onChange={(e) => setField('description', e.target.value)}
               rows={3}
@@ -457,8 +456,10 @@ export default function AdminProductFormModal({
           </div>
 
           <div>
-            <label style={labelStyle}>Product image *</label>
+            <label htmlFor="admin-product-image" style={labelStyle}>Product image *</label>
             <input
+              id="admin-product-image"
+              name="image"
               type="text"
               value={imageDisplayValue}
               onChange={(e) => setField('image', e.target.value)}
@@ -470,6 +471,8 @@ export default function AdminProductFormModal({
               <Upload size={14} />
               Upload image (max 20 MB)
               <input
+                id="admin-product-image-file"
+                name="imageFile"
                 type="file"
                 accept="image/*"
                 hidden
@@ -490,8 +493,10 @@ export default function AdminProductFormModal({
           </div>
 
           <div>
-            <label style={labelStyle}>Background image</label>
+            <label htmlFor="admin-product-background" style={labelStyle}>Background image</label>
             <input
+              id="admin-product-background"
+              name="background"
               type="text"
               value={backgroundDisplayValue}
               onChange={(e) => setField('background', e.target.value)}
@@ -503,6 +508,8 @@ export default function AdminProductFormModal({
               <Upload size={14} />
               Upload background (max 20 MB)
               <input
+                id="admin-product-background-file"
+                name="backgroundFile"
                 type="file"
                 accept="image/*"
                 hidden
@@ -523,8 +530,10 @@ export default function AdminProductFormModal({
           </div>
 
           <div style={{ gridColumn: '1 / -1' }}>
-            <label style={labelStyle}>360° spin video (MP4)</label>
+            <label htmlFor="admin-product-video" style={labelStyle}>360° spin video (MP4)</label>
             <input
+              id="admin-product-video"
+              name="video_360"
               type="text"
               value={videoDisplayValue}
               onChange={(e) => setField('video_360', e.target.value)}
@@ -537,6 +546,8 @@ export default function AdminProductFormModal({
                 <Upload size={14} />
                 Upload MP4 (max 15 MB)
                 <input
+                  id="admin-product-video-file"
+                  name="videoFile"
                   type="file"
                   accept="video/mp4,.mp4"
                   hidden
@@ -588,6 +599,8 @@ export default function AdminProductFormModal({
                     }}
                   >
                     <input
+                      id={`admin-product-extra-size-${size}`}
+                      name="extraSizes"
                       type="checkbox"
                       checked={extraSizes.has(size)}
                       onChange={(e) => {
@@ -607,6 +620,8 @@ export default function AdminProductFormModal({
           <div style={{ gridColumn: '1 / -1' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer' }}>
               <input
+                id="admin-product-out-of-stock"
+                name="is_out_of_stock"
                 type="checkbox"
                 checked={form.is_out_of_stock}
                 onChange={(e) => setField('is_out_of_stock', e.target.checked)}

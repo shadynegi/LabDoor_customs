@@ -10,7 +10,7 @@ Get Lab Door Customs running locally in about 10 minutes.
 
 - Node.js 20+
 - PostgreSQL database (Supabase free tier works)
-- Resend API key (for emails — optional for basic testing)
+- WhatsApp contact number (`WHATSAPP_CONTACT_NUMBER` / `VITE_WHATSAPP_CONTACT_NUMBER`)
 
 ---
 
@@ -34,14 +34,12 @@ PORT=5000
 NODE_ENV=development
 FRONTEND_URL=http://localhost:5173
 DATABASE_URL=postgresql://postgres:PASSWORD@db.PROJECT.supabase.co:6543/postgres?pgbouncer=true
-WHATSAPP_ORDER_PHONE=919888514572
+WHATSAPP_CONTACT_NUMBER=+919888514572
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD_HASH=$2b$12$your_bcrypt_hash_here
 JWT_SECRET=your_secure_jwt_secret_at_least_32_characters_long
 ORDER_TOKEN_ENCRYPTION_KEY=your_32_char_encryption_key_for_checkout_tokens
 IP_SALT=random_salt_for_ip_anonymization
-RESEND_API_KEY=re_xxx
-SENDER_EMAIL=noreply@yourdomain.com
 ```
 
 `ORDER_TOKEN_ENCRYPTION_KEY` and `IP_SALT` are required in production (`validate-env.mjs`).
@@ -74,6 +72,7 @@ Apply the database schema:
 
 ```env
 VITE_API_BASE_URL=/api
+VITE_WHATSAPP_CONTACT_NUMBER=+919888514572
 ```
 
 Vite proxies `/api` to the backend during development.
@@ -86,7 +85,7 @@ Vite proxies `/api` to the backend during development.
 npm run dev
 ```
 
-Starts the API (port 5000) and Vite dev server (port 5173) together.
+Starts the API (port 5000) and Vite dev server (port 5173) together via `scripts/dev.mjs` (`concurrently`). One `Ctrl+C` stops both processes cleanly on Windows.
 
 - Storefront: http://localhost:5173
 - API health: http://localhost:5000/api/health (or http://localhost:5173/api/health via proxy)

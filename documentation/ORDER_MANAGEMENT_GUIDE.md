@@ -23,9 +23,9 @@ Admin workflows for order fulfillment.
 
 1. Customer places order via **Place Order** → order appears as **pending** in admin.
 2. After payment is confirmed on WhatsApp, admin opens the order and clicks **Mark paid** with a payment reference.
-3. Order moves to **processing**; confirmation email sends if Resend is configured.
+3. Order moves to **processing**; WhatsApp confirmation sends when Cloud API is configured.
 4. Enter tracking number, carrier, optional tracking URL, and optional **estimated delivery** date → **Save tracking** (`PUT /api/orders/:id` includes `estimated_delivery`).
-5. Click **Notify shipped** (`POST /api/orders/:id/notify-shipped`) — requires tracking number.
+5. Click **Notify shipped** (`POST /api/orders/:id/notify-shipped`) — sends WhatsApp shipping notification; requires tracking number and customer phone.
 6. Use **Mark shipped** / **Mark delivered** for status transitions.
 
 Orders are paginated (50 per page). Use the search box to find orders by **order id** (UUID), order number, customer email, or name — search runs server-side across the full order list (`GET /api/orders?search=`). The WhatsApp message includes the **Order ID** (`orders.id` UUID) for lookup.
@@ -59,7 +59,7 @@ Each manual mark is recorded in `activity_logs` as `admin_mark_paid`.
 
 ## Cancellation and replacements
 
-**Store policy:** All sales are final — no customer refunds. Manufacturing-defect replacements are handled via support email (see Replacement Policy on the storefront).
+**Store policy:** All sales are final — no customer refunds. Manufacturing-defect replacements are handled via WhatsApp contact (see Replacement Policy on the storefront).
 
 **Pending unpaid orders:** **Cancel unpaid order** in the admin modal restores inventory immediately.
 
@@ -72,7 +72,7 @@ Each manual mark is recorded in `activity_logs` as `admin_mark_paid`.
 | Action | Endpoint |
 |--------|----------|
 | List / search | `GET /api/orders?page=&limit=50&status=&search=` |
-| Customer lookup | `POST /api/orders/lookup` — `{ orderNumber, accessToken }` |
+| Customer lookup | `POST /api/orders/lookup` — `{ orderId, email }` |
 | Update | `PUT /api/orders/:id` |
 | Status | `PATCH /api/orders/:id/status` |
 | Cancel | `POST /api/orders/:id/cancel` |

@@ -1,4 +1,4 @@
-> **Historical snapshot (2026-06-08).** Current system uses WhatsApp checkout and **409** automated tests — see [`info.md`](info.md) and [`COVERAGE_MATRIX.md`](COVERAGE_MATRIX.md).
+> **Historical snapshot (2026-06-08).** Current system uses WhatsApp checkout and **401** automated tests — see [`info.md`](info.md) and [`COVERAGE_MATRIX.md`](COVERAGE_MATRIX.md).
 
 # Lab Door Customs — Project Audit (2026-06-08)
 
@@ -13,7 +13,7 @@
 
 ## Executive summary
 
-The platform is **production-viable** for core storefront checkout (WhatsApp place-order), admin fulfillment, and manual payment confirmation. PayPal capture/webhooks were removed; admin **Mark paid** is the payment confirmation path.
+The platform is **production-viable** for core storefront checkout (WhatsApp place-order), admin fulfillment, and manual payment confirmation. Admin **Mark paid** is the payment confirmation path after WhatsApp checkout.
 
 **Remediation (2026-06-08):** Critical and high audit items **C1–C4, C6, H1–H8** in `3dbdef9`; follow-up **F-01–F-07, DB-01, FE-01–FE-06** in `c6de967`; maintenance resilience + docs in `5e3be15`; payment/UI test sprint in `8303997`+ (checkout-context, refund mismatch, webhook COMPLETED, mark-paid success, coupon scope, orders `?code=`, checkout total mismatch). See [`COVERAGE_MATRIX.md`](COVERAGE_MATRIX.md).
 
@@ -48,9 +48,9 @@ The platform is **production-viable** for core storefront checkout (WhatsApp pla
 | | |
 |---|---|
 | **Severity** | Critical (customer-facing pricing) |
-| **Files** | `backend/src/lib/paypalCheckout.ts` L4; `frontend/src/utils/pricing.ts` L15; `info.md` L318-322 |
+| **Files** | `backend/src/lib/checkoutPricing.ts`; `frontend/src/utils/pricing.ts`; `info.md` pricing section |
 | **Issue** | Code charges $25 shipping below **$300**; docs promise free shipping over **$200**. |
-| **Fix** | Pick one threshold (recommend **$200** to match marketing/docs). Update `FREE_SHIPPING_THRESHOLD` in backend + frontend; update `Tests/backend/checkoutPricing.test.ts`; grep UI copy (“$300” strings); run PayPal sandbox on $250 cart. |
+| **Fix** | Pick one threshold (recommend **$200** to match marketing/docs). Update `FREE_SHIPPING_THRESHOLD` in backend + frontend; update `Tests/backend/checkoutPricing.test.ts`; grep UI copy (“$300” strings); verify checkout pricing on a $250 cart. |
 
 ### C2 — Activity action type mismatch (silent data loss)
 
@@ -103,9 +103,9 @@ The platform is **production-viable** for core storefront checkout (WhatsApp pla
 
 ### H1 — Volume discount undocumented; coupon validate mismatch
 
-| **Files** | `paypalCheckout.ts` L23-35; `coupons.ts` validate; `info.md` pricing section |
+| **Files** | `checkoutPricing helpers` L23-35; `coupons.ts` validate; `info.md` pricing section |
 | **Issue** | 10%/20% volume discount applied at create-payment; not in docs; `/coupons/validate` uses raw subtotal → client/server total drift. |
-| **Fix** | Document volume rules in `info.md`. In validate endpoint, accept item count/items, run `calculateVolumeDiscount`, apply coupon to post-volume subtotal. Return breakdown in validate response. Frontend: compare server totals before PayPal redirect. |
+| **Fix** | Document volume rules in `info.md`. In validate endpoint, accept item count/items, run `calculateVolumeDiscount`, apply coupon to post-volume subtotal. Return breakdown in validate response. Frontend: compare server totals before place-order. |
 
 ### H2 — Order number enumeration
 
@@ -121,7 +121,7 @@ The platform is **production-viable** for core storefront checkout (WhatsApp pla
 
 ### H4 — Coupon validate vs create-payment pricing base
 
-| **Files** | `coupons.ts`, `paypalCheckout.ts` |
+| **Files** | `coupons.ts`, `checkoutPricing helpers` |
 | **Fix** | Same as H1 — unified pricing pipeline shared by validate + create-payment. |
 
 ### H5 — `POST /reviews/check` doesn't verify product exists
@@ -175,7 +175,7 @@ The platform is **production-viable** for core storefront checkout (WhatsApp pla
 |------|----------------|
 | API-only admin UI | Documented, intentional |
 | `PROMO_COUPON_CODE` | **Closed (by design)** — storefront hint for `LDCOFF10`; customer must apply code; seed via `migration-ldcoff10-coupon.sql` |
-| RLS table count in boilerplate guides | **Closed** — milestone intros updated to 14 tables (`CLIENT_REVOKED_TABLES`) |
+| RLS table count in boilerplate guides | **Closed** — intros updated to 12 tables (`CLIENT_REVOKED_TABLES`; reviews removed July 2026) |
 | `test_guidelines.md` inventory | **Synced** — 127 tests (73+30+24) |
 | `info.md` auth legend `?token=` | **Closed** — documents `?aid=` + header; legacy `?token=` strip noted for `/orders` only |
 | ReviewList “not helpful” button | **Closed** — disabled styling after vote |
@@ -186,13 +186,13 @@ The platform is **production-viable** for core storefront checkout (WhatsApp pla
 
 ## What is fully implemented (verified OK)
 
-- PayPal create-payment atomic order + stock + exchange code + `access_token_encrypted`
+- WhatsApp place-order atomic order + stock + exchange code + `access_token_encrypted`
 - Capture idempotency, `ORDER_ALREADY_CAPTURED` handling, amount mismatch auto-refund (capture path)
 - **409** when capture succeeds but DB not completed (+ frontend processing UI + poll timeout UX)
 - Checkout/access exchange encryption; durable email link minting via encrypted order token
 - Coupon validate + create-payment share `computeCheckoutPricingForCart` (DB prices, volume discount)
-- Coupon scope enforcement at checkout (`all` / `product` / `category`); admin coupon edit scope
-- Admin bulk limits (500), status transition validation, mark-paid PayPal verify, server product search
+- Coupon scope enforcement at checkout (`all` / `product`); admin coupon edit scope
+- Admin bulk limits (500), status transition validation, mark-paid with payment reference, server product search
 - CSRF, rate limits (Redis fail-closed), Cloudflare enforcement, production grant-revoke gate
 - Review PII stripping (`toPublicReview`), admin moderation UI, check endpoint anti-enumeration (product missing)
 - Storefront routes, cart validation + retry, client/server total compare, legacy order URL deprecation
@@ -239,7 +239,7 @@ Sprint 4 — Admin/storefront polish
 | **F-01** | Closed | `orders.access_token_encrypted` at create-payment; `getOrderAccessTokenForEmail()` reads durable store with checkout-exchange fallback |
 | **F-02** | Closed | `/coupons/validate` uses `computeCheckoutPricingForCart` (DB prices + volume + shipping) |
 | **FE-01** | Closed | Checkout blocks place-order when server `total` ≠ client total (> $0.01) |
-| **FE-02** | Closed | `PaymentSuccess` error UI when PayPal `token` missing |
+| **FE-02** | Closed | `legacy payment-return error UI |
 | **FE-03** | Closed | 409 poll timeout shows terminal error + retry |
 | **FE-04** | Closed | Coupon cleared when cart signature changes |
 | **FE-05** | Closed | Admin product search via `POST /products/search` |
@@ -254,12 +254,11 @@ Sprint 4 — Admin/storefront polish
 
 | ID | Severity | Issue | Next step |
 |----|----------|-------|-----------|
-| **Future** | Low | PayPal disputes/chargebacks, OpenAPI, Sentry release maps | See `CRITICAL_FIXES_TODO.md` |
+| **Future** | Low | OpenAPI, Sentry release maps | See `CRITICAL_FIXES_TODO.md` |
 
 ### Test sprint order (closes C5 without re-auditing)
 
 1. `Tests/api/captureReconciliation.test.ts` — PAY-409, PAY-CONTEXT  
-2. `Tests/api/paypalWebhook.test.ts` — PAY-WEBHOOK, PAY-WEBHOOK-DENIED  
 3. `Tests/api/checkoutExchange.test.ts` + `orderAccessExchange.test.ts` — PAY-EXCHANGE, ORD-ACCESS-EX  
 4. `Tests/api/adminMarkPaid.test.ts` — ORD-MARK-PAID  
 5. `Tests/api/activityBatch.test.ts` — ACT-BATCH, ACT-CONTACT  
@@ -298,7 +297,7 @@ Sprint 4 — Admin/storefront polish
 | 2026-06-08 | — | Follow-up audit post `3dbdef9`; `COVERAGE_MATRIX.md` refreshed; `info.md` volume discount + activity wiring |
 | 2026-06-08 | F-01 | `orders.access_token_encrypted` + `getOrderAccessTokenForEmail()` durable email minting |
 | 2026-06-08 | F-02 | Coupon validate uses `computeCheckoutPricingForCart`; returns `pricing` breakdown |
-| 2026-06-08 | FE-01 | Checkout compares server vs client total before PayPal redirect |
+| 2026-06-08 | FE-01 | Checkout compares server vs client total before place-order |
 | 2026-06-08 | FE-02/FE-03 | PaymentSuccess missing-token and 409-timeout error UX |
 | 2026-06-08 | FE-04 | Coupon cleared on cart signature change |
 | 2026-06-08 | FE-05/FE-06 | Admin server product search; coupons/reviews/orders loading fixes |
@@ -312,7 +311,7 @@ Sprint 4 — Admin/storefront polish
 | 2026-06-09 | M4/M13/M14 | Admin product search picker; activity log/batch errors; review message unification |
 | 2026-06-09 | C5 | Expanded — capture 409, webhook DENIED, checkout exchange API, mark-paid validation, reviews check, activity log, Playwright payment/orders UI (127 tests) |
 | 2026-06-09 | C5 | Closed core gaps — checkout-context, capture refund mismatch, webhook COMPLETED, mark-paid success, coupon scope, orders `?code=`, checkout total mismatch UI (141 tests) |
-| 2026-06-10 | PAY-CREATE | `createPaymentHappy.test.ts` — mocked PayPal + exchange row happy path |
+| 2026-06-10 | PAY-CREATE | `createPaymentHappy.test.ts` — WhatsApp place-order happy path |
 | 2026-06-10 | ORD-EMAIL-LINK | `emailPortalUrl.test.ts` — `buildOrderPortalUrl` unit coverage |
 | 2026-06-10 | SEC-BOOTSTRAP | `rlsGrantRevoke.test.ts` — grant revoke runs when `BOOTSTRAP_SKIP_DDL` |
 | 2026-06-10 | UI-ADMIN | `admin-ui.spec.ts` — login redirect + dashboard analytics smoke (149 tests) |
@@ -328,5 +327,4 @@ Sprint 4 — Admin/storefront polish
 - [`DOCUMENTATION_INDEX.md`](DOCUMENTATION_INDEX.md)
 - [`API_DOCUMENTATION.md`](API_DOCUMENTATION.md)
 - [`ADMIN_DASHBOARD_GUIDE.md`](ADMIN_DASHBOARD_GUIDE.md)
-- [`PAYPAL_TESTING_GUIDE.md`](PAYPAL_TESTING_GUIDE.md)
-- [`test_guidelines.md`](test_guidelines.md)
+- - [`test_guidelines.md`](test_guidelines.md)

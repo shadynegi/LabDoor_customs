@@ -52,9 +52,7 @@ export const useProductSearch = (debounceMs: number = 300): UseProductSearchResu
     let count = 0;
     if (filters.minPrice !== undefined) count++;
     if (filters.maxPrice !== undefined) count++;
-    if (filters.size) count++;
     if (filters.color) count++;
-    if (filters.minRating !== undefined) count++;
     return count;
   }, [filters]);
 
@@ -87,12 +85,10 @@ export const useProductSearch = (debounceMs: number = 300): UseProductSearchResu
         sizes: [],
         colors: [],
         priceRange: { min: 0, max: 500 },
-        ratingRange: { min: 0, max: 5, avg: 0 },
         sortOptions: [
           { value: 'default', label: 'Default' },
           { value: 'price_asc', label: 'Price: Low to High' },
           { value: 'price_desc', label: 'Price: High to Low' },
-          { value: 'rating_desc', label: 'Highest Rated' },
           { value: 'newest', label: 'Newest First' },
           { value: 'oldest', label: 'Oldest First' },
         ],

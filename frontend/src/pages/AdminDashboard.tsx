@@ -24,7 +24,6 @@ import {
   CheckCircle,
   Ban,
   Send,
-  Star,
   Download,
   History,
   CalendarDays,
@@ -44,7 +43,6 @@ import {
   todayIstYmd,
 } from '../lib/adminAnalyticsDates';
 import AdminCouponsTab from '../components/AdminCouponsTab';
-import AdminReviewsTab from '../components/AdminReviewsTab';
 import AdminActionDialog from '../components/AdminActionDialog';
 import { clearProductCatalogCache } from '../lib/productCatalogCache';
 import { DashboardSkeleton, SkeletonStyles } from '../components/Skeletons';
@@ -64,8 +62,6 @@ interface Order {
   total: number;
   payment_status: 'pending' | 'completed' | 'failed' | 'refunded';
   payment_method: string;
-  paypal_order_id?: string;
-  paypal_capture_id?: string;
   status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
   tracking_number?: string;
   tracking_url?: string;
@@ -77,8 +73,6 @@ interface Order {
 }
 
 type Product = AdminProduct & {
-  rating?: number;
-  review_count?: number;
   view_count?: number;
   cart_count?: number;
 };
@@ -153,7 +147,7 @@ interface Analytics {
   };
 }
 
-type Tab = 'analytics' | 'products' | 'orders' | 'customers' | 'coupons' | 'reviews' | 'settings';
+type Tab = 'analytics' | 'products' | 'orders' | 'customers' | 'coupons' | 'settings';
 
 const CUSTOMER_HISTORY_PAGE_SIZE = 10;
 
@@ -280,7 +274,7 @@ export default function AdminDashboard() {
   };
 
   const loadTabData = async (tab: Tab, options?: { force?: boolean }) => {
-    if (tab === 'coupons' || tab === 'reviews') {
+    if (tab === 'coupons') {
       setLoading(false);
       return;
     }
@@ -320,12 +314,15 @@ export default function AdminDashboard() {
     void loadTabData(activeTab);
   }, [activeTab]);
 
+  const productSearchSeq = useRef(0);
+
   useEffect(() => {
     if (!productSearch.trim()) {
       setProductSearchResults(null);
       return;
     }
     const handle = window.setTimeout(async () => {
+      const seq = ++productSearchSeq.current;
       try {
         const response = await catalogFetch('/products/search', {
           method: 'POST',
@@ -336,6 +333,7 @@ export default function AdminDashboard() {
           }),
         });
         const data = await response.json();
+        if (seq !== productSearchSeq.current) return;
         if (data.success) {
           setProductSearchResults(
             (data.data || []).map((p: { id: number; name: string; price: string | number; stock?: number; is_out_of_stock?: boolean }) => ({
@@ -349,6 +347,7 @@ export default function AdminDashboard() {
           toast.error(data.error || 'Product search failed');
         }
       } catch (error) {
+        if (seq !== productSearchSeq.current) return;
         logError('Admin product search failed:', error);
         toast.error('Product search failed');
       }
@@ -535,10 +534,14 @@ export default function AdminDashboard() {
     }
   };
 
-  const fetchOrders = async (page = ordersPage, search = orderSearch) => {
+  const fetchOrders = async (
+    page = ordersPage,
+    search = orderSearch,
+    statusFilter = orderStatusFilter
+  ) => {
     setOrdersError(null);
     try {
-      const statusQuery = orderStatusFilter !== 'all' ? `&status=${orderStatusFilter}` : '';
+      const statusQuery = statusFilter !== 'all' ? `&status=${statusFilter}` : '';
       const searchQuery = search.trim() ? `&search=${encodeURIComponent(search.trim())}` : '';
       const response = await apiFetch(`/orders?limit=50&page=${page}${statusQuery}${searchQuery}`);
       const data = await response.json();
@@ -757,7 +760,7 @@ export default function AdminDashboard() {
       });
       setOrderCustomerEdit(false);
     }
-  }, [selectedOrder?.id]);
+  }, [selectedOrder]);
 
   useEffect(() => {
     if (activeTab === 'customers') {
@@ -923,7 +926,7 @@ export default function AdminDashboard() {
       const response = await apiFetch(`/orders/${orderId}/notify-shipped`, { method: 'POST' });
       const data = await response.json();
       if (data.success) {
-        toast.success('Shipping notification sent');
+        toast.success('Shipping notification sent via WhatsApp');
       } else {
         toast.error(data.error || 'Failed to send notification');
       }
@@ -1293,6 +1296,8 @@ export default function AdminDashboard() {
               <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: '#6b7280', fontWeight: 600 }}>
                 From
                 <input
+                  id="admin-analytics-from"
+                  name="analyticsCustomFrom"
                   type="date"
                   value={analyticsCustomFrom}
                   max={analyticsCustomTo}
@@ -1310,6 +1315,8 @@ export default function AdminDashboard() {
               <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: '#6b7280', fontWeight: 600 }}>
                 To
                 <input
+                  id="admin-analytics-to"
+                  name="analyticsCustomTo"
                   type="date"
                   value={analyticsCustomTo}
                   min={analyticsCustomFrom}
@@ -1572,6 +1579,8 @@ export default function AdminDashboard() {
         </span>
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#374151', cursor: 'pointer', fontWeight: 500 }}>
           <input
+            id="admin-products-low-stock-only"
+            name="showLowStockOnly"
             type="checkbox"
             checked={showLowStockOnly}
             onChange={(e) => setShowLowStockOnly(e.target.checked)}
@@ -1579,9 +1588,15 @@ export default function AdminDashboard() {
           Low stock only
         </label>
         <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
+          <label htmlFor="admin-product-search" style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0, 0, 0, 0)', whiteSpace: 'nowrap', border: 0 }}>
+            Search products
+          </label>
           <Search size={18} color="#9ca3af" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
           <input
+            id="admin-product-search"
+            name="productSearch"
             type="text" placeholder="Search products..." value={productSearch} onChange={(e) => setProductSearch(e.target.value)}
+            aria-label="Search products"
             style={{ width: '100%', padding: '10px 12px 10px 40px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14 }}
           />
         </div>
@@ -1621,7 +1636,10 @@ export default function AdminDashboard() {
             <div key={product.id} style={{ background: 'white', borderRadius: 12, border: '1px solid #e5e7eb', padding: 16 }}>
               <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                 <input
+                  id={`admin-product-select-${product.id}`}
+                  name="selectedProducts"
                   type="checkbox"
+                  aria-label={`Select ${product.name}`}
                   checked={selectedProducts.has(product.id)}
                   onChange={(e) => {
                     const newSet = new Set(selectedProducts);
@@ -1668,7 +1686,7 @@ export default function AdminDashboard() {
           <thead>
             <tr style={{ background: '#f9fafb' }}>
               <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#374151', width: 40 }}>
-                <input type="checkbox" checked={selectedProducts.size === filteredProducts.length && filteredProducts.length > 0}
+                <input id="admin-products-select-all" name="selectAllProducts" type="checkbox" aria-label="Select all products" checked={selectedProducts.size === filteredProducts.length && filteredProducts.length > 0}
                   onChange={(e) => setSelectedProducts(e.target.checked ? new Set(filteredProducts.map(p => p.id)) : new Set())} />
               </th>
               <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#374151' }}>Product</th>
@@ -1684,7 +1702,12 @@ export default function AdminDashboard() {
             {filteredProducts.map((product) => (
               <tr key={product.id} style={{ borderTop: '1px solid #e5e7eb' }}>
                 <td style={{ padding: 16 }}>
-                  <input type="checkbox" checked={selectedProducts.has(product.id)}
+                  <input
+                    id={`admin-product-select-${product.id}`}
+                    name="selectedProducts"
+                    type="checkbox"
+                    aria-label={`Select ${product.name}`}
+                    checked={selectedProducts.has(product.id)}
                     onChange={(e) => {
                       const newSet = new Set(selectedProducts);
                       e.target.checked ? newSet.add(product.id) : newSet.delete(product.id);
@@ -1704,7 +1727,7 @@ export default function AdminDashboard() {
                     <div>
                       <div style={{ fontWeight: 600, color: '#1f2937' }}>{product.name}</div>
                       <div style={{ fontSize: 12, color: '#6b7280' }}>
-                        {[product.category, product.color].filter(Boolean).join(' · ')}
+                        {product.color || ''}
                       </div>
                     </div>
                   </div>
@@ -1797,11 +1820,22 @@ export default function AdminDashboard() {
       {/* Toolbar */}
       <div style={{ background: 'white', borderRadius: 12, padding: 16, marginBottom: 16, border: '1px solid #e5e7eb', display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
         <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
+          <label htmlFor="admin-order-search" style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0, 0, 0, 0)', whiteSpace: 'nowrap', border: 0 }}>
+            Search orders
+          </label>
           <Search size={18} color="#9ca3af" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
-          <input type="text" placeholder="Search orders..." value={orderSearch} onChange={(e) => setOrderSearch(e.target.value)}
-            style={{ width: '100%', padding: '10px 12px 10px 40px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14 }} />
+          <input
+            id="admin-order-search"
+            name="orderSearch"
+            type="text"
+            placeholder="Search orders..."
+            value={orderSearch}
+            onChange={(e) => setOrderSearch(e.target.value)}
+            aria-label="Search orders"
+            style={{ width: '100%', padding: '10px 12px 10px 40px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14 }}
+          />
         </div>
-        <select value={orderStatusFilter} onChange={(e) => { setOrderStatusFilter(e.target.value); setOrdersPage(1); fetchOrders(1, orderSearch); }}
+        <select id="admin-order-status-filter" name="orderStatusFilter" aria-label="Filter orders by status" value={orderStatusFilter} onChange={(e) => { setOrderStatusFilter(e.target.value); setOrdersPage(1); fetchOrders(1, orderSearch, e.target.value); }}
           style={{ padding: '10px 16px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14 }}>
           <option value="all">All Status</option>
           <option value="pending">Pending</option>
@@ -1813,7 +1847,7 @@ export default function AdminDashboard() {
         <button onClick={() => setSelectedOrders(new Set(filteredOrders.map(o => o.id)))} style={{ padding: '10px 16px', background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: 'pointer' }}>Select All</button>
         <button onClick={() => setSelectedOrders(new Set())} style={{ padding: '10px 16px', background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: 'pointer' }}>Clear</button>
         {selectedOrders.size > 0 && (
-          <select onChange={(e) => { if (e.target.value) handleBulkOrderUpdate({ status: e.target.value }); e.target.value = ''; }}
+          <select id="admin-order-bulk-status" name="bulkOrderStatus" aria-label="Bulk update order status" onChange={(e) => { if (e.target.value) handleBulkOrderUpdate({ status: e.target.value }); e.target.value = ''; }}
             style={{ padding: '10px 16px', background: '#9c6649', color: 'white', border: 'none', borderRadius: 8, fontWeight: 600 }}>
             <option value="">Bulk Update ({selectedOrders.size})</option>
             <option value="processing">Mark Processing</option>
@@ -1850,7 +1884,7 @@ export default function AdminDashboard() {
         {filteredOrders.map((order) => (
           <div key={order.id} style={{ background: 'white', borderRadius: 12, padding: 16, border: `2px solid ${selectedOrders.has(order.id) ? '#9c6649' : '#e5e7eb'}`, cursor: 'pointer' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-              <input type="checkbox" checked={selectedOrders.has(order.id)} onChange={(e) => {
+              <input id={`admin-order-select-${order.id}`} name="selectedOrders" type="checkbox" aria-label={`Select order ${order.order_number}`} checked={selectedOrders.has(order.id)} onChange={(e) => {
                 e.stopPropagation();
                 const newSet = new Set(selectedOrders);
                 e.target.checked ? newSet.add(order.id) : newSet.delete(order.id);
@@ -1895,12 +1929,18 @@ export default function AdminDashboard() {
       {/* Search */}
       <div style={{ background: 'white', borderRadius: 12, padding: 16, marginBottom: 16, border: '1px solid #e5e7eb', display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
         <div style={{ position: 'relative', flex: 1, minWidth: 200, maxWidth: 400 }}>
+          <label htmlFor="admin-customer-search" style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0, 0, 0, 0)', whiteSpace: 'nowrap', border: 0 }}>
+            Search customers
+          </label>
           <Search size={18} color="#9ca3af" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
-          <input type="text" placeholder="Search customers..." value={customerSearch} onChange={(e) => setCustomerSearch(e.target.value)}
+          <input id="admin-customer-search" name="customerSearch" type="text" placeholder="Search customers..." value={customerSearch} onChange={(e) => setCustomerSearch(e.target.value)}
+            aria-label="Search customers"
             style={{ width: '100%', padding: '10px 12px 10px 40px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14 }} />
         </div>
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: '#374151', cursor: 'pointer' }}>
           <input
+            id="admin-show-deleted-customers"
+            name="showDeletedCustomers"
             type="checkbox"
             checked={showDeletedCustomers}
             onChange={(e) => setShowDeletedCustomers(e.target.checked)}
@@ -2043,6 +2083,8 @@ export default function AdminDashboard() {
           <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13, color: '#374151' }}>
             From (optional)
             <input
+              id="admin-activity-export-start"
+              name="activityExportStart"
               type="date"
               value={activityExportStart}
               onChange={(e) => setActivityExportStart(e.target.value)}
@@ -2052,6 +2094,8 @@ export default function AdminDashboard() {
           <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13, color: '#374151' }}>
             To (optional)
             <input
+              id="admin-activity-export-end"
+              name="activityExportEnd"
               type="date"
               value={activityExportEnd}
               onChange={(e) => setActivityExportEnd(e.target.value)}
@@ -2194,15 +2238,23 @@ export default function AdminDashboard() {
     { id: 'products', label: 'Products', icon: ShoppingBag },
     { id: 'orders', label: 'Orders', icon: Package },
     { id: 'coupons', label: 'Coupons', icon: Tag },
-    { id: 'reviews', label: 'Reviews', icon: Star },
     { id: 'customers', label: 'Customers', icon: Users },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f9fafb' }}>
+    <div style={{ minHeight: '100dvh', background: '#f9fafb' }}>
       {/* Header */}
-      <div ref={adminHeaderRef} style={{ background: 'linear-gradient(135deg, #361906 0%, #9c6649 100%)', padding: isMobile ? '16px' : '24px 40px', position: 'sticky', top: 0, zIndex: 100 }}>
+      <div ref={adminHeaderRef} style={{
+        background: 'linear-gradient(135deg, #361906 0%, #9c6649 100%)',
+        padding: isMobile ? '16px' : '24px 40px',
+        paddingTop: isMobile ? 'max(16px, env(safe-area-inset-top, 0px))' : 'max(24px, env(safe-area-inset-top, 0px))',
+        paddingLeft: isMobile ? 'max(16px, env(safe-area-inset-left, 0px))' : 'max(40px, env(safe-area-inset-left, 0px))',
+        paddingRight: isMobile ? 'max(16px, env(safe-area-inset-right, 0px))' : 'max(40px, env(safe-area-inset-right, 0px))',
+        position: 'sticky',
+        top: 0,
+        zIndex: 100,
+      }}>
         <div style={{ maxWidth: 1400, margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h1 style={{ margin: 0, fontSize: isMobile ? 24 : 32, fontWeight: 800, color: 'white' }}>Admin Dashboard</h1>
           <button onClick={handleLogout} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', background: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 8, cursor: 'pointer', fontSize: 14, fontWeight: 600 }}>
@@ -2216,7 +2268,15 @@ export default function AdminDashboard() {
         <div
           role="tablist"
           aria-label="Admin sections"
-          style={{ maxWidth: 1400, margin: '0 auto', padding: '0 16px', display: 'flex', gap: 4, overflowX: 'auto' }}
+          style={{
+            maxWidth: 1400,
+            margin: '0 auto',
+            padding: '0 max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px))',
+            display: 'flex',
+            gap: 4,
+            overflowX: 'auto',
+            WebkitOverflowScrolling: 'touch',
+          }}
         >
           {tabs.map(({ id, label, icon: Icon }) => (
             <button
@@ -2266,7 +2326,6 @@ export default function AdminDashboard() {
             {activeTab === 'products' && renderProducts()}
             {activeTab === 'orders' && renderOrders()}
             {activeTab === 'coupons' && <AdminCouponsTab />}
-            {activeTab === 'reviews' && <AdminReviewsTab />}
             {activeTab === 'customers' && renderCustomers()}
             {activeTab === 'settings' && renderSettings()}
           </div>
@@ -2305,42 +2364,42 @@ export default function AdminDashboard() {
                 <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12 }}>
                   <label style={{ fontSize: 13, color: '#374151' }}>
                     Name
-                    <input value={orderCustomerForm.customer_name} onChange={(e) => setOrderCustomerForm((f) => ({ ...f, customer_name: e.target.value }))}
+                    <input id="admin-order-customer-name" name="customer_name" value={orderCustomerForm.customer_name} onChange={(e) => setOrderCustomerForm((f) => ({ ...f, customer_name: e.target.value }))}
                       style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, boxSizing: 'border-box' }} />
                   </label>
                   <label style={{ fontSize: 13, color: '#374151' }}>
                     Email
-                    <input type="email" value={orderCustomerForm.customer_email} onChange={(e) => setOrderCustomerForm((f) => ({ ...f, customer_email: e.target.value }))}
+                    <input id="admin-order-customer-email" name="customer_email" type="email" value={orderCustomerForm.customer_email} onChange={(e) => setOrderCustomerForm((f) => ({ ...f, customer_email: e.target.value }))}
                       style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, boxSizing: 'border-box' }} />
                   </label>
                   <label style={{ fontSize: 13, color: '#374151', gridColumn: isMobile ? 'auto' : '1 / -1' }}>
                     Street address
-                    <input value={orderCustomerForm.address} onChange={(e) => setOrderCustomerForm((f) => ({ ...f, address: e.target.value }))}
+                    <input id="admin-order-customer-address" name="address" value={orderCustomerForm.address} onChange={(e) => setOrderCustomerForm((f) => ({ ...f, address: e.target.value }))}
                       style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, boxSizing: 'border-box' }} />
                   </label>
                   <label style={{ fontSize: 13, color: '#374151' }}>
                     City
-                    <input value={orderCustomerForm.city} onChange={(e) => setOrderCustomerForm((f) => ({ ...f, city: e.target.value }))}
+                    <input id="admin-order-customer-city" name="city" value={orderCustomerForm.city} onChange={(e) => setOrderCustomerForm((f) => ({ ...f, city: e.target.value }))}
                       style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, boxSizing: 'border-box' }} />
                   </label>
                   <label style={{ fontSize: 13, color: '#374151' }}>
                     State
-                    <input value={orderCustomerForm.state} onChange={(e) => setOrderCustomerForm((f) => ({ ...f, state: e.target.value }))}
+                    <input id="admin-order-customer-state" name="state" value={orderCustomerForm.state} onChange={(e) => setOrderCustomerForm((f) => ({ ...f, state: e.target.value }))}
                       style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, boxSizing: 'border-box' }} />
                   </label>
                   <label style={{ fontSize: 13, color: '#374151' }}>
                     ZIP
-                    <input value={orderCustomerForm.zipCode} onChange={(e) => setOrderCustomerForm((f) => ({ ...f, zipCode: e.target.value }))}
+                    <input id="admin-order-customer-zip" name="zipCode" value={orderCustomerForm.zipCode} onChange={(e) => setOrderCustomerForm((f) => ({ ...f, zipCode: e.target.value }))}
                       style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, boxSizing: 'border-box' }} />
                   </label>
                   <label style={{ fontSize: 13, color: '#374151' }}>
                     Country
-                    <input value={orderCustomerForm.country} onChange={(e) => setOrderCustomerForm((f) => ({ ...f, country: e.target.value }))}
+                    <input id="admin-order-customer-country" name="country" value={orderCustomerForm.country} onChange={(e) => setOrderCustomerForm((f) => ({ ...f, country: e.target.value }))}
                       style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, boxSizing: 'border-box' }} />
                   </label>
                   <label style={{ fontSize: 13, color: '#374151', gridColumn: isMobile ? 'auto' : '1 / -1' }}>
                     Admin notes
-                    <textarea value={orderCustomerForm.admin_notes} onChange={(e) => setOrderCustomerForm((f) => ({ ...f, admin_notes: e.target.value }))}
+                    <textarea id="admin-order-customer-notes" name="admin_notes" value={orderCustomerForm.admin_notes} onChange={(e) => setOrderCustomerForm((f) => ({ ...f, admin_notes: e.target.value }))}
                       rows={2}
                       style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, boxSizing: 'border-box', fontFamily: 'inherit', resize: 'vertical' }} />
                   </label>
@@ -2393,23 +2452,25 @@ export default function AdminDashboard() {
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12, marginBottom: 12 }}>
                 <label style={{ fontSize: 13, color: '#374151' }}>
                   Tracking number
-                  <input value={orderTrackingNumber} onChange={(e) => setOrderTrackingNumber(e.target.value)}
+                  <input id="admin-order-tracking-number" name="tracking_number" value={orderTrackingNumber} onChange={(e) => setOrderTrackingNumber(e.target.value)}
                     style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8 }} />
                 </label>
                 <label style={{ fontSize: 13, color: '#374151' }}>
                   Carrier
-                  <input value={orderCarrier} onChange={(e) => setOrderCarrier(e.target.value)}
+                  <input id="admin-order-carrier" name="carrier" value={orderCarrier} onChange={(e) => setOrderCarrier(e.target.value)}
                     style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8 }} />
                 </label>
               </div>
               <label style={{ fontSize: 13, color: '#374151', display: 'block', marginBottom: 12 }}>
                 Tracking URL (optional)
-                <input value={orderTrackingUrl} onChange={(e) => setOrderTrackingUrl(e.target.value)}
+                <input id="admin-order-tracking-url" name="tracking_url" value={orderTrackingUrl} onChange={(e) => setOrderTrackingUrl(e.target.value)}
                   style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8 }} />
               </label>
               <label style={{ fontSize: 13, color: '#374151', display: 'block', marginBottom: 12 }}>
                 Estimated delivery
                 <input
+                  id="admin-order-estimated-delivery"
+                  name="estimated_delivery"
                   type="date"
                   value={orderEstimatedDelivery}
                   onChange={(e) => setOrderEstimatedDelivery(e.target.value)}
@@ -2493,10 +2554,12 @@ export default function AdminDashboard() {
                 Add / subtract
               </button>
             </div>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+            <label htmlFor="admin-bulk-stock-value" style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
               {bulkStockMode === 'set' ? 'New stock level' : 'Stock change (+/-)'}
             </label>
             <input
+              id="admin-bulk-stock-value"
+              name="bulkStockValue"
               type="number"
               value={bulkStockValue}
               onChange={(e) => setBulkStockValue(parseInt(e.target.value, 10) || 0)}
@@ -2583,14 +2646,14 @@ export default function AdminDashboard() {
           <div style={{ padding: 24 }}>
             <h2 style={{ margin: '0 0 4px', fontSize: 20, fontWeight: 800 }}>Edit customer</h2>
             <p style={{ margin: '0 0 20px', fontSize: 14, color: '#6b7280' }}>{editingCustomer.email}</p>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Name</label>
-            <input value={customerEditForm.name} onChange={(e) => setCustomerEditForm((f) => ({ ...f, name: e.target.value }))}
+            <label htmlFor="admin-customer-edit-name" style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Name</label>
+            <input id="admin-customer-edit-name" name="name" value={customerEditForm.name} onChange={(e) => setCustomerEditForm((f) => ({ ...f, name: e.target.value }))}
               style={{ width: '100%', padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14, boxSizing: 'border-box', marginBottom: 16 }} />
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Phone</label>
-            <input value={customerEditForm.phone} onChange={(e) => setCustomerEditForm((f) => ({ ...f, phone: e.target.value }))}
+            <label htmlFor="admin-customer-edit-phone" style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Phone</label>
+            <input id="admin-customer-edit-phone" name="phone" value={customerEditForm.phone} onChange={(e) => setCustomerEditForm((f) => ({ ...f, phone: e.target.value }))}
               style={{ width: '100%', padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14, boxSizing: 'border-box', marginBottom: 16 }} />
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Admin notes</label>
-            <textarea value={customerEditForm.admin_notes} onChange={(e) => setCustomerEditForm((f) => ({ ...f, admin_notes: e.target.value }))}
+            <label htmlFor="admin-customer-edit-notes" style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Admin notes</label>
+            <textarea id="admin-customer-edit-notes" name="admin_notes" value={customerEditForm.admin_notes} onChange={(e) => setCustomerEditForm((f) => ({ ...f, admin_notes: e.target.value }))}
               rows={3}
               style={{ width: '100%', padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14, boxSizing: 'border-box', fontFamily: 'inherit', resize: 'vertical', marginBottom: 20 }} />
             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>

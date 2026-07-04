@@ -7,15 +7,14 @@ Implemented capabilities in Lab Door Customs.
 
 ## Current system behavior
 
-Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API (`backend/`), Vitest + Playwright tests (`Tests/`). Production runs one Express process serving `/api/*` and the built SPA; PostgreSQL is Supabase with backend **service_role** access — RLS and revoked grants block `anon`/`authenticated` PostgREST on 14 tables.
+Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API (`backend/`), Vitest + Playwright tests (`Tests/`). Production runs one Express process serving `/api/*` and the built SPA; PostgreSQL is Supabase with backend **service_role** access — RLS and revoked grants block `anon`/`authenticated` PostgREST on 10 tables.
 
 | Area | How it works |
 |------|----------------|
-| **Checkout** | Cart in localStorage; PayPal checkout exchange `?code=`; order tracking links use `GET /api/orders/access-exchange/:code` (no token in email URL); capture requires `serverOrderId` + `accessToken`. |
-| **Admin** | Bulk updates max **500** IDs; manual mark paid verifies PayPal capture via API; paid orders cannot cancel without refund; product cards on mobile. |
+| **Checkout** | Cart in localStorage; WhatsApp place-order checkout; order tracking via order ID + checkout email (`POST /api/orders/lookup`). |
+| **Admin** | Bulk updates max **500** IDs; manual mark paid requires payment reference + admin note; paid orders cannot cancel (no refunds); product cards on mobile. |
 | **Activity** | `POST /api/activity/batch` is CSRF-exempt and rate-limited; frontend sends only with analytics cookie consent; IPs anonymized with `IP_SALT`. |
-| **Reviews** | Public responses strip PII (`toPublicReview()`); admin shows email. Eligibility via `POST /api/reviews/check` (email in body). Votes on approved reviews only. |
-| **Mobile** | Sticky CTAs with keyboard lift on checkout; cookie banner top on purchase routes; cart stacked CTA at 320px; OOS hides product sticky bar; admin product cards on phones. |
+| **Mobile** | Sticky CTAs with keyboard lift on checkout; cookie banner top on purchase routes; cart stacked CTA + policy spacer; `100dvh` + safe-area insets; Playwright **responsive-pages-ui** (11 viewports incl. 320px); OOS hides product sticky bar; admin product cards on phones. |
 
 Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_ENCRYPTION_KEY`, `IP_SALT`, `ADMIN_PASSWORD_HASH`.
 
@@ -23,12 +22,12 @@ Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_
 
 ## Storefront
 
-Product catalog with search/filters, 360° product viewer, cart, PayPal checkout, order tracking, reviews, contact form, policy pages, SEO sitemap.
+Product catalog with search/filters, 360° product viewer, cart, WhatsApp checkout, order tracking, contact form, policy pages, SEO sitemap.
 
 ## Admin
 
-Dashboard for products, orders, customers, coupons, reviews, contact inbox, activity log, analytics/GSC status.
+Dashboard for products, orders, customers, coupons, analytics/GSC status, and Settings (activity export, sessions).
 
 ## Backend
 
-REST API with CSRF, rate limiting, Redis cache, PayPal webhooks, email notifications, maintenance jobs, structured logging, Sentry.
+REST API with CSRF, rate limiting, Redis cache, WhatsApp notifications, maintenance jobs, structured logging, Sentry.

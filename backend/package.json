@@ -4,7 +4,7 @@
   "description": "Backend API for Lab Door Customs",
   "main": "dist/server.js",
   "scripts": {
-    "dev": "nodemon --exec ts-node src/server.ts",
+    "dev": "nodemon --signal SIGINT --exec ts-node src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
     "test": "node ../Tests/scripts/run-with-report.mjs vitest",
@@ -30,7 +30,6 @@
     "postgres": "^3.4.7",
     "rate-limit-redis": "^5.0.0",
     "redis": "^6.0.0",
-    "resend": "^6.8.0",
     "xss": "^1.0.15"
   },
   "devDependencies": {

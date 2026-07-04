@@ -19,7 +19,7 @@ interface Coupon {
   used_count?: number;
   is_active?: boolean;
   valid_until?: string;
-  applies_to?: 'all' | 'category' | 'product';
+  applies_to?: 'all' | 'product';
   applies_to_ids?: number[];
 }
 
@@ -34,7 +34,7 @@ export default function AdminCouponsTab() {
   const [totalPages, setTotalPages] = useState(1);
   const [customCode, setCustomCode] = useState('');
   const [customPercent, setCustomPercent] = useState(10);
-  const [customAppliesTo, setCustomAppliesTo] = useState<'all' | 'category' | 'product'>('all');
+  const [customAppliesTo, setCustomAppliesTo] = useState<'all' | 'product'>('all');
   const [customAppliesToIds, setCustomAppliesToIds] = useState('');
   const [editingCoupon, setEditingCoupon] = useState<Coupon | null>(null);
   const [couponToDelete, setCouponToDelete] = useState<Coupon | null>(null);
@@ -42,7 +42,7 @@ export default function AdminCouponsTab() {
   const [editMaxUses, setEditMaxUses] = useState('');
   const [editValidUntil, setEditValidUntil] = useState('');
   const [editIsActive, setEditIsActive] = useState(true);
-  const [editAppliesTo, setEditAppliesTo] = useState<'all' | 'category' | 'product'>('all');
+  const [editAppliesTo, setEditAppliesTo] = useState<'all' | 'product'>('all');
   const [editAppliesToIds, setEditAppliesToIds] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
 
@@ -86,7 +86,7 @@ export default function AdminCouponsTab() {
   const createCoupon = async (
     code: string,
     percent: number,
-    appliesTo: 'all' | 'category' | 'product' = customAppliesTo
+    appliesTo: 'all' | 'product' = customAppliesTo
   ) => {
     const normalized = code.trim().toUpperCase();
     if (!normalized) {
@@ -101,11 +101,7 @@ export default function AdminCouponsTab() {
           ? parseAppliesToIds()
           : null;
     if (appliesTo !== 'all' && !appliesToIds) {
-      toast.error(
-        appliesTo === 'product'
-          ? 'Select at least one product ID for product-scoped coupons'
-          : 'Enter at least one category ID for category-scoped coupons'
-      );
+      toast.error('Select at least one product ID for product-scoped coupons');
       return;
     }
 
@@ -180,11 +176,7 @@ export default function AdminCouponsTab() {
           .map((s) => parseInt(s.trim(), 10))
           .filter((n) => !Number.isNaN(n) && n > 0);
         if (!appliesToIds.length) {
-          toast.error(
-            editAppliesTo === 'product'
-              ? 'Enter at least one product ID'
-              : 'Enter at least one category ID'
-          );
+          toast.error('Enter at least one product ID');
           return;
         }
       }
@@ -264,15 +256,19 @@ export default function AdminCouponsTab() {
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13 }}>
             Code
             <input
+              id="admin-coupon-custom-code"
+              name="customCode"
               value={customCode}
               onChange={(e) => setCustomCode(e.target.value.toUpperCase())}
               placeholder="MYCODE"
-              style={{ padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, minWidth: 140 }}
+              style={{ padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, minWidth: 0, width: '100%', maxWidth: 200 }}
             />
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13 }}>
             Discount %
             <select
+              id="admin-coupon-custom-percent"
+              name="customPercent"
               value={customPercent}
               onChange={(e) => setCustomPercent(Number(e.target.value))}
               style={{ padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8 }}
@@ -285,34 +281,24 @@ export default function AdminCouponsTab() {
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13 }}>
             Applies to
             <select
+              id="admin-coupon-custom-applies-to"
+              name="customAppliesTo"
               value={customAppliesTo}
               onChange={(e) => setCustomAppliesTo(e.target.value as typeof customAppliesTo)}
               style={{ padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8 }}
             >
               <option value="all">Entire order</option>
               <option value="product">Specific products</option>
-              <option value="category">Specific categories</option>
             </select>
           </label>
           {customAppliesTo === 'product' && (
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, minWidth: 280 }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, flex: '1 1 100%', minWidth: 0, maxWidth: '100%' }}>
               Products
               <AdminProductSearchPicker
                 mode="multi"
                 value={customAppliesToIds}
                 onChange={setCustomAppliesToIds}
                 placeholder="Search to add products…"
-              />
-            </label>
-          )}
-          {customAppliesTo === 'category' && (
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13 }}>
-              Category IDs (comma-separated)
-              <input
-                value={customAppliesToIds}
-                onChange={(e) => setCustomAppliesToIds(e.target.value)}
-                placeholder="e.g. 1, 2"
-                style={{ padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8 }}
               />
             </label>
           )}
@@ -382,9 +368,7 @@ export default function AdminCouponsTab() {
                   <td style={{ padding: 16, fontSize: 13, color: '#6b7280' }}>
                     {coupon.applies_to === 'product'
                       ? `Products (${(coupon.applies_to_ids || []).length})`
-                      : coupon.applies_to === 'category'
-                        ? `Categories (${(coupon.applies_to_ids || []).length})`
-                        : 'All'}
+                      : 'All'}
                   </td>
                   <td style={{ padding: 16 }}>
                     {coupon.discount_type === 'percentage'
@@ -506,6 +490,8 @@ export default function AdminCouponsTab() {
             <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, marginBottom: 12 }}>
               Description
               <input
+                id="admin-coupon-edit-description"
+                name="description"
                 value={editDescription}
                 onChange={(e) => setEditDescription(e.target.value)}
                 style={{ padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8 }}
@@ -514,9 +500,9 @@ export default function AdminCouponsTab() {
             <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, marginBottom: 12 }}>
               Max uses (blank = unlimited)
               <input
+                id="admin-coupon-edit-max-uses"
+                name="maxUses"
                 type="number"
-                min={0}
-                value={editMaxUses}
                 onChange={(e) => setEditMaxUses(e.target.value)}
                 style={{ padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8 }}
               />
@@ -524,8 +510,9 @@ export default function AdminCouponsTab() {
             <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, marginBottom: 12 }}>
               Valid until
               <input
+                id="admin-coupon-edit-valid-until"
+                name="validUntil"
                 type="date"
-                value={editValidUntil}
                 onChange={(e) => setEditValidUntil(e.target.value)}
                 style={{ padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8 }}
               />
@@ -533,13 +520,14 @@ export default function AdminCouponsTab() {
             <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, marginBottom: 12 }}>
               Applies to
               <select
+                id="admin-coupon-edit-applies-to"
+                name="appliesTo"
                 value={editAppliesTo}
-                onChange={(e) => setEditAppliesTo(e.target.value as 'all' | 'category' | 'product')}
+                onChange={(e) => setEditAppliesTo(e.target.value as 'all' | 'product')}
                 style={{ padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8 }}
               >
                 <option value="all">All products</option>
                 <option value="product">Specific products</option>
-                <option value="category">Category</option>
               </select>
             </label>
             {editAppliesTo === 'product' && (
@@ -553,21 +541,11 @@ export default function AdminCouponsTab() {
                 />
               </label>
             )}
-            {editAppliesTo === 'category' && (
-              <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, marginBottom: 12 }}>
-                Category IDs (comma-separated)
-                <input
-                  value={editAppliesToIds}
-                  onChange={(e) => setEditAppliesToIds(e.target.value)}
-                  placeholder="e.g. 1, 2, 3"
-                  style={{ padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8 }}
-                />
-              </label>
-            )}
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, marginBottom: 20 }}>
               <input
+                id="admin-coupon-edit-active"
+                name="isActive"
                 type="checkbox"
-                checked={editIsActive}
                 onChange={(e) => setEditIsActive(e.target.checked)}
               />
               Active

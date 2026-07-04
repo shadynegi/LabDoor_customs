@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildOrderPortalUrl } from '../../backend/src/lib/email';
+import { buildOrderPortalUrl } from '../../backend/src/lib/orderPortalUrl';
 
 describe('buildOrderPortalUrl', () => {
   it('returns /orders when orderId is missing', () => {

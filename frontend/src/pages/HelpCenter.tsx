@@ -6,8 +6,7 @@ import {
   FREE_SHIPPING_MESSAGE,
   SHIPPING_COST,
 } from "../utils/pricing";
-import { REPLACEMENT_SUPPORT_EMAIL } from "../constants/returnPolicy";
-import { SITE_EMAILS } from "../lib/site";
+import { buildWhatsAppContactUrl, getWhatsAppContactDisplay } from "../lib/whatsappContact";
 
 type Section = "shipping" | "privacy" | "terms";
 
@@ -21,7 +20,7 @@ export default function HelpCenter() {
 
   return (
     <div style={{ 
-      minHeight: "100vh",
+      minHeight: "100dvh",
       background: "linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)",
       padding: isMobile ? "40px 20px" : "60px 40px",
       paddingBottom: isMobile ? "max(40px, env(safe-area-inset-bottom))" : "40px"
@@ -131,13 +130,13 @@ export default function HelpCenter() {
                     <Link to="/orders" style={{ color: "#9c6649", fontWeight: 600 }}>
                       My Orders
                     </Link>{" "}
-                    page with your <strong>order ID</strong> (UUID from your confirmation email or WhatsApp
+                    page with your <strong>order ID</strong> (UUID from your confirmation WhatsApp
                     message) and the <strong>email address used at checkout</strong>.
                   </p>
                   <p style={{ lineHeight: 1.8, color: "#6b7280", marginBottom: 12 }}>
-                    Order confirmation and shipping notification emails include a link that pre-fills your order
-                    ID — enter your checkout email and click <strong>Search</strong> to view status, items, and
-                    tracking details.
+                    Order confirmation and shipping updates are sent via WhatsApp when configured — use
+                    the tracking link in your message or enter your order ID and checkout email on My
+                    Orders, then click <strong>Search</strong>.
                   </p>
                   <p style={{ lineHeight: 1.8, color: "#6b7280", margin: 0 }}>
                     When your order ships, tracking number and carrier information appear on My Orders. If you
@@ -228,7 +227,7 @@ export default function HelpCenter() {
                   <ul style={{ paddingLeft: 20, lineHeight: 1.8, color: "#6b7280" }}>
                     <li>Place an order (name, email, phone, shipping address, cart items, size selections)</li>
                     <li>Look up an order on My Orders (order ID and checkout email)</li>
-                    <li>Submit the contact form or a product review</li>
+                    <li>Submit the contact form</li>
                     <li>Accept optional analytics cookies (page views and storefront actions, when consented)</li>
                   </ul>
                   <p style={{ lineHeight: 1.8, color: "#6b7280", marginTop: 12, marginBottom: 0 }}>
@@ -243,9 +242,8 @@ export default function HelpCenter() {
                   </h3>
                   <ul style={{ paddingLeft: 20, lineHeight: 1.8, color: "#6b7280" }}>
                     <li>Process and fulfill orders (pricing validation, inventory, shipping)</li>
-                    <li>Send order confirmation and shipping emails (via Resend)</li>
+                    <li>Send order confirmation and shipping updates via WhatsApp (when configured)</li>
                     <li>Respond to contact messages and support requests</li>
-                    <li>Moderate product reviews</li>
                     <li>Improve the storefront when analytics consent is granted</li>
                     <li>Protect against fraud and abuse (rate limits, CSRF)</li>
                   </ul>
@@ -257,7 +255,7 @@ export default function HelpCenter() {
                   </h3>
                   <p style={{ lineHeight: 1.8, color: "#6b7280", margin: 0 }}>
                     We do not sell your personal information. We share data only with service providers
-                    that help us operate the store (email delivery, hosting, database, WhatsApp messaging
+                    that help us operate the store (hosting, database, WhatsApp messaging
                     when configured) under confidentiality obligations.
                   </p>
                 </div>
@@ -280,9 +278,14 @@ export default function HelpCenter() {
                   borderLeft: "4px solid #9c6649"
                 }}>
                   <p style={{ margin: 0, color: "#4b5563", fontSize: 14, lineHeight: 1.7 }}>
-                    For privacy-related questions or to exercise your rights, contact{" "}
-                    <a href={`mailto:${SITE_EMAILS.privacy}`} style={{ color: "#9c6649", fontWeight: 600 }}>
-                      {SITE_EMAILS.privacy}
+                    For privacy-related questions or to exercise your rights, message us on WhatsApp at{" "}
+                    <a
+                      href={buildWhatsAppContactUrl()}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: "#9c6649", fontWeight: 600 }}
+                    >
+                      {getWhatsAppContactDisplay()}
                     </a>
                   </p>
                 </div>
@@ -371,7 +374,18 @@ export default function HelpCenter() {
                   </p>
                   <ul style={{ paddingLeft: 20, lineHeight: 1.8, color: "#6b7280" }}>
                     <li>Replacements are available only for verified manufacturing defects</li>
-                    <li>Contact {REPLACEMENT_SUPPORT_EMAIL} within 30 days of delivery with your order ID and photos</li>
+                    <li>
+                      Message us on{" "}
+                      <a
+                        href={buildWhatsAppContactUrl()}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ color: "#9c6649", fontWeight: 600 }}
+                      >
+                        {getWhatsAppContactDisplay()}
+                      </a>{" "}
+                      within 30 days of delivery with your order ID and photos
+                    </li>
                     <li>Approved replacements ship the same item when stock is available</li>
                     <li>
                       See the full{" "}
@@ -410,9 +424,14 @@ export default function HelpCenter() {
                   borderLeft: "4px solid #9c6649"
                 }}>
                   <p style={{ margin: 0, color: "#4b5563", fontSize: 14, lineHeight: 1.7 }}>
-                    For questions about these terms, contact{" "}
-                    <a href={`mailto:${SITE_EMAILS.legal}`} style={{ color: "#9c6649", fontWeight: 600 }}>
-                      {SITE_EMAILS.legal}
+                    For questions about these terms, message us on WhatsApp at{" "}
+                    <a
+                      href={buildWhatsAppContactUrl()}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: "#9c6649", fontWeight: 600 }}
+                    >
+                      {getWhatsAppContactDisplay()}
                     </a>
                   </p>
                 </div>

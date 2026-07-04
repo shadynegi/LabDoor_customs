@@ -4,7 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { useResponsive } from '../hooks/useResponsive';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, FileText, Scale, ShoppingBag, AlertTriangle, Copyright, Globe, ShieldCheck } from 'lucide-react';
-import { NO_REFUND_POLICY_SHORT, REPLACEMENT_POLICY_SHORT, REPLACEMENT_SUPPORT_EMAIL } from '../constants/returnPolicy';
+import { NO_REFUND_POLICY_SHORT, REPLACEMENT_POLICY_SHORT } from '../constants/returnPolicy';
+import { buildWhatsAppContactUrl, getWhatsAppContactDisplay } from '../lib/whatsappContact';
 
 export default function TermsOfService() {
   const navigate = useNavigate();
@@ -34,7 +35,7 @@ export default function TermsOfService() {
 
   return (
     <div style={{
-      minHeight: '100vh',
+      minHeight: '100dvh',
       background: 'linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)',
       padding: isMobile ? '20px' : '40px',
     }}>
@@ -109,7 +110,13 @@ export default function TermsOfService() {
             <ul style={{ paddingLeft: 20, marginBottom: 12 }}>
               <li>By placing an order, you acknowledge and agree to this no-refund policy</li>
               <li>Replacements are not guaranteed until we verify a manufacturing defect</li>
-              <li>Contact <a href={`mailto:${REPLACEMENT_SUPPORT_EMAIL}`}>{REPLACEMENT_SUPPORT_EMAIL}</a> with your order number and photos</li>
+              <li>
+                Message us on{' '}
+                <a href={buildWhatsAppContactUrl()} target="_blank" rel="noopener noreferrer">
+                  {getWhatsAppContactDisplay()}
+                </a>{' '}
+                with your order number and photos
+              </li>
             </ul>
             <p style={{ margin: 0 }}>
               Full details:{' '}

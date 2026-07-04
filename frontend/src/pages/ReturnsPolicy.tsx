@@ -8,14 +8,14 @@ import {
   XCircle,
   Package,
   Camera,
-  Mail,
+  MessageCircle,
   AlertTriangle,
 } from 'lucide-react';
 import {
   NO_REFUND_POLICY_SHORT,
   REPLACEMENT_POLICY_SHORT,
-  REPLACEMENT_SUPPORT_EMAIL,
 } from '../constants/returnPolicy';
+import { buildWhatsAppContactUrl, getWhatsAppContactDisplay } from '../lib/whatsappContact';
 
 export default function ReturnsPolicy() {
   const navigate = useNavigate();
@@ -56,7 +56,7 @@ export default function ReturnsPolicy() {
   return (
     <div
       style={{
-        minHeight: '100vh',
+        minHeight: '100dvh',
         background: 'linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)',
         padding: isMobile ? '20px' : '40px',
       }}
@@ -159,9 +159,9 @@ export default function ReturnsPolicy() {
           <Section icon={Camera} title="How to request a replacement">
             <ol style={{ paddingLeft: 20 }}>
               <li style={{ marginBottom: 12 }}>
-                Email{' '}
-                <a href={`mailto:${REPLACEMENT_SUPPORT_EMAIL}`} style={{ color: '#9c6649', fontWeight: 600 }}>
-                  {REPLACEMENT_SUPPORT_EMAIL}
+                Message us on{' '}
+                <a href={buildWhatsAppContactUrl()} target="_blank" rel="noopener noreferrer" style={{ color: '#9c6649', fontWeight: 600 }}>
+                  {getWhatsAppContactDisplay()}
                 </a>{' '}
                 with your <strong>order number</strong> and a clear description of the defect
               </li>
@@ -206,7 +206,7 @@ export default function ReturnsPolicy() {
             </ul>
           </Section>
 
-          <Section icon={Mail} title="Contact">
+          <Section icon={MessageCircle} title="Contact">
             <div
               style={{
                 marginTop: 8,
@@ -218,7 +218,9 @@ export default function ReturnsPolicy() {
             >
               <p style={{ margin: 0, marginBottom: 8 }}>
                 <strong>Replacement requests:</strong>{' '}
-                <a href={`mailto:${REPLACEMENT_SUPPORT_EMAIL}`}>{REPLACEMENT_SUPPORT_EMAIL}</a>
+                <a href={buildWhatsAppContactUrl()} target="_blank" rel="noopener noreferrer">
+                  {getWhatsAppContactDisplay()}
+                </a>
               </p>
               <p style={{ margin: 0 }}>
                 <strong>Response time:</strong> Within 2–3 business days

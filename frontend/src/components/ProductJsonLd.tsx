@@ -9,8 +9,6 @@ export interface ProductJsonLdProps {
   image?: string;
   price: number;
   inStock?: boolean;
-  rating?: number;
-  reviewCount?: number;
 }
 
 export default function ProductJsonLd({
@@ -21,8 +19,6 @@ export default function ProductJsonLd({
   image,
   price,
   inStock = true,
-  rating,
-  reviewCount,
 }: ProductJsonLdProps) {
   const siteUrl = getSiteUrl();
 
@@ -52,14 +48,6 @@ export default function ProductJsonLd({
       },
     };
 
-    if (rating && reviewCount && reviewCount > 0) {
-      schema.aggregateRating = {
-        '@type': 'AggregateRating',
-        ratingValue: rating.toFixed(1),
-        reviewCount,
-      };
-    }
-
     const script = document.createElement('script');
     script.type = 'application/ld+json';
     script.id = 'product-json-ld';
@@ -69,7 +57,7 @@ export default function ProductJsonLd({
     return () => {
       document.getElementById('product-json-ld')?.remove();
     };
-  }, [id, publicId, name, description, image, price, inStock, rating, reviewCount, siteUrl]);
+  }, [id, publicId, name, description, image, price, inStock, siteUrl]);
 
   return null;
 }

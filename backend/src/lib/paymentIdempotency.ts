@@ -15,7 +15,6 @@ export interface IdempotencyRow {
   operation: string;
   status: IdempotencyStatus;
   server_order_id: string | null;
-  paypal_order_id: string | null;
   response_json: Record<string, unknown> | null;
   created_at: Date;
   expires_at: Date;
@@ -32,18 +31,7 @@ export function resolveIdempotencyStorageKey(operation: string, key: string): st
   return crypto.createHash('sha256').update(`${operation}\0${key}`).digest('hex');
 }
 
-export function buildCapturePaymentKey(
-  headerKey: string | undefined,
-  paypalOrderId: string
-): string {
-  const trimmed = headerKey?.trim();
-  if (trimmed && trimmed.length >= 8 && trimmed.length <= 128) {
-    return trimmed;
-  }
-  return paypalOrderId;
-}
-
-export function buildCreatePaymentKey(
+export function buildPlaceOrderKey(
   headerKey: string | undefined,
   email: string,
   items: Array<{ product_id: number; quantity: number }>,
@@ -84,7 +72,6 @@ export async function ensureIdempotencyTable(): Promise<void> {
       operation VARCHAR(32) NOT NULL,
       status VARCHAR(32) NOT NULL DEFAULT 'processing',
       server_order_id UUID,
-      paypal_order_id VARCHAR(128),
       response_json JSONB,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       expires_at TIMESTAMPTZ NOT NULL
@@ -223,15 +210,14 @@ export async function completeIdempotencyKey(
   key: string,
   operation: string,
   response: Record<string, unknown>,
-  opts?: { serverOrderId?: string; paypalOrderId?: string }
+  opts?: { serverOrderId?: string }
 ): Promise<void> {
   const storageKey = resolveIdempotencyStorageKey(operation, key);
   await sql`
     UPDATE payment_idempotency SET
       status = 'completed',
       response_json = ${sql.json(JSON.parse(JSON.stringify(response)))},
-      server_order_id = COALESCE(${opts?.serverOrderId ?? null}, server_order_id),
-      paypal_order_id = COALESCE(${opts?.paypalOrderId ?? null}, paypal_order_id)
+      server_order_id = COALESCE(${opts?.serverOrderId ?? null}, server_order_id)
     WHERE idempotency_key = ${storageKey} AND operation = ${operation}
   `;
 }

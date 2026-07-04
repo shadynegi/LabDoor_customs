@@ -10,6 +10,9 @@ See [`info.md`](info.md) for the full API reference.
 2. Click **Place Order**.
 3. Server validates cart, reserves stock, creates a pending order (`payment_method=WhatsApp`).
 4. Browser redirects to `https://wa.me/{phone}?text=...` with order details.
+
+Checkout sends `X-Idempotency-Key` from `createClientId()` (`frontend/src/lib/clientId.ts`) — `crypto.randomUUID()` when the browser allows it, otherwise an RFC-4122 v4 fallback for phones on **HTTP LAN** (`http://192.168.x.x`).
+
 5. Customer sends the message; admin confirms payment and marks the order paid in the dashboard.
 
 ## Admin flow
@@ -17,17 +20,17 @@ See [`info.md`](info.md) for the full API reference.
 1. Find the order by **Order ID** (the `orders.id` UUID from the WhatsApp message) — admin search supports `order_number`, email, name, and **order id**.
 2. When payment is confirmed, open the order → **Mark paid** with a payment reference (UPI ID, WhatsApp note, etc.) and admin note.
 3. Order moves to `payment_status=completed`, `status=processing`.
-4. Customer receives a **confirmation email** (Resend) and a **WhatsApp message** to the mobile number from checkout (WhatsApp Cloud API when `WHATSAPP_CLOUD_ACCESS_TOKEN` and `WHATSAPP_CLOUD_PHONE_NUMBER_ID` are set).
+4. Customer receives a **WhatsApp message** to the mobile number from checkout (WhatsApp Cloud API when `WHATSAPP_CLOUD_ACCESS_TOKEN` and `WHATSAPP_CLOUD_PHONE_NUMBER_ID` are set).
 
 ## Environment
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `WHATSAPP_ORDER_PHONE` | No | E.164 digits only (default `919888514572`) — business number for place-order `wa.me` links |
-| `WHATSAPP_CLOUD_ACCESS_TOKEN` | No* | Meta Graph API token for outbound payment confirmation texts |
+| `WHATSAPP_CONTACT_NUMBER` | Yes (production) | E.164 store contact — place-order `wa.me` links and support |
+| `WHATSAPP_CLOUD_ACCESS_TOKEN` | No* | Meta Graph API token for outbound payment/shipping confirmation texts |
 | `WHATSAPP_CLOUD_PHONE_NUMBER_ID` | No* | WhatsApp Business phone number ID from Meta developer console |
 
-\*Both Cloud API vars are required together to send WhatsApp confirmations automatically. Without them, email still sends when Resend is configured; WhatsApp is skipped with a server log warning.
+\*Both Cloud API vars are required together to send WhatsApp confirmations automatically. Without them, checkout still redirects to the store WhatsApp number; automated customer texts are skipped with a server log warning.
 
 ## API
 
@@ -44,9 +47,9 @@ The pre-filled WhatsApp text uses **`Order ID: {serverOrderId}`** (`orders.id` U
 | Layer | Files | Coverage |
 |-------|-------|----------|
 | Unit | `Tests/backend/whatsappCheckout.test.ts` | Place-order message formatting, URL encoding |
+| Unit | `Tests/backend/clientId.test.ts` | Checkout idempotency key — UUID fallback when `crypto.randomUUID` unavailable |
 | Unit | `Tests/backend/whatsappNotifications.test.ts` | Payment confirmation message, phone normalization, Cloud API send |
-| Unit | `Tests/backend/whatsappNotifications.test.ts` | Payment confirmation message, phone normalization, Cloud API send |
-| Unit | `Tests/backend/postPaymentCapture.test.ts` | Email + WhatsApp hooks on mark paid |
+| Unit | `Tests/backend/postPaymentCapture.test.ts` | WhatsApp hooks on admin mark paid |
 | API | `Tests/api/orderTracking.test.ts` | Lookup validation, shipped tracking, deprecated links, admin-only GET |
 | API | `Tests/api/whatsappPaymentConfirmation.test.ts` | Mark paid triggers notifications; idempotent skip when already paid |
 | API | `Tests/api/checkout.test.ts`, `checkoutWhatsAppIntegration.test.ts` | Validation, happy path, `whatsappUrl` payload, idempotency cache |

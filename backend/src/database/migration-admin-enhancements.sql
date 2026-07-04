@@ -45,7 +45,6 @@ CREATE TABLE IF NOT EXISTS order_line_items (
   quantity INTEGER NOT NULL CHECK (quantity > 0),
   unit_price DECIMAL(10, 2) NOT NULL CHECK (unit_price >= 0),
   line_total DECIMAL(10, 2) NOT NULL CHECK (line_total >= 0),
-  category VARCHAR(100),
   size VARCHAR(50),
   color VARCHAR(100),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()

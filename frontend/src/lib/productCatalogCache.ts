@@ -23,13 +23,5 @@ export function normalizeProduct(product: Product): Product {
   return {
     ...product,
     price: typeof product.price === 'string' ? parseFloat(product.price) : product.price,
-    rating:
-      typeof product.rating === 'string'
-        ? parseFloat(product.rating)
-        : product.rating || 0,
-    review_count:
-      typeof product.review_count === 'string'
-        ? parseInt(String(product.review_count), 10)
-        : product.review_count || 0,
   };
 }
