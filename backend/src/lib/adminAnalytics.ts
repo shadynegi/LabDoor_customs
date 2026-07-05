@@ -1,7 +1,8 @@
-import sql, { withRetry } from './db';
+import sql, { runWithConcurrency, withRetry } from './db';
 import { cached } from './cache';
 import { CACHE, TTL, invalidateCachePrefix } from './cacheKeys';
 import { getLowStockProducts } from './inventoryMovements';
+import { LOW_STOCK_THRESHOLD } from './lowStock';
 import {
   analyticsCacheKey,
   fetchSalesAnalytics,
@@ -22,18 +23,16 @@ export async function getAdminAnalytics(query: Record<string, unknown> = {}) {
   const key = analyticsCacheKey(range);
 
   return cached(CACHE.adminAnalytics(key), TTL.adminAnalytics, async () => {
-    const [base, sales, lowStock, lowStockCountRows] = await Promise.all([
-      fetchAdminAnalytics(),
-      fetchSalesAnalytics(range),
-      getLowStockProducts(25),
-      analyticsQuery('low_stock_count', () => sql`
-        SELECT COUNT(*)::int AS c
-        FROM products
-        WHERE reorder_alert_enabled = TRUE
-          AND is_out_of_stock = FALSE
-          AND stock <= reorder_point
-      `),
-    ]);
+    // Sequential top-level fetches — avoids stacking parallel fan-out on the shared pool.
+    const base = await fetchAdminAnalytics();
+    const sales = await fetchSalesAnalytics(range);
+    const lowStock = await getLowStockProducts(25);
+    const lowStockCountRows = await analyticsQuery('low_stock_count', () => sql`
+      SELECT COUNT(*)::int AS c
+      FROM products
+      WHERE is_out_of_stock = FALSE
+        AND stock <= ${LOW_STOCK_THRESHOLD}
+    `);
 
     return {
       ...base,
@@ -58,53 +57,61 @@ export async function fetchAdminAnalytics() {
     countrySummary,
     recentOrders,
     dailyTrend,
-  ] = await Promise.all([
-    analyticsQuery('order_stats', () => sql`
+  ] = await runWithConcurrency([
+    () =>
+      analyticsQuery('order_stats', () => sql`
       SELECT
         COUNT(*)::int AS total_orders,
         COALESCE(SUM(CASE WHEN payment_status = 'completed' THEN total ELSE 0 END), 0)::float AS total_revenue
       FROM orders
     `),
-    analyticsQuery('order_stats_30d', () => sql`
+    () =>
+      analyticsQuery('order_stats_30d', () => sql`
       SELECT
         COUNT(*)::int AS orders_last_30_days,
         COALESCE(SUM(CASE WHEN payment_status = 'completed' THEN total ELSE 0 END), 0)::float AS revenue_last_30_days
       FROM orders
       WHERE created_at >= NOW() - INTERVAL '30 days'
     `),
-    analyticsQuery('customer_stats', () => sql`
+    () =>
+      analyticsQuery('customer_stats', () => sql`
       SELECT COUNT(*)::int AS total_customers FROM customers WHERE is_deleted = false OR is_deleted IS NULL
     `),
-    analyticsQuery('customer_stats_30d', () => sql`
+    () =>
+      analyticsQuery('customer_stats_30d', () => sql`
       SELECT COUNT(*)::int AS new_customers_30_days
       FROM customers
       WHERE created_at >= NOW() - INTERVAL '30 days'
         AND (is_deleted = false OR is_deleted IS NULL)
     `),
-    analyticsQuery('product_stats', () => sql`
+    () =>
+      analyticsQuery('product_stats', () => sql`
       SELECT
         COUNT(*)::int AS total_products,
         COUNT(*) FILTER (WHERE is_out_of_stock = true OR stock <= 0)::int AS out_of_stock_products,
         COUNT(*) FILTER (
-          WHERE reorder_alert_enabled = TRUE AND is_out_of_stock = FALSE AND stock <= reorder_point
+          WHERE is_out_of_stock = FALSE AND stock > 0 AND stock <= ${LOW_STOCK_THRESHOLD}
         )::int AS low_stock_products,
         COALESCE(SUM(view_count), 0)::int AS total_views,
         COALESCE(SUM(cart_count), 0)::int AS total_cart_adds
       FROM products
     `),
-    analyticsQuery('top_viewed', () => sql`
+    () =>
+      analyticsQuery('top_viewed', () => sql`
       SELECT id, name, COALESCE(view_count, 0)::int AS view_count
       FROM products
       ORDER BY view_count DESC NULLS LAST, id ASC
       LIMIT 5
     `),
-    analyticsQuery('top_carted', () => sql`
+    () =>
+      analyticsQuery('top_carted', () => sql`
       SELECT id, name, COALESCE(cart_count, 0)::int AS cart_count
       FROM products
       ORDER BY cart_count DESC NULLS LAST, id ASC
       LIMIT 5
     `),
-    analyticsQuery('country_summary', () => sql`
+    () =>
+      analyticsQuery('country_summary', () => sql`
       SELECT
         COALESCE(shipping_address->>'country', 'Unknown') AS country,
         COUNT(*)::int AS order_count,
@@ -115,13 +122,15 @@ export async function fetchAdminAnalytics() {
       ORDER BY order_count DESC
       LIMIT 12
     `),
-    analyticsQuery('recent_orders', () => sql`
+    () =>
+      analyticsQuery('recent_orders', () => sql`
       SELECT id, order_number, customer_name, customer_email, total, status, payment_status, created_at
       FROM orders
       ORDER BY created_at DESC
       LIMIT 8
     `),
-    analyticsQuery('daily_trend', () => sql`
+    () =>
+      analyticsQuery('daily_trend', () => sql`
       SELECT
         DATE(created_at) AS date,
         COUNT(*)::int AS orders,

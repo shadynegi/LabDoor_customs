@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { catalogFetch } from '../config';
 import { toast } from 'sonner';
 import { logError } from '../lib/logger';
-import { normalizeProduct } from '../lib/productCatalogCache';
+import { normalizeProduct, CATALOG_CLEARED_EVENT } from '../lib/productCatalogCache';
 
 export interface Product {
   id: number;
@@ -13,8 +13,6 @@ export interface Product {
   image: string;
   description?: string;
   background?: string;
-  size?: string;
-  color?: string;
   created_at?: string;
   stock?: number;
   view_count?: number;
@@ -79,6 +77,14 @@ export const useProducts = (): UseProductsResult => {
 
   useEffect(() => {
     fetchProducts();
+  }, []);
+
+  useEffect(() => {
+    const onCatalogCleared = () => {
+      void fetchProducts();
+    };
+    window.addEventListener(CATALOG_CLEARED_EVENT, onCatalogCleared);
+    return () => window.removeEventListener(CATALOG_CLEARED_EVENT, onCatalogCleared);
   }, []);
 
   return {

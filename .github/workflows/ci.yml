@@ -22,17 +22,17 @@ jobs:
         run: npm run validate-env -w backend
         env:
           CI_VALIDATE_PRODUCTION: 'true'
-          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+          DATABASE_URL: postgresql://ci:ci@aws-0-local.pooler.supabase.com:6543/postgres?pgbouncer=true
           FRONTEND_URL: https://www.labdoorcustoms.com
           ADMIN_PASSWORD_HASH: '$2b$12$ci.placeholder.hash.for.validation.only'
           ADMIN_USERNAME: ci-admin
           JWT_SECRET: 'Ci-jwt-secret-at-least-32-characters!long'
           REDIS_URL: redis://localhost:6379
           SENTRY_DSN: https://example@sentry.io/0
-          RESEND_API_KEY: re_ci_placeholder
+          WHATSAPP_CONTACT_NUMBER: '+919888514572'
           TRUST_CLOUDFLARE: 'true'
           ORDER_TOKEN_ENCRYPTION_KEY: ci-order-token-encryption-key-32chars
-          IP_SALT: ci-ip-salt-for-tests-only
+          IP_SALT: ci-ip-salt-for-tests-only-32chars-min
       - name: Require VITE_SENTRY_DSN secret
         env:
           VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}

@@ -21,10 +21,13 @@ vi.mock('../backend/src/lib/db', () => ({
       await fn(item);
     }
   },
+  runWithConcurrency: async <T>(tasks: Array<() => Promise<T>>) => Promise.all(tasks.map((t) => t())),
+  getRecommendedQueryConcurrency: () => 10,
   getPoolStats: () => ({
     activeConnections: 0,
     totalQueries: 0,
-    maxConnections: 10,
+    maxConnections: 20,
+    queuedQueries: 0,
     isProduction: false,
     poolerMode: false,
     prepareEnabled: true,

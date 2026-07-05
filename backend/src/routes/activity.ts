@@ -258,24 +258,34 @@ router.get('/export', verifyAdmin, async (req: Request, res: Response) => {
   res.setHeader('Cache-Control', 'no-store');
 
   try {
-    const cursor = sql`
-      SELECT id, session_id, user_email, action_type, entity_type, entity_id,
-             entity_name, metadata, ip_address, user_agent, page_url, referrer, created_at
-      FROM activity_logs
-      WHERE 1=1
-      ${action ? sql`AND action_type = ${action}` : sql``}
-      ${entity ? sql`AND entity_type = ${entity}` : sql``}
-      ${email ? sql`AND user_email = ${email}` : sql``}
-      ${start ? sql`AND created_at >= ${start}::timestamptz` : sql``}
-      ${end ? sql`AND created_at <= ${end}::timestamptz` : sql``}
-      ORDER BY created_at DESC
-    `.cursor(50);
+    const pageSize = 50;
+    let offset = 0;
 
-    for await (const batch of cursor) {
+    while (true) {
+      const batch = await sql`
+        SELECT id, session_id, user_email, action_type, entity_type, entity_id,
+               entity_name, metadata, ip_address, user_agent, page_url, referrer, created_at
+        FROM activity_logs
+        WHERE 1=1
+        ${action ? sql`AND action_type = ${action}` : sql``}
+        ${entity ? sql`AND entity_type = ${entity}` : sql``}
+        ${email ? sql`AND user_email = ${email}` : sql``}
+        ${start ? sql`AND created_at >= ${start}::timestamptz` : sql``}
+        ${end ? sql`AND created_at <= ${end}::timestamptz` : sql``}
+        ORDER BY created_at DESC
+        LIMIT ${pageSize} OFFSET ${offset}
+      `;
+
+      if (!batch.length) break;
+
       for (const row of batch) {
         res.write(`${JSON.stringify(row)}\n`);
       }
+
+      if (batch.length < pageSize) break;
+      offset += pageSize;
     }
+
     res.end();
   } catch (error: unknown) {
     logger.error('Activity export error:', error);

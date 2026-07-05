@@ -2,7 +2,7 @@
 
 Manual QA for forms, validation, and CSRF behavior.
 
-**Full reference:** [`info.md`](info.md)
+**Full reference:** [`info.md`](info.md) · **Manual cases:** [`manual-qa-test-cases.md`](manual-qa-test-cases.md)
 
 ---
 
@@ -40,9 +40,10 @@ Expect output ending with `count 0`.
 
 - [ ] `/checkout` — no “A form field element should have an id or name attribute” issues
 - [ ] `/checkout` — no “No label associated with a form field” issues (including policy checkbox and coupon field)
-- [ ] `/contact` — all fields labeled; submit works
+- [ ] `/contact` — all fields labeled; submit opens WhatsApp with prefilled message
 - [ ] `/orders` — order ID + email lookup fields labeled
 - [ ] `/products` — sort/filter/search controls have `aria-label` or visible/`sr-only` labels
+- [ ] `/terms-of-service` — **Governing Law** shows Punjab, India jurisdiction
 
 ### Admin
 
@@ -66,7 +67,7 @@ On CSRF 403, `apiFetch` refreshes the token and retries once.
 - [ ] Contact form submits successfully
 - [ ] Checkout place-order succeeds
 - [ ] Admin login works
-- [ ] Admin product create/update works
+- [ ] Admin product create/update works (single product per save — no size variants)
 
 ---
 
@@ -75,10 +76,10 @@ On CSRF 403, `apiFetch` refreshes the token and retries once.
 - [ ] Required fields validated (name, email, subject, message)
 - [ ] Invalid email rejected
 - [ ] Page displays WhatsApp contact from `VITE_WHATSAPP_CONTACT_NUMBER` (`contact-support-whatsapp` link)
-- [ ] Success toast shown on submit
+- [ ] Success state shown on submit (**Sent!** button label)
 - [ ] `contact_submit` activity event sent when analytics consent granted
-- [ ] Optional WhatsApp follow-up opens after successful submit when `whatsappUrl` returned
-- [ ] Message stored in `contact_messages` (verify in Supabase if needed)
+- [ ] **Send Message** opens WhatsApp (`wa.me`) in a new tab with prefilled name, email, subject, and message body
+- [ ] Store address visible: 415, Sector 78, Mohali, Punjab, India 140308
 
 ---
 
@@ -131,5 +132,4 @@ On CSRF 403, `apiFetch` refreshes the token and retries once.
 
 ## Rate limiting
 
-- [ ] Rapid contact submissions eventually rate-limited
 - [ ] Rapid admin login failures locked after 5 attempts / 15 min

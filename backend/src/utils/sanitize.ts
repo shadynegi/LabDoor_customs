@@ -48,27 +48,6 @@ export const sanitizeObject = <T extends Record<string, any>>(obj: T): T => {
 };
 
 /**
- * Sanitize contact form data
- */
-export const sanitizeContactForm = (data: {
-  name?: string;
-  email?: string;
-  phone?: string;
-  subject?: string;
-  message?: string;
-  order_number?: string;
-}) => {
-  return {
-    name: sanitizeString(data.name),
-    email: sanitizeString(data.email)?.toLowerCase(),
-    phone: sanitizeString(data.phone),
-    subject: sanitizeString(data.subject),
-    message: sanitizeString(data.message),
-    order_number: sanitizeString(data.order_number),
-  };
-};
-
-/**
  * Sanitize order data
  */
 export const sanitizeOrderData = (data: {
@@ -99,7 +78,6 @@ export const sanitizeSearchQuery = (query: string | null | undefined): string =>
 export default {
   sanitizeString,
   sanitizeObject,
-  sanitizeContactForm,
   sanitizeOrderData,
   sanitizeSearchQuery,
 };

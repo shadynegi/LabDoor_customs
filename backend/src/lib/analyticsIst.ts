@@ -13,7 +13,14 @@ const IST_WEEKDAY: Record<string, number> = {
   Sat: 6,
 };
 
+export function isValidAnalyticsDate(date: Date): boolean {
+  return !Number.isNaN(date.getTime());
+}
+
 function istCalendarParts(date: Date): { year: number; month: number; day: number } {
+  if (!isValidAnalyticsDate(date)) {
+    throw new RangeError('Invalid time value');
+  }
   const formatter = new Intl.DateTimeFormat('en-US', {
     timeZone: ANALYTICS_TIME_ZONE,
     year: 'numeric',

@@ -46,7 +46,7 @@ Admins can search by order id UUID, order number, email, or name in the dashboar
 
 | Layer | Files | Coverage |
 |-------|-------|----------|
-| API | `Tests/api/orderLookup.test.ts`, `orderTracking.test.ts` | Valid/invalid lookup, case-insensitive email, shipped tracking, deprecated access-exchange 410 |
-| UI | `Tests/frontend/orders-ui.spec.ts` | Email link prefill, lookup form, reload clears details, errors, shipped tracking link |
-| Unit | `Tests/backend/emailPortalUrl.test.ts` | Order portal URL (`/orders?orderId={uuid}`) via `orderPortalUrl.ts` |
+| API | `Tests/integration/api/orders/lookup.test.ts` | Valid/invalid lookup, case-insensitive email, shipped tracking, deprecated access-exchange 410, admin-only GET |
+| UI | `Tests/e2e/specs/orders/orders-ui.spec.ts` | Email link prefill, lookup form, reload clears details, errors, shipped tracking link |
+| Unit | `Tests/unit/backend/orders/orderPortalUrl.test.ts` | Order portal URL (`/orders?orderId={uuid}`) via `orderPortalUrl.ts` |
 

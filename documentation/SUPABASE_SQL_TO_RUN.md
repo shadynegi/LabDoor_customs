@@ -8,16 +8,17 @@ SQL scripts to initialize and maintain the Lab Door Customs database.
 
 ## Production Supabase status
 
-**All required database migrations are applied** on the Lab Door Customs Supabase project (operator-confirmed, June 2026). Set `BOOTSTRAP_SKIP_DDL=true` on Railway so boot skips redundant DDL.
+**All required database migrations are applied** on the Lab Door Customs Supabase project (operator-confirmed, July 2026). Set `BOOTSTRAP_SKIP_DDL=true` on Railway so boot skips redundant DDL.
 
 | Category | Status |
 |----------|--------|
 | Base schema + incremental migrations | Applied — see list in [Migration audit](#migration-audit-production-vs-new-databases) |
 | `migration-performance-linter-fixes.sql` | Applied — FK indexes + consolidated RLS policies (lint 0001 / 0006) |
 | `migration-products-search-trgm.sql` | Applied — `pg_trgm` + product search GIN indexes |
-| `migration-admin-enhancements.sql` | Applied — SKU, reorder point, `inventory_movements`, `order_line_items`, admin notes |
+| `migration-admin-enhancements.sql` | Applied — `cost_price`, `inventory_movements`, `order_line_items`, admin notes |
+| `migration-remove-product-variant-fields.sql` | Applied — drops legacy `sku`, `reorder_point`, `size`, `color` (one product per shoe; also applied at boot via `ensureProductVariantFieldsRemoved()`) |
 | `migration-remove-product-category.sql` | Applied — dropped `products.category`, `order_line_items.category`; coupon scope `all` / `product` only (July 2026) |
-| `migration-drop-reviews.sql` | **Pending** — drops `reviews`, `review_votes`, and rating trigger (July 2026 feature removal) |
+| `migration-drop-reviews.sql` | Applied — drops `reviews`, `review_votes`, and rating trigger (July 2026 feature removal) |
 | `migration-drop-paypal.sql` | Applied — legacy payment tables/columns removed (July 2026) |
 | `migration-products-video-360.sql` | Applied — `products.video_360` |
 | RLS + grant revoke migrations | Applied |
@@ -25,15 +26,17 @@ SQL scripts to initialize and maintain the Lab Door Customs database.
 
 Re-running any migration file is safe (`IF NOT EXISTS`). Use the verification queries below only for **new environments** (staging clones) or periodic audits.
 
+**Note:** `contact_messages` remains in schema/RLS for historical data; the storefront contact form no longer inserts rows (WhatsApp client-side only).
+
 ---
 
 ## How the database is accessed
 
 The Express backend is the sole application client. It connects with **service_role** credentials via `DATABASE_URL`. RLS policies restrict all **10** application tables to `service_role`; `anon` and `authenticated` PostgREST access is revoked. Catalog, orders, and admin data are served only through `/api/*` routes.
 
-## Remove product reviews (run once)
+## Remove product reviews (applied on production)
 
-After deploying the code that removes `/api/reviews` and the storefront reviews UI, run in the Supabase SQL Editor:
+**Applied on production Supabase** (July 2026). On **new** databases that still have review tables, run once in the Supabase SQL Editor after deploying code without `/api/reviews` and the storefront reviews UI.
 
 **File:** `backend/src/database/migration-drop-reviews.sql`
 
@@ -76,9 +79,10 @@ Located in `backend/src/database/`:
 - `migration-products-search-trgm.sql` — `pg_trgm` + GIN indexes on `products.name` / `products.description` for `POST /api/products/search`. **Applied on production Supabase.** Run once on new DBs.
 - `migration-products-video-360.sql` — optional `products.video_360` TEXT for admin-uploaded 360° MP4 URLs. Also applied at boot via `ensureProductVideo360Column()`.
 - `migration-products-public-id.sql` — `products.public_id` UUID for storefront URLs (`/product/{public_id}`). Also applied at boot via `ensureProductPublicIdColumn()`.
-- `migration-admin-enhancements.sql` — SKU, reorder point, `inventory_movements`, `order_line_items`, customer/order admin notes. Also applied at boot via `ensureAdminEnhancementSchema()`.
+- `migration-admin-enhancements.sql` — `cost_price`, `inventory_movements`, `order_line_items`, customer/order admin notes. Also applied at boot via `ensureAdminEnhancementSchema()`.
+- `migration-remove-product-variant-fields.sql` — drops legacy `sku`, `reorder_point`, `size`, `color`. **Applied on production Supabase** (July 2026). Also applied at boot via `ensureProductVariantFieldsRemoved()`.
 - `migration-remove-product-category.sql` — drops shoe `category` columns and category-scoped coupon scope. **Applied on production Supabase** (July 2026). Include on fresh DBs after `migration-admin-enhancements.sql` (or use updated `schema.sql` without category columns).
-- `migration-drop-reviews.sql` — drops `reviews`, `review_votes`, and `update_product_rating()` trigger. **Run on existing DBs** when removing the reviews feature.
+- `migration-drop-reviews.sql` — drops `reviews`, `review_votes`, and `update_product_rating()` trigger. **Applied on production Supabase** (July 2026). Run on **new** DBs that still have review tables.
 - `migration-drop-paypal.sql` — legacy payment cleanup. **Applied on production Supabase** (July 2026).
 - `migration-payment-idempotency.sql` — idempotency table + indexes including partial index `idx_payment_idempotency_processing_created` for maintenance reaper
 
@@ -156,7 +160,7 @@ WHERE schemaname = 'public'
 
 Use this when deciding what still needs the SQL editor on **production** (verify first) vs a **fresh** Supabase project (run in order).
 
-### Applied on production Supabase (June 2026)
+### Applied on production Supabase (July 2026)
 
 All required migrations from `backend/src/database/` are applied on production. **Do not re-run** unless a verification query below fails.
 
@@ -165,8 +169,11 @@ All required migrations from `backend/src/database/` are applied on production. 
 | `schema.sql` + migrations 1–15 in the audit table | Core tables, RLS, payment/exchange, admin enhancements |
 | `migration-performance-linter-fixes.sql` | FK indexes + consolidated RLS (lint 0001 / 0006) |
 | `migration-products-search-trgm.sql` | `pg_trgm` + product search GIN indexes |
-| `migration-admin-enhancements.sql` | Inventory, SKU, order line items, admin notes |
+| `migration-admin-enhancements.sql` | Inventory, order line items, admin notes |
+| `migration-remove-product-variant-fields.sql` | Drop legacy SKU/reorder/size/color columns |
 | `migration-remove-product-category.sql` | Dropped shoe category columns; coupon scope `all` / `product` only |
+| `migration-drop-reviews.sql` | Dropped `reviews`, `review_votes`, rating trigger |
+| `migration-drop-paypal.sql` | Legacy payment tables/columns removed |
 | `migration-products-video-360.sql` | `products.video_360` |
 
 **Optional (not required for launch):** `migration-ldcoff10-coupon.sql`, `seed.sql`.
@@ -179,9 +186,9 @@ On a **fresh** Supabase project, run files in order when the audit query returns
 |-------|------|----------------|
 | 1 | `schema.sql` | Core tables (`products`, `orders`, `customers`, …) |
 | 2 | `migration-activity-logs.sql` | `activity_logs` (if not in base schema) |
-| 3 | `migration-add-size-color.sql` | Columns `products.size`, `products.color` |
+| 3 | `migration-remove-product-variant-fields.sql` | Drops legacy `sku`, `reorder_point`, `size`, `color` (skip `migration-add-size-color.sql` on new DBs — use updated `schema.sql` without those columns) |
 | 4b | `migration-products-video-360.sql` | Column `products.video_360` (360° MP4) |
-| 4c | `migration-admin-enhancements.sql` | SKU, reorder point, `inventory_movements`, `order_line_items`, admin notes |
+| 4c | `migration-admin-enhancements.sql` | `cost_price`, `inventory_movements`, `order_line_items`, admin notes |
 | 4d | `migration-remove-product-category.sql` | Drop `products.category`, `order_line_items.category`; coupon scope `all`/`product` only |
 | 5 | `migration-soft-delete-users.sql` | `customers.is_deleted`, `customers.deleted_at` |
 | 6 | `migration-order-access-exchange.sql` | Table `order_access_exchanges` |
@@ -192,7 +199,13 @@ On a **fresh** Supabase project, run files in order when the audit query returns
 | 11 | `migration-rls-drop-authenticated-policies.sql` | Only if legacy authenticated policies remain |
 | 12 | `migration-rls-tighten.sql` | Reference only — boot `ensureRlsPolicies()` mirrors this |
 
-**Legacy (skip on current production):** `migration-order-access-token.sql` — superseded by exchange + encrypted token migrations.
+**Legacy (skip on current production):**
+
+| File | Notes |
+|------|--------|
+| `migration-order-access-token.sql` | Superseded by exchange + encrypted token migrations |
+| `migration-order-checkout-exchange.sql` | Legacy PayPal checkout exchange — **dropped** by `migration-drop-paypal.sql` |
+| `migration-processed-refund-events.sql` | Legacy PayPal refund dedupe — **dropped** by `migration-drop-paypal.sql` |
 
 ### Usually applied by backend boot (production complete via SQL editor)
 

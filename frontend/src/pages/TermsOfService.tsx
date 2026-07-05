@@ -179,8 +179,9 @@ export default function TermsOfService() {
           <Section icon={Globe} title="Governing Law">
             <p>
               These Terms of Service are governed by and construed in accordance with the laws of 
-              the State of New York, United States, without regard to its conflict of law provisions. 
-              Any disputes arising from these terms shall be resolved in the courts of New York.
+              Punjab, India, without regard to its conflict of law provisions. Any disputes arising 
+              from or relating to these terms shall be subject to the exclusive jurisdiction of the 
+              courts and applicable legal authorities in Punjab, India.
             </p>
           </Section>
 

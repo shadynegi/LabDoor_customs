@@ -11,7 +11,7 @@ Tick every item before pointing production traffic at Lab Door Customs.
 Run in the **Supabase SQL Editor** (or psql on port 5432). Scripts live in `backend/src/database/`. **Production:** all required migrations are applied — see [SUPABASE_SQL_TO_RUN.md](./SUPABASE_SQL_TO_RUN.md).
 
 - [x] Base schema applied (`schema.sql` on fresh DB, or already present from prior setup)
-- [ ] Run `migration-drop-reviews.sql` in Supabase SQL Editor (drops `reviews` / `review_votes`)
+- [x] Run `migration-drop-reviews.sql` in Supabase SQL Editor (drops `reviews` / `review_votes`)
 - [x] Run `migration-drop-paypal.sql` in Supabase SQL Editor (legacy payment cleanup)
 - [x] `migration-activity-logs.sql`
 - [x] `migration-rls-tighten.sql` (reference; policies active via boot + performance migration)
@@ -22,10 +22,13 @@ Run in the **Supabase SQL Editor** (or psql on port 5432). Scripts live in `back
 - [x] `migration-performance-linter-fixes.sql` (applied on production Supabase)
 - [x] `migration-products-search-trgm.sql` (applied on production Supabase)
 - [x] `migration-products-video-360.sql` — `products.video_360`
-- [x] `migration-admin-enhancements.sql` — inventory, SKU, order line items, admin notes
+- [x] `migration-admin-enhancements.sql` — inventory, order line items, admin notes
+- [x] `migration-remove-product-variant-fields.sql` — drop legacy SKU/reorder/size/color columns
 - [x] `migration-remove-product-category.sql` — dropped shoe category columns; coupon scope `all` / `product` only
 - [x] `migration-products-public-id.sql` — `products.public_id` for storefront URLs (`/product/{public_id}`; also bootstrapped via `ensureProductPublicIdColumn()`)
 - [x] Payment/checkout tables present (`order_access_exchanges`, `payment_idempotency`, etc.)
+
+**Phase 1 SQL migrations:** all items above are applied on production Supabase (July 2026).
 
 **After SQL:**
 
@@ -63,6 +66,8 @@ Set on the **Railway service** (repository root). The server **exits on boot** i
 - [ ] `LOG_LEVEL=info`
 - [ ] **`UPLOAD_DIR`** — mount a **Railway persistent volume** for admin product uploads (default `./uploads` is ephemeral; Multer files are lost on redeploy without a volume)
 
+**Automated coverage (CI):** `Tests/integration/api/products/upload-persistence.test.ts` uploads via admin API, asserts files under `UPLOAD_DIR/products/`, and verifies they survive a simulated redeploy (same volume path). Playwright UI flow: `Tests/e2e/specs/admin/storage-persistence.spec.ts` (mocked API). True Railway redeploy still requires a manual/staging check after volume mount.
+
 ### Validate locally before deploy
 
 ```bash
@@ -73,6 +78,8 @@ CI_VALIDATE_PRODUCTION=true NODE_ENV=production node backend/scripts/validate-en
 (Set all required vars in the shell or `.env` for this command.)
 
 - [ ] `validate-env` prints `OK`
+
+**Automated coverage (CI):** `Tests/unit/backend/infrastructure/validateEnv.test.ts` spawns `backend/scripts/validate-env.mjs` and asserts exit codes + stderr for missing `DATABASE_URL`, `REDIS_URL`, `SENTRY_DSN`, JWT/auth secrets, pooler port **6543**, and optional-vs-required WhatsApp vars. Run: `npm run test:unit -w backend -- validateEnv`.
 
 ---
 
@@ -139,7 +146,7 @@ From repository root on Railway:
 - [ ] Start: `npm start`
 - [ ] Deploy logs show no missing-env exit
 - [ ] Deploy logs show RLS migration applied
-- [ ] CI on `main` is green (**401** automated tests + build + E2E smoke — see [`test_guidelines.md`](test_guidelines.md))
+- [ ] CI on `main` is green (**520** automated tests + viewport audit + build — see [`test_guidelines.md`](test_guidelines.md))
 
 ---
 
@@ -169,11 +176,13 @@ CI does **not** open a live WhatsApp session. Complete these on **desktop and a 
 - [ ] Login with `ADMIN_USERNAME` + password (hash verified server-side)
 - [ ] Orders tab shows new order; **Mark paid** after WhatsApp confirmation
 - [ ] Update order status (e.g. processing → shipped) if applicable
-- [ ] Products tab: stock/OOS toggle works; catalog refreshes on storefront
+- [ ] Products tab: **out-of-stock toggle** (`ToggleSwitch`) works; storefront reflects stock state after refresh or catalog listener
 
 ### Contact (optional but recommended)
 
-- [ ] Submit contact form; confirm submission succeeds (stored in `contact_messages`)
+- [ ] Submit contact form; confirm **Sent!** state and WhatsApp opens with prefilled message (`VITE_WHATSAPP_CONTACT_NUMBER`)
+- [ ] Store address on `/contact` shows Mohali, Punjab, India (415, Sector 78, 140308)
+- [ ] `/terms-of-service` **Governing Law** section states **Punjab, India** (no New York references)
 
 ### WhatsApp confirmation
 

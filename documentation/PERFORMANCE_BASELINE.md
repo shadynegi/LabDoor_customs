@@ -32,7 +32,7 @@ npm run measure:dist -w frontend      # Size report
 npm run build:budget -w frontend      # Fail if budgets exceeded
 ```
 
-**Automated contract test:** `Tests/backend/performanceBudgets.test.ts` asserts `build-budget.mjs` thresholds match this document.
+**Automated contract test:** `Tests/unit/backend/infrastructure/performanceBudgets.test.ts` asserts `build-budget.mjs` thresholds match this document.
 
 ## Post-optimization targets
 

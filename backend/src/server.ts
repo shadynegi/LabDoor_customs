@@ -26,7 +26,12 @@ import { getRequestPath, getRequestTimeoutMs } from './lib/requestTiming';
 import { mountRateLimits } from './middleware/rateLimits';
 import { startMaintenanceJobs } from './lib/maintenanceJobs';
 import { ensureActivityLogsTable } from './lib/activitySchema';
-import { ensureProductVideo360Column, ensureAdminEnhancementSchema, ensureProductPublicIdColumn } from './lib/productSchema';
+import {
+  ensureProductVideo360Column,
+  ensureAdminEnhancementSchema,
+  ensureProductPublicIdColumn,
+  ensureProductVariantFieldsRemoved,
+} from './lib/productSchema';
 import { registerGracefulShutdown } from './lib/gracefulShutdown';
 import { ensureIdempotencyTable } from './lib/paymentIdempotency';
 import { warmCaches } from './lib/cacheWarm';
@@ -38,12 +43,12 @@ import { assertJwtSecretForProduction } from './lib/jwtSecret';
 import { purgeLegacyAdminSessions } from './lib/adminSessionMigration';
 import { mountFrontend } from './lib/serveFrontend';
 import { registerProcessErrorHandlers } from './lib/processErrorHandlers';
+import { isPoolerDatabaseUrl } from './lib/databaseUrl';
 import { ensureUploadDirs, getUploadRoot } from './lib/productUpload';
 
 // Import routes
 import productsRouter from "./routes/products";
 import ordersRouter from "./routes/orders";
-import contactRouter from "./routes/contact";
 import adminRouter, { verifyAdmin } from "./routes/admin";
 import activityRouter from "./routes/activity";
 import couponsRouter from "./routes/coupons";
@@ -102,6 +107,14 @@ const validateEnvVars = () => {
         logger.error(`${key} must be at least ${minSecretLen} characters in production`);
         process.exit(1);
       }
+    }
+
+    const dbUrl = process.env.DATABASE_URL?.trim() || '';
+    if (!isPoolerDatabaseUrl(dbUrl)) {
+      logger.error(
+        'DATABASE_URL must use PgBouncer pooler (host contains "pooler" or port 6543), or set DB_USE_POOLER=true'
+      );
+      process.exit(1);
     }
   } else {
     const recommended = ['ADMIN_USERNAME', 'JWT_SECRET', 'WHATSAPP_CONTACT_NUMBER'];
@@ -396,7 +409,6 @@ app.use(
 );
 app.use("/api/products", productsRouter);
 app.use("/api/orders", ordersRouter);
-app.use("/api/contact", contactRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/activity", activityRouter);
 app.use("/api/coupons", couponsRouter);
@@ -625,6 +637,7 @@ async function bootstrap(): Promise<void> {
   await runBootstrapTask('product_video_360', ensureProductVideo360Column);
   await runBootstrapTask('product_public_id', ensureProductPublicIdColumn);
   await runBootstrapTask('admin_enhancements', ensureAdminEnhancementSchema);
+  await runBootstrapTask('product_variant_fields_removed', ensureProductVariantFieldsRemoved);
   await runBootstrapTask('order_line_items_backfill', async () => {
     const { backfillOrderLineItems } = await import('./lib/orderLineItems');
     await backfillOrderLineItems(200);

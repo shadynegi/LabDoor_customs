@@ -13,7 +13,8 @@
     "test:api": "node ../Tests/scripts/run-with-report.mjs api",
     "test:raw": "vitest run",
     "keep-alive": "node scripts/keep-alive.js",
-    "validate-env": "node scripts/validate-env.mjs"
+    "validate-env": "node scripts/validate-env.mjs",
+    "seed:test-data": "node scripts/seed-test-data.mjs"
   },
   "dependencies": {
     "@sentry/node": "^10.55.0",

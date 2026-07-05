@@ -30,7 +30,7 @@ Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_
 
 1. Connect to Supabase SQL Editor.
 2. Run `backend/src/database/schema.sql`, then incremental files in `backend/src/database/migration-*.sql`. On **production**, use the **Migration audit** section in [`SUPABASE_SQL_TO_RUN.md`](./SUPABASE_SQL_TO_RUN.md) to verify what is already applied before re-running scripts.
-3. Confirm core tables exist: `products`, `orders`, `order_items`, `customers`, `coupons`, `contact_messages`, plus runtime tables (`payment_idempotency`, `order_access_exchanges`, `activity_logs`, `admin_sessions`, etc.). On existing DBs: run `migration-drop-reviews.sql` if `reviews` / `review_votes` remain; run `migration-drop-paypal.sql` if legacy payment tables/columns remain.
+3. Confirm core tables exist: `products`, `orders`, `order_items`, `customers`, `coupons`, `contact_messages` (legacy — contact form is client-side WhatsApp only), plus runtime tables (`payment_idempotency`, `order_access_exchanges`, `activity_logs`, `admin_sessions`, etc.). On **new** databases only: run `migration-drop-reviews.sql` if `reviews` / `review_votes` remain; run `migration-drop-paypal.sql` if legacy payment tables/columns remain. **Production Supabase:** both reviews and variant-field migrations are already applied (July 2026).
 4. Set `DATABASE_URL` to pooler URI (6543) on backend.
 5. Start backend — runtime schema patches apply automatically for incremental DDL.
 

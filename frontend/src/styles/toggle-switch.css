@@ -1,0 +1,90 @@
+/* Reusable toggle switch — ON = checked, thumb slides right with green track */
+.toggle-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.toggle-switch__control {
+  position: relative;
+  flex-shrink: 0;
+  width: 44px;
+  height: 26px;
+  border: none;
+  border-radius: 13px;
+  padding: 0;
+  cursor: pointer;
+  background: #d1d5db;
+  transition: background-color 250ms ease, box-shadow 250ms ease, opacity 250ms ease;
+}
+
+.toggle-switch__control[aria-checked='true'] {
+  background: #10b981;
+}
+
+.toggle-switch__control:hover:not(:disabled) {
+  box-shadow: 0 0 0 3px rgba(156, 102, 73, 0.15);
+}
+
+.toggle-switch__control[aria-checked='true']:hover:not(:disabled) {
+  background: #059669;
+}
+
+.toggle-switch__control:focus-visible {
+  outline: 2px solid #9c6649;
+  outline-offset: 2px;
+}
+
+.toggle-switch__control:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.toggle-switch__control--loading {
+  cursor: wait;
+}
+
+.toggle-switch__thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.2), 0 1px 2px rgba(15, 23, 42, 0.12);
+  transition: transform 250ms ease;
+  pointer-events: none;
+}
+
+.toggle-switch__control[aria-checked='true'] .toggle-switch__thumb {
+  transform: translateX(18px);
+}
+
+.toggle-switch__label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  line-height: 1.2;
+  min-width: 5.5rem;
+  text-align: left;
+}
+
+.toggle-switch__label--on {
+  color: #b45309;
+}
+
+.toggle-switch--sm .toggle-switch__control {
+  width: 40px;
+  height: 24px;
+  border-radius: 12px;
+}
+
+.toggle-switch--sm .toggle-switch__thumb {
+  width: 18px;
+  height: 18px;
+}
+
+.toggle-switch--sm .toggle-switch__control[aria-checked='true'] .toggle-switch__thumb {
+  transform: translateX(16px);
+}

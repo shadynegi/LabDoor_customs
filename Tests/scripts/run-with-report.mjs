@@ -6,13 +6,16 @@
  *
  * Suites:
  *   all        — backend unit + API + frontend UI (3 reports + summary)
- *   unit       — backend unit tests only (Tests/backend/)
- *   api        — API integration tests only (Tests/api/)
+ *   unit       — backend unit tests only (Tests/unit/backend/)
+ *   api        — API integration tests only (Tests/integration/api/)
  *   vitest     — backend unit + API together (single backend report)
- *   frontend   — Playwright UI tests (Tests/frontend/)
+ *   frontend   — Playwright UI tests (Tests/e2e/specs/) + viewport overflow audit
+ *   frontend-unit — React component/hook unit tests (Tests/unit/frontend/)
+ *   viewport-audit — viewport overflow audit only (requires frontend build)
  */
 
-import { spawnSync } from 'node:child_process';
+import { spawnSync, spawn } from 'node:child_process';
+import http from 'node:http';
 import {
   existsSync,
   mkdirSync,
@@ -36,7 +39,9 @@ const SUITE_SLUG = {
   unit: 'backend-unit',
   api: 'api',
   vitest: 'backend',
+  'frontend-unit': 'frontend-unit',
   frontend: 'frontend-ui',
+  'viewport-audit': 'viewport-audit',
 };
 
 function pad(n) {
@@ -236,8 +241,8 @@ function runVitest(scope) {
   const tmpJson = join(resultsDir, `.tmp-vitest-${Date.now()}.json`);
   const args = ['vitest', 'run', '--reporter=verbose', '--reporter=json', `--outputFile=${tmpJson}`];
 
-  if (scope === 'unit') args.push('../Tests/backend');
-  else if (scope === 'api') args.push('../Tests/api');
+  if (scope === 'unit') args.push('../Tests/unit/backend');
+  else if (scope === 'api') args.push('../Tests/integration/api');
 
   const label =
     scope === 'unit'
@@ -259,12 +264,65 @@ function runVitest(scope) {
   };
 }
 
+function runFrontendUnit() {
+  const tmpJson = join(resultsDir, `.tmp-vitest-frontend-${Date.now()}.json`);
+  const run = runCommand(
+    'Frontend unit (Vitest + RTL)',
+    'npx',
+    ['vitest', 'run', '--reporter=verbose', '--reporter=json', `--outputFile=${tmpJson}`],
+    { cwd: join(repoRoot, 'frontend') },
+  );
+  const parsed = parseVitestJson(tmpJson);
+  if (existsSync(tmpJson)) unlinkSync(tmpJson);
+
+  return {
+    name: 'Frontend unit (Vitest + RTL)',
+    slug: SUITE_SLUG['frontend-unit'],
+    scope: 'frontend-unit',
+    ...run,
+    ...parsed,
+  };
+}
+
+function runViewportOverflowAudit() {
+  const run = runCommand(
+    'Viewport overflow audit',
+    'node',
+    ['scripts/run-viewport-audit.mjs'],
+    { cwd: testsRoot },
+  );
+
+  const passed = run.exitCode === 0
+    ? [{ file: 'Tests/scripts/audit-viewport-overflow.mjs', title: 'Viewport overflow audit', status: 'passed', duration: run.durationMs }]
+    : [];
+  const failed = run.exitCode !== 0
+    ? [{
+        file: 'Tests/scripts/audit-viewport-overflow.mjs',
+        title: 'Viewport overflow audit',
+        status: 'failed',
+        duration: run.durationMs,
+        failureLog: [run.stdout, run.stderr].filter(Boolean).join('\n').trim() || 'Viewport overflow audit failed',
+      }]
+    : [];
+
+  return {
+    name: 'Viewport overflow audit',
+    slug: SUITE_SLUG['viewport-audit'],
+    scope: 'viewport-audit',
+    ...run,
+    passed,
+    failed,
+    skipped: [],
+  };
+}
+
 function ensureFrontendBuild() {
   const env = { ...process.env };
   // Playwright preview uses localhost VITE_* — not a production/CI deploy build.
   delete env.CI;
   env.VITE_API_BASE_URL = env.VITE_API_BASE_URL || '/api';
   env.VITE_SITE_URL = env.VITE_SITE_URL || 'http://127.0.0.1:4173';
+  env.VITE_WHATSAPP_CONTACT_NUMBER = env.VITE_WHATSAPP_CONTACT_NUMBER || '+919888514572';
   // Omit Sentry for Playwright preview — a placeholder DSN bloats the JS bundle past build:budget.
   delete env.VITE_SENTRY_DSN;
   return runCommand('Frontend build (Playwright preview)', 'npm', ['run', 'build', '-w', 'frontend'], {
@@ -325,8 +383,8 @@ function runPlaywright() {
       env: {
         ...process.env,
         PLAYWRIGHT_JSON_OUTPUT: tmpJson,
-        // Default CI so Playwright does not reuse a stale preview after ensureFrontendBuild().
-        CI: process.env.CI ?? 'true',
+        // Fresh preview after ensureFrontendBuild(); direct Playwright runs reuse a healthy server.
+        PLAYWRIGHT_FORCE_NEW_SERVER: process.env.PLAYWRIGHT_FORCE_NEW_SERVER ?? 'true',
       },
     },
   );
@@ -644,11 +702,32 @@ function resolveRuns(suiteArg) {
     return [
       runVitest('unit'),
       runVitest('api'),
+      runFrontendUnit(),
       runPlaywright(),
+      runViewportOverflowAudit(),
     ];
   }
   if (suiteArg === 'frontend') {
-    return [runPlaywright()];
+    return [runPlaywright(), runViewportOverflowAudit()];
+  }
+  if (suiteArg === 'frontend-unit') {
+    return [runFrontendUnit()];
+  }
+  if (suiteArg === 'viewport-audit') {
+    const build = ensureFrontendBuild();
+    if (build.exitCode !== 0) {
+      return [{
+        name: 'Viewport overflow audit',
+        slug: SUITE_SLUG['viewport-audit'],
+        scope: 'viewport-audit',
+        ...build,
+        passed: [],
+        failed: [],
+        skipped: [],
+        parseError: 'Frontend build failed before viewport audit could run.',
+      }];
+    }
+    return [runViewportOverflowAudit()];
   }
   if (suiteArg === 'unit' || suiteArg === 'api' || suiteArg === 'vitest') {
     return [runVitest(suiteArg)];
@@ -661,7 +740,7 @@ function main() {
 
   const runs = resolveRuns(suite);
   if (!runs) {
-    console.error(`Unknown suite "${suite}". Use: all | unit | api | vitest | frontend`);
+    console.error(`Unknown suite "${suite}". Use: all | unit | api | vitest | frontend | frontend-unit | viewport-audit`);
     process.exit(1);
   }
 

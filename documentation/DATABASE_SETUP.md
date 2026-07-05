@@ -27,6 +27,7 @@ Production TLS: set `DB_SSL_CA_PATH` to Supabase CA bundle.
 2. Run `backend/src/database/schema.sql` in the SQL editor.
 3. Optionally run `backend/src/database/seed.sql` for sample products.
 4. Apply migration files in `backend/src/database/` as needed.
+5. **Dev/staging only:** `npm run seed:test-data` — 10 `Test*` customers + 20 orders for admin dashboard/analytics QA (idempotent; order numbers `GSS-TEST-SEED-*`).
 
 ---
 
@@ -34,12 +35,12 @@ Production TLS: set `DB_SSL_CA_PATH` to Supabase CA bundle.
 
 | Table | Purpose |
 |-------|---------|
-| `products` | Catalog — price, stock, size, color, optional `video_360` |
+| `products` | Catalog — price, stock, optional `cost_price`, optional `video_360`; one row per shoe |
 | `orders` | Orders — JSONB items/shipping, `payment_id`, payment/status enums |
 | `customers` | Aggregated stats — total_orders, total_spent, soft delete |
 | `coupons` | Discount rules — type, limits, scope (`applies_to`: `all` or `product` + IDs) |
 | `coupon_usage` | Per-order coupon reservations |
-| `contact_messages` | Contact form submissions |
+| `contact_messages` | Legacy table (schema/RLS retained; storefront no longer writes — contact form opens WhatsApp client-side) |
 | `activity_logs` | Client activity (anonymized IP) |
 | `admin_sessions` | Admin session token hashes (SHA-256) |
 
@@ -58,7 +59,8 @@ Migration files:
 
 - `migration-payment-idempotency.sql` — table + indexes (including partial index for reaper)
 - `migration-remove-product-category.sql` — drop shoe category columns; coupon scope `all` / `product` only (**applied on production Supabase**, July 2026)
-- `migration-drop-reviews.sql` — drop `reviews` / `review_votes` and rating trigger (**run on existing DBs** after reviews feature removal)
+- `migration-remove-product-variant-fields.sql` — drop legacy `sku`, `reorder_point`, `size`, `color` columns (**applied on production Supabase**, July 2026; also applied at boot via `ensureProductVariantFieldsRemoved()`)
+- `migration-drop-reviews.sql` — drop `reviews` / `review_votes` and rating trigger (**applied on production Supabase**, July 2026)
 - `migration-drop-paypal.sql` — legacy payment cleanup (**applied on production Supabase**, July 2026)
 
 Boot creates missing indexes via `ensureIdempotencyIndexes()` even when `BOOTSTRAP_SKIP_DDL=true`.
@@ -83,7 +85,7 @@ Boot creates missing indexes via `ensureIdempotencyIndexes()` even when `BOOTSTR
 
 - **10 tables** have RLS with service_role-only policies (including `order_access_exchanges`).
 - **`anon` and `authenticated` grants are revoked** — no public product catalog via PostgREST/GraphQL.
-- Boot is **non-destructive** when policies exist. **Production Supabase:** all required migrations applied (June 2026), including performance linter fixes and product search indexes.
+- Boot is **non-destructive** when policies exist. **Production Supabase:** all required migrations applied (July 2026), including performance linter fixes, product search indexes, reviews removal, variant-field cleanup, and PayPal legacy cleanup.
 - The Express backend connects with **service_role** credentials for all API operations.
 
 Set `BOOTSTRAP_SKIP_DDL=true` on production after migrations are applied.

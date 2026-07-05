@@ -25,6 +25,34 @@ import { authenticateAdminUser } from '../lib/adminCredentials';
 
 const router = Router();
 
+const SESSION_VERIFY_CACHE_TTL_MS = 10_000;
+const sessionVerifyCache = new Map<string, { username: string; expiresAt: number }>();
+
+function getCachedSessionVerify(tokenHash: string): { username: string } | null {
+  const entry = sessionVerifyCache.get(tokenHash);
+  if (!entry || entry.expiresAt <= Date.now()) {
+    sessionVerifyCache.delete(tokenHash);
+    return null;
+  }
+  return { username: entry.username };
+}
+
+function cacheSessionVerify(tokenHash: string, username: string): void {
+  sessionVerifyCache.set(tokenHash, {
+    username,
+    expiresAt: Date.now() + SESSION_VERIFY_CACHE_TTL_MS,
+  });
+}
+
+function invalidateSessionVerifyCache(tokenHash: string): void {
+  sessionVerifyCache.delete(tokenHash);
+}
+
+/** Clears in-memory session verify cache (test isolation only). */
+export function clearSessionVerifyCacheForTests(): void {
+  sessionVerifyCache.clear();
+}
+
 // Bcrypt configuration
 const BCRYPT_ROUNDS = 12; // Cost factor for hashing
 
@@ -56,7 +84,7 @@ const cleanupExpiredSessions = async (): Promise<{ deleted: number }> => {
   try {
     const result = await dbQuery(() => sql`
       DELETE FROM admin_sessions 
-      WHERE expires_at < NOW()
+      WHERE expires_at <= NOW()
       RETURNING id
     `, 'admin:q1');
     const deleted = result.length;
@@ -69,6 +97,45 @@ const cleanupExpiredSessions = async (): Promise<{ deleted: number }> => {
     return { deleted: 0 };
   }
 };
+
+/** Keep only the N most recent sessions per admin user (matches post-login cleanup). */
+const cleanupExcessSessions = async (keepCount = 5): Promise<{ deleted: number }> => {
+  try {
+    const result = await dbQuery(() => sql`
+      DELETE FROM admin_sessions
+      WHERE id IN (
+        SELECT id FROM (
+          SELECT id, ROW_NUMBER() OVER (PARTITION BY username ORDER BY created_at DESC) AS rn
+          FROM admin_sessions
+        ) ranked
+        WHERE rn > ${keepCount}
+      )
+      RETURNING id
+    `, 'admin:sessionsPruneExcess');
+    const deleted = result.length;
+    if (deleted > 0) {
+      logger.info(`🧹 Pruned ${deleted} excess admin session(s)`);
+    }
+    return { deleted };
+  } catch (error) {
+    logger.error('Excess session cleanup error:', error);
+    return { deleted: 0 };
+  }
+};
+
+async function runAdminSessionCleanup(): Promise<{
+  deleted: number;
+  deleted_expired: number;
+  deleted_excess: number;
+}> {
+  const expired = await cleanupExpiredSessions();
+  const excess = await cleanupExcessSessions(5);
+  return {
+    deleted_expired: expired.deleted,
+    deleted_excess: excess.deleted,
+    deleted: expired.deleted + excess.deleted,
+  };
+}
 
 // Clean up old sessions for a specific user (keep only recent ones)
 const cleanupUserSessions = async (username: string, keepCount: number = 5): Promise<void> => {
@@ -141,6 +208,11 @@ async function validateAdminSession(
 
   try {
     const tokenHash = hashAdminSessionToken(token);
+    const cached = getCachedSessionVerify(tokenHash);
+    if (cached) {
+      return { valid: true, username: cached.username };
+    }
+
     const sessions = await withRetry(
       () => sql`
         SELECT username FROM admin_sessions
@@ -155,7 +227,9 @@ async function validateAdminSession(
       return { valid: false };
     }
 
-    return { valid: true, username: sessions[0].username as string };
+    const username = sessions[0].username as string;
+    cacheSessionVerify(tokenHash, username);
+    return { valid: true, username };
   } catch (error) {
     logger.error('Admin session validation error:', error);
     return { valid: false };
@@ -242,8 +316,7 @@ router.post('/login', async (req: Request, res: Response) => {
     const userAgent = req.get('user-agent') || 'unknown';
 
     if (!matchedAdmin) {
-      // Log failed login attempt
-      await dbQuery(
+      void dbQuery(
         () =>
           sql`
         INSERT INTO activity_logs (action_type, metadata, ip_address, user_agent)
@@ -261,13 +334,6 @@ router.post('/login', async (req: Request, res: Response) => {
     const token = generateToken(matchedAdmin.username);
     const tokenHash = hashAdminSessionToken(token);
 
-    // Clean up expired sessions (runs on each login)
-    await cleanupExpiredSessions();
-    
-    // Clean up old sessions for this user (keep only 5 most recent)
-    await cleanupUserSessions(matchedAdmin.username, 5);
-
-    // Store session in database
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
     await dbQuery(
       () => sql`
@@ -277,15 +343,6 @@ router.post('/login', async (req: Request, res: Response) => {
       'admin:storeSession'
     );
 
-    // Log successful login
-    await dbQuery(
-      () => sql`
-      INSERT INTO activity_logs (action_type, metadata, ip_address, user_agent)
-      VALUES ('admin_login_success', ${JSON.stringify({ username: matchedAdmin.username })}, ${ipAddress}, ${userAgent})
-    `,
-      'admin:loginSuccess'
-    ).catch(() => {});
-
     res.cookie(ADMIN_SESSION_COOKIE, token, adminSessionCookieOptions);
 
     res.json({
@@ -293,6 +350,16 @@ router.post('/login', async (req: Request, res: Response) => {
       expiresAt: expiresAt.toISOString(),
       message: 'Login successful',
     });
+
+    void cleanupExpiredSessions();
+    void cleanupUserSessions(matchedAdmin.username, 5);
+    void dbQuery(
+      () => sql`
+      INSERT INTO activity_logs (action_type, metadata, ip_address, user_agent)
+      VALUES ('admin_login_success', ${JSON.stringify({ username: matchedAdmin.username })}, ${ipAddress}, ${userAgent})
+    `,
+      'admin:loginSuccess'
+    ).catch(() => {});
   } catch (error: unknown) {
     logger.error('Admin login error:', error);
     respond500(res, error, 'Request failed');
@@ -346,6 +413,7 @@ router.post('/logout', verifyAdmin, async (req: Request, res: Response) => {
 
     if (token) {
       const tokenHash = hashAdminSessionToken(token);
+      invalidateSessionVerifyCache(tokenHash);
       await dbQuery(
         () => sql`DELETE FROM admin_sessions WHERE token = ${tokenHash}`,
         'admin:logoutSession'
@@ -421,24 +489,77 @@ router.get('/analytics/export', verifyAdmin, async (req: Request, res: Response)
   }
 });
 
-// POST /admin/sessions/cleanup — purge expired admin sessions
+// POST /admin/sessions/cleanup — purge expired and excess admin sessions
 router.post('/sessions/cleanup', verifyAdmin, async (_req: Request, res: Response) => {
   try {
-    const result = await cleanupExpiredSessions();
-    res.json({ success: true, data: result, message: `Removed ${result.deleted} expired session(s)` });
+    const result = await runAdminSessionCleanup();
+    const parts: string[] = [];
+    if (result.deleted_expired > 0) {
+      parts.push(`${result.deleted_expired} expired`);
+    }
+    if (result.deleted_excess > 0) {
+      parts.push(`${result.deleted_excess} excess`);
+    }
+    const message =
+      result.deleted > 0
+        ? `Removed ${parts.join(' and ')} session(s)`
+        : 'No expired or excess sessions to remove';
+    res.json({ success: true, data: result, message });
   } catch (error: unknown) {
     logger.error('Session cleanup error:', error);
     respond500(res, error, 'Failed to clean up sessions');
   }
 });
 
+// DELETE /admin/sessions/:id — revoke a specific session (not the current cookie session)
+router.delete('/sessions/:id', verifyAdmin, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const cookieToken = req.cookies?.[ADMIN_SESSION_COOKIE];
+    const currentTokenHash = cookieToken ? hashAdminSessionToken(cookieToken) : null;
+
+    const rows = await dbQuery(
+      () => sql`
+        SELECT id, token FROM admin_sessions WHERE id = ${id}::uuid LIMIT 1
+      `,
+      'admin:sessionById'
+    );
+
+    if (!rows.length) {
+      return res.status(404).json({ success: false, error: 'Session not found' });
+    }
+
+    if (currentTokenHash && rows[0].token === currentTokenHash) {
+      return res.status(400).json({
+        success: false,
+        error: 'Cannot revoke your current session — log out instead',
+      });
+    }
+
+    await dbQuery(
+      () => sql`DELETE FROM admin_sessions WHERE id = ${id}::uuid`,
+      'admin:revokeSession'
+    );
+    invalidateSessionVerifyCache(String(rows[0].token));
+
+    res.json({ success: true, message: 'Session revoked' });
+  } catch (error: unknown) {
+    logger.error('Session revoke error:', error);
+    respond500(res, error, 'Failed to revoke session');
+  }
+});
+
 // GET /admin/sessions - Get active sessions info
 router.get('/sessions', verifyAdmin, async (req: Request, res: Response) => {
   try {
+    const cookieToken = req.cookies?.[ADMIN_SESSION_COOKIE];
+    const currentTokenHash = cookieToken ? hashAdminSessionToken(cookieToken) : null;
+
     const sessions = await dbQuery(
       () => sql`
       SELECT id, username, ip_address, user_agent, created_at, expires_at,
-        CASE WHEN expires_at > NOW() THEN true ELSE false END as is_active
+        CASE WHEN expires_at > NOW() THEN true ELSE false END as is_active,
+        CASE WHEN token = ${currentTokenHash} THEN true ELSE false END as is_current
       FROM admin_sessions
       ORDER BY created_at DESC
       LIMIT 50
@@ -538,23 +659,23 @@ router.get('/customers', verifyAdmin, async (req: Request, res: Response) => {
 
     const searchPattern = search ? `%${String(search)}%` : null;
 
-    const [customers, countResult] = await Promise.all([
-      sql`
-        SELECT id, email, name, phone, total_orders, total_spent,
-               last_order_date, first_order_date, is_deleted, deleted_at, created_at,
-               admin_notes, addresses
-        FROM customers
-        WHERE ${showDeleted ? sql`TRUE` : sql`is_deleted = FALSE`}
-        ${searchPattern ? sql`AND (email ILIKE ${searchPattern} OR name ILIKE ${searchPattern})` : sql``}
-        ORDER BY total_spent DESC
-        LIMIT ${limit} OFFSET ${offset}
-      `,
-      sql`
-        SELECT COUNT(*) as total FROM customers
-        WHERE ${showDeleted ? sql`TRUE` : sql`is_deleted = FALSE`}
-        ${searchPattern ? sql`AND (email ILIKE ${searchPattern} OR name ILIKE ${searchPattern})` : sql``}
-      `,
-    ]);
+    const customers = await sql`
+      SELECT id, email, name, phone, total_orders, total_spent,
+             last_order_date, first_order_date, is_deleted, deleted_at, created_at,
+             admin_notes, addresses
+      FROM customers
+      WHERE 1=1
+      ${showDeleted ? sql`` : sql`AND is_deleted = FALSE`}
+      ${searchPattern ? sql`AND (email ILIKE ${searchPattern} OR name ILIKE ${searchPattern})` : sql``}
+      ORDER BY total_spent DESC
+      LIMIT ${limit} OFFSET ${offset}
+    `;
+    const countResult = await sql`
+      SELECT COUNT(*) as total FROM customers
+      WHERE 1=1
+      ${showDeleted ? sql`` : sql`AND is_deleted = FALSE`}
+      ${searchPattern ? sql`AND (email ILIKE ${searchPattern} OR name ILIKE ${searchPattern})` : sql``}
+    `;
 
     const total = parseInt(countResult[0]?.total || '0');
 

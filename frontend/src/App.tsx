@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Link, useLocation, Navigate } from "react-router-dom";
-import { ShoppingCart, Package, ShoppingBag } from "lucide-react";
+import { ShoppingCart, Package } from "lucide-react";
 import { lazy, Suspense, useEffect } from "react";
 import { CartProvider, useCart } from "./pages/CartContext";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -230,32 +230,6 @@ function Navigation() {
         alignItems: "center",
         flexShrink: 0,
       }}>
-        <Link
-          to="/products"
-          style={{
-            textDecoration: "none",
-            color: location.pathname === '/products' || location.pathname.startsWith('/product/')
-              ? "#9c6649"
-              : "#6b7280",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 6,
-            fontSize: isMobile ? 14 : 15,
-            fontWeight: 600,
-            transition: "all 0.2s",
-            padding: isMobile ? "10px" : "8px 12px",
-            borderRadius: 10,
-            minWidth: isMobile ? 44 : "auto",
-            minHeight: isMobile ? 44 : "auto",
-            background: location.pathname === '/products' || location.pathname.startsWith('/product/')
-              ? "#f3f4f6"
-              : "transparent",
-          }}
-        >
-          <ShoppingBag size={isMobile ? 22 : 20} />
-          {!isMobile && "Products"}
-        </Link>
         <Link 
           to="/orders" 
           style={{ 

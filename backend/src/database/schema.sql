@@ -12,9 +12,8 @@ CREATE TABLE IF NOT EXISTS products (
   image TEXT,
   description TEXT,
   background TEXT,
-  size VARCHAR(50),                -- Shoe sizes: 'US 7', 'US 8', 'US 9', 'US 10', 'US 11', 'US 12', etc.
-  color VARCHAR(100),              -- Primary color: 'Blue', 'Gold', 'Pink', 'Brown', 'Black', etc.
   stock INTEGER DEFAULT 0 CHECK (stock >= 0),
+  cost_price DECIMAL(10, 2),
   public_id UUID NOT NULL DEFAULT uuid_generate_v4() UNIQUE,
   rating DECIMAL(3, 2) DEFAULT 0.00 CHECK (rating >= 0 AND rating <= 5),
   review_count INTEGER DEFAULT 0 CHECK (review_count >= 0),
@@ -144,8 +143,6 @@ CREATE TABLE IF NOT EXISTS coupon_usage (
 );
 
 -- Create indexes for better query performance
-CREATE INDEX IF NOT EXISTS idx_products_size ON products(size);
-CREATE INDEX IF NOT EXISTS idx_products_color ON products(color);
 CREATE INDEX IF NOT EXISTS idx_products_created_at ON products(created_at);
 
 CREATE INDEX IF NOT EXISTS idx_orders_customer_email ON orders(customer_email);
@@ -215,12 +212,12 @@ CREATE TRIGGER update_contact_messages_updated_at
   EXECUTE FUNCTION update_updated_at_column();
 
 -- Insert sample products (optional - based on your frontend)
-INSERT INTO products (name, price, image, description, background, size, color, stock, rating, review_count) VALUES
-  ('Nike Drops - Blue', 98.00, '/assets/blue-nike.png', 'Self-lacing basketball shoe', '/assets/blue-bg.png', 'US 9', 'Blue', 50, 4.5, 128),
-  ('Golden ESSENCE', 98.00, '/assets/gold-black-nike.png', 'Premium athletic footwear', '/assets/gold-bg.png', 'US 10', 'Gold', 30, 4.8, 94),
-  ('Pink Panda Runners', 129.00, '/assets/pink-nike.png', 'Lightweight running shoe', '/assets/pink-bg.png', 'US 8', 'Pink', 40, 4.3, 156),
-  ('Browny CLASSIC', 89.00, '/assets/black-brown-nike.png', 'Timeless design classic', '/assets/brown-bg.png', 'US 11', 'Brown', 60, 4.6, 203),
-  ('LAB DOOR SPORT', 89.00, '/assets/brown-pink-nike.png', 'Sport performance shoe', '/assets/brown-pink-bg.png', 'US 9', 'Brown', 45, 4.4, 87)
+INSERT INTO products (name, price, image, description, background, stock, rating, review_count) VALUES
+  ('Nike Drops - Blue', 98.00, '/assets/blue-nike.png', 'Self-lacing basketball shoe', '/assets/blue-bg.png', 50, 4.5, 128),
+  ('Golden ESSENCE', 98.00, '/assets/gold-black-nike.png', 'Premium athletic footwear', '/assets/gold-bg.png', 30, 4.8, 94),
+  ('Pink Panda Runners', 129.00, '/assets/pink-nike.png', 'Lightweight running shoe', '/assets/pink-bg.png', 40, 4.3, 156),
+  ('Browny CLASSIC', 89.00, '/assets/black-brown-nike.png', 'Timeless design classic', '/assets/brown-bg.png', 60, 4.6, 203),
+  ('LAB DOOR SPORT', 89.00, '/assets/brown-pink-nike.png', 'Sport performance shoe', '/assets/brown-pink-bg.png', 45, 4.4, 87)
 ON CONFLICT DO NOTHING;
 
 -- Row Level Security: service_role only (Express API is the sole data path)

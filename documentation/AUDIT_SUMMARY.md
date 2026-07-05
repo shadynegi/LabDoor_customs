@@ -21,7 +21,7 @@ Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API
 
 Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_ENCRYPTION_KEY`, `IP_SALT`, `ADMIN_PASSWORD_HASH`.
 
-**Automated tests:** 423 (119 backend unit + 71 API + 233 Playwright) — see [`test_guidelines.md`](test_guidelines.md).
+**Automated tests:** 520 (141 backend unit + 80 API + 13 frontend unit + 286 Playwright) plus viewport overflow audit — see [`test_guidelines.md`](test_guidelines.md) and [`Tests/README.md`](../Tests/README.md).
 
 ---
 
@@ -34,12 +34,12 @@ Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_
 
 - CSRF double-submit on mutating routes (exempt: `POST /api/activity/batch`)
 - Helmet security headers and CSP
-- Rate limiting on login, contact, checkout (Redis-backed in production; fail closed)
+- Rate limiting on admin login, checkout, order lookup, product search (Redis-backed in production; fail closed)
 - HTTPS enforced in production via Cloudflare `x-forwarded-proto`
 
 ## Database access
 
-- Supabase PostgreSQL via Express `service_role` only; RLS on **12** tables with no anon/authenticated PostgREST access
+- Supabase PostgreSQL via Express `service_role` only; RLS on **10** application tables with no anon/authenticated PostgREST access
 - `ensureClientGrantsRevoked()` always runs (even when `BOOTSTRAP_SKIP_DDL=true`); production startup **fails** if client grants remain
 - Order access tokens SHA-256 hashed; `access_token_encrypted` uses AES-256-GCM (`ORDER_TOKEN_ENCRYPTION_KEY`)
 

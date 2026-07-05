@@ -2,73 +2,66 @@ import React, { useState } from "react";
 import { MessageCircle, MapPin, Send } from "lucide-react";
 import { toast } from "sonner";
 import MetaTags from "../components/MetaTags";
-import { logError } from "../lib/logger";
-import { apiFetch } from "../config";
 import { trackContactSubmit } from "../utils/activityTracker";
 import { useResponsive } from "../hooks/useResponsive";
-import { buildWhatsAppContactUrl, getWhatsAppContactDisplay } from "../lib/whatsappContact";
+import {
+  buildWhatsAppContactUrl,
+  formatContactFormWhatsAppMessage,
+  getWhatsAppContactDisplay,
+  validateContactForm,
+} from "../lib/whatsappContact";
 import { safeHorizontalPad } from "../lib/responsive";
+
+const EMPTY_FORM = {
+  name: "",
+  email: "",
+  subject: "",
+  message: "",
+};
 
 export default function ContactUs() {
   const { isMobile, isSmallMobile } = useResponsive();
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    subject: "",
-    message: ""
-  });
+  const [formData, setFormData] = useState(EMPTY_FORM);
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    setIsSubmitting(true);
-    
-    try {
-      const response = await apiFetch('/contact', {
-        method: 'POST',
-        body: JSON.stringify(formData),
+    if (isSubmitting || submitted) return;
+
+    const validation = validateContactForm(formData);
+    if (!validation.ok) {
+      toast.error(validation.error, {
+        description: validation.description,
+        duration: 6000,
       });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        trackContactSubmit(formData.subject);
-        setSubmitted(true);
-        toast.success(data.message || 'Message sent successfully!', {
-          description: "We'll get back to you as soon as possible.",
-          duration: 5000,
-        });
-        if (typeof data.whatsappUrl === 'string' && data.whatsappUrl) {
-          window.open(data.whatsappUrl, '_blank', 'noopener,noreferrer');
-        }
-        setTimeout(() => {
-          setSubmitted(false);
-          setFormData({ name: "", email: "", subject: "", message: "" });
-        }, 3000);
-      } else {
-        toast.error(data.error || 'Failed to send message', {
-          description: data.message || 'Please try again or contact us directly.',
-          duration: 6000,
-        });
-      }
-    } catch (error) {
-      logError('Error submitting contact form:', error);
-      if (error instanceof TypeError && error.message === 'Failed to fetch') {
-        toast.error('Network error', {
-          description: 'Please check your internet connection and try again.',
-          duration: 6000,
-        });
-      } else {
-        toast.error('Failed to send message', {
-          description: 'An unexpected error occurred. Please try again later.',
-          duration: 6000,
-        });
-      }
-    } finally {
-      setIsSubmitting(false);
+      return;
     }
+
+    const whatsappUrl = buildWhatsAppContactUrl(
+      formatContactFormWhatsAppMessage(validation.data),
+    );
+    if (whatsappUrl === '#') {
+      toast.error('WhatsApp contact is not configured', {
+        description: 'Please try again later or use the WhatsApp link in the sidebar.',
+        duration: 6000,
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    trackContactSubmit(validation.data.subject);
+    window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
+    setSubmitted(true);
+    toast.success('Opening WhatsApp…', {
+      description: "Send the pre-filled message to reach us. We'll respond as soon as possible.",
+      duration: 5000,
+    });
+    setTimeout(() => {
+      setSubmitted(false);
+      setFormData(EMPTY_FORM);
+      setIsSubmitting(false);
+    }, 3000);
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -173,9 +166,10 @@ export default function ContactUs() {
                     Address
                   </h3>
                   <p style={{ color: "#6b7280", margin: 0 }}>
-                    123 Fashion Avenue<br />
-                    New York, NY 10001<br />
-                    United States
+                    415, Sector 78<br />
+                    Mohali, Punjab<br />
+                    India<br />
+                    140308
                   </p>
                 </div>
               </div>
@@ -318,7 +312,7 @@ export default function ContactUs() {
                   fontWeight: 500,
                   textAlign: "center"
                 }}>
-                  ✓ Message sent successfully! We'll get back to you soon.
+                  ✓ WhatsApp opened with your message. Send it there to reach us.
                 </div>
               )}
 
@@ -354,7 +348,7 @@ export default function ContactUs() {
                 }}
               >
                 <Send size={18} />
-                {isSubmitting ? "Sending..." : (submitted ? "Sent!" : "Send Message")}
+                {isSubmitting ? "Opening WhatsApp…" : (submitted ? "Sent!" : "Send Message")}
               </button>
             </form>
           </div>
@@ -363,4 +357,3 @@ export default function ContactUs() {
     </div>
   );
 }
-

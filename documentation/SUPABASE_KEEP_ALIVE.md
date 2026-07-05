@@ -101,7 +101,7 @@ No Railway or app redeploy required for the cron itself.
 
 ## Testing
 
-**Unit tests:** `Tests/backend/keepAlive.test.ts` — pooler SSL/prepare options and read-only `PING_QUERY` (`SELECT 1 AS ping`).
+**Unit tests:** `Tests/unit/backend/infrastructure/keepAlive.test.ts` — pooler SSL/prepare options and read-only `PING_QUERY` (`SELECT 1 AS ping`).
 
 **Live ping** (with valid `DATABASE_URL`):
 

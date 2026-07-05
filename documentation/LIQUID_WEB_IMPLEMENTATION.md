@@ -28,4 +28,4 @@ Vendored at `Utilities/liquid-web-1.1.1/`. Provides glass-morphism UI primitives
 
 - Glass cards, buttons, and panels on home and product pages
 - Consistent blur/transparency aesthetic
-- See [LIQUID_GLASS_COMPLETE_IMPLEMENTATION.md](./LIQUID_GLASS_COMPLETE_IMPLEMENTATION.md) for component mapping
+- See [archive/milestones/LIQUID_GLASS_COMPLETE_IMPLEMENTATION.md](./archive/milestones/LIQUID_GLASS_COMPLETE_IMPLEMENTATION.md) for historical component mapping

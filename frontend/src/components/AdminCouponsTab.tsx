@@ -23,7 +23,7 @@ interface Coupon {
   applies_to_ids?: number[];
 }
 
-const PRESET_DISCOUNTS = [5, 10, 20, 25, 50] as const;
+const DISCOUNT_PERCENT_OPTIONS = [5, 10, 20, 25, 50] as const;
 const PAGE_SIZE = 10;
 
 export default function AdminCouponsTab() {
@@ -83,23 +83,15 @@ export default function AdminCouponsTab() {
     return ids.length > 0 ? ids : null;
   };
 
-  const createCoupon = async (
-    code: string,
-    percent: number,
-    appliesTo: 'all' | 'product' = customAppliesTo
-  ) => {
-    const normalized = code.trim().toUpperCase();
+  const createCoupon = async () => {
+    const normalized = customCode.trim().toUpperCase();
     if (!normalized) {
       toast.error('Coupon code is required');
       return;
     }
 
-    const appliesToIds =
-      appliesTo === 'all'
-        ? null
-        : appliesTo === customAppliesTo
-          ? parseAppliesToIds()
-          : null;
+    const appliesTo = customAppliesTo;
+    const appliesToIds = appliesTo === 'all' ? null : parseAppliesToIds();
     if (appliesTo !== 'all' && !appliesToIds) {
       toast.error('Select at least one product ID for product-scoped coupons');
       return;
@@ -110,9 +102,9 @@ export default function AdminCouponsTab() {
         method: 'POST',
         body: JSON.stringify({
           code: normalized,
-          description: `${percent}% off your order`,
+          description: `${customPercent}% off your order`,
           discount_type: 'percentage',
-          discount_value: percent,
+          discount_value: customPercent,
           minimum_order: 0,
           is_active: true,
           applies_to: appliesTo,
@@ -224,34 +216,10 @@ export default function AdminCouponsTab() {
   return (
     <div>
       <div style={{ background: 'white', borderRadius: 12, padding: 20, marginBottom: 16, border: '1px solid #e5e7eb' }}>
-        <h3 style={{ margin: '0 0 12px', fontSize: 18, fontWeight: 700 }}>Quick presets</h3>
+        <h3 style={{ margin: '0 0 12px', fontSize: 18, fontWeight: 700 }}>Create coupon</h3>
         <p style={{ margin: '0 0 16px', fontSize: 14, color: '#6b7280' }}>
-          Create percentage coupons — checkout billing applies them automatically via server-side pricing.
+          Percentage discounts apply automatically at checkout via server-side pricing.
         </p>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-          {PRESET_DISCOUNTS.map((pct) => (
-            <button
-              key={pct}
-              type="button"
-              onClick={() => createCoupon(`SAVE${pct}`, pct, 'all')}
-              style={{
-                padding: '10px 18px',
-                background: '#f5e0d5',
-                color: '#361906',
-                border: '1px solid #9c6649',
-                borderRadius: 8,
-                cursor: 'pointer',
-                fontWeight: 700,
-              }}
-            >
-              {pct}% — SAVE{pct}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div style={{ background: 'white', borderRadius: 12, padding: 20, marginBottom: 16, border: '1px solid #e5e7eb' }}>
-        <h3 style={{ margin: '0 0 12px', fontSize: 18, fontWeight: 700 }}>Custom coupon</h3>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-end' }}>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13 }}>
             Code
@@ -273,7 +241,7 @@ export default function AdminCouponsTab() {
               onChange={(e) => setCustomPercent(Number(e.target.value))}
               style={{ padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8 }}
             >
-              {PRESET_DISCOUNTS.map((p) => (
+              {DISCOUNT_PERCENT_OPTIONS.map((p) => (
                 <option key={p} value={p}>{p}%</option>
               ))}
             </select>
@@ -304,7 +272,8 @@ export default function AdminCouponsTab() {
           )}
           <button
             type="button"
-            onClick={() => createCoupon(customCode, customPercent)}
+            data-testid="admin-coupon-create"
+            onClick={() => createCoupon()}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -343,7 +312,7 @@ export default function AdminCouponsTab() {
         {loading ? (
           <p style={{ padding: 24, color: '#6b7280' }}>Loading coupons…</p>
         ) : coupons.length === 0 ? (
-          <p style={{ padding: 24, color: '#6b7280' }}>No coupons yet. Use a preset above to get started.</p>
+          <p style={{ padding: 24, color: '#6b7280' }}>No coupons yet. Create one above to get started.</p>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: isMobile ? 480 : 640 }}>
             <thead>

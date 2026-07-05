@@ -64,17 +64,6 @@ export function mountRateLimits(app: Express): void {
     })
   );
 
-  app.use(
-    '/api/contact',
-    rateLimit({
-      ...common,
-      store: storeFor('rl:contact'),
-      windowMs: 60 * 60 * 1000,
-      max: 5,
-      handler: rateLimit429('Too many messages sent, please try again later.'),
-    })
-  );
-
   app.post(
     '/api/orders',
     rateLimit({

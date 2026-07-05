@@ -69,6 +69,8 @@ The frontend build runs `validate-env.mjs` → `generate-sitemap.mjs` → TypeSc
 
 | Variable | Purpose |
 |----------|---------|
+| `DB_POOL_MAX` | Postgres pool size (default **10** on pooler, **20** direct); global query semaphore; keep `REQUEST_TIMEOUT_MS` ≥ 30s |
+| `REQUEST_TIMEOUT_MS` | HTTP request timeout (default **60000** ms) |
 | `BOOTSTRAP_SKIP_DDL` | Skip CREATE TABLE/INDEX on boot when schema already in Supabase |
 | `MAINTENANCE_DEFER_MS` | Delay first maintenance run (default 120000) |
 | `LOG_LEVEL` | `debug` / `info` / `warn` / `error` |

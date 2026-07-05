@@ -1,10 +1,12 @@
 import fs from 'fs';
 import path from 'path';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import postgres from 'postgres';
-import type { Sql } from 'postgres';
+import type { Sql, TransactionSql, PendingQuery } from 'postgres';
 import dotenv from 'dotenv';
 import { logger } from './logger';
 import { isTransientDbError } from './dbErrors';
+import { runWithConcurrency as runTasksWithConcurrency } from './runWithConcurrency';
 
 export { isTransientDbError } from './dbErrors';
 
@@ -32,7 +34,7 @@ function usePoolerMode(url: string): boolean {
 }
 
 const poolerMode = usePoolerMode(connectionString);
-const defaultPoolMax = poolerMode ? 5 : 10;
+const defaultPoolMax = poolerMode ? 10 : 20;
 const maxConnections = parseInt(process.env.DB_POOL_MAX || String(defaultPoolMax), 10);
 
 if (poolerMode) {
@@ -66,7 +68,7 @@ function buildSslConfig(): false | { rejectUnauthorized: boolean; ca?: string } 
 
 const statementTimeoutMs = parseInt(process.env.DB_STATEMENT_TIMEOUT_MS || '300000', 10);
 
-const sql: Sql = postgres(connectionString, {
+const baseSql: Sql = postgres(connectionString, {
   max: maxConnections,
   idle_timeout: 30,
   connect_timeout: 10,
@@ -88,6 +90,110 @@ const sql: Sql = postgres(connectionString, {
     statement_timeout: statementTimeoutMs,
   },
 });
+
+/** Inside sql.begin — one pool slot for the whole transaction; tx queries share it. */
+const txnQueryDepth = new AsyncLocalStorage<number>();
+
+let inFlightQueries = 0;
+const queryWaitQueue: Array<() => void> = [];
+
+async function acquireQuerySlot(): Promise<void> {
+  if ((txnQueryDepth.getStore() ?? 0) > 0) {
+    return;
+  }
+  if (inFlightQueries < maxConnections) {
+    inFlightQueries++;
+    return;
+  }
+  await new Promise<void>((resolve) => {
+    queryWaitQueue.push(() => {
+      inFlightQueries++;
+      resolve();
+    });
+  });
+}
+
+function releaseQuerySlot(): void {
+  if ((txnQueryDepth.getStore() ?? 0) > 0) {
+    return;
+  }
+  inFlightQueries = Math.max(0, inFlightQueries - 1);
+  const next = queryWaitQueue.shift();
+  if (next) next();
+}
+
+async function withQuerySlot<T>(fn: () => Promise<T>): Promise<T> {
+  if ((txnQueryDepth.getStore() ?? 0) > 0) {
+    return fn();
+  }
+  await acquireQuerySlot();
+  try {
+    return await fn();
+  } finally {
+    releaseQuerySlot();
+  }
+}
+
+function isPostgresQuery(value: unknown): boolean {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'then' in value &&
+    (value as { tagged?: boolean }).tagged === true
+  );
+}
+
+/** Defer execution until await so nested sql fragments compose and .cursor() stays available. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function wrapSqlQuery<T extends PendingQuery<any>>(query: T): T {
+  return new Proxy(query, {
+    get(target, prop, receiver) {
+      if (prop === 'then') {
+        return (
+          onFulfilled?: (value: unknown) => unknown,
+          onRejected?: (reason: unknown) => unknown
+        ) => withQuerySlot(() => (target as Promise<unknown>).then(onFulfilled, onRejected));
+      }
+      if (prop === 'catch') {
+        return (onRejected: (reason: unknown) => unknown) =>
+          withQuerySlot(() => (target as Promise<unknown>).catch(onRejected));
+      }
+      if (prop === 'finally') {
+        return (onFinally: () => void | Promise<void>) =>
+          withQuerySlot(() => (target as Promise<unknown>).finally(onFinally));
+      }
+
+      const value = Reflect.get(target, prop, receiver);
+
+      if (typeof value === 'function') {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return (...args: any[]) => {
+          const result = value.apply(target, args);
+          if (result === target) return receiver;
+          if (isPostgresQuery(result)) return wrapSqlQuery(result);
+          return result;
+        };
+      }
+
+      return value;
+    },
+  }) as T;
+}
+
+const taggedSql = (strings: TemplateStringsArray, ...values: any[]) =>
+  wrapSqlQuery(baseSql(strings, ...values));
+
+const sql = Object.assign(taggedSql, baseSql) as Sql;
+
+const baseBegin = baseSql.begin.bind(baseSql);
+sql.begin = ((callback: (tx: TransactionSql) => unknown | Promise<unknown>) =>
+  withQuerySlot(() =>
+    baseBegin(async (tx) => txnQueryDepth.run(1, () => callback(tx)))
+  )) as typeof baseSql.begin;
+
+const baseUnsafe = baseSql.unsafe.bind(baseSql);
+sql.unsafe = ((...args: Parameters<typeof baseSql.unsafe>) =>
+  wrapSqlQuery(baseUnsafe(...args))) as typeof baseSql.unsafe;
 
 export interface WithRetryOptions {
   retries?: number;
@@ -217,14 +323,31 @@ export async function runInChunks<T, R>(
   return results;
 }
 
-let activeConnections = 0;
+/** Leave headroom for auth, login, and incidental reads when fanning out analytics queries. */
+export function getRecommendedQueryConcurrency(reserve = 4): number {
+  const reserveSlots = Math.max(0, reserve);
+  return Math.max(1, maxConnections - reserveSlots);
+}
+
+/**
+ * Run independent async tasks with a concurrency cap so we do not exhaust the postgres.js pool
+ * (e.g. admin analytics with many parallel COUNT queries on DB_POOL_MAX=10).
+ */
+export async function runWithConcurrency<T>(
+  tasks: Array<() => Promise<T>>,
+  limit = getRecommendedQueryConcurrency()
+): Promise<T[]> {
+  return runTasksWithConcurrency(tasks, limit);
+}
+
 let totalQueries = 0;
 
 export function getPoolStats() {
   return {
-    activeConnections,
+    activeConnections: inFlightQueries,
     totalQueries,
     maxConnections,
+    queuedQueries: queryWaitQueue.length,
     isProduction,
     poolerMode,
     prepareEnabled: !poolerMode,
@@ -233,13 +356,11 @@ export function getPoolStats() {
 
 export async function query<T>(queryFn: () => Promise<T>, label?: string): Promise<T> {
   const startTime = Date.now();
-  activeConnections++;
   totalQueries++;
 
   try {
     return await withRetry(queryFn, { label });
   } finally {
-    activeConnections--;
     const duration = Date.now() - startTime;
     const slowQueryMs = parseInt(process.env.DB_SLOW_QUERY_LOG_MS || '2000', 10);
     if (duration >= slowQueryMs) {

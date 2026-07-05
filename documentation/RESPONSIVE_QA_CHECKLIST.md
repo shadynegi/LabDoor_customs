@@ -21,7 +21,7 @@ Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API
 
 Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_ENCRYPTION_KEY`, `IP_SALT`, `ADMIN_PASSWORD_HASH`.
 
-**Automated baseline (not a substitute for manual QA):** `Tests/frontend/responsive-pages-ui.spec.ts` (193 tests, 11 viewports including 320px), `responsive-ui.spec.ts`, and `mobile-ui.spec.ts` run in Playwright’s `mobile-chrome` project.
+**Automated baseline (not a substitute for manual QA):** `Tests/e2e/specs/responsive/responsive-pages-ui.spec.ts` (193 tests, 11 viewports including 320px), `responsive-ui.spec.ts`, and `mobile-ui.spec.ts` run in Playwright’s `mobile-chrome` project.
 
 ---
 
@@ -51,7 +51,7 @@ Use browser DevTools device mode or resize the window to each width.
 - [ ] Hero image fits without horizontal scroll at 320px
 - [ ] Hero carousel and **View All Products** reachable by vertical scroll on mobile (not clipped)
 - [ ] Carousel shoe thumbnails show full product (`object-fit: contain`, not cropped)
-- [ ] Navigation menu accessible
+- [ ] Sticky header on non-home pages shows **Orders** and **Cart** only (no Products nav icon); home **View All Products** reaches catalog
 
 ### Products (`/products`)
 
@@ -80,7 +80,8 @@ Use browser DevTools device mode or resize the window to each width.
 - [ ] **Vertical scroll works** on `/contact`, `/shipping-policy`, `/help`, and other tall pages (wheel/touch)
 - [ ] `/shipping-policy` shows **$25** shipping and **free over $200** (not legacy tier table)
 - [ ] `/contact` shows WhatsApp contact link from `VITE_WHATSAPP_CONTACT_NUMBER` (`contact-support-whatsapp`)
-- [ ] Contact form submits successfully
+- [ ] Contact form **Send Message** opens WhatsApp popup with prefilled fields; button shows **Sent!**
+- [ ] Store address on `/contact`: 415, Sector 78, Mohali, Punjab, India 140308
 - [ ] `/payment/cancel` heading reads **Checkout Cancelled**
 
 ---

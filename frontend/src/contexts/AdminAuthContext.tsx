@@ -43,12 +43,12 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
+    setIsAuthenticated(false);
     try {
       await apiFetch('/admin/logout', { method: 'POST' });
     } catch {
       // ignore
     }
-    setIsAuthenticated(false);
   }, []);
 
   useEffect(() => {

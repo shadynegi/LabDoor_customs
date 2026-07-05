@@ -15,9 +15,9 @@ Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API
 |------|----------------|
 | **Checkout** | Cart validation with retry; `policy_accepted` required; **Place Order** → `POST /api/checkout/place-order` → WhatsApp redirect (`Order ID` in message = `orders.id` UUID); `X-Idempotency-Key` from `createClientId()` (LAN HTTP safe); incomplete-field toast before submit; checkout email synced to activity on change/blur. |
 | **Orders** | `/orders?orderId=` pre-fill from email; `POST /api/orders/lookup` with order ID + email; order details clear on full page reload; in-session refresh while page stays open; lookup failure **Order not found**; legacy access-exchange **410**. |
-| **Admin** | Products paginated (load more); inventory (SKU, reorder, movements, low-stock, bulk stock delta); analytics periods + CSV export (sales by product); customer search/notes; order customer-details + pending-item edits; **Settings** tab (activity export, sessions, customer recompute); coupon scope (`all` / product IDs); estimated delivery; error/retry states. |
+| **Admin** | Products paginated (load more); **out-of-stock toggle** (`ToggleSwitch`, optimistic `PUT /api/products/:id`); inventory (movements, low-stock at 5 units, bulk stock delta); analytics periods + CSV export (sales by product); customer search/notes; order customer-details + pending-item edits; **Settings** tab (activity export, sessions, customer recompute); coupon scope (`all` / product IDs); estimated delivery; session verify **10s** in-memory cache; error/retry states. |
 | **Activity** | Consent-gated batch; `contact_submit` on contact success; IPs anonymized with `IP_SALT`. |
-| **Mobile** | Sticky CTAs with keyboard lift on checkout; cookie banner top on purchase routes; cart stacked CTA + policy spacer; whole-number shoe sizes; LAN checkout via `createClientId`; Playwright **responsive-pages-ui** (11 phone viewports incl. 320px); OOS hides product sticky bar; admin product cards on phones; `100dvh` + safe-area insets. |
+| **Mobile** | Sticky CTAs with keyboard lift on checkout; cookie banner top on purchase routes; cart stacked CTA + policy spacer; whole-number shoe sizes; LAN checkout via `createClientId`; non-home nav **Orders** + **Cart** only; Playwright **responsive-pages-ui** (11 phone viewports incl. 320px) + **viewport overflow audit** in `npm test`; OOS hides product sticky bar; admin product cards on phones; `100dvh` + safe-area insets. |
 
 Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_ENCRYPTION_KEY`, `IP_SALT`, `ADMIN_PASSWORD_HASH`.
 
@@ -40,20 +40,27 @@ If the user did not mention testing, **skip** `npm test`, `npm run test:all`, Pl
 
 | Suite | Tool | Location | Count | Needs live DB? |
 |-------|------|----------|-------|----------------|
-| Backend unit | Vitest | `Tests/backend/` | 31 files, 118 tests | No (mocked) |
-| API integration | Vitest + Supertest | `Tests/api/` | 18 files, 71 tests | No (mocked) |
-| Frontend E2E / UI | Playwright | `Tests/frontend/` | 15 files, 233 tests (40 desktop + 193 mobile project) | No (mocked `/api` + static preview) |
+| Backend unit | Vitest | `Tests/unit/backend/` | 35 files, 141 tests | No (mocked) |
+| API integration | Vitest + Supertest | `Tests/integration/api/` | 19 files, 80 tests | No (mocked) |
+| Frontend unit | Vitest + RTL | `Tests/unit/frontend/` | 3 files, 13 tests | No |
+| Frontend E2E / UI | Playwright | `Tests/e2e/specs/` | 24 files, 286 tests (93 desktop + 193 mobile project) | No (mocked `/api` + static preview) |
+| Viewport overflow audit | Playwright script | `Tests/scripts/audit-viewport-overflow.mjs` | 12 widths × 16 routes | No (static preview) |
 | Link checker | Custom script | repo root | — | No |
+| Codebase audit | `scripts/audit-codebase.mjs` | `documentation/OPTIMIZATION_BASELINE.md` | — | No |
 
-**Total:** 423 automated tests — 119 backend unit + 71 API + 233 Playwright UI (40 desktop chromium + 193 mobile-chrome).
+**Total:** 520 automated tests — 141 backend unit + 80 API + 13 frontend unit + 286 Playwright UI (93 desktop chromium + 193 mobile-chrome). **`npm test`** also runs the viewport overflow audit (mandatory in CI).
 
-Backend unit tests include: payment idempotency, order tokens, order token encryption, **admin credentials** (`adminCredentials.test.ts` — primary + `ADMIN_ADDITIONAL_USERS`), **cart line size validation** (`cartLineSize.test.ts` — whole-number UK/US/EU sizes), **product public_id** URL helpers, product image validation, admin session hashing, checkout pricing, **WhatsApp message formatting** (`whatsappCheckout.test.ts` — totals, volume/coupon lines, size, free shipping, URL encoding), **WhatsApp payment confirmation** (`whatsappNotifications.test.ts`, `postPaymentCapture.test.ts`), coupon scope (`applies_to` all/product), `computeCheckoutPricingForCart`, RLS table list + bootstrap contract, RLS grant revoke under `BOOTSTRAP_SKIP_DDL`, order portal URL (`buildOrderPortalUrl` in `orderPortalUrl.ts`), client IP, keep-alive, **checkout client id** (`clientId.test.ts` — UUID fallback when `crypto.randomUUID` unavailable), **admin analytics IST date helpers** (`adminAnalyticsDates.test.ts`), **build performance budgets** (`performanceBudgets.test.ts`), **sales analytics** invalid custom-date fallback.
+**Layout reference:** [`Tests/README.md`](../Tests/README.md)
 
-API tests include: **place-order** checkout (validation — amount mismatch, policy, customer, OOS; **WhatsApp integration** happy path, message in `whatsappUrl`, custom `WHATSAPP_CONTACT_NUMBER`, idempotency cache via `checkoutWhatsAppIntegration.test.ts`), **WhatsApp payment confirmation** on admin mark paid (`whatsappPaymentConfirmation.test.ts`), **order tracking** (`orderTracking.test.ts` — invalid UUID, case-insensitive email, shipped tracking fields, deprecated access-exchange 410, admin-only GET by id), admin mark-paid (validation + success + notification hook), **admin analytics** (401, custom IST range, CSV export, unknown period), **admin enhancements** (low-stock, inventory movements, customer PATCH, bulk stock delta, order customer-details, analytics period), **products search** (invalid limit, blank query browse), **validate-cart** (empty, invalid item, OOS, happy path), **stability/concurrency smoke** (parallel health + CSRF), no-refund policy (admin refund route removed, cancel 403), health, orders, security (incl. LAN dev CORS, analytics export 401, deprecated access-exchange 410, CSRF logout), activity batch/log, order lookup.
+Backend unit tests include: payment idempotency, order tokens, order token encryption, **admin credentials** (`adminCredentials.test.ts` — primary + `ADMIN_ADDITIONAL_USERS`), **cart line size validation** (`cartLineSize.test.ts` — whole-number UK/US/EU sizes), **product public_id** URL helpers, product image validation, admin session hashing, checkout pricing, **WhatsApp message formatting** (`whatsappCheckout.test.ts` — totals, volume/coupon lines, size, free shipping, URL encoding), **WhatsApp payment confirmation** (`whatsappNotifications.test.ts`, `postPaymentCapture.test.ts`), **contact form WhatsApp helpers** (`contactWhatsAppMessage.test.ts`), **DB query concurrency** (`dbConcurrency.test.ts` — global semaphore + `runWithConcurrency`), **sql tag deferred execution** (`infrastructure/dbSqlWrapper.test.ts` — nested fragments, `.cursor()`), coupon scope (`applies_to` all/product), `computeCheckoutPricingForCart`, RLS table list + bootstrap contract, RLS grant revoke under `BOOTSTRAP_SKIP_DDL`, order portal URL (`buildOrderPortalUrl` in `orderPortalUrl.ts`), client IP, keep-alive, **production env validation** (`infrastructure/validateEnv.test.ts` — spawns `validate-env.mjs`, pooler port 6543, Redis/Sentry/auth secrets), **checkout client id** (`clientId.test.ts` — UUID fallback when `crypto.randomUUID` unavailable), **admin analytics IST date helpers** (`adminAnalyticsDates.test.ts`), **sales analytics date coercion** (`analytics/salesAnalytics.test.ts` — invalid DB timestamps), **build performance budgets** (`performanceBudgets.test.ts`), **sales analytics** invalid custom-date fallback.
+
+API tests include: **place-order** checkout (validation — `place-order.validation.test.ts`; **WhatsApp integration** — `place-order.whatsapp.test.ts`), **order lookup/tracking** (`orders/lookup.test.ts` — validation, UUID, case-insensitive email, shipped tracking, deprecated access-exchange 410, admin-only GET by id), admin mark-paid (`orders/mark-paid.test.ts`), **WhatsApp payment confirmation** (`orders/whatsapp-payment-confirmation.test.ts`), **admin analytics**, **admin enhancements**, **admin session verify cache** (`admin/session-verify-cache.test.ts` — 10s TTL, logout invalidation, concurrent verifyAdmin), **products search**, **product upload persistence** (`products/upload-persistence.test.ts` — `UPLOAD_DIR` volume survives simulated redeploy), **validate-cart**, **stability/concurrency smoke**, no-refund policy (`orders/order-policy-admin.test.ts`), health, orders routes, security, activity batch/log.
+
+Frontend unit tests (`Tests/unit/frontend/`, Vitest + React Testing Library, jsdom): **ToggleSwitch** (accessibility, keyboard, loading), **whatsappContact** (validation, `wa.me` URLs), **productCatalogCache** (normalize, catalog-cleared event). Config: `frontend/vitest.config.ts` (`NODE_ENV=test` for React 19 `act`). Run: `npm run test:frontend-unit`.
 
 Backend unit tests also cover: **sales analytics** period parsing + CSV export, **admin analytics cache** keys/TTL, inventory movement helpers (via integration paths), payment idempotency, order tokens, RLS, email portal URL, and related order utilities.
 
-Playwright includes: orders **orderId + email lookup** (`orders-ui.spec.ts` — email link prefill, reload clears details, lookup errors, shipped tracking link), legacy access-exchange deprecation (**Checkout Cancelled** heading on `/payment/cancel`), checkout country pre-select (native `<select>`), **WhatsApp place-order** (`checkout-place-order-ui.spec.ts` — policy + form + mocked `whatsappUrl`), **storefront content** (`storefront.spec.ts` — shipping policy $25/$200, document scroll; `contact-ui.spec.ts` — WhatsApp contact link), **admin analytics custom range** (Apply-before-export, IST query params), admin login redirect + dashboard analytics smoke, **responsive UI** (`responsive-ui.spec.ts`: mobile checkout/cart sticky CTA, product overflow, admin login), **responsive pages matrix** (`responsive-pages-ui.spec.ts`: every storefront route at 11 phone viewports — iPhone SE 320px / SE 3rd gen / 15 Pro / 17 / 17 Pro / 17 Pro Max, Galaxy S24/S25/S25 Ultra/A55, Pixel 9 Pro — overflow + cart policy above sticky bar), **deep flows** (`deep-flows-ui.spec.ts`: catalog `?q=` server search, product trust badges, checkout policy gate + coupon, cart quantity, order confirmation with UUID). Shared helpers: `Tests/frontend/helpers/viewports.ts`, `Tests/frontend/helpers/responsive.ts`. Checkout helpers live in `Tests/frontend/helpers/checkout.ts` (`clickPlaceOrderAndWaitForResponse`, `fillCheckoutCustomerForm`). Playwright product IDs come from `Tests/fixtures/products.ts` via `Tests/frontend/fixtures/mock-data.ts`. The storefront fixture warms `/api/csrf-token` on load to avoid first-test timeouts.
+Playwright specs live under `Tests/e2e/specs/` by domain (storefront, checkout, orders, contact, admin, responsive, regression). Shared helpers: `Tests/e2e/helpers/` (`viewports.ts`, `responsive.ts`, `checkout.ts`, `mock-api.ts`). Product IDs: `Tests/shared/fixtures/products.ts` via `Tests/e2e/fixtures/mock-data.ts`. The storefront fixture warms `/api/csrf-token` on load.
 
 ---
 
@@ -61,25 +68,27 @@ Playwright includes: orders **orderId + email lookup** (`orders-ui.spec.ts` — 
 
 ```
 Tests/
-├── test_guidelines.md   # This file
-├── setup.ts             # Shared Vitest mocks (DB, Redis, idempotency)
-├── helpers/
-│   └── http.ts          # CSRF cookie/header helpers for API tests
-├── fixtures/
-│   └── products.ts      # DB-shaped product catalog + sqlMock lookup helpers
-├── backend/             # Backend unit tests (Vitest)
-├── api/                 # HTTP API tests (Vitest + Supertest)
-├── frontend/            # Storefront E2E + UI tests (Playwright)
-│   ├── fixtures/        # Mock API data + extended test fixture
-│   └── helpers/         # API mocks, cookie/cart helpers
-├── test-results/        # Timestamped reports (generated; gitignored)
+├── README.md              # Suite layout and conventions
+├── setup.ts               # Shared Vitest mocks (DB, Redis, idempotency)
+├── shared/
+│   ├── fixtures/products.ts
+│   └── helpers/           # http.ts, adminAuth.ts, api/checkout.ts, api/orders.ts
+├── unit/
+│   ├── backend/          # Backend unit tests by domain (auth, checkout, orders, …)
+│   └── frontend/         # React component + client lib tests (Vitest + RTL)
+├── integration/api/       # HTTP API tests by domain (checkout, orders, admin, …)
+├── e2e/
+│   ├── fixtures/          # Playwright storefront + admin fixtures
+│   ├── helpers/           # mock-api, checkout, responsive, viewports
+│   └── specs/             # Playwright specs by domain
 ├── scripts/
-│   └── run-with-report.mjs  # Runs tests and writes reports
-├── playwright.config.ts # Playwright config (preview server on port 4173)
-└── package.json         # Playwright dependency + frontend test scripts
+│   ├── run-with-report.mjs
+│   ├── run-viewport-audit.mjs
+│   └── audit-viewport-overflow.mjs
+└── playwright.config.ts
 ```
 
-All automated tests live under **`Tests/`** (`backend/`, `api/`, `frontend/`).
+All automated tests live under **`Tests/`** (`unit/`, `integration/`, `e2e/`). See [`Tests/README.md`](../Tests/README.md).
 
 ---
 
@@ -92,7 +101,7 @@ npm install            # from repository root (workspaces)
 npm test
 ```
 
-No running server or database required. `Tests/setup.ts` mocks Postgres, Redis, and idempotency storage. Checkout and cart API tests use **`Tests/fixtures/products.ts`** for DB-shaped product rows and `product_id` values (see [Product catalog fixtures](#product-catalog-fixtures) below).
+No running server or database required. `Tests/setup.ts` mocks Postgres, Redis, and idempotency storage. Checkout and cart API tests use **`Tests/shared/fixtures/products.ts`** for DB-shaped product rows and `product_id` values (see [Product catalog fixtures](#product-catalog-fixtures) below).
 
 ### Frontend E2E (Playwright)
 
@@ -106,9 +115,9 @@ npm run test:frontend:install   # first time only — downloads Chromium
 npm run test:frontend
 ```
 
-Playwright starts `vite preview` on `http://127.0.0.1:4173` automatically (see `playwright.config.ts`). Preview sets `PLAYWRIGHT=true` so Vite **does not proxy** `/api` to a live backend — all API traffic is mocked in-browser via `page.route()`. The backend does **not** need to be running.
+Playwright starts `vite preview` on `http://127.0.0.1:4173` automatically (see `playwright.config.ts`). Preview sets `PLAYWRIGHT=true` so Vite **does not proxy** `/api` to a live backend — all API traffic is mocked in-browser via `page.route()`. The backend does **not** need to be running. Set `VITE_WHATSAPP_CONTACT_NUMBER` in `frontend/.env` (default `+919888514572`) so local `npm run preview` and contact E2E match the test runner without extra setup.
 
-**UI coverage:** products list/detail, cart, checkout shell, contact form, navigation, cookie consent, **admin analytics custom range**, **responsive mobile layouts** (`mobile-ui.spec.ts`, `responsive-ui.spec.ts`, and **`responsive-pages-ui.spec.ts`** — all routes × 11 phone viewports in the `mobile-chrome` project), **WhatsApp place-order** (`checkout-place-order-ui.spec.ts`), checkout policy/coupon flows in **deep flows**. Playwright uses `workers: 1` and `retries: 1` for stable checkout flows.
+**UI coverage:** products list/detail, cart, checkout shell, contact form, navigation, cookie consent, **admin analytics custom range**, **admin dashboard module E2E** (`Tests/e2e/specs/admin/*.spec.ts` — products, coupons, orders, customers, settings, integration, resilience, env-validation, storage-persistence), **responsive mobile layouts** (`mobile-ui.spec.ts`, `responsive-ui.spec.ts`, and **`responsive-pages-ui.spec.ts`** — all routes × 11 phone viewports in the `mobile-chrome` project), **WhatsApp place-order** (`checkout-place-order-ui.spec.ts`), checkout policy/coupon flows in **deep flows**. Playwright uses `workers: 1` and `retries: 1` for stable checkout flows.
 
 ---
 
@@ -165,7 +174,7 @@ npm run test:unit
 npm run test:api
 ```
 
-**Locations:** `Tests/backend/` and `Tests/api/`
+**Locations:** `Tests/unit/backend/` and `Tests/integration/api/`
 
 | Suite | Coverage |
 |-------|----------|
@@ -183,7 +192,7 @@ cd Tests && npm run test:frontend:install   # first time only
 npm run test:frontend                       # from repository root
 ```
 
-**Location:** `Tests/frontend/storefront.spec.ts`
+**Location:** `Tests/e2e/specs/storefront/storefront.spec.ts`
 
 Playwright serves the built `dist/` via Vite preview (no backend required for smoke tests).
 
@@ -191,6 +200,7 @@ Playwright serves the built `dist/` via Vite preview (no backend required for sm
 
 ```bash
 npm run links:check   # from repo root
+npm run audit:codebase   # depcheck + legacy scan → documentation/OPTIMIZATION_BASELINE.md
 ```
 
 Validates internal links in documentation markdown files.
@@ -213,62 +223,37 @@ Production frontend builds run `optimize-assets` (WebP from source PNGs) and `bu
 
 ## Test inventory
 
-### Backend unit tests (`Tests/backend/`)
+### Backend unit tests (`Tests/unit/backend/`)
 
-| File | What it covers |
-|------|----------------|
-| `checkoutPricing.test.ts` | Volume discounts, shipping rules, checkout pricing |
-| `whatsappCheckout.test.ts` | WhatsApp place-order message formatting, URL builder, volume/coupon/size/shipping lines, URL encoding |
-| `whatsappNotifications.test.ts` | Payment confirmation message, phone normalization, Cloud API send |
-| `postPaymentCapture.test.ts` | WhatsApp hooks after admin mark paid |
-| `clientIp.test.ts` | Client IP extraction, anonymization, Cloudflare headers |
-| `clientId.test.ts` | Checkout `createClientId()` — RFC-4122 v4 fallback when `crypto.randomUUID` unavailable (HTTP LAN) |
-| `orderTokens.test.ts` | Order access token generation and validation |
-| `adminAnalyticsCache.test.ts` | Admin analytics cache keys and TTL |
-| `adminAnalyticsDates.test.ts` | Frontend IST date helpers (`adminAnalyticsDates.ts`) |
-| `analyticsIst.test.ts` | IST calendar boundaries for admin analytics |
-| `salesAnalytics.test.ts` | Analytics period parsing (incl. custom IST `from`/`to`, invalid-date fallback) and CSV export helpers |
-| `performanceBudgets.test.ts` | Frontend `build-budget.mjs` contract (JS bundle limits) |
-| `keepAlive.test.ts` | Supabase keep-alive pooler options + read-only `SELECT 1` query constant |
+Organized by domain: `auth/`, `checkout/`, `contact/`, `coupons/`, `orders/`, `products/`, `analytics/`, `infrastructure/` (incl. `validateEnv.test.ts`, `keepAlive.test.ts`, `performanceBudgets.test.ts`). Key files: `checkout/checkoutPricing.test.ts`, `checkout/whatsappCheckout.test.ts`, `contact/contactWhatsAppMessage.test.ts`, `orders/orderPortalUrl.test.ts`, `infrastructure/dbConcurrency.test.ts`.
 
-See `Tests/backend/` for the full list (33 files, 121 tests).
+See `Tests/unit/backend/` for the full list (35 files, 141 tests).
 
-### API tests (`Tests/api/`)
+### API tests (`Tests/integration/api/`)
 
-| File | What it covers |
-|------|----------------|
-| `health.test.ts` | `GET /api/health` — status and dependencies |
-| `security.test.ts` | CSRF protection, CORS, rate limiting, analytics export 401, CSRF logout |
-| `checkout.test.ts` | `POST /api/checkout/place-order` validation and edge cases |
-| `checkoutWhatsAppIntegration.test.ts` | Place-order happy path — `whatsappUrl`, pending statuses, idempotency cache |
-| `orders.test.ts` | Order lookup routes, deprecated endpoints |
-| `validateCart.test.ts` | `POST /api/products/validate-cart` — empty cart, invalid item, OOS, happy path |
-| `stabilityConcurrency.test.ts` | Parallel health + CSRF smoke (latency bounds) |
-| `adminEnhancements.test.ts` | Low-stock, inventory movements, customer PATCH, bulk stock, order edits, analytics period |
-| `adminAnalytics.test.ts` | Admin analytics API — 401, IST custom range, CSV export, unknown period |
-| `productsSearch.test.ts` | Product search API — invalid limit, blank query browse, happy path |
+Organized by domain: `checkout/` (`place-order.validation.test.ts`, `place-order.whatsapp.test.ts`, `validate-cart.test.ts`), `orders/` (`lookup.test.ts`, `mark-paid.test.ts`, `order-policy-admin.test.ts`, `whatsapp-payment-confirmation.test.ts`), `admin/` (`analytics.test.ts`, `enhancements.test.ts`, `session-verify-cache.test.ts`), `products/` (`search.test.ts`, `upload.test.ts`, `upload-persistence.test.ts`), `activity/`, `security/`, plus `health.test.ts`.
 
-See `Tests/api/` for the full list (19 files, 74 tests).
+See `Tests/integration/api/` for the full list (19 files, 80 tests).
 
-API tests use `Tests/helpers/http.ts` for CSRF token flow with Supertest.
+API tests use `Tests/shared/helpers/http.ts` for CSRF token flow with Supertest.
 
-### Frontend E2E / UI (`Tests/frontend/`)
+### Frontend unit tests (`Tests/unit/frontend/`)
 
-| File | What it covers |
-|------|----------------|
-| `storefront.spec.ts` | Home, products, checkout route, contact page + WhatsApp link, shipping policy rates, document scroll |
-| `contact-ui.spec.ts` | Contact form fields, submit mock, WhatsApp contact link on page |
-| `deep-flows-ui.spec.ts` | Search, policy gate, coupon, cart qty, order confirmation |
-| `checkout-ui.spec.ts` | Checkout form, country pre-select |
-| `checkout-place-order-ui.spec.ts` | Policy acceptance + place-order → mocked `whatsappUrl` |
-| `admin-analytics-ui.spec.ts` | Custom IST range — Apply before export, CSV disabled until applied |
-| `responsive-ui.spec.ts` | Mobile checkout fields, cart sticky CTA, product overflow, admin login |
-| `responsive-pages-ui.spec.ts` | All storefront routes × 11 phone viewports (incl. 320px iPhone SE; overflow, headings, cart policy vs sticky bar, checkout form, sort control) |
-| `audit-viewport-overflow.mjs` | Optional script — 12 widths (320–1024px) × 16 routes; requires `npm run preview` on port 4173 |
-| `admin-ui.spec.ts` | Admin login redirect + dashboard analytics smoke |
-| `mobile-ui.spec.ts` | Home/products/cart nav on Pixel 5 viewport |
+Vitest + React Testing Library (jsdom). Config: `frontend/vitest.config.ts`, setup: `Tests/unit/frontend/setup.ts`.
 
-See `Tests/frontend/` for the full list (15 files, 217 tests across desktop + mobile Playwright projects).
+| File | Coverage |
+|------|----------|
+| `components/ToggleSwitch.test.tsx` | Admin out-of-stock switch — `role="switch"`, keyboard, loading |
+| `lib/whatsappContact.test.ts` | Contact validation, `wa.me` URL building |
+| `lib/productCatalogCache.test.ts` | `normalizeProduct`, `ldc:catalog-cleared` event |
+
+Run: `npm run test:frontend-unit` (13 tests across 3 files).
+
+### Frontend E2E / UI (`Tests/e2e/specs/`)
+
+Organized by domain: `storefront/`, `checkout/`, `orders/`, `contact/`, `admin/`, `responsive/`, `regression/`. Key specs: `storefront/storefront.spec.ts`, `contact/contact-ui.spec.ts`, `responsive/responsive-pages-ui.spec.ts` (193 mobile-chrome tests).
+
+See `Tests/e2e/specs/` for the full list (24 files, 286 tests across desktop + mobile Playwright projects).
 
 Individual smoke cases (`storefront.spec.ts`):
 
@@ -285,18 +270,20 @@ Individual smoke cases (`storefront.spec.ts`):
 
 | Concern | Config file | Notes |
 |---------|-------------|--------|
-| Vitest include paths | `backend/vitest.config.ts` | `Tests/backend/**/*.test.ts`, `Tests/api/**/*.test.ts` |
+| Vitest include paths | `backend/vitest.config.ts` | `Tests/unit/backend/**/*.test.ts`, `Tests/integration/api/**/*.test.ts` |
+| Frontend Vitest | `frontend/vitest.config.ts` | `Tests/unit/frontend/**/*.{test,spec}.{ts,tsx}`, jsdom + RTL setup |
 | Vitest setup / mocks | `Tests/setup.ts` | Mocks `../backend/src/lib/db`, Redis, idempotency |
 | Test env vars | `backend/vitest.config.ts` | Fake JWT, WhatsApp phone, admin credentials for tests |
-| Playwright | `Tests/playwright.config.ts` | `testDir: ./frontend`, preview on port **4173**, projects: `chromium`, `chromium-checkout-serial` (legacy checkout mismatch specs), `mobile-chrome`; `workers: 1`, `retries: 1` |
-| Frontend npm scripts | `frontend/package.json` | `test:e2e` → `npm run test:frontend --prefix ../Tests` |
-| Root npm scripts | `package.json` | `test`, `test:backend`, `test:api`, `test:frontend`, `test:all` |
+| Playwright | `Tests/playwright.config.ts` | `testDir: ./e2e/specs`, preview on port **4173**, `reuseExistingServer` when `PLAYWRIGHT_FORCE_NEW_SERVER` is unset; projects: `chromium`, `mobile-chrome`; `workers: 1`, `retries: 1` |
+| Viewport audit | `Tests/scripts/run-viewport-audit.mjs` | Starts preview if needed; runs `audit-viewport-overflow.mjs` (included in `npm test`) |
+| Frontend npm scripts | `frontend/package.json` | `test` (Vitest), `test:e2e` → Playwright via `Tests/` |
+| Root npm scripts | `package.json` | `test`, `test:backend`, `test:api`, `test:frontend-unit`, `test:frontend`, `test:all` |
 
 Import paths in test files use `../../backend/src/...` (tests live outside `backend/` but import backend source).
 
 ### Product catalog fixtures
 
-Vitest API/backend tests mock Postgres via `sqlMock` in `Tests/setup.ts`. Do **not** hardcode `product_id: 1` for checkout or cart tests — use the shared catalog in **`Tests/fixtures/products.ts`**, which mirrors real `products` table rows (SERIAL ids such as `10042`, `10104`).
+Vitest API/backend tests mock Postgres via `sqlMock` in `Tests/setup.ts`. Do **not** hardcode `product_id: 1` for checkout or cart tests — use the shared catalog in **`Tests/shared/fixtures/products.ts`**, which mirrors real `products` table rows (SERIAL ids such as `10042`, `10104`).
 
 | Export | Purpose |
 |--------|---------|
@@ -306,7 +293,7 @@ Vitest API/backend tests mock Postgres via `sqlMock` in `Tests/setup.ts`. Do **n
 | `installProductCatalogMock(sqlMock)` | Routes `SELECT … FROM products WHERE id = ?` through the in-memory catalog |
 | `mockProductDbLookup(sqlMock, product)` | One-shot mock for a single product lookup; returns the row’s `id` |
 
-Playwright reuses the same ids via `Tests/frontend/fixtures/mock-data.ts` (`PRIMARY_MOCK_PRODUCT`, `MOCK_PRODUCTS`). Product detail URLs in UI tests use `` `/product/${TEST_PRODUCT_IDS.nikeBlue}` `` rather than `/product/1`.
+Playwright reuses the same ids via `Tests/e2e/fixtures/mock-data.ts` (`PRIMARY_MOCK_PRODUCT`, `MOCK_PRODUCTS`). Product detail URLs in UI tests use `` `/product/${TEST_PRODUCT_IDS.nikeBlue}` `` rather than `/product/1`.
 
 ---
 
@@ -316,8 +303,7 @@ GitHub Actions (`.github/workflows/ci.yml`) on push/PR to `main`/`master`:
 
 | Job | Steps |
 |-----|-------|
-| backend | `npm ci`, build, Vitest (`npm test`) |
-| frontend | env validation, build with production secrets, `Tests/` npm ci, Playwright install, E2E smoke |
+| monorepo | `npm ci`, build, **`npm test`** (backend unit + API + frontend unit + Playwright + viewport audit) |
 | sitemap | live API sitemap with product requirement |
 | links | documentation link check |
 
@@ -354,6 +340,8 @@ Expect `success: true` with database and Redis status.
 
 | Checklist | Focus |
 |-----------|-------|
+| [manual-qa-test-cases.md](manual-qa-test-cases.md) | **Full-stack manual QA** — test suite review, detailed cases (AUTH/SF/CHK/ADM/*), release regression checklist |
+| [manual-qa-test-cases.csv](manual-qa-test-cases.csv) | Same manual cases in CSV for Excel/Sheets execution tracking (Status, Bug, Priority, Impact) |
 | [RESPONSIVE_QA_CHECKLIST.md](RESPONSIVE_QA_CHECKLIST.md) | Mobile/tablet/desktop layouts |
 | [FORMS_QA_CHECKLIST.md](FORMS_QA_CHECKLIST.md) | Forms, CSRF, validation, **form accessibility** (id/name, labels, Chrome DevTools Issues) |
 
@@ -366,16 +354,18 @@ Expect `success: true` with database and Redis status.
 1. Browse products, search, filter
 2. Add to cart, adjust quantities
 3. Proceed to checkout, fill shipping form; accept no-refund / replacement-only policy checkbox
-4. Apply valid/invalid coupon codes
-5. Click **Place Order**; verify WhatsApp redirect (or mocked URL in E2E); admin **Mark paid** in dashboard
-6. Verify WhatsApp confirmation (when Cloud API configured) and order lookup (`/orders?orderId=` pre-fill + email)
-7. Cart validation retry; contact form activity event (with consent)
+4. Spot-check `/terms-of-service` — **Governing Law** references **Punjab, India**
+5. Apply valid/invalid coupon codes
+6. Click **Place Order**; verify WhatsApp redirect (or mocked URL in E2E); admin **Mark paid** in dashboard
+7. Verify WhatsApp confirmation (when Cloud API configured) and order lookup (`/orders?orderId=` pre-fill + email)
+8. Cart validation retry; contact form opens WhatsApp with prefilled message + `contact_submit` activity (with consent)
 
 ### Admin
 
 1. Login at `/admin/login` (or visit `/admin` — redirects based on session)
-2. View analytics tab — change period, export CSV, confirm sales/inventory panels
-3. Create/edit a product (SKU, reorder point, cost price); view inventory movement history; use low-stock filter; bulk stock delta
+2. View analytics tab — change period, export CSV, confirm sales/inventory panels (use `npm run seed:test-data` for realistic date ranges)
+3. Search customers/orders with `test` to isolate seeded QA rows (`GSS-TEST-SEED-*` order numbers)
+3. Create/edit a product (one listing per shoe; cost price optional); view inventory movement history; use low-stock filter (≤5 units); bulk stock delta
 4. View and update an order (status, tracking, customer details on pending orders)
 5. Search customers, edit admin notes; open **View History** and paginate orders (10/page)
 6. Send shipping notification
@@ -385,7 +375,7 @@ Expect `success: true` with database and Redis status.
 
 Place a test order on staging/production; confirm WhatsApp message **Order ID** matches `orders.id` (UUID); mark paid in admin.
 
-**Automated coverage:** `whatsappCheckout.test.ts`, `checkoutWhatsAppIntegration.test.ts`, `checkout.test.ts`, `checkout-place-order-ui.spec.ts` — see [Product catalog fixtures](#product-catalog-fixtures).
+**Automated coverage:** `unit/backend/checkout/whatsappCheckout.test.ts`, `integration/api/checkout/place-order.whatsapp.test.ts`, `place-order.validation.test.ts`, `e2e/specs/checkout/checkout-place-order-ui.spec.ts` — see [Product catalog fixtures](#product-catalog-fixtures).
 
 See [WHATSAPP_CHECKOUT_GUIDE.md](WHATSAPP_CHECKOUT_GUIDE.md).
 
@@ -399,7 +389,7 @@ See [WHATSAPP_CHECKOUT_GUIDE.md](WHATSAPP_CHECKOUT_GUIDE.md).
 | Playwright browser download fails (SSL) | Run `npm run test:frontend:install` from `Tests/` on a network that can reach Playwright CDN; corporate proxies may need `NODE_TLS_REJECT_UNAUTHORIZED=0` for install only |
 | E2E fails immediately | Ensure `cd frontend && npm run build` completed; preview serves `dist/` |
 | Vitest import errors | Run tests from `backend/`; paths assume monorepo layout `LabDoor_customs/backend` + `LabDoor_customs/Tests` |
-| Port 4173 in use | Stop other preview servers or set `reuseExistingServer: true` (default locally when `CI` is unset) |
+| Port 4173 in use | Run Playwright directly (`npx playwright test` from `Tests/`) — reuses a healthy preview when `PLAYWRIGHT_FORCE_NEW_SERVER` is unset. After `npm run test:frontend`, the runner sets `PLAYWRIGHT_FORCE_NEW_SERVER=true` so a fresh build is served. Stop stale preview processes if reuse fails. |
 | Corporate VPN / Zscaler blocks Supabase | `npm run dev` may show `ENOTFOUND` for `db.*.supabase.co`; health returns **503 DEGRADED**; DB routes fail until off VPN or allowlisted |
 | `npm run build` fails env validation locally | Set `VITE_API_BASE_URL`, `VITE_SITE_URL`, `VITE_SENTRY_DSN` in `frontend/.env`, or use `NODE_ENV=development` for a non-strict local build |
 | `build:budget` JS over limit | Admin dashboard bundle grew — see [`PERFORMANCE_BASELINE.md`](PERFORMANCE_BASELINE.md); budget is **1.4 MB** raw JS in `dist/assets`. Playwright test builds omit `VITE_SENTRY_DSN` (placeholder DSN adds ~130 KB); production CI must still set a real DSN. |
@@ -408,9 +398,9 @@ See [WHATSAPP_CHECKOUT_GUIDE.md](WHATSAPP_CHECKOUT_GUIDE.md).
 
 ## Adding new tests
 
-1. **Backend unit** — add `Tests/backend/yourFeature.test.ts`; import from `../../backend/src/...`
-2. **API** — add `Tests/api/yourRoute.test.ts`; use `Tests/helpers/http.ts` for authenticated/CSRF requests; for cart/checkout lines use `Tests/fixtures/products.ts` (`cartLine`, `installProductCatalogMock`)
-3. **Frontend E2E** — add `Tests/frontend/yourFlow.spec.ts`; follow patterns in `storefront.spec.ts`; seed carts with `PRIMARY_MOCK_PRODUCT.id` from `mock-data.ts`
+1. **Backend unit** — add `Tests/unit/backend/{domain}/yourFeature.test.ts`; import from `../../../../backend/src/...`
+2. **API** — add `Tests/integration/api/{domain}/yourRoute.test.ts`; use `Tests/shared/helpers/http.ts` for CSRF; reuse `placeOrderPayload()` / `mockOrderRow()` from `Tests/shared/helpers/api/`
+3. **Frontend E2E** — add `Tests/e2e/specs/{domain}/yourFlow.spec.ts`; extend `e2e/fixtures/storefront.ts`; seed carts with `PRIMARY_MOCK_PRODUCT.id` from `mock-data.ts`
 
 Keep mocks in `Tests/setup.ts` when new tests need shared DB/Redis stubs. Run the relevant suite **only when explicitly validating** your change.
 
@@ -422,6 +412,7 @@ Keep mocks in `Tests/setup.ts` when new tests need shared DB/Redis stubs. Run th
 |----------|--------|
 | [info.md](info.md) | Full project reference |
 | [WHATSAPP_CHECKOUT_GUIDE.md](WHATSAPP_CHECKOUT_GUIDE.md) | WhatsApp checkout and admin payment confirmation |
+| [manual-qa-test-cases.md](manual-qa-test-cases.md) | Full-stack manual QA test cases + release checklist |
 | [RESPONSIVE_QA_CHECKLIST.md](RESPONSIVE_QA_CHECKLIST.md) | Manual responsive QA |
 | [FORMS_QA_CHECKLIST.md](FORMS_QA_CHECKLIST.md) | Manual forms QA |
 | [DOCUMENTATION_INDEX.md](DOCUMENTATION_INDEX.md) | Full docs index |

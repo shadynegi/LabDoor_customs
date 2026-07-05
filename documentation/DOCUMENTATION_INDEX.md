@@ -12,17 +12,19 @@
 
 | Area | Behavior |
 |------|----------|
-| Monorepo | `frontend/` (React/Vite), `backend/` (Express), `Tests/` (Vitest + Playwright) |
+| Monorepo | `frontend/` (React/Vite), `backend/` (Express), `Tests/` (`unit/backend/`, `unit/frontend/`, `integration/api/`, `e2e/` — see [`Tests/README.md`](../Tests/README.md)) |
 | Production | One Express process: `/api/*` + built SPA; Supabase PostgreSQL via service_role |
 | Checkout | Server-side place-order; `policy_accepted` required; `createClientId()` idempotency key (HTTP LAN safe); WhatsApp redirect (`Order ID` = `orders.id` UUID in message); email synced to activity on change/blur |
-| Cart | `POST /api/products/validate-cart` on item changes with retry; catalog search via `POST /api/products/search` (no categories; no full-catalog client cache) |
+| Cart | `POST /api/products/validate-cart` on item changes with retry; catalog search via `POST /api/products/search` (price/sort filters only; no categories; no full-catalog client cache) |
 | Orders | Email `?orderId=` pre-fill on `/orders`; lookup via order ID + checkout email |
 | RLS | **10** tables with revoked `anon`/`authenticated` grants + service_role-only policies; no public PostgREST product read |
 | Form a11y | `id`/`name` on all controls; `htmlFor` or `aria-label`; `audit-form-labels.mjs` + Chrome DevTools Issues QA |
 | Activity | Consent-gated batch; `contact_submit`, `purchase_complete`, `size_select`, `quantity_change`; CSRF-exempt `/activity/batch`; IP anonymized |
-| Admin | Server product search; order search by **id UUID**, order number, email, name; products paginated (no category field); **Settings** tab (activity export, sessions, customer recompute); coupon scope (`all` / product IDs); estimated delivery; **no customer refunds** (cancel unpaid pending only) |
-| Store policy | All sales final; manufacturing-defect replacements within 30 days; `/returns-policy` + `/replacement-policy` |
-| Mobile | Sticky CTAs, visualViewport keyboard offset, **document scroll** (`html` scrollport; `#root` block layout; Home `overflow-x` only), home carousel `object-fit: contain`, cart policy spacer, LAN checkout idempotency (`createClientId`), **responsive-pages-ui** Playwright matrix (423 tests total; 193 mobile-chrome) |
+| Admin | Server product search; order search by **id UUID**, order number, email, name; products paginated (**one product per shoe**; no SKU/size/color fields); **out-of-stock toggle** per product (`ToggleSwitch`); **Settings** tab (activity export, sessions, customer recompute); coupon scope (`all` / product IDs); estimated delivery; **no customer refunds** (cancel unpaid pending only) |
+| Contact | Client-side WhatsApp only (`/contact` → prefilled `wa.me`; Mohali store address on page; no `POST /api/contact`) |
+| Store policy | All sales final; manufacturing-defect replacements within 30 days; `/returns-policy` + `/replacement-policy`; **Terms of Service** governed by **Punjab, India** (`/terms-of-service`) |
+| Mobile | Sticky CTAs, visualViewport keyboard offset, **document scroll** (`html` scrollport; `#root` block layout; Home `overflow-x` only), home carousel `object-fit: contain`, cart policy spacer, LAN checkout idempotency (`createClientId`), non-home nav (**Orders** + **Cart** only; catalog via home **View All Products**), **responsive-pages-ui** Playwright matrix (193 mobile-chrome); **520** automated tests total — see [`test_guidelines.md`](test_guidelines.md) |
+| Testing | **520** automated (141 unit + 80 API + 13 frontend unit + 286 Playwright) + viewport audit; **107** manual QA cases — [`Tests/README.md`](../Tests/README.md), [`manual-qa-test-cases.md`](manual-qa-test-cases.md) |
 
 ---
 
@@ -45,6 +47,9 @@
 | [AUDIT_SUMMARY.md](AUDIT_SUMMARY.md) | Security controls reference + open gaps (synced with audit) |
 | [PROJECT_AUDIT.md](PROJECT_AUDIT.md) | Full audit snapshot (2026-06-08) + remediation log — **do not re-audit wholesale** |
 | [COVERAGE_MATRIX.md](COVERAGE_MATRIX.md) | Doc → code → test map — **update per PR** (avoids repeat audits) |
+| [OPTIMIZATION.md](OPTIMIZATION.md) | Codebase optimization strategy + phased execution status |
+| [OPTIMIZATION_BASELINE.md](OPTIMIZATION_BASELINE.md) | Auto-generated audit baseline (`npm run audit:codebase`) |
+| [archive/README.md](archive/README.md) | Historical milestone docs (not current reference) |
 | [PERFORMANCE_BASELINE.md](./PERFORMANCE_BASELINE.md) | Frontend bundle budgets, WebP asset pipeline, optimization metrics |
 | [MEDIA_ASSET_GUIDE.md](./MEDIA_ASSET_GUIDE.md) | Static and product image conventions |
 
@@ -56,6 +61,9 @@
 |----------|---------|
 | [API_DOCUMENTATION.md](./API_DOCUMENTATION.md) | REST API endpoints |
 | [test_guidelines.md](test_guidelines.md) | Manual and automated testing (primary) |
+| [manual-qa-test-cases.md](manual-qa-test-cases.md) | Full-stack manual QA — suite review, test cases, release checklist |
+| [manual-qa-test-cases.csv](manual-qa-test-cases.csv) | Manual QA cases in CSV for execution tracking (Excel/Sheets) |
+| [Tests/README.md](../Tests/README.md) | Test suite layout, conventions, domain folders |
 | [TEST_RESULTS.md](TEST_RESULTS.md) | Generated test reports (`test-results/`) |
 | [TESTING_INSTRUCTIONS.md](./TESTING_INSTRUCTIONS.md) | Redirect → `test_guidelines.md` |
 | [DATABASE_SETUP.md](./DATABASE_SETUP.md) | Schema, migrations, Supabase |

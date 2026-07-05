@@ -67,7 +67,7 @@
 | `package.json` | Root workspace — `npm run dev`, `build`, `start`, `test` |
 | `frontend/` | React 19 SPA — Vite build output consumed by Express |
 | `backend/` | Express server — API, static SPA hosting, jobs, cache |
-| `Tests/` | Vitest + Playwright |
+| `Tests/` | Vitest + Playwright — `unit/backend/`, `unit/frontend/`, `integration/api/`, `e2e/specs/` (see [`Tests/README.md`](../Tests/README.md)) |
 | `.github/workflows/` | CI, Supabase keep-alive cron |
 | `documentation/` | Setup, deploy, and operational guides |
 | `scripts/` | `dev.mjs` (parallel dev servers), `link-check.mjs` |
@@ -91,7 +91,7 @@
 | Cache | Redis 6 (required in production) + in-memory fallback |
 | Customer messaging | WhatsApp (`WHATSAPP_CONTACT_NUMBER`, optional Cloud API) |
 | Observability | Pino (structured logs), Sentry (backend + frontend) |
-| Testing | Vitest (backend), Playwright (frontend E2E smoke) |
+| Testing | Vitest (backend unit + API, frontend unit RTL), Playwright (E2E), viewport overflow audit in `npm test` |
 | Deploy | Railway (single service, repo root), Cloudflare (required proxy in production) |
 
 ---
@@ -102,17 +102,17 @@
 
 | Route | Purpose |
 |-------|---------|
-| `/` | Home — hero carousel, featured products |
-| `/products` | Catalog — filters, server search (`POST /api/products/search`), pagination; supports `?q=` deep links |
-| `/product/:id` | Product detail — `:id` = product `public_id` UUID (legacy numeric `products.id` still resolves); size selection required before **Add to Cart**; 360° viewer, JSON-LD, meta tags |
+| `/` | Home — hero carousel (indicator dots capped at **5**, sliding window), featured products |
+| `/products` | Catalog — filters, server search (`POST /api/products/search`), pagination; supports `?q=` deep links; **Out of Stock** badge when `is_out_of_stock` or `stock === 0` |
+| `/product/:id` | Product detail — `:id` = product `public_id` UUID (legacy numeric `products.id` still resolves); size selection required before **Add to Cart**; disabled when out of stock; 360° viewer, JSON-LD, meta tags |
 | `/cart` | Shopping cart (localStorage via `CartContext`) |
 | `/checkout` | Customer/shipping form, coupon validation, no-refund policy checkbox, **Place Order** → WhatsApp redirect |
 | `/payment/success` | Optional confirmation page after WhatsApp redirect (order stored in sessionStorage) |
 | `/payment/cancel` | Abandoned checkout — **Checkout Cancelled** page; clears pending order storage; cart preserved |
-| `/orders` | Customer order lookup — order ID + checkout email (`POST /api/orders/lookup`); email links pre-fill `?orderId=` |
-| `/contact` | Contact form with CSRF-protected POST — WhatsApp contact from `VITE_WHATSAPP_CONTACT_NUMBER` |
+| `/orders` | Customer order lookup — order ID + checkout email (`POST /api/orders/lookup`); email links pre-fill `?orderId=`; **no status/date filters** (lookup form only) |
+| `/contact` | Contact form — opens WhatsApp (`wa.me`) with prefilled message; Mohali store address; number from `VITE_WHATSAPP_CONTACT_NUMBER` |
 | `/about`, `/help` | Static content — About covers custom footwear + WhatsApp checkout; Help summarizes shipping ($25 / free over $200), privacy (`privacy@labdoorcustoms.com`), and store policies |
-| `/privacy-policy`, `/terms-of-service`, `/returns-policy`, `/replacement-policy`, `/shipping-policy` | Legal pages — shipping policy matches checkout pricing ($25 flat, free over $200); no-refund / manufacturing-defect replacement policy |
+| `/privacy-policy`, `/terms-of-service`, `/returns-policy`, `/replacement-policy`, `/shipping-policy` | Legal pages — shipping policy matches checkout pricing ($25 flat, free over $200); no-refund / manufacturing-defect replacement policy; **Terms of Service** governed by **Punjab, India** (`TermsOfService.tsx`) |
 | `/admin` | Redirect — `/admin/login` if unauthenticated, `/adminshivamdashboard` if session valid |
 | `/admin/login` | Admin authentication |
 | `/adminshivamdashboard` | Protected admin dashboard |
@@ -120,7 +120,7 @@
 ### Search and catalog
 
 - **Server:** paginated product list, filters, single-product fetch, sitemap URL export — cached in Redis when available.
-- **Client:** Filters on `/products` (color, price, sort) call `POST /api/products/search`. Optional `?q=` on `/products` still applies a text search without a visible search bar. No full-catalog client download. **No shoe category taxonomy** — products are organized by name, size, and color only. Shoe **size is chosen on product detail / checkout**, not via the products listing filter.
+- **Client:** Filters on `/products` (price, sort) call `POST /api/products/search`. Optional `?q=` on `/products` still applies a text search without a visible search bar. No full-catalog client download. **No shoe category taxonomy** — products are organized by name and price. Shoe **size is chosen on product detail / checkout** (all standard UK/US/EU sizes available per product), not via catalog filters or per-size product rows.
 
 ### Cart and pricing display
 
@@ -157,7 +157,8 @@ Global CSS in `frontend/src/index.css` (see [MOBILE_RESPONSIVE.md](MOBILE_RESPON
 - **`#root`** is block layout (not flex) so nested app shells do not trap scroll.
 - **`AppShell`** keeps flex column + sticky footer; **`main`** uses `flex: 1 0 auto` so content height drives document scroll.
 - **Home** uses `overflow-x: hidden` only (not `overflow: hidden`) so the product carousel below the hero remains reachable.
-- **Home product carousel** (`ProductCarousel`): scrolling thumbnail cards use `object-fit: contain` (not `cover`) so shoe photos are not cropped; images are centered on the brand gradient with the product name in a dedicated footer.
+- **Home product carousel** (`ProductCarousel`): scrolling thumbnail cards use `object-fit: contain` (not `cover`) so shoe photos are not cropped; images are centered on the brand gradient with the product name in a dedicated footer; centered **View All Products** button navigates to `/products`.
+- **Global navigation** (non-home routes): sticky header with logo, **Orders**, and **Cart** only — no standalone Products icon. Home uses its own header (About + Cart) and optional mobile bottom nav (Contact, About, Help). Catalog entry points: home carousel, search, cart **Continue Shopping**, and direct `/products` URLs.
 
 ---
 
@@ -165,22 +166,22 @@ Global CSS in `frontend/src/index.css` (see [MOBILE_RESPONSIVE.md](MOBILE_RESPON
 
 **URL:** `/adminshivamdashboard` (not under `/admin/*` to reduce scanner noise)
 
-**Authentication:** Username + password → HttpOnly `admin_session` cookie (24-hour session). Primary credentials: `ADMIN_USERNAME` + `ADMIN_PASSWORD_HASH`; optional additional admins via `ADMIN_ADDITIONAL_USERS` JSON. Session tokens are **SHA-256 hashed** before storage in `admin_sessions` (raw token never persisted).
+**Authentication:** Username + password → HttpOnly `admin_session` cookie (24-hour session). Primary credentials: `ADMIN_USERNAME` + `ADMIN_PASSWORD_HASH`; optional additional admins via `ADMIN_ADDITIONAL_USERS` JSON. Session tokens are **SHA-256 hashed** before storage in `admin_sessions` (raw token never persisted). Login responds after the session row is inserted; session cleanup and success activity logging run in the background. **Logout** clears client auth state immediately (before the logout API completes) so in-flight dashboard requests abort instead of returning 401 toasts. `validateAdminSession` caches successful DB verifies for **10 seconds** in memory (per token hash) to reduce pool load on dashboard polling.
 
 **Tabs and capabilities**
 
 | Tab | Functions |
 |-----|-----------|
 | Analytics | Period selector (`day` / `week` / `month` / `year` / `all` / **Custom** with IST calendar **From**/**To** + **Apply range**); order/revenue stats, **sales by product**, **inventory snapshot**, low-stock count; **CSV export** only after custom range is applied (matches dashboard); GA4/GSC config status; error state with retry |
-| Products | Paginated list (50/page, load more); **low-stock filter**; SKU, reorder point, cost price on create/edit; **inventory movement history** per product; bulk **stock** / **stock_delta** updates; image via **Multer** upload (≤20MB) or URL; optional **360° MP4** |
+| Products | Paginated list (50/page, load more, **`cache: 'no-store'`**); thumbnails via `resolveProductImage()` (`object-fit: contain`); **low-stock filter** (fixed threshold: 5 units); per-row **out-of-stock toggle** (`ToggleSwitch` — optimistic `PUT /api/products/:id`, invalidates server + client catalog listeners); optional **cost price** on create/edit; **one product per shoe** (all standard sizes on storefront); **inventory movement history** per product; bulk **stock** / **stock_delta** / **is_out_of_stock** updates; **delete** optimistically removes row from list; image via **Multer** upload (≤20MB) or URL; optional **360° MP4** |
 | Orders | Paginated list (50/page), **server-side search**, filter by status, bulk status updates; order modal: tracking, carrier, tracking URL, **estimated delivery**, notify shipped, status transitions, **mark paid**, **edit customer/shipping** (`PATCH …/customer-details`), **edit line items on unpaid pending orders** (`PATCH …/pending-items`), cancel unpaid pending only |
-| Coupons | Preset percentage coupons (5/10/20/25/50%), custom codes with **scope** (`applies_to`: all / product + IDs), **server product search** for product scope, **edit** (description, max uses, expiry, active), activate/deactivate, delete; list **paginated (10/page)** |
+| Coupons | Percentage coupons (5–50%) with **scope** (`applies_to`: all / product + IDs), **server product search** for product scope, **edit** (description, max uses, expiry, active), activate/deactivate, delete; list **paginated (10/page)** |
 | Customers | **Server search + pagination**; **admin notes**; address history; **View History** modal (orders paginated, 10/page); detail view, soft delete / restore, show deleted toggle |
-| Settings | **Activity log export** (NDJSON, optional date range); **admin sessions** list + expired-session cleanup; **customer aggregate recompute** |
+| Settings | **Activity log export** (NDJSON, optional date range); **admin sessions** list (`is_current` flag) + **Revoke** per session (`DELETE …/sessions/:id`, not current cookie) + cleanup (`POST …/sessions/cleanup` — expired rows and excess logins, keeps **5** newest per user); **customer aggregate recompute** |
 
 **API-only admin features** (no dedicated UI tab): none beyond Settings tab operational tools. Customer refunds remain disabled (no-refund store policy).
 
-**Store policy:** All sales final — no refunds. Replacements only for verified manufacturing defects within **30 days of delivery** (`/returns-policy`; `/replacement-policy` is an alias). Checkout requires `policy_accepted: true` on place-order. Shared policy text lives in `backend/src/lib/returnPolicy.ts` and `frontend/src/constants/returnPolicy.ts`. Manufacturing-defect claims: contact via WhatsApp (`WHATSAPP_CONTACT_NUMBER` / `VITE_WHATSAPP_CONTACT_NUMBER`).
+**Store policy:** All sales final — no refunds. Replacements only for verified manufacturing defects within **30 days of delivery** (`/returns-policy`; `/replacement-policy` is an alias). Checkout requires `policy_accepted: true` on place-order. Shared policy text lives in `backend/src/lib/returnPolicy.ts` and `frontend/src/constants/returnPolicy.ts`. Manufacturing-defect claims: contact via WhatsApp (`WHATSAPP_CONTACT_NUMBER` / `VITE_WHATSAPP_CONTACT_NUMBER`). **Terms of Service** (`/terms-of-service`, `frontend/src/pages/TermsOfService.tsx`): governed by the laws of **Punjab, India**; disputes subject to courts in Punjab, India; legal contact **legal@labdoorcustoms.com**.
 
 ---
 
@@ -329,10 +330,11 @@ At place-order, a row in `coupon_usage` reserves the coupon for the pending orde
 
 ### Contact form
 
-- `POST /api/contact` — rate-limited, CSRF-protected.
-- Stores message in `contact_messages` for audit; response may include `whatsappUrl` for optional follow-up chat.
-- Storefront `/contact` shows WhatsApp contact from `VITE_WHATSAPP_CONTACT_NUMBER`.
-- Successful submit emits `contact_submit` activity event (consent-gated).
+- **`/contact`** (`ContactUs.tsx`) — client-side only; no `POST /api/contact`.
+- On **Send Message**, validates fields (`validateContactForm`), builds a prefilled WhatsApp body via `formatContactFormWhatsAppMessage` in `frontend/src/lib/whatsappContact.ts`, and opens `buildWhatsAppContactUrl` (`wa.me` + `VITE_WHATSAPP_CONTACT_NUMBER`) in a new browser tab.
+- Sidebar WhatsApp link uses the same helper without a prefilled message.
+- **Store address** (display only): 415, Sector 78, Mohali, Punjab, India 140308.
+- Successful submit emits `contact_submit` activity event when analytics consent is granted.
 
 ---
 
@@ -378,7 +380,7 @@ At place-order, a row in `coupon_usage` reserves the coupon for the pending orde
 
 - Per-route limits via `express-rate-limit`.
 - Redis-backed store when `REDIS_URL` is set; in-memory fallback in development only — **production fails closed** if Redis is required but unavailable.
-- Notable limits: admin login (5 per 15 min), contact, coupon validate, place-order, order lookup, product search, order access exchange.
+- Notable limits: admin login (5 per 15 min), coupon validate, place-order, order lookup, product search, order access exchange.
 
 ### Network and transport
 
@@ -390,7 +392,7 @@ At place-order, a row in `coupon_usage` reserves the coupon for the pending orde
 | **compression** | `compression` middleware — gzip/deflate responses **> 1 KB**; honors `x-no-compression`; level 6 |
 | **JSON body limit** | `express.json({ limit: '1mb' })` — large admin images use **Multer** multipart, not JSON |
 | **HTTPS** | Production redirect via `x-forwarded-proto`; optional direct SSL via cert env paths |
-| **Request timeout** | 60s default (`REQUEST_TIMEOUT_MS`); slow routes use 180s (`SLOW_REQUEST_TIMEOUT_MS`): `/api/products*`, `/api/admin/analytics`, `/api/activity/*` |
+| **Request timeout** | 60s default (`REQUEST_TIMEOUT_MS`); slow routes use 180s (`SLOW_REQUEST_TIMEOUT_MS`): `/api/products*`, `/api/admin/analytics`, `/api/activity/*`. Keep `REQUEST_TIMEOUT_MS` ≥ 30s when `DB_POOL_MAX` is low — short timeouts cause 504s while admin analytics queues on the pool. |
 | **Trust proxy** | Enabled for Railway/load balancers |
 
 ### Express middleware stack (order)
@@ -414,17 +416,18 @@ Registered in `backend/src/server.ts` (simplified):
 ### Input and data protection
 
 - XSS sanitization via `xss` library (`utils/sanitize.ts`).
-- Parameterized SQL only (postgres.js tagged templates).
+- Parameterized SQL only (postgres.js tagged templates). The exported `sql` tag in `lib/db.ts` wraps queries so execution is deferred until `await` (fixes nested template fragments and preserves `.cursor()` on pending queries).
 - Order secrets stripped from API responses (`stripOrderSecrets` removes `access_token_hash` and `access_token_encrypted` — never returned in JSON).
 - DB TLS verification in production (`DB_SSL_CA_PATH`; `rejectUnauthorized` defaults true).
 - Product images: admin uploads via **`POST /api/admin/uploads/product-media`** (Multer multipart, images ≤20MB, MP4 ≤15MB) → stored under `uploads/products/` and served at `/uploads/products/*`. Create/update accepts HTTPS/relative URLs (max 2048 chars) or legacy JSON `data:image/*` ≤1MB (`lib/productImage.ts`, aligned with `express.json` 1MB limit). Optional **`UPLOAD_DIR`** env overrides storage path.
-- Supabase RLS at startup (`ensureRlsPolicies()`): all **10** application tables (including `order_access_exchanges`) use **service_role-only** policies; `anon` and `authenticated` grants are revoked — no public product read via PostgREST/GraphQL; all data access goes through Express. Boot is **non-destructive** when policies already exist (skips DROP/CREATE that caused pooler lock hangs). **Production Supabase:** all required SQL migrations applied (June 2026), including `migration-performance-linter-fixes.sql` (lint 0006 policy consolidation + FK indexes) and `migration-products-search-trgm.sql`.
+- Supabase RLS at startup (`ensureRlsPolicies()`): all **10** application tables (including `order_access_exchanges`) use **service_role-only** policies; `anon` and `authenticated` grants are revoked — no public product read via PostgREST/GraphQL; all data access goes through Express. Boot is **non-destructive** when policies already exist (skips DROP/CREATE that caused pooler lock hangs). **Production Supabase:** all required SQL migrations applied (July 2026), including performance linter fixes, product search indexes, reviews removal, variant-field cleanup, and PayPal legacy cleanup — see [`SUPABASE_SQL_TO_RUN.md`](SUPABASE_SQL_TO_RUN.md).
 
 ### Production environment gates
 
 Backend exits on startup if missing (mirrors `backend/scripts/validate-env.mjs`):
 
 - `DATABASE_URL`, `FRONTEND_URL`, `ADMIN_PASSWORD_HASH`, `ADMIN_USERNAME`, `JWT_SECRET` (32+ chars), `WHATSAPP_CONTACT_NUMBER`, `TRUST_CLOUDFLARE=true`, `REDIS_URL`, `SENTRY_DSN`, `ORDER_TOKEN_ENCRYPTION_KEY`, `IP_SALT`
+- `DATABASE_URL` must target **PgBouncer pooler** (host contains `pooler` or port **6543**), or set `DB_USE_POOLER=true`. WhatsApp Cloud API credentials (`WHATSAPP_CLOUD_*`) are optional.
 
 CI runs `npm run validate-env` in the backend job with `CI_VALIDATE_PRODUCTION=true`.
 
@@ -446,7 +449,7 @@ Redis connection failure in production prevents server startup.
 - Log level: `LOG_LEVEL` env or `info` (prod) / `debug` (dev).
 - Every request gets a child logger with `X-Request-Id` (UUID).
 - **Request lifecycle:** `Request started` (method, path, IP, timeout tier) and `Request finished` (status, duration). Slow requests log at `warn` when duration ≥ `REQUEST_LOG_SLOW_MS` (default 3s).
-- **DB:** `[withRetry]` logs include operation `label`, Postgres `code`, and pool stats on failure; queries ≥ `DB_SLOW_QUERY_LOG_MS` (default 2s) log as `[DB] slow query`. Hot paths use `query()` (`dbQuery` in routes): products, activity, orders, coupons, contact, admin, and `cacheWarm.ts` on startup.
+- **DB:** `[withRetry]` logs include operation `label`, Postgres `code`, and pool stats (`activeConnections`, `maxConnections`, `queuedQueries`) on failure; queries ≥ `DB_SLOW_QUERY_LOG_MS` (default 2s) log as `[DB] slow query`. All `sql` calls acquire a global concurrency slot (pool size); analytics fan-out uses `runWithConcurrency` capped at `DB_POOL_MAX − 4`. Hot paths use `query()` (`dbQuery` in routes): products, activity, orders, coupons, admin, and `cacheWarm.ts` on startup.
 - **Process errors:** `registerProcessErrorHandlers()` logs `unhandledRejection` and `uncaughtException` without exiting (dev warns; production logs + Sentry). Transient pool blips should not take down the API process.
 - **Timeouts:** `Request timeout` includes `elapsedMs`, path, and pool stats.
 
@@ -489,6 +492,7 @@ Each task runs on every start but **skips DDL** when `BOOTSTRAP_SKIP_DDL=true` o
 
 - `ensureIdempotencyTable()` — also ensures indexes including `idx_payment_idempotency_processing_created`
 - `ensureActivityLogsTable()`, `ensureOrderPaymentSchema()`, `ensureCheckoutExchangeTable()`, `ensureOrderAccessExchangeTable()`
+- `ensureProductVideo360Column()`, `ensureProductPublicIdColumn()`, `ensureAdminEnhancementSchema()`, `ensureProductVariantFieldsRemoved()` — product catalog columns and admin inventory tables
 - `ensureRlsPolicies()` — skips when marker tables already have `Service role%` policies; never DROP legacy policies unless `BOOTSTRAP_FORCE_RLS=true`
 - `ensureClientGrantsRevoked()` — always runs (even when DDL is skipped); in production, startup **fails** if `anon`/`authenticated` still hold table grants after revoke
 - `purgeLegacyAdminSessions()` — skips when no legacy plaintext tokens
@@ -548,13 +552,14 @@ On server startup, preloads product list pages (limits 10 and 20) to reduce cold
 
 ## WhatsApp contact
 
-Store contact number: **`WHATSAPP_CONTACT_NUMBER`** (backend) and **`VITE_WHATSAPP_CONTACT_NUMBER`** (frontend build — must match). Helpers: `backend/src/lib/whatsappContact.ts`, `frontend/src/lib/whatsappContact.ts`. Checkout place-order opens `wa.me` via `whatsappCheckout.ts`.
+Store contact number: **`WHATSAPP_CONTACT_NUMBER`** (backend) and **`VITE_WHATSAPP_CONTACT_NUMBER`** (frontend build — must match). Helpers: `backend/src/lib/whatsappContact.ts` (checkout/support URL builder), `frontend/src/lib/whatsappContact.ts` (`buildWhatsAppContactUrl`, `getWhatsAppContactDisplay`, `validateContactForm`, `formatContactFormWhatsAppMessage`). Checkout place-order opens `wa.me` via `whatsappCheckout.ts`.
 
 | Notification | Trigger |
 |--------------|---------|
 | WhatsApp payment confirmation | After admin marks order paid — outbound text to customer phone via Cloud API (`WHATSAPP_CLOUD_*`) |
 | WhatsApp shipping notification | Status → shipped (with tracking) or admin `POST /api/orders/:id/notify-shipped` |
-| Contact follow-up | Contact form success may return `whatsappUrl` with prefilled message |
+| Checkout place-order | `whatsappCheckout.ts` — `wa.me` redirect after pending order |
+| Contact form | `frontend/src/lib/whatsappContact.ts` — prefilled `wa.me` from form fields (no backend API) |
 
 Optional **WhatsApp Cloud API** (`WHATSAPP_CLOUD_ACCESS_TOKEN`, `WHATSAPP_CLOUD_PHONE_NUMBER_ID`) sends automated texts to the customer mobile from checkout. Without Cloud API, checkout still redirects to the store WhatsApp number; automated customer texts are skipped with a server log warning.
 
@@ -621,12 +626,12 @@ A **correct** `DATABASE_URL` can still produce occasional maintenance warnings w
 
 | Table | Purpose |
 |-------|---------|
-| `products` | Catalog — price, stock, size, color, optional `video_360` (MP4 URL for 360° viewer). Legacy `rating` / `review_count` columns remain in DB (defaults) but are unused after reviews removal. |
+| `products` | Catalog — price, stock, optional `cost_price`, optional `video_360` (MP4 URL for 360° viewer). One row per shoe; storefront size selection is checkout-only (not stored on the product). Legacy `rating` / `review_count` columns remain in DB (defaults) but are unused after reviews removal. |
 | `orders` | Orders — JSONB items/shipping, `payment_id`, `access_token_hash`, `access_token_encrypted` |
 | `customers` | Aggregated customer stats, soft delete |
 | `coupons` | Discount rules, scope, validity, usage limits |
 | `coupon_usage` | Per-order coupon reservations |
-| `contact_messages` | Contact form submissions (audit storage) |
+| `contact_messages` | Legacy table (no longer written by storefront; schema retained) |
 | `activity_logs` | Anonymized activity events |
 | `admin_sessions` | Admin session token hashes (SHA-256) |
 
@@ -645,10 +650,11 @@ A **correct** `DATABASE_URL` can still produce occasional maintenance warnings w
 - `backend/src/database/migration-rls-tighten.sql` — reference SQL for RLS (mirrors boot logic)
 - `backend/src/database/migration-performance-linter-fixes.sql` — FK indexes (lint 0001) and consolidated RLS policies (lint 0006). **Applied on production Supabase** (June 2026).
 - `backend/src/database/migration-products-search-trgm.sql` — `pg_trgm` + GIN indexes on `products.name` / `products.description` for `POST /api/products/search`. **Applied on production Supabase** (June 2026).
-- `backend/src/database/migration-admin-enhancements.sql` — SKU, reorder point, inventory movements, order line items, admin notes. **Applied on production Supabase** (June 2026).
+- `backend/src/database/migration-admin-enhancements.sql` — `cost_price`, inventory movements, order line items, admin notes. **Applied on production Supabase** (June 2026).
+- `backend/src/database/migration-remove-product-variant-fields.sql` — drops legacy `sku`, `reorder_point`, `size`, `color` columns. **Applied on production Supabase** (July 2026). Also applied at boot via `ensureProductVariantFieldsRemoved()`.
 - `backend/src/database/migration-products-video-360.sql` — `products.video_360` for admin 360° MP4 URLs. **Applied on production Supabase** (June 2026).
 - `backend/src/database/migration-remove-product-category.sql` — drops `products.category` and `order_line_items.category`; coupon scope limited to `all` / `product`. **Applied on production Supabase** (July 2026).
-- `backend/src/database/migration-drop-reviews.sql` — drops `reviews`, `review_votes`, and `update_product_rating()` trigger. **Run in Supabase SQL Editor** when removing the reviews feature from an existing database (see [`SUPABASE_SQL_TO_RUN.md`](SUPABASE_SQL_TO_RUN.md)).
+- `backend/src/database/migration-drop-reviews.sql` — drops `reviews`, `review_votes`, and `update_product_rating()` trigger. **Applied on production Supabase** (July 2026). See [`SUPABASE_SQL_TO_RUN.md`](SUPABASE_SQL_TO_RUN.md) for verification SQL on new environments.
 - `backend/src/database/migration-drop-paypal.sql` — legacy payment cleanup (applied on production Supabase, July 2026).
 - `backend/src/database/migration-payment-idempotency.sql` — includes partial index for reaper (`idx_payment_idempotency_processing_created`); boot also creates this index via `ensureIdempotencyIndexes()` when missing
 
@@ -692,12 +698,12 @@ Any unmatched `/api/*` path returns **404** JSON `{ error: "Route not found" }`.
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | GET | `/api/products` | Public | List products (pagination, filters) |
-| GET | `/api/products/filters` | Public | Available filter facets (size, color, price range, sort) |
+| GET | `/api/products/filters` | Public | Price range and sort options |
 | GET | `/api/products/sitemap-urls` | Public | Product IDs/paths for sitemap generation |
 | GET | `/api/products/:id` | Public | Single product by `public_id` UUID or legacy numeric `id` |
-| POST | `/api/products/search` | Public + CSRF | Product search and filters |
-| POST | `/api/products/validate-cart` | Public + CSRF | Validate cart lines (price, stock, existence) |
-| POST | `/api/products` | Admin + CSRF | Create product |
+| POST | `/api/products/search` | Public + CSRF | Product search — `query`, `minPrice`, `maxPrice`, `sortBy`, pagination (no size/color filters) |
+| POST | `/api/products/validate-cart` | Public + CSRF | Validate cart lines (price, stock, existence; **size required per line** at checkout) |
+| POST | `/api/products` | Admin + CSRF | Create product — one row per shoe; body: `name`, `price`, `image`, optional `description`, `background`, `stock`, `is_out_of_stock`, `video_360`, `cost_price` |
 | PUT | `/api/products/:id` | Admin + CSRF | Update product |
 | DELETE | `/api/products/:id` | Admin + CSRF | Delete product |
 
@@ -736,12 +742,6 @@ Any unmatched `/api/*` path returns **404** JSON `{ error: "Route not found" }`.
 | DELETE | `/api/coupons/:id` | Admin + CSRF | Delete coupon |
 | GET | `/api/coupons/:id/usage` | Admin | Coupon redemption history |
 
-### Contact (`/api/contact` — `backend/src/routes/contact.ts`)
-
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| POST | `/api/contact` | Public + CSRF | Submit contact form |
-
 ### Activity (`/api/activity` — `backend/src/routes/activity.ts`)
 
 | Method | Path | Auth | Description |
@@ -760,9 +760,10 @@ Any unmatched `/api/*` path returns **404** JSON `{ error: "Route not found" }`.
 | POST | `/api/admin/generate-hash` | Public (dev only) | Generate bcrypt hash — **403 in production**; use `scripts/generate-admin-hash.mjs` |
 | POST | `/api/admin/logout` | Admin + CSRF | Logout; clears session |
 | GET | `/api/admin/verify` | Public | Session probe — always **200** with `{ authenticated: true \| false }` (not 401 when logged out) |
-| GET | `/api/admin/sessions` | Admin | List active admin sessions |
-| POST | `/api/admin/sessions/cleanup` | Admin + CSRF | Purge expired sessions |
-| GET | `/api/admin/analytics` | Admin | Dashboard analytics; `?period=day\|week\|month\|year\|all\|custom` (+ optional `from`/`to` ISO datetimes, **IST +05:30** for custom); includes `sales` and `inventory`. Preset period boundaries (day/week/month/year) use **Asia/Kolkata** calendar. |
+| GET | `/api/admin/sessions` | Admin | List admin sessions (`is_active`, `is_current` for cookie session) |
+| POST | `/api/admin/sessions/cleanup` | Admin + CSRF | Purge expired sessions and excess logins (keeps 5 newest per user) |
+| DELETE | `/api/admin/sessions/:id` | Admin + CSRF | Revoke a session (not the current cookie session) |
+| GET | `/api/admin/analytics` | Admin | Dashboard analytics; `?period=day\|week\|month\|year\|all\|custom` (+ optional `from`/`to` ISO datetimes, **IST +05:30** for custom); includes `sales` and `inventory`. Preset period boundaries (day/week/month/year) use **Asia/Kolkata** calendar. Invalid or missing DB timestamps are skipped (no `Invalid time value` errors). |
 | GET | `/api/admin/analytics/export` | Admin | CSV product sales export; same `period`/`from`/`to` as analytics; custom filenames `product-sales-YYYY-MM-DD_YYYY-MM-DD.csv` (IST dates) |
 | GET | `/api/admin/customers` | Admin | Customer list (`?search=&page=&limit=`) |
 | GET | `/api/admin/customers/:email` | Admin | Customer detail + order history (`?page=&limit=`; default 20, max 100) |
@@ -770,7 +771,7 @@ Any unmatched `/api/*` path returns **404** JSON `{ error: "Route not found" }`.
 | POST | `/api/admin/customers/recompute` | Admin + CSRF | Rebuild customer aggregates from completed orders |
 | POST | `/api/admin/customers/:id/restore` | Admin + CSRF | Restore soft-deleted customer |
 | DELETE | `/api/admin/customers/:id` | Admin + CSRF | Soft-delete customer |
-| GET | `/api/admin/products/low-stock` | Admin | Products at/below reorder point |
+| GET | `/api/admin/products/low-stock` | Admin | Products at/below fixed low-stock threshold (5 units) |
 | GET | `/api/admin/products/:id/inventory-movements` | Admin | Stock movement audit log |
 | POST | `/api/admin/products/bulk-update` | Admin + CSRF | Bulk updates: `stock`, `stock_delta`, `is_out_of_stock` |
 | POST | `/api/admin/uploads/product-media` | Admin + CSRF | Multipart upload — fields `image`, `background`, `video_360` (images ≤20MB, MP4 ≤15MB); returns URL paths under `/uploads/products/*` |
@@ -794,10 +795,10 @@ Any unmatched `/api/*` path returns **404** JSON `{ error: "Route not found" }`.
 | `/products` | `ProductsPage` | Catalog; optional query `?q=` for search |
 | `/product/:id` | `ProductDetailPage` | `:id` = `products.public_id` UUID (numeric id supported for legacy links); sitemap uses `public_id` |
 | `/about` | `AboutUs` | About page |
-| `/contact` | `ContactUs` | Contact form; WhatsApp contact from env |
+| `/contact` | `ContactUs` | Contact form → WhatsApp `wa.me` with prefilled message |
 | `/help` | `HelpCenter` | Help / FAQ (shipping $25 / free over $200) |
 | `/privacy-policy` | `PrivacyPolicy` | Privacy policy |
-| `/terms-of-service` | `TermsOfService` | Terms of service |
+| `/terms-of-service` | `TermsOfService` | Terms of service — governing law **Punjab, India**; contact **legal@labdoorcustoms.com** |
 | `/returns-policy` | `ReturnsPolicy` | No-refund / manufacturing-defect replacement policy |
 | `/replacement-policy` | `ReturnsPolicy` | Alias for returns policy |
 | `/shipping-policy` | `ShippingPolicy` | Shipping policy — matches checkout pricing ($25 / free over $200) |
@@ -835,7 +836,7 @@ Any unmatched `/api/*` path returns **404** JSON `{ error: "Route not found" }`.
 
 ### URLs referenced in navigation (not separate routes)
 
-Footer/header links use the routes above. Product search navigates to `/products?q={query}`. Cart badge and checkout flow link `/cart` → `/checkout` → WhatsApp → optional `/payment/success`.
+Footer/header links use the routes above. Non-home sticky header: **Orders** + **Cart** (no Products nav icon). Product search navigates to `/products?q={query}`. Home **View All Products** carousel button navigates to `/products`. Cart badge and checkout flow link `/cart` → `/checkout` → WhatsApp → optional `/payment/success`.
 
 ---
 
@@ -877,6 +878,7 @@ Templates: `backend/env.template`, `frontend/env.template`
 | `MAINTENANCE_DEFER_MS` | 120000 | Delay first maintenance run after bootstrap |
 | `MAINTENANCE_DB_RETRIES` | 2 | Retries per maintenance DB step on transient pool/network errors |
 | `MAINTENANCE_DB_RETRY_MS` | 1000 | Base backoff (ms) between maintenance DB retries |
+| `DB_POOL_MAX` | 10 (pooler) / 20 (direct) | postgres.js pool size; all `sql` queries acquire a global slot (max concurrent = pool size); admin analytics fan-out capped at `max − 4` |
 | `DB_STATEMENT_TIMEOUT_MS` | 300000 | Postgres `statement_timeout` per connection (client-side; Supabase pooler may still cap ~120s) |
 | `BOOTSTRAP_BLOCK_UNTIL_RLS` | — | Dev only: set `true` to block API ready until RLS migration finishes (production always waits) |
 | `BOOTSTRAP_BLOCK_API` | — | Dev only: set `true` to return 503 until full bootstrap completes (default: API ready immediately in dev) |
@@ -925,7 +927,7 @@ Templates: `backend/env.template`, `frontend/env.template`
 
 | Job | Steps |
 |-----|-------|
-| monorepo | Root `npm ci`, backend validate-env, `npm run build` (`VITE_API_BASE_URL=/api`), Vitest, Playwright smoke |
+| monorepo | Root `npm ci`, backend `validate-env` (pooler `DATABASE_URL`, `WHATSAPP_CONTACT_NUMBER`, auth secrets), `npm run build` (`VITE_API_BASE_URL=/api`), Vitest + Playwright + viewport audit (**520** tests) |
 | sitemap | Requires `PRODUCTION_API_BASE_URL`; generates sitemap with live product URLs |
 | links | Markdown link checker |
 
@@ -990,11 +992,14 @@ LOG_LEVEL=debug
 This skips CREATE TABLE/INDEX on every restart and enables detailed request/DB logs. See [Logging and monitoring](#logging-and-monitoring).
 
 ```bash
-npm test                         # All tests: backend unit + API + frontend UI (reports per suite)
+npm test                         # All: backend unit + API + frontend unit + Playwright + viewport audit
 npm run test:backend             # Backend unit only
 npm run test:api                 # API integration only
-npm run test:frontend            # Playwright UI only
+npm run test:frontend-unit       # React component/hook unit tests (Vitest + RTL)
+npm run test:frontend            # Playwright UI + viewport overflow audit
 npm run validate-env             # backend + frontend env checks
+npm run audit:codebase           # depcheck, legacy scan, test inventory → documentation/OPTIMIZATION_BASELINE.md
+npm run seed:test-data           # 10 Test customers + 20 orders (dev/staging QA — idempotent)
 npm run build                    # frontend (optimize-assets + budget check) + backend
 npm run build -w frontend        # includes optimize-assets, sitemap, build:budget
 npm run measure:dist -w frontend # dist/assets size report
@@ -1007,18 +1012,27 @@ npm run links:check
 
 | Suite | Tool | Coverage |
 |-------|------|----------|
-| Backend unit/API | Vitest | **place-order** checkout (validation + WhatsApp integration happy path), WhatsApp message formatting, admin mark-paid, **admin analytics** (401, IST custom range, CSV export), **validate-cart** (empty/invalid/OOS), **products search** edge cases, **stability/concurrency smoke**, coupon scope (`all` / `product`), `computeCheckoutPricingForCart`, payment idempotency, order tokens, process error handlers, RLS table list + grant revoke, order portal URL, activity batch/log, order lookup, **IST date helpers**, **build performance budgets**, sales analytics invalid-date fallback, **checkout client id** (`createClientId` LAN fallback) |
-| Frontend E2E / UI | Playwright | Storefront smoke + deep flows, **document scroll** smoke, **responsive pages matrix** (11 phone viewports × all routes, incl. 320px), checkout/contact/admin UI, mobile viewport |
+| Backend unit/API | Vitest | `Tests/unit/backend/` and `Tests/integration/api/` — place-order validation + WhatsApp integration, admin mark-paid, **admin session verify cache** (`session-verify-cache.test.ts`), admin analytics (invalid date guards), **sql tag wrapper** (`dbSqlWrapper.test.ts`), validate-cart, products search, stability smoke, coupon scope, payment idempotency, order tokens, RLS, order portal URL, merged order lookup (`orders/lookup.test.ts`), contact WhatsApp helpers, DB concurrency semaphore, IST date helpers, performance budgets, `createClientId` LAN fallback, **production env validation** (`infrastructure/validateEnv.test.ts`), **upload volume persistence** (`products/upload-persistence.test.ts`) |
+| Frontend unit | Vitest + RTL | `Tests/unit/frontend/` — `ToggleSwitch`, `whatsappContact`, `productCatalogCache` (`frontend/vitest.config.ts`) |
+| Frontend E2E / UI | Playwright | `Tests/e2e/specs/` by domain (storefront, checkout, orders, contact, admin, responsive, regression) — document scroll, responsive pages matrix (11 viewports × routes, incl. 320px), contact WhatsApp popup |
 
-**Total automated tests:** 423 (119 backend unit + 71 API + 233 Playwright UI).
+**Total automated tests:** 520 (141 backend unit + 80 API + 13 frontend unit + 286 Playwright UI). **`npm test`** also runs the viewport overflow audit (12 widths × 16 routes).
 
-**Viewport overflow audit (optional):** With `frontend` built and preview on port 4173, run `node Tests/scripts/audit-viewport-overflow.mjs` — checks 12 widths × 16 storefront routes for horizontal overflow.
+**Suite layout:** [`Tests/README.md`](../Tests/README.md) — directory map, conventions, shared fixtures (`Tests/shared/`).
+
+**Codebase optimization:** [`OPTIMIZATION.md`](OPTIMIZATION.md) phased strategy; baseline via `npm run audit:codebase` → [`OPTIMIZATION_BASELINE.md`](OPTIMIZATION_BASELINE.md).
+
+**Viewport overflow audit:** Included in `npm test` via `Tests/scripts/run-viewport-audit.mjs` (12 widths × 16 storefront routes). Manual: `node Tests/scripts/run-viewport-audit.mjs` after `npm run build -w frontend`.
 
 | Link check | Custom script | Documentation internal links |
 
-API and backend unit tests mock Postgres via `Tests/setup.ts`. Checkout/cart tests use **`Tests/fixtures/products.ts`** for DB-shaped product rows and `product_id` values (not hardcoded `1`). Playwright mocks share the same ids through `Tests/frontend/fixtures/mock-data.ts`.
+API and backend unit tests mock Postgres via `Tests/setup.ts`. Checkout/cart tests use **`Tests/shared/fixtures/products.ts`** for DB-shaped product rows and `product_id` values (not hardcoded `1`). Playwright mocks share the same ids through `Tests/e2e/fixtures/mock-data.ts`.
 
-**Detailed runbook:** [test_guidelines.md](test_guidelines.md) — automated tests, manual QA, CI, commands, and policy (run tests only when explicitly requested).
+**Admin QA seed (local/staging):** `npm run seed:test-data` loads **10** customers (names contain `Test`, emails contain `test`) and **20** orders (`GSS-TEST-SEED-01` … `20`) spanning multiple days/months/years for dashboard and analytics filters. Idempotent — safe to re-run. Requires `DATABASE_URL` in `backend/.env` and at least one product row. Script: `backend/scripts/seed-test-data.mjs`.
+
+**Detailed runbook:** [test_guidelines.md](test_guidelines.md) and [Tests/README.md](../Tests/README.md) — automated tests, manual QA, CI, commands, and policy (run tests only when explicitly requested).
+
+**Manual QA (full stack):** [manual-qa-test-cases.md](manual-qa-test-cases.md) — automated suite review, **107** structured manual cases, and release regression checklist. **CSV:** [manual-qa-test-cases.csv](manual-qa-test-cases.csv) for spreadsheet/test-management tracking.
 
 ---
 
@@ -1027,6 +1041,8 @@ API and backend unit tests mock Postgres via `Tests/setup.ts`. Checkout/cart tes
 | Document | Topic |
 |----------|-------|
 | [test_guidelines.md](test_guidelines.md) | Testing — automated, manual QA, CI, when to run |
+| [manual-qa-test-cases.md](manual-qa-test-cases.md) | Full-stack manual QA cases + release regression checklist |
+| [Tests/README.md](../Tests/README.md) | Test suite layout (`unit/`, `integration/`, `e2e/`) |
 | [PROJECT_AUDIT.md](PROJECT_AUDIT.md) | Full audit snapshot and remediation backlog |
 | [COVERAGE_MATRIX.md](COVERAGE_MATRIX.md) | Critical path coverage — update with behavior changes |
 | [QUICK_START.md](QUICK_START.md) | 10-minute local setup |

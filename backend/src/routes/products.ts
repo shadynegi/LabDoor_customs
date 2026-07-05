@@ -7,7 +7,7 @@ import { cached } from '../lib/cache';
 import { CACHE, TTL, invalidateProductCaches } from '../lib/cacheKeys';
 import { parsePagination, paginationMeta } from '../lib/pagination';
 import { verifyAdmin } from './admin';
-import { sanitizeSearchQuery, sanitizeString } from '../utils/sanitize';
+import { sanitizeSearchQuery } from '../utils/sanitize';
 import {
   validateProductImageUrl,
   validateOptionalProductImageUrl,
@@ -55,16 +55,11 @@ interface Product {
   image: string;
   description?: string;
   background?: string;
-  size?: string;
-  color?: string;
   stock?: number;
   view_count?: number;
   cart_count?: number;
   is_out_of_stock?: boolean;
   video_360?: string | null;
-  sku?: string | null;
-  reorder_point?: number;
-  reorder_alert_enabled?: boolean;
   cost_price?: number | null;
   created_at?: string;
   updated_at?: string;
@@ -156,28 +151,20 @@ router.post('/validate-cart', async (req: Request, res: Response) => {
   }
 });
 
-// GET available filter options (sizes, colors, price range)
+// GET available filter options (price range, sort)
 router.get('/filters', async (_req: Request, res: Response) => {
   try {
-    const [sizes, priceRange] = await dbQuery(
+    const [priceRange] = await dbQuery(
       () =>
-        Promise.all([
-          sql`
-        SELECT DISTINCT size FROM products 
-        WHERE size IS NOT NULL 
-        ORDER BY size ASC
-      `,
-          sql`
+        sql`
         SELECT MIN(price) as min_price, MAX(price) as max_price FROM products
       `,
-        ]),
       'products:filters'
     );
 
     res.json({
       success: true,
       data: {
-        sizes: sizes.map(s => s.size),
         priceRange: {
           min: parseFloat(priceRange[0]?.min_price || '0'),
           max: parseFloat(priceRange[0]?.max_price || '1000')
@@ -301,20 +288,15 @@ router.post('/', verifyAdmin, async (req: Request, res: Response) => {
 
     const result = await dbQuery(
       () => sql`
-      INSERT INTO products (name, price, image, description, background, size, color, stock, video_360, sku, reorder_point, reorder_alert_enabled, cost_price)
+      INSERT INTO products (name, price, image, description, background, stock, video_360, cost_price)
       VALUES (
         ${productData.name},
         ${productData.price},
         ${imageResult.value},
         ${productData.description || null},
         ${backgroundResult.value},
-        ${productData.size || null},
-        ${productData.color || null},
         ${productData.stock || 0},
         ${videoResult.value},
-        ${productData.sku?.trim() || null},
-        ${productData.reorder_point ?? 5},
-        ${productData.reorder_alert_enabled ?? true},
         ${productData.cost_price ?? null}
       )
       RETURNING *
@@ -405,13 +387,8 @@ router.put('/:id', verifyAdmin, async (req: Request, res: Response) => {
         image = COALESCE(${imageValue}, image),
         description = COALESCE(${updates.description || null}, description),
         background = COALESCE(${backgroundValue !== undefined ? backgroundValue : null}, background),
-        size = COALESCE(${updates.size || null}, size),
-        color = COALESCE(${updates.color || null}, color),
         is_out_of_stock = COALESCE(${isOutOfStock}, is_out_of_stock),
         video_360 = COALESCE(${video360Value !== undefined ? video360Value : null}, video_360),
-        sku = COALESCE(${updates.sku !== undefined ? (updates.sku?.trim() || null) : null}, sku),
-        reorder_point = COALESCE(${updates.reorder_point ?? null}, reorder_point),
-        reorder_alert_enabled = COALESCE(${updates.reorder_alert_enabled ?? null}, reorder_alert_enabled),
         cost_price = COALESCE(${updates.cost_price ?? null}, cost_price),
         updated_at = NOW()
       WHERE id = ${id}
@@ -480,8 +457,6 @@ router.post('/search', async (req: Request, res: Response) => {
       query, 
       minPrice, 
       maxPrice, 
-      size,
-      color,
       sortBy = 'default',
       page = 1,
       limit: bodyLimit = 20,
@@ -500,8 +475,6 @@ router.post('/search', async (req: Request, res: Response) => {
 
     // Sanitize inputs
     const sanitizedQuery = query ? sanitizeSearchQuery(query) : '';
-    const sanitizedSize = size ? sanitizeString(size) : null;
-    const sanitizedColor = color ? sanitizeString(color) : null;
     const searchPattern = `%${sanitizedQuery}%`;
     
     // Validate numeric filters
@@ -528,11 +501,9 @@ router.post('/search', async (req: Request, res: Response) => {
 
     // Build WHERE conditions
     const hasSearchQuery = sanitizedQuery.trim().length > 0;
-    const hasSize = sanitizedSize !== null;
-    const hasColor = sanitizedColor !== null;
     const hasPriceRange = priceMin !== null || priceMax !== null;
 
-    if (!hasSearchQuery && !hasSize && !hasColor && !hasPriceRange) {
+    if (!hasSearchQuery && !hasPriceRange) {
       products = await dbQuery(
         () => sql`
         SELECT * FROM products 
@@ -548,8 +519,6 @@ router.post('/search', async (req: Request, res: Response) => {
         SELECT * FROM products 
         WHERE 1=1
         ${hasSearchQuery ? sql`AND (name ILIKE ${searchPattern} OR description ILIKE ${searchPattern})` : sql``}
-        ${hasSize ? sql`AND size = ${sanitizedSize}` : sql``}
-        ${hasColor ? sql`AND color = ${sanitizedColor}` : sql``}
         ${priceMin !== null ? sql`AND price >= ${priceMin}` : sql``}
         ${priceMax !== null ? sql`AND price <= ${priceMax}` : sql``}
         ${getSortOrder()}
@@ -572,8 +541,6 @@ router.post('/search', async (req: Request, res: Response) => {
       },
       filters: {
         query: sanitizedQuery || null,
-        size: sanitizedSize,
-        color: sanitizedColor,
         minPrice: priceMin,
         maxPrice: priceMax,
         sortBy: sortOption

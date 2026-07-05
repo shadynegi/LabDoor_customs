@@ -22,7 +22,7 @@ Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_
 
 ## Storefront
 
-Product catalog with search/filters, 360° product viewer, cart, WhatsApp checkout, order tracking, contact form, policy pages, SEO sitemap.
+Product catalog with search/filters, 360° product viewer, cart, WhatsApp checkout, order tracking, contact form (opens WhatsApp with prefilled message — no API), policy pages, SEO sitemap.
 
 ## Admin
 

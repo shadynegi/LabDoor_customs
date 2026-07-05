@@ -317,6 +317,7 @@ Sprint 4 — Admin/storefront polish
 | 2026-06-10 | UI-ADMIN | `admin-ui.spec.ts` — login redirect + dashboard analytics smoke (149 tests) |
 | 2026-06-10 | PAY-POLICY / POL-ADMIN | No-refund store policy — `policy_accepted`, admin refund/cancel 403, storefront policy pages (`1406729`; 150 tests) |
 | 2026-06-26 | TEST-EXPANSION | +35 tests — validate-cart API, admin analytics IST/UI, responsive mobile UI, performance budgets, stability smoke, checkout serial Playwright project (233 tests) |
+| 2026-07-05 | TEST-EXPANSION | Admin module Playwright specs (59), production env validation (`validateEnv.test.ts`), upload volume persistence, pooler `DATABASE_URL` gate — **520** automated tests |
 
 *Append a line when closing each Critical/High item.*
 

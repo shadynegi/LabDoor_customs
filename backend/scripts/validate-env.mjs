@@ -23,6 +23,19 @@ function fail(message) {
   process.exit(1);
 }
 
+/** Mirrors backend/src/lib/databaseUrl.ts and db.ts pooler detection. */
+function isPoolerDatabaseUrl(url) {
+  if (process.env.DB_USE_POOLER === 'true') return true;
+  try {
+    const parsed = new URL(url.replace(/^postgres(ql)?:\/\//, 'http://'));
+    const host = parsed.hostname.toLowerCase();
+    const port = parsed.port || '5432';
+    return host.includes('pooler') || port === '6543';
+  } catch {
+    return url.includes('pooler') || url.includes(':6543');
+  }
+}
+
 for (const key of requiredAlways) {
   if (!process.env[key]?.trim()) {
     fail(`Missing required variable: ${key}`);
@@ -62,6 +75,13 @@ if (isProduction) {
 
   if (process.env.ALLOW_INSECURE_RLS === 'true') {
     fail('ALLOW_INSECURE_RLS=true is forbidden in production');
+  }
+
+  const dbUrl = process.env.DATABASE_URL?.trim() || '';
+  if (!isPoolerDatabaseUrl(dbUrl)) {
+    fail(
+      'DATABASE_URL must use PgBouncer pooler (host contains "pooler" or port 6543), or set DB_USE_POOLER=true'
+    );
   }
 }
 

@@ -46,14 +46,16 @@ The pre-filled WhatsApp text uses **`Order ID: {serverOrderId}`** (`orders.id` U
 
 | Layer | Files | Coverage |
 |-------|-------|----------|
-| Unit | `Tests/backend/whatsappCheckout.test.ts` | Place-order message formatting, URL encoding |
-| Unit | `Tests/backend/clientId.test.ts` | Checkout idempotency key — UUID fallback when `crypto.randomUUID` unavailable |
-| Unit | `Tests/backend/whatsappNotifications.test.ts` | Payment confirmation message, phone normalization, Cloud API send |
-| Unit | `Tests/backend/postPaymentCapture.test.ts` | WhatsApp hooks on admin mark paid |
-| API | `Tests/api/orderTracking.test.ts` | Lookup validation, shipped tracking, deprecated links, admin-only GET |
-| API | `Tests/api/whatsappPaymentConfirmation.test.ts` | Mark paid triggers notifications; idempotent skip when already paid |
-| API | `Tests/api/checkout.test.ts`, `checkoutWhatsAppIntegration.test.ts` | Validation, happy path, `whatsappUrl` payload, idempotency cache |
-| UI | `Tests/frontend/orders-ui.spec.ts` | OrderId+email lookup, sessionStorage, errors, shipped tracking |
-| UI | `Tests/frontend/checkout-place-order-ui.spec.ts` | Policy + form + Place Order → mocked `whatsappUrl` |
+| Layer | Path | What it covers |
+|-------|------|----------------|
+| Unit | `Tests/unit/backend/checkout/whatsappCheckout.test.ts` | Place-order message formatting, URL encoding |
+| Unit | `Tests/unit/backend/checkout/clientId.test.ts` | Checkout idempotency key — UUID fallback when `crypto.randomUUID` unavailable |
+| Unit | `Tests/unit/backend/checkout/whatsappNotifications.test.ts` | Payment confirmation message, phone normalization, Cloud API send |
+| Unit | `Tests/unit/backend/checkout/postPaymentCapture.test.ts` | WhatsApp hooks on admin mark paid |
+| API | `Tests/integration/api/orders/lookup.test.ts` | Lookup validation, shipped tracking, deprecated links, admin-only GET |
+| API | `Tests/integration/api/orders/whatsapp-payment-confirmation.test.ts` | Mark paid triggers notifications; idempotent skip when already paid |
+| API | `Tests/integration/api/checkout/place-order.validation.test.ts`, `place-order.whatsapp.test.ts` | Validation, happy path, `whatsappUrl` payload, idempotency cache |
+| UI | `Tests/e2e/specs/orders/orders-ui.spec.ts` | OrderId+email lookup, sessionStorage, errors, shipped tracking |
+| UI | `Tests/e2e/specs/checkout/checkout-place-order-ui.spec.ts` | Policy + form + Place Order → mocked `whatsappUrl` |
 
-Product ids in tests come from **`Tests/fixtures/products.ts`** (DB-shaped SERIAL ids, not hardcoded `1`). See [`test_guidelines.md`](test_guidelines.md#product-catalog-fixtures).
+Product ids in tests come from **`Tests/shared/fixtures/products.ts`** (DB-shaped SERIAL ids, not hardcoded `1`). See [`test_guidelines.md`](test_guidelines.md#product-catalog-fixtures).

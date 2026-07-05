@@ -19,7 +19,7 @@ import MobileStickyCta from '../components/MobileStickyCta';
 import { trackProductView, trackSizeSelect } from '../utils/activityTracker';
 import { REPLACEMENT_POLICY_PATH } from '../constants/returnPolicy';
 import { getProductDetailPath } from '../lib/productPaths';
-import { normalizeProduct } from '../lib/productCatalogCache';
+import { normalizeProduct, CATALOG_CLEARED_EVENT } from '../lib/productCatalogCache';
 import { FREE_SHIPPING_MESSAGE } from '../utils/pricing';
 
 const Product360Viewer = lazy(() =>
@@ -100,6 +100,26 @@ const ProductDetailPage: React.FC = () => {
     void fetchProduct();
     return () => controller.abort();
   }, [id, navigate]);
+
+  useEffect(() => {
+    if (!id) return;
+
+    const onCatalogCleared = async () => {
+      try {
+        const response = await catalogFetch(`/products/${id}`);
+        if (!response.ok) return;
+        const data = await response.json();
+        if (data.success && data.data) {
+          setProduct(normalizeProduct(data.data));
+        }
+      } catch {
+        // Ignore background refresh errors
+      }
+    };
+
+    window.addEventListener(CATALOG_CLEARED_EVENT, onCatalogCleared);
+    return () => window.removeEventListener(CATALOG_CLEARED_EVENT, onCatalogCleared);
+  }, [id]);
 
   const isOutOfStock = Boolean(product?.is_out_of_stock || product?.stock === 0);
   const sizeSelected = Boolean(selectedSize);

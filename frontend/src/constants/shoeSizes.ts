@@ -6,5 +6,3 @@ export const SHOE_SIZE_OPTIONS = {
 } as const;
 
 export type ShoeSizeSystem = keyof typeof SHOE_SIZE_OPTIONS;
-
-export const US_SIZES_FOR_ADMIN = SHOE_SIZE_OPTIONS.US.map((size) => `US ${size}`);

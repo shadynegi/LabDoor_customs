@@ -42,21 +42,12 @@ export async function ensureProductPublicIdColumn(): Promise<void> {
   logger.info('products.public_id column ready');
 }
 
-/** Admin enhancements: SKU, reorder, inventory_movements, order_line_items (see migration-admin-enhancements.sql). */
+/** Admin enhancements: cost_price, inventory_movements, order_line_items (see migration-admin-enhancements.sql). */
 export async function ensureAdminEnhancementSchema(): Promise<void> {
   if (!(await publicTableExists('products'))) {
     return;
   }
 
-  await sql`
-    ALTER TABLE products ADD COLUMN IF NOT EXISTS sku VARCHAR(64)
-  `;
-  await sql`
-    ALTER TABLE products ADD COLUMN IF NOT EXISTS reorder_point INTEGER NOT NULL DEFAULT 5
-  `;
-  await sql`
-    ALTER TABLE products ADD COLUMN IF NOT EXISTS reorder_alert_enabled BOOLEAN NOT NULL DEFAULT TRUE
-  `;
   await sql`
     ALTER TABLE products ADD COLUMN IF NOT EXISTS cost_price DECIMAL(10, 2)
   `;
@@ -113,4 +104,22 @@ export async function ensureAdminEnhancementSchema(): Promise<void> {
   `;
 
   logger.info('Admin enhancement schema ready');
+}
+
+/** Drop legacy per-size/SKU/reorder columns (see migration-remove-product-variant-fields.sql). */
+export async function ensureProductVariantFieldsRemoved(): Promise<void> {
+  if (!(await publicTableExists('products'))) {
+    return;
+  }
+
+  await sql`DROP INDEX IF EXISTS idx_products_sku_unique`;
+  await sql`DROP INDEX IF EXISTS idx_products_size`;
+  await sql`DROP INDEX IF EXISTS idx_products_color`;
+  await sql`ALTER TABLE products DROP COLUMN IF EXISTS sku`;
+  await sql`ALTER TABLE products DROP COLUMN IF EXISTS reorder_point`;
+  await sql`ALTER TABLE products DROP COLUMN IF EXISTS reorder_alert_enabled`;
+  await sql`ALTER TABLE products DROP COLUMN IF EXISTS size`;
+  await sql`ALTER TABLE products DROP COLUMN IF EXISTS color`;
+
+  logger.info('products variant columns removed (single-product model)');
 }

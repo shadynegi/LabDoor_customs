@@ -6,9 +6,9 @@ Each suite writes its own report files, grouped by a shared **run ID** timestamp
 
 | File pattern | Suite |
 |--------------|-------|
-| `backend-unit-YYYY-MM-DD_HH-mm-ss.md` | Backend unit tests (`Tests/backend/`) |
-| `api-YYYY-MM-DD_HH-mm-ss.md` | API integration tests (`Tests/api/`) |
-| `frontend-ui-YYYY-MM-DD_HH-mm-ss.md` | Playwright UI tests (`Tests/frontend/`) |
+| `backend-unit-YYYY-MM-DD_HH-mm-ss.md` | Backend unit tests (`Tests/unit/backend/`) |
+| `api-YYYY-MM-DD_HH-mm-ss.md` | API integration tests (`Tests/integration/api/`) |
+| `frontend-ui-YYYY-MM-DD_HH-mm-ss.md` | Playwright UI tests (`Tests/e2e/specs/`) |
 | `summary-YYYY-MM-DD_HH-mm-ss.md` | Combined summary (only when running `npm test` / `test:all`) |
 | `latest-summary.json` | Pointer to the most recent full run |
 

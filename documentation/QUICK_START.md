@@ -64,6 +64,7 @@ Apply the database schema:
 ```bash
 # Run backend/src/database/schema.sql in Supabase SQL editor
 # Then run any migration-*.sql files as needed
+# Optional: seed.sql for sample products; npm run seed:test-data for admin QA data
 ```
 
 ---
@@ -119,8 +120,19 @@ cd backend && SERVE_FRONTEND=true npm start
 ## 5. Verify
 
 ```bash
-npm test
+npm test                    # full suite: backend unit + API + frontend unit + Playwright + viewport audit
+npm run test:frontend-unit  # React component/hook tests only
 ```
+
+**Admin dashboard QA data (optional, requires `DATABASE_URL` + products):**
+
+```bash
+npm run seed:test-data
+```
+
+Loads 10 customers (`Test*` names, `test` in email) and 20 orders (`GSS-TEST-SEED-*`) across date ranges for analytics filters. Idempotent — re-run anytime.
+
+Copy `frontend/env.template` to `frontend/.env` if missing. **`VITE_WHATSAPP_CONTACT_NUMBER`** defaults to `+919888514572` (matches contact E2E and `Tests/scripts/run-with-report.mjs`).
 
 For a **production-like build** locally, set `frontend/.env` with `VITE_API_BASE_URL`, `VITE_SITE_URL`, and `VITE_SENTRY_DSN` (or run with `NODE_ENV=development` to skip strict env checks). Then:
 
@@ -128,7 +140,7 @@ For a **production-like build** locally, set `frontend/.env` with `VITE_API_BASE
 npm run build
 ```
 
-**Production:** all required migrations are applied (June 2026). **Local/new Supabase:** run `schema.sql` and `migration-*.sql` files from `backend/src/database/`, or rely on boot-time schema helpers on first Railway deploy.
+**Production:** all required migrations are applied (July 2026). **Local/new Supabase:** run `schema.sql` and `migration-*.sql` files from `backend/src/database/`, or rely on boot-time schema helpers on first Railway deploy.
 
 ---
 

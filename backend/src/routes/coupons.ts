@@ -184,14 +184,12 @@ router.get('/', verifyAdmin, async (req: Request, res: Response) => {
     }
     const { limit, offset } = parsed.params;
 
-    const [coupons, countResult] = await Promise.all([
-      sql`
-        SELECT * FROM coupons
-        ORDER BY created_at DESC
-        LIMIT ${limit} OFFSET ${offset}
-      `,
-      sql`SELECT COUNT(*) as total FROM coupons`,
-    ]);
+    const coupons = await sql`
+      SELECT * FROM coupons
+      ORDER BY created_at DESC
+      LIMIT ${limit} OFFSET ${offset}
+    `;
+    const countResult = await sql`SELECT COUNT(*) as total FROM coupons`;
 
     const total = parseInt(countResult[0]?.total || '0');
 

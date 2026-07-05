@@ -90,11 +90,23 @@ async function fetchWithTimeout(
 ): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  const externalSignal = init.signal;
+
+  if (externalSignal) {
+    if (externalSignal.aborted) {
+      clearTimeout(timeoutId);
+      throw new DOMException('The operation was aborted.', 'AbortError');
+    }
+    externalSignal.addEventListener('abort', () => controller.abort(), { once: true });
+  }
 
   try {
     return await fetch(url, { ...init, signal: controller.signal });
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
+      if (externalSignal?.aborted) {
+        throw error;
+      }
       throw new Error(`Request timed out after ${timeoutMs}ms`);
     }
     throw error;

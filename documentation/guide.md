@@ -114,6 +114,8 @@ npm run validate-env
 
 Fix any reported issues before starting the app.
 
+Optional optimization baseline: `npm run audit:codebase` (writes `documentation/OPTIMIZATION_BASELINE.md`).
+
 ---
 
 ## Phase 3 — Start the application (development)
@@ -157,12 +159,14 @@ This single command runs all suites in order:
 
 | Suite | Tool | Tests | Needs live DB? |
 |-------|------|-------|----------------|
-| Backend unit | Vitest | 118 | No (mocked) |
-| API integration | Vitest | 71 | No (mocked) |
-| Frontend UI | Playwright | 233 | No (mocked API + static preview) |
-| **Total** | | **423** | |
+| Backend unit | Vitest | 138 | No (mocked) |
+| API integration | Vitest | 78 | No (mocked) |
+| Frontend unit | Vitest + RTL | 13 | No |
+| Frontend UI | Playwright | 286 (93 desktop + 193 mobile) | No (mocked API + static preview) |
+| Viewport overflow audit | Playwright script | 12 widths × 16 routes | No (static preview) |
+| **Total** | | **520** | |
 
-The runner auto-builds the frontend for UI tests if `frontend/dist` is missing and installs Playwright in `Tests/` on first run if needed.
+The runner auto-builds the frontend for UI tests if `frontend/dist` is missing, installs Playwright in `Tests/` on first run if needed, and runs the viewport overflow audit after Playwright.
 
 ### Test reports
 
@@ -172,7 +176,9 @@ Reports are written to `documentation/test-results/`:
 |------|----------|
 | `backend-unit-{runId}.md` / `.json` | Backend unit test results |
 | `api-{runId}.md` / `.json` | API integration results |
+| `frontend-unit-{runId}.md` / `.json` | Frontend unit (RTL) results |
 | `frontend-ui-{runId}.md` / `.json` | Playwright UI results |
+| `viewport-audit-{runId}.md` / `.json` | Viewport overflow audit |
 | `summary-{runId}.md` / `.json` | Combined overview |
 | `latest-summary.json` | Most recent full run |
 
@@ -181,10 +187,11 @@ Reports are written to `documentation/test-results/`:
 ### Run individual suites
 
 ```powershell
-npm run test:backend    # Backend unit only
-npm run test:api        # API integration only
-npm run test:frontend   # Playwright UI only (alias: npm run test:ui)
-npm run test:all        # Same as npm test
+npm run test:backend       # Backend unit only
+npm run test:api           # API integration only
+npm run test:frontend-unit # React component/hook unit tests
+npm run test:frontend      # Playwright UI + viewport audit (alias: npm run test:ui)
+npm run test:all           # Same as npm test
 ```
 
 See [test_guidelines.md](test_guidelines.md) for coverage details and manual QA flows.
@@ -254,6 +261,7 @@ Automated tests mock Postgres, Redis, and API responses — no running server re
 | Validate env | `npm run validate-env` |
 | Dev mode | `npm run dev` |
 | All tests | `npm test` |
+| Frontend unit | `npm run test:frontend-unit` |
 | Build | `npm run build` |
 
 ---

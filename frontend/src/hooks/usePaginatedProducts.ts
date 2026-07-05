@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { catalogFetch } from '../config';
 import type { Product } from './useProducts';
-import { normalizeProduct } from '../lib/productCatalogCache';
+import { normalizeProduct, CATALOG_CLEARED_EVENT } from '../lib/productCatalogCache';
 import { toast } from 'sonner';
 import { logError } from '../lib/logger';
 
@@ -92,6 +92,15 @@ export const usePaginatedProducts = (limit: number = 10): UsePaginatedProductsRe
 
   useEffect(() => {
     fetchProducts(1, false);
+  }, [fetchProducts]);
+
+  useEffect(() => {
+    const onCatalogCleared = () => {
+      setCurrentPage(1);
+      void fetchProducts(1, false);
+    };
+    window.addEventListener(CATALOG_CLEARED_EVENT, onCatalogCleared);
+    return () => window.removeEventListener(CATALOG_CLEARED_EVENT, onCatalogCleared);
   }, [fetchProducts]);
 
   return {

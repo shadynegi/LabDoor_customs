@@ -30,7 +30,7 @@ Displays:
 - **Units sold**, revenue, average order value, and **revenue change vs prior period** for the selected range
 - **Top sellers** by units and revenue; **revenue by product** table with share %
 - **Best sales period** in range (highest-revenue bucket)
-- **Low-stock alert** — products at or below reorder point (`inventory.low_stock_products`)
+- **Low-stock alert** — products at or below fixed threshold of 5 units (`inventory.low_stock_products`)
 - Product engagement metrics (views, cart adds)
 - Customer statistics and geographic breakdown
 - **Export CSV** — `GET /api/admin/analytics/export?period=` (+ `from`/`to` when `period=custom`); **disabled until Apply range** on Custom so export matches on-screen data; download name includes IST date range for custom periods
@@ -40,9 +40,11 @@ Data source: `GET /api/admin/analytics?period=day|week|month|year|all|custom&fro
 
 Response includes `sales` (period metrics) and `inventory` (low-stock summary). Cached 5–15 min per period (`ADMIN_ANALYTICS_CACHE_TTL_MS`).
 
+**QA seed data:** Run `npm run seed:test-data` (see [`info.md`](info.md#testing)) to populate 10 `Test*` customers and 20 orders spanning today, last 7/30 days, earlier this year, and previous year — filter admin lists with `test` or order prefix `GSS-TEST-SEED-`.
+
 If the analytics API fails, the tab shows an error message with a **Retry** button.
 
-**Automated UI tests:** `Tests/frontend/admin-analytics-ui.spec.ts` verifies Custom range **Apply range** sends IST query params and **Export CSV** stays disabled until dates are applied (and re-disables when dates change). See [`test_guidelines.md`](test_guidelines.md).
+**Automated UI tests:** `Tests/e2e/specs/admin/admin-analytics-ui.spec.ts` verifies Custom range **Apply range** sends IST query params and **Export CSV** stays disabled until dates are applied (and re-disables when dates change). See [`test_guidelines.md`](test_guidelines.md).
 
 ---
 
@@ -53,12 +55,13 @@ If the analytics API fails, the tab shows an error message with a **Retry** butt
 - **Load more** — paginated list via `GET /api/products?limit=50&page=` when not searching
 - Error banner with **Retry** if the product list fails to load
 - **Coupons** — product scope uses **server search** (`AdminProductSearchPicker` → `POST /api/products/search`), not a fixed product list
-- Create new products (name, price, images via **file upload** (Multer, max 20 MB) or URL, optional **360° MP4 video**, **SKU**, **reorder point**, optional **cost price**, size, color, stock)
+- Create new products (name, price, images via **file upload** (Multer, max 20 MB) or URL, optional **360° MP4 video**, optional **cost price**, stock) — **one listing per shoe**; all standard sizes available on the storefront
 - Edit existing products (stock changes are logged to `inventory_movements`)
 - Delete products
 - **Bulk stock** — set absolute stock or apply delta for selected products via `POST /api/admin/products/bulk-update` (`stock`, `stock_delta`, or `is_out_of_stock`)
-- **Low-stock filter** — highlight products below reorder point
+- **Low-stock filter** — highlight products at or below 5 units in stock
 - **Stock history** — per-product movement log via `GET /api/admin/products/:id/inventory-movements`
+- **Out-of-stock toggle** — per-row switch (`ToggleSwitch` in Status column): ON marks the product out of stock (green track, thumb right); OFF marks in stock (gray track, thumb left). Updates via `PUT /api/products/:id` with optimistic UI, loading state, and toast feedback; invalidates server product cache and storefront catalog listeners.
 - Bulk mark in/out of stock via same bulk-update endpoint
 
 Product list API responses are cached (60s TTL); writes invalidate cache.
@@ -109,8 +112,7 @@ Bulk status dropdown supports processing, shipped, and delivered only. **Cancell
 
 Manage discount codes used at checkout (server-side billing via `resolveCouponDiscount`).
 
-- **Quick presets** — create `SAVE5`, `SAVE10`, `SAVE20`, `SAVE25`, `SAVE50` (percentage off, entire order)
-- **Custom coupon** — any code + 5–50% discount + **scope**: entire order or specific product IDs (`applies_to` / `applies_to_ids` on `POST /api/coupons`)
+- **Create coupon** — any code + 5–50% discount + **scope**: entire order or specific product IDs (`applies_to` / `applies_to_ids` on `POST /api/coupons`)
 - **Edit** — pencil icon opens a modal to update description, max uses, valid-until date, **applies_to scope** (all / product IDs), and active status (`PUT /api/coupons/:id`)
 - **Activate / deactivate** — toggle `is_active` without deleting
 - **Delete** — remove unused coupons
@@ -141,7 +143,7 @@ Aggregated customer data from the `customers` table (updated when admin marks an
 Operational tools without a dedicated data grid:
 
 - **Activity log export** — download all storefront activity as NDJSON via `GET /api/activity/export`; optional **From** / **To** date filters
-- **Admin sessions** — list recent sessions (`GET /api/admin/sessions`, last 50) with active/expired counts; **Clean up expired** calls `POST /api/admin/sessions/cleanup`
+- **Admin sessions** — list recent sessions (`GET /api/admin/sessions`, last 50) with `is_current`, active/expired counts; **Revoke** per row (`DELETE /api/admin/sessions/:id`, not the current cookie session); **Clean up** calls `POST /api/admin/sessions/cleanup` (removes expired rows and excess logins — keeps **5** newest per user)
 - **Customer aggregates** — **Recompute customer aggregates** runs `POST /api/admin/customers/recompute` (refresh order counts and spend from completed orders)
 
 ---
@@ -161,7 +163,7 @@ These are available via API but do not have dedicated dashboard tabs:
 | Endpoint | Purpose |
 |----------|---------|
 | `POST /api/admin/products/bulk-update` | Bulk product updates (`stock`, `stock_delta`, `is_out_of_stock`) |
-| `GET /api/admin/products/low-stock` | Products at or below reorder point |
+| `GET /api/admin/products/low-stock` | Products at/below fixed low-stock threshold (5 units) |
 | `GET /api/admin/products/:id/inventory-movements` | Stock movement audit log |
 | `GET /api/admin/analytics/export` | CSV export of product sales for period |
 | `PATCH /api/admin/customers/:id` | Update customer CRM profile |
@@ -176,8 +178,9 @@ Use the dedicated cancel endpoint for unpaid pending orders — not bulk update.
 
 Managed from the **Settings** tab (and via API):
 
-- `GET /api/admin/sessions` — list recent admin sessions
-- `POST /api/admin/sessions/cleanup` — remove expired sessions
+- `GET /api/admin/sessions` — list recent admin sessions (`is_current` flag)
+- `POST /api/admin/sessions/cleanup` — remove expired sessions and excess logins (keeps 5 newest per user)
+- `DELETE /api/admin/sessions/:id` — revoke a specific session (not the current cookie)
 - `POST /api/admin/logout` — end current session
 
 If your session expires mid-use, API calls return 401. Log in again at `/admin/login`.

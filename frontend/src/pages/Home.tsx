@@ -58,6 +58,24 @@ const priceVariants: Variants = {
   exit: { opacity: 0, y: -20, transition: { duration: 0.2 } }
 };
 
+const HERO_MAX_DOTS = 5;
+
+/** At most 5 dots; when there are more products, show a window centered on the active slide. */
+function getHeroDotIndices(productCount: number, currentIndex: number): number[] {
+  if (productCount <= HERO_MAX_DOTS) {
+    return Array.from({ length: productCount }, (_, i) => i);
+  }
+  const half = Math.floor(HERO_MAX_DOTS / 2);
+  let start = currentIndex - half;
+  if (start < 0) start = 0;
+  let end = start + HERO_MAX_DOTS - 1;
+  if (end >= productCount) {
+    end = productCount - 1;
+    start = end - HERO_MAX_DOTS + 1;
+  }
+  return Array.from({ length: HERO_MAX_DOTS }, (_, i) => start + i);
+}
+
 export default function Home() {
   const { products: apiProducts, loading, error, refetch } = useProducts();
   const products = apiProducts;  
@@ -614,7 +632,9 @@ export default function Home() {
               zIndex: 10,
             }}
           >
-            {products.map((p, i) => (
+            {getHeroDotIndices(products.length, index).map((i) => {
+              const p = products[i];
+              return (
               <button
                 key={p.id}
                 type="button"
@@ -644,7 +664,8 @@ export default function Home() {
                   display: 'block',
                 }} />
               </button>
-            ))}
+              );
+            })}
           </div>
 
           {/* Price and Add to Cart - Center Below Dots */}

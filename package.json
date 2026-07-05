@@ -17,9 +17,12 @@
     "test:backend": "node Tests/scripts/run-with-report.mjs unit",
     "test:api": "node Tests/scripts/run-with-report.mjs api",
     "test:vitest": "node Tests/scripts/run-with-report.mjs vitest",
+    "test:frontend-unit": "node Tests/scripts/run-with-report.mjs frontend-unit",
     "test:frontend": "node Tests/scripts/run-with-report.mjs frontend",
     "test:ui": "node Tests/scripts/run-with-report.mjs frontend",
     "validate-env": "npm run validate-env -w backend && npm run validate-env -w frontend",
+    "audit:codebase": "node scripts/audit-codebase.mjs",
+    "seed:test-data": "npm run seed:test-data -w backend",
     "links:check": "node scripts/link-check.mjs"
   },
   "devDependencies": {

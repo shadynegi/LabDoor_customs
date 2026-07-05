@@ -1,6 +1,7 @@
 /* Import glassmorphism/liquid glass styles */
 @import './styles/glassmorphism.css';
 @import './styles/responsive.css';
+@import './styles/toggle-switch.css';
 
 /* Global Styles - Lab Door Customs */
 :root {

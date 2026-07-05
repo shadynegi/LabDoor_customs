@@ -4,7 +4,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     setupFiles: ['../Tests/setup.ts'],
-    include: ['../Tests/backend/**/*.test.ts', '../Tests/api/**/*.test.ts'],
+    include: ['../Tests/unit/backend/**/*.test.ts', '../Tests/integration/api/**/*.test.ts'],
     env: {
       NODE_ENV: 'test',
       DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/postgres',

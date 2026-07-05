@@ -6,8 +6,8 @@ import { apiFetch } from '../config';
 import { apiUpload } from '../lib/apiUpload';
 import { logError } from '../lib/logger';
 import { clearProductCatalogCache } from '../lib/productCatalogCache';
+import { resolveProductBackground, resolveProductImage } from '../lib/productImageMaps';
 import { useResponsive } from '../hooks/useResponsive';
-import { US_SIZES_FOR_ADMIN } from '../constants/shoeSizes';
 
 export interface AdminProduct {
   id: number;
@@ -16,13 +16,9 @@ export interface AdminProduct {
   image: string;
   description?: string;
   background?: string;
-  size?: string;
-  color?: string;
   stock: number;
   is_out_of_stock: boolean;
   video_360?: string | null;
-  sku?: string | null;
-  reorder_point?: number;
   cost_price?: number | null;
 }
 
@@ -32,17 +28,11 @@ export interface ProductFormPayload {
   image: string;
   description?: string;
   background?: string;
-  size?: string;
-  color?: string;
   stock: number;
   is_out_of_stock?: boolean;
   video_360?: string | null;
-  sku?: string | null;
-  reorder_point?: number;
   cost_price?: number | null;
 }
-
-const COLORS = ['Black', 'White', 'Blue', 'Gold', 'Pink', 'Brown', 'Red', 'Green', 'Grey', 'Multi'];
 
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 const MAX_VIDEO_BYTES = 15 * 1024 * 1024;
@@ -53,13 +43,9 @@ const emptyForm = (): ProductFormPayload => ({
   image: '',
   description: '',
   background: '',
-  size: 'US 10',
-  color: 'Black',
   stock: 0,
   is_out_of_stock: false,
   video_360: '',
-  sku: '',
-  reorder_point: 5,
   cost_price: null,
 });
 
@@ -96,7 +82,6 @@ export default function AdminProductFormModal({
   const { isMobile } = useResponsive();
   const isEditing = Boolean(product);
   const [form, setForm] = useState<ProductFormPayload>(emptyForm());
-  const [extraSizes, setExtraSizes] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [backgroundFile, setBackgroundFile] = useState<File | null>(null);
@@ -134,19 +119,13 @@ export default function AdminProductFormModal({
         image: product.image || '',
         description: product.description || '',
         background: product.background || '',
-        size: product.size || 'US 10',
-        color: product.color || '',
         stock: product.stock,
         is_out_of_stock: product.is_out_of_stock,
         video_360: product.video_360 || '',
-        sku: product.sku || '',
-        reorder_point: product.reorder_point ?? 5,
         cost_price: product.cost_price ?? null,
       });
-      setExtraSizes(new Set());
     } else {
       setForm(emptyForm());
-      setExtraSizes(new Set());
     }
     resetPendingFiles();
   }, [isOpen, product]);
@@ -243,12 +222,8 @@ export default function AdminProductFormModal({
         image: (uploaded.image ?? form.image.trim()),
         background: (uploaded.background ?? form.background?.trim()) || undefined,
         description: form.description?.trim() || undefined,
-        size: form.size?.trim() || undefined,
-        color: form.color?.trim() || undefined,
         is_out_of_stock: form.stock === 0 ? true : form.is_out_of_stock,
         video_360: (uploaded.video_360 ?? form.video_360?.trim()) || undefined,
-        sku: form.sku?.trim() || undefined,
-        reorder_point: form.reorder_point ?? 5,
         cost_price: form.cost_price != null && form.cost_price > 0 ? form.cost_price : undefined,
       };
 
@@ -256,17 +231,8 @@ export default function AdminProductFormModal({
         await saveProduct(payload, product.id);
         toast.success('Product updated');
       } else {
-        const sizes = [payload.size || 'US 10', ...Array.from(extraSizes)]
-          .filter((s, i, arr) => arr.indexOf(s) === i);
-
-        for (const size of sizes) {
-          await saveProduct({ ...payload, size });
-        }
-        toast.success(
-          sizes.length === 1
-            ? 'Product created'
-            : `Created ${sizes.length} size listings`
-        );
+        await saveProduct(payload);
+        toast.success('Product created');
       }
 
       clearProductCatalogCache();
@@ -280,10 +246,10 @@ export default function AdminProductFormModal({
     }
   };
 
-  const previewSrc = (src: string) => {
+  const previewSrc = (src: string, kind: 'image' | 'background' = 'image') => {
     if (!src) return '';
-    if (src.startsWith('data:') || src.startsWith('http') || src.startsWith('/')) return src;
-    return src;
+    if (src.startsWith('data:') || src.startsWith('http')) return src;
+    return kind === 'background' ? resolveProductBackground(src) ?? src : resolveProductImage(src);
   };
 
   const imageDisplayValue = imageFile
@@ -306,7 +272,7 @@ export default function AdminProductFormModal({
 
   return (
     <LiquidModal isOpen={isOpen} onClose={onClose} maxWidth={720}>
-      <form onSubmit={handleSubmit} style={{ padding: 24 }}>
+      <form data-testid="admin-product-form" onSubmit={handleSubmit} style={{ padding: 24 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
           <div>
             <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>
@@ -315,7 +281,7 @@ export default function AdminProductFormModal({
             <p style={{ margin: '6px 0 0', fontSize: 14, color: '#6b7280' }}>
               {isEditing
                 ? 'Update listing details, images, and inventory.'
-                : 'Create a catalog listing with image, size, price, and stock.'}
+                : 'Create one catalog listing. All standard sizes are available on the storefront.'}
             </p>
           </div>
           <button type="button" onClick={onClose} style={{ background: '#f3f4f6', border: 'none', borderRadius: 8, padding: 8, cursor: 'pointer' }}>
@@ -367,34 +333,6 @@ export default function AdminProductFormModal({
           </div>
 
           <div>
-            <label htmlFor="admin-product-sku" style={labelStyle}>SKU</label>
-            <input
-              id="admin-product-sku"
-              name="sku"
-              type="text"
-              value={form.sku || ''}
-              onChange={(e) => setField('sku', e.target.value)}
-              placeholder="e.g. NIKE-BLU-US10"
-              style={inputStyle}
-              maxLength={64}
-            />
-          </div>
-
-          <div>
-            <label htmlFor="admin-product-reorder-point" style={labelStyle}>Reorder point</label>
-            <input
-              id="admin-product-reorder-point"
-              name="reorder_point"
-              type="number"
-              min={0}
-              step={1}
-              value={form.reorder_point ?? 5}
-              onChange={(e) => setField('reorder_point', parseInt(e.target.value, 10) || 0)}
-              style={inputStyle}
-            />
-          </div>
-
-          <div>
             <label htmlFor="admin-product-cost-price" style={labelStyle}>Cost price (USD)</label>
             <input
               id="admin-product-cost-price"
@@ -410,36 +348,6 @@ export default function AdminProductFormModal({
               placeholder="Optional — for profit estimates"
               style={inputStyle}
             />
-          </div>
-
-          <div>
-            <label htmlFor="admin-product-size" style={labelStyle}>Primary size</label>
-            <select
-              id="admin-product-size"
-              name="size"
-              value={form.size || ''}
-              onChange={(e) => setField('size', e.target.value)}
-              style={inputStyle}
-            >
-              {US_SIZES_FOR_ADMIN.map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label htmlFor="admin-product-color" style={labelStyle}>Color</label>
-            <select
-              id="admin-product-color"
-              name="color"
-              value={form.color || ''}
-              onChange={(e) => setField('color', e.target.value)}
-              style={inputStyle}
-            >
-              {COLORS.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
           </div>
 
           <div style={{ gridColumn: '1 / -1' }}>
@@ -522,9 +430,9 @@ export default function AdminProductFormModal({
             </label>
             {(backgroundPreviewUrl || form.background) && (
               <img
-                src={backgroundPreviewUrl || previewSrc(form.background || '')}
+                src={backgroundPreviewUrl || previewSrc(form.background || '', 'background')}
                 alt="Background preview"
-                style={{ marginTop: 10, width: '100%', maxHeight: 120, objectFit: 'cover', borderRadius: 8 }}
+                style={{ marginTop: 10, width: '100%', maxHeight: 120, objectFit: 'contain', borderRadius: 8, background: '#f3f4f6' }}
               />
             )}
           </div>
@@ -576,47 +484,6 @@ export default function AdminProductFormModal({
             </p>
           </div>
 
-          {!isEditing && (
-            <div style={{ gridColumn: '1 / -1', background: '#f9fafb', borderRadius: 12, padding: 16, border: '1px solid #e5e7eb' }}>
-              <label style={{ ...labelStyle, marginBottom: 10 }}>Also create listings for these sizes</label>
-              <p style={{ margin: '0 0 12px', fontSize: 13, color: '#6b7280' }}>
-                Each size becomes a separate product row with the same name, price, and images.
-              </p>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                {US_SIZES_FOR_ADMIN.filter((s) => s !== form.size).map((size) => (
-                  <label
-                    key={size}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 6,
-                      padding: '6px 10px',
-                      borderRadius: 8,
-                      border: `1px solid ${extraSizes.has(size) ? '#9c6649' : '#e5e7eb'}`,
-                      background: extraSizes.has(size) ? '#fdf4ef' : 'white',
-                      fontSize: 13,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <input
-                      id={`admin-product-extra-size-${size}`}
-                      name="extraSizes"
-                      type="checkbox"
-                      checked={extraSizes.has(size)}
-                      onChange={(e) => {
-                        const next = new Set(extraSizes);
-                        if (e.target.checked) next.add(size);
-                        else next.delete(size);
-                        setExtraSizes(next);
-                      }}
-                    />
-                    {size}
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
-
           <div style={{ gridColumn: '1 / -1' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer' }}>
               <input
@@ -641,6 +508,7 @@ export default function AdminProductFormModal({
           </button>
           <button
             type="submit"
+            data-testid="admin-product-submit"
             disabled={saving}
             style={{
               padding: '12px 24px',

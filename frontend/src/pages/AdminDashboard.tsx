@@ -30,6 +30,7 @@ import {
   Settings,
 } from 'lucide-react';
 import { apiFetch, catalogFetch, slowApiFetch, config, getApiHeaders, ensureCsrfToken } from '../config';
+import { useAdminAuth, ADMIN_LOGIN_PATH } from '../contexts/AdminAuthContext';
 import { useResponsive } from '../hooks/useResponsive';
 import { toast } from 'sonner';
 import LiquidModal from '../components/LiquidModal';
@@ -44,7 +45,9 @@ import {
 } from '../lib/adminAnalyticsDates';
 import AdminCouponsTab from '../components/AdminCouponsTab';
 import AdminActionDialog from '../components/AdminActionDialog';
+import ToggleSwitch from '../components/ToggleSwitch';
 import { clearProductCatalogCache } from '../lib/productCatalogCache';
+import { resolveProductImage } from '../lib/productImageMaps';
 import { DashboardSkeleton, SkeletonStyles } from '../components/Skeletons';
 import { logError } from '../lib/logger';
 
@@ -111,6 +114,7 @@ interface AdminSession {
   created_at: string;
   expires_at: string;
   is_active: boolean;
+  is_current?: boolean;
 }
 
 interface Analytics {
@@ -139,7 +143,7 @@ interface Analytics {
   };
   inventory?: {
     low_stock_count: number;
-    low_stock_products: Array<{ id: number; name: string; sku: string | null; stock: number; reorder_point: number }>;
+    low_stock_products: Array<{ id: number; name: string; stock: number; low_stock_threshold: number }>;
   };
   integrations?: {
     ga4?: { configured: boolean; measurementId: string | null; consoleUrl: string };
@@ -160,9 +164,11 @@ type AdminDialog =
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
+  const { logout: adminLogout } = useAdminAuth();
   const [activeTab, setActiveTab] = useState<Tab>('analytics');
   const { isMobile } = useResponsive();
   const adminHeaderRef = useRef<HTMLDivElement>(null);
+  const analyticsAbortRef = useRef<AbortController | null>(null);
   const [adminHeaderHeight, setAdminHeaderHeight] = useState(isMobile ? 72 : 80);
 
   useEffect(() => {
@@ -200,12 +206,14 @@ export default function AdminDashboard() {
   } | null>(null);
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [sessionsCleaning, setSessionsCleaning] = useState(false);
+  const [revokingSessionId, setRevokingSessionId] = useState<string | null>(null);
   const [recomputeLoading, setRecomputeLoading] = useState(false);
   const [productsError, setProductsError] = useState<string | null>(null);
   const [productsPage, setProductsPage] = useState(1);
   const [productsTotalPages, setProductsTotalPages] = useState(1);
   const [productsTotal, setProductsTotal] = useState(0);
   const [productsLoadingMore, setProductsLoadingMore] = useState(false);
+  const [stockTogglingIds, setStockTogglingIds] = useState<Set<number>>(new Set());
   
   // UI states
   const [loading, setLoading] = useState(true);
@@ -311,6 +319,12 @@ export default function AdminDashboard() {
   };
 
   useEffect(() => {
+    return () => {
+      analyticsAbortRef.current?.abort();
+    };
+  }, []);
+
+  useEffect(() => {
     void loadTabData(activeTab);
   }, [activeTab]);
 
@@ -326,6 +340,7 @@ export default function AdminDashboard() {
       try {
         const response = await catalogFetch('/products/search', {
           method: 'POST',
+          cache: 'no-store',
           body: JSON.stringify({
             query: productSearch.trim(),
             limit: 50,
@@ -365,12 +380,17 @@ export default function AdminDashboard() {
       return;
     }
     setAnalyticsError(null);
+    analyticsAbortRef.current?.abort();
+    const controller = new AbortController();
+    analyticsAbortRef.current = controller;
     try {
       const query = buildAnalyticsQueryParams(period, customFrom, customTo);
       const response = await slowApiFetch(`/admin/analytics?${query}`, {
+        signal: controller.signal,
         retry: { count: 1, on: [502, 503, 504] },
       });
       const data = await response.json();
+      if (controller.signal.aborted) return;
       if (data.success) {
         setAnalytics(data.data);
         if (period === 'custom') {
@@ -383,6 +403,9 @@ export default function AdminDashboard() {
         toast.error(data.error || 'Failed to load analytics');
       }
     } catch (error) {
+      if (controller.signal.aborted || (error instanceof Error && error.name === 'AbortError')) {
+        return;
+      }
       logError('Error fetching analytics:', error);
       setAnalytics(null);
       setAnalyticsError('Unable to load analytics. Check your connection and try again.');
@@ -499,7 +522,7 @@ export default function AdminDashboard() {
       const response = await apiFetch('/admin/sessions/cleanup', { method: 'POST' });
       const data = await response.json();
       if (data.success) {
-        toast.success(data.message || 'Expired sessions removed');
+        toast.success(data.message || 'Session cleanup complete');
         await fetchAdminSessions();
       } else {
         toast.error(data.error || 'Session cleanup failed');
@@ -509,6 +532,29 @@ export default function AdminDashboard() {
       toast.error('Failed to clean up sessions');
     } finally {
       setSessionsCleaning(false);
+    }
+  };
+
+  const handleRevokeSession = async (session: AdminSession) => {
+    if (session.is_current) {
+      toast.error('Use Logout to end your current session');
+      return;
+    }
+    setRevokingSessionId(session.id);
+    try {
+      const response = await apiFetch(`/admin/sessions/${session.id}`, { method: 'DELETE' });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.success) {
+        toast.error(data.error || 'Failed to revoke session');
+        return;
+      }
+      toast.success('Session revoked');
+      await fetchAdminSessions();
+    } catch (error) {
+      logError('Session revoke error:', error);
+      toast.error('Failed to revoke session');
+    } finally {
+      setRevokingSessionId(null);
     }
   };
 
@@ -568,6 +614,17 @@ export default function AdminDashboard() {
     }
   };
 
+  const removeProductFromLists = (productId: number) => {
+    setProducts((prev) => prev.filter((p) => p.id !== productId));
+    setProductSearchResults((prev) => (prev ? prev.filter((p) => p.id !== productId) : prev));
+    setLowStockProducts((prev) => prev.filter((p) => p.id !== productId));
+    setSelectedProducts((prev) => {
+      const next = new Set(prev);
+      next.delete(productId);
+      return next;
+    });
+  };
+
   const fetchProducts = async (page = 1, append = false) => {
     if (append) {
       setProductsLoadingMore(true);
@@ -575,7 +632,7 @@ export default function AdminDashboard() {
       setProductsError(null);
     }
     try {
-      const response = await catalogFetch(`/products?limit=50&page=${page}`);
+      const response = await catalogFetch(`/products?limit=50&page=${page}`, { cache: 'no-store' });
       const data = await response.json();
       if (data.success) {
         const parsed = (data.data || []).map((p: any) => ({
@@ -629,7 +686,7 @@ export default function AdminDashboard() {
       const data = await response.json();
       if (data.success) {
         setLowStockProducts(
-          (data.data || []).map((p: { id: number; name: string; sku?: string | null; stock: number; reorder_point: number }) => ({
+          (data.data || []).map((p: { id: number; name: string; stock: number; low_stock_threshold?: number }) => ({
             ...p,
             price: 0,
             image: '',
@@ -1031,13 +1088,10 @@ export default function AdminDashboard() {
   };
 
   const handleLogout = async () => {
-    try {
-      await apiFetch('/admin/logout', { method: 'POST' });
-    } catch {
-      // Continue with client redirect even if logout request fails
-    }
+    analyticsAbortRef.current?.abort();
+    await adminLogout();
     toast.success('Logged out successfully');
-    navigate('/admin/login');
+    navigate(ADMIN_LOGIN_PATH, { replace: true });
   };
 
   // Bulk actions
@@ -1101,20 +1155,46 @@ export default function AdminDashboard() {
     }
   };
 
-  const toggleProductStock = async (productId: number, currentStatus: boolean) => {
+  const patchProductStockInLists = (productId: number, isOutOfStock: boolean) => {
+    const patch = (product: Product) =>
+      product.id === productId ? { ...product, is_out_of_stock: isOutOfStock } : product;
+    setProducts((prev) => prev.map(patch));
+    setLowStockProducts((prev) => prev.map(patch));
+    setProductSearchResults((prev) => (prev ? prev.map(patch) : prev));
+  };
+
+  const toggleProductStock = async (productId: number, nextOutOfStock: boolean) => {
+    if (stockTogglingIds.has(productId)) return;
+
+    const previousOutOfStock = !nextOutOfStock;
+    setStockTogglingIds((prev) => new Set(prev).add(productId));
+    patchProductStockInLists(productId, nextOutOfStock);
+
     try {
       const response = await apiFetch(`/products/${productId}`, {
         method: 'PUT',
-        body: JSON.stringify({ is_out_of_stock: !currentStatus }),
+        body: JSON.stringify({ is_out_of_stock: nextOutOfStock }),
       });
       const data = await response.json();
       if (data.success) {
         clearProductCatalogCache();
-        toast.success(`Product marked as ${!currentStatus ? 'out of stock' : 'in stock'}`);
-        fetchProducts();
+        if (data.data?.is_out_of_stock !== undefined) {
+          patchProductStockInLists(productId, Boolean(data.data.is_out_of_stock));
+        }
+        toast.success(`Product marked as ${nextOutOfStock ? 'out of stock' : 'in stock'}`);
+      } else {
+        patchProductStockInLists(productId, previousOutOfStock);
+        toast.error(data.error || 'Update failed');
       }
-    } catch (error) {
+    } catch {
+      patchProductStockInLists(productId, previousOutOfStock);
       toast.error('Update failed');
+    } finally {
+      setStockTogglingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(productId);
+        return next;
+      });
     }
   };
 
@@ -1131,14 +1211,16 @@ export default function AdminDashboard() {
   const executeDeleteProduct = async (product: Product) => {
     try {
       const response = await apiFetch(`/products/${product.id}`, { method: 'DELETE' });
-      const data = await response.json();
-      if (data.success) {
-        clearProductCatalogCache();
-        toast.success('Product deleted');
-        fetchProducts();
-      } else {
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.success) {
         toast.error(data.error || 'Delete failed');
+        return;
       }
+      clearProductCatalogCache();
+      removeProductFromLists(product.id);
+      invalidateTab('products');
+      await fetchProducts(productsPage, false);
+      toast.success('Product deleted');
     } catch {
       toast.error('Delete failed');
     }
@@ -1403,7 +1485,7 @@ export default function AdminDashboard() {
                 <AlertTriangle size={20} color="#d97706" />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 700, color: '#92400e' }}>
-                    {analytics.inventory.low_stock_count} product{analytics.inventory.low_stock_count !== 1 ? 's' : ''} at or below reorder point
+                    {analytics.inventory.low_stock_count} product{analytics.inventory.low_stock_count !== 1 ? 's' : ''} at or below low-stock threshold (5 units)
                   </div>
                   <div style={{ fontSize: 13, color: '#b45309', marginTop: 4 }}>
                     {analytics.inventory.low_stock_products.slice(0, 3).map((p) => p.name).join(', ')}
@@ -1649,22 +1731,21 @@ export default function AdminDashboard() {
                   style={{ marginTop: 4, minWidth: 20, minHeight: 20 }}
                 />
                 {product.image && (
-                  <img src={product.image} alt="" style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 8 }} />
+                  <img src={resolveProductImage(product.image)} alt="" style={{ width: 48, height: 48, objectFit: 'contain', borderRadius: 8, background: '#f3f4f6' }} />
                 )}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 700, color: '#1f2937' }}>{product.name}</div>
                   <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>
-                    ${product.price.toFixed(2)} · Stock {product.stock} · {product.size || '—'}
+                    ${product.price.toFixed(2)} · Stock {product.stock}
                   </div>
-                  <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
-                    <button
-                      type="button"
-                      aria-label={product.is_out_of_stock ? 'Mark in stock' : 'Mark out of stock'}
-                      onClick={() => toggleProductStock(product.id, product.is_out_of_stock)}
-                      style={{ padding: '8px 12px', minHeight: 44, borderRadius: 8, border: 'none', cursor: 'pointer', background: product.is_out_of_stock ? '#fee2e2' : '#dcfce7', color: product.is_out_of_stock ? '#dc2626' : '#16a34a', fontWeight: 600, fontSize: 13 }}
-                    >
-                      {product.is_out_of_stock ? 'Out of Stock' : 'In Stock'}
-                    </button>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <ToggleSwitch
+                      checked={Boolean(product.is_out_of_stock)}
+                      loading={stockTogglingIds.has(product.id)}
+                      onChange={(checked) => void toggleProductStock(product.id, checked)}
+                      ariaLabel={`${product.name}: out of stock ${product.is_out_of_stock ? 'on' : 'off'}`}
+                      size="sm"
+                    />
                     <button type="button" aria-label="Stock history" onClick={() => void openInventoryHistory(product)} style={{ padding: 8, minHeight: 44, minWidth: 44, background: '#eff6ff', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
                       <History size={16} color="#2563eb" aria-hidden="true" />
                     </button>
@@ -1690,7 +1771,6 @@ export default function AdminDashboard() {
                   onChange={(e) => setSelectedProducts(e.target.checked ? new Set(filteredProducts.map(p => p.id)) : new Set())} />
               </th>
               <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#374151' }}>Product</th>
-              <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#374151' }}>Size</th>
               <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#374151' }}>Price</th>
               <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#374151' }}>Stock</th>
               <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#374151' }}>Views</th>
@@ -1718,21 +1798,17 @@ export default function AdminDashboard() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     {product.image && (
                       <img
-                        src={product.image}
+                        src={resolveProductImage(product.image)}
                         alt=""
-                        style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 8, background: '#f3f4f6' }}
+                        style={{ width: 40, height: 40, objectFit: 'contain', borderRadius: 8, background: '#f3f4f6' }}
                         onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                       />
                     )}
                     <div>
                       <div style={{ fontWeight: 600, color: '#1f2937' }}>{product.name}</div>
-                      <div style={{ fontSize: 12, color: '#6b7280' }}>
-                        {product.color || ''}
-                      </div>
                     </div>
                   </div>
                 </td>
-                <td style={{ padding: 16, color: '#374151', fontWeight: 500 }}>{product.size || '—'}</td>
                 <td style={{ padding: 16, fontWeight: 600, color: '#10b981' }}>${product.price.toFixed(2)}</td>
                 <td style={{ padding: 16 }}>
                   <span style={{ padding: '4px 12px', borderRadius: 12, fontSize: 13, fontWeight: 600,
@@ -1743,16 +1819,14 @@ export default function AdminDashboard() {
                 </td>
                 <td style={{ padding: 16, color: '#6b7280' }}>{product.view_count || 0}</td>
                 <td style={{ padding: 16, textAlign: 'center' }}>
-                  <button
-                    type="button"
-                    onClick={() => toggleProductStock(product.id, product.is_out_of_stock)}
-                    title={product.is_out_of_stock ? 'Mark in stock' : 'Mark out of stock'}
-                    aria-label={product.is_out_of_stock ? 'Mark in stock' : 'Mark out of stock'}
-                    style={{ width: 40, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer',
-                      background: product.is_out_of_stock ? '#ef4444' : '#10b981', position: 'relative' }}>
-                    <span style={{ position: 'absolute', width: 18, height: 18, borderRadius: '50%', background: 'white', top: 3,
-                      left: product.is_out_of_stock ? 19 : 3, transition: 'left 0.2s' }} />
-                  </button>
+                  <div style={{ display: 'inline-flex', justifyContent: 'center' }}>
+                    <ToggleSwitch
+                      checked={Boolean(product.is_out_of_stock)}
+                      loading={stockTogglingIds.has(product.id)}
+                      onChange={(checked) => void toggleProductStock(product.id, checked)}
+                      ariaLabel={`${product.name}: out of stock ${product.is_out_of_stock ? 'on' : 'off'}`}
+                    />
+                  </div>
                 </td>
                 <td style={{ padding: 16, textAlign: 'center' }}>
                   <div style={{ display: 'flex', justifyContent: 'center', gap: 8 }}>
@@ -2131,7 +2205,7 @@ export default function AdminDashboard() {
           <div>
             <h3 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 700, color: '#1f2937' }}>Admin sessions</h3>
             <p style={{ margin: 0, fontSize: 14, color: '#6b7280' }}>
-              Recent admin login sessions (last 50). Remove expired sessions from the database.
+              Recent admin login sessions (last 50). Clean up removes expired sessions and keeps only the 5 newest per user. Revoke individual sessions to sign out other devices.
             </p>
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -2149,7 +2223,7 @@ export default function AdminDashboard() {
               disabled={sessionsCleaning}
               style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 16px', background: '#fef3c7', color: '#92400e', border: 'none', borderRadius: 8, cursor: sessionsCleaning ? 'not-allowed' : 'pointer', fontWeight: 600, fontSize: 14, opacity: sessionsCleaning ? 0.7 : 1 }}
             >
-              <Trash2 size={16} /> {sessionsCleaning ? 'Cleaning…' : 'Clean up expired'}
+              <Trash2 size={16} /> {sessionsCleaning ? 'Cleaning…' : 'Clean up'}
             </button>
           </div>
         </div>
@@ -2174,6 +2248,7 @@ export default function AdminDashboard() {
                   <th style={{ padding: '8px 12px', color: '#6b7280', fontWeight: 600 }}>Created</th>
                   <th style={{ padding: '8px 12px', color: '#6b7280', fontWeight: 600 }}>Expires</th>
                   <th style={{ padding: '8px 12px', color: '#6b7280', fontWeight: 600 }}>Status</th>
+                  <th style={{ padding: '8px 12px', color: '#6b7280', fontWeight: 600 }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -2192,8 +2267,32 @@ export default function AdminDashboard() {
                         background: session.is_active ? '#d1fae5' : '#f3f4f6',
                         color: session.is_active ? '#065f46' : '#6b7280',
                       }}>
-                        {session.is_active ? 'Active' : 'Expired'}
+                        {session.is_current ? 'Current' : session.is_active ? 'Active' : 'Expired'}
                       </span>
+                    </td>
+                    <td style={{ padding: '10px 12px' }}>
+                      {session.is_current ? (
+                        <span style={{ fontSize: 12, color: '#9ca3af' }}>This device</span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => void handleRevokeSession(session)}
+                          disabled={revokingSessionId === session.id}
+                          style={{
+                            padding: '6px 12px',
+                            background: '#fee2e2',
+                            color: '#b91c1c',
+                            border: 'none',
+                            borderRadius: 8,
+                            fontSize: 12,
+                            fontWeight: 600,
+                            cursor: revokingSessionId === session.id ? 'not-allowed' : 'pointer',
+                            opacity: revokingSessionId === session.id ? 0.7 : 1,
+                          }}
+                        >
+                          {revokingSessionId === session.id ? 'Revoking…' : 'Revoke'}
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -2335,7 +2434,7 @@ export default function AdminDashboard() {
       {/* Order Detail Modal */}
       {selectedOrder && (
         <LiquidModal isOpen={!!selectedOrder} onClose={() => setSelectedOrder(null)} maxWidth={700} ariaLabel="Order details">
-          <div className="responsive-modal-body">
+          <div className="responsive-modal-body" data-testid="admin-order-detail">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
               <div>
                 <h2 style={{ margin: 0, fontSize: isMobile ? 20 : 24, fontWeight: 800 }}>#{selectedOrder.order_number}</h2>
@@ -2805,7 +2904,7 @@ export default function AdminDashboard() {
           open
           variant="confirm"
           title="Delete product"
-          message={`Delete "${adminDialog.product.name}" (${adminDialog.product.size || 'no size'})? This cannot be undone.`}
+          message={`Delete "${adminDialog.product.name}"? This cannot be undone.`}
           confirmLabel="Delete"
           onCancel={() => setAdminDialog(null)}
           onConfirm={() => {

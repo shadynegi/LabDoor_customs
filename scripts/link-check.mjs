@@ -1,5 +1,5 @@
 /**
- * Validates internal documentation links and frontend route references.
+ * Validates internal documentation links and frontend route references. Skips `documentation/archive/` (historical milestone snapshots with stale relative links).
  * Run from LabDoor_customs/: npm run links:check
  */
 import fs from 'node:fs';
@@ -22,8 +22,10 @@ const VALID_ROUTES = new Set([
   '/privacy-policy',
   '/terms-of-service',
   '/returns-policy',
+  '/replacement-policy',
   '/shipping-policy',
   '/orders',
+  '/admin',
   '/admin/login',
   '/adminshivamdashboard',
   '/cart',
@@ -48,7 +50,8 @@ function collectMarkdownFiles(dir = DOC_DIR, files = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (entry.name !== 'node_modules') collectMarkdownFiles(full, files);
+      if (entry.name === 'node_modules' || entry.name === 'archive') continue;
+      collectMarkdownFiles(full, files);
     } else if (entry.name.endsWith('.md')) {
       files.push(full);
     }

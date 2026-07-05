@@ -1,4 +1,4 @@
-import sql, { withRetry } from './db';
+import sql, { runWithConcurrency, withRetry } from './db';
 import {
   startOfIstDay,
   startOfIstDayFromYmd,
@@ -20,10 +20,23 @@ export interface AnalyticsDateRange {
 
 const MS_DAY = 24 * 60 * 60 * 1000;
 
+function coerceAnalyticsDate(value: unknown): Date | null {
+  if (value == null) return null;
+  const date = value instanceof Date ? value : new Date(String(value));
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function toIsoString(date: Date): string {
+  if (Number.isNaN(date.getTime())) {
+    throw new RangeError('Invalid time value');
+  }
+  return date.toISOString();
+}
+
 export function parseAnalyticsDateRange(query: Record<string, unknown>): AnalyticsDateRange {
   const period = String(query.period || 'month').toLowerCase() as AnalyticsPeriod;
   const now = new Date();
-  let to = query.to ? new Date(String(query.to)) : now;
+  let to = coerceAnalyticsDate(query.to) ?? now;
   let from: Date;
   let bucket: AnalyticsDateRange['bucket'] = 'day';
 
@@ -45,7 +58,7 @@ export function parseAnalyticsDateRange(query: Record<string, unknown>): Analyti
       bucket = 'month';
       break;
     case 'custom':
-      from = query.from ? new Date(String(query.from)) : new Date(to.getTime() - 30 * MS_DAY);
+      from = coerceAnalyticsDate(query.from) ?? new Date(to.getTime() - 30 * MS_DAY);
       bucket = 'day';
       break;
     case 'month':
@@ -55,7 +68,7 @@ export function parseAnalyticsDateRange(query: Record<string, unknown>): Analyti
       break;
   }
 
-  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
+  if (!coerceAnalyticsDate(from) || !coerceAnalyticsDate(to)) {
     to = now;
     from = startOfIstMonth(now);
   }
@@ -69,7 +82,11 @@ export function parseAnalyticsDateRange(query: Record<string, unknown>): Analyti
 
 export function analyticsCacheKey(range: AnalyticsDateRange): string {
   if (range.period === 'custom') {
-    return `${range.period}:${range.from.toISOString()}:${range.to.toISOString()}`;
+    const from = coerceAnalyticsDate(range.from);
+    const to = coerceAnalyticsDate(range.to);
+    if (from && to) {
+      return `${range.period}:${toIsoString(from)}:${toIsoString(to)}`;
+    }
   }
   return range.period;
 }
@@ -131,8 +148,9 @@ async function aggregateFromLineItems(
           ? sql`date_trunc('month', li.created_at)`
           : sql`date_trunc('day', li.created_at)`;
 
-  const [summaryRows, productRows, seriesRows] = await Promise.all([
-    salesQuery('summary', () => sql`
+  const [summaryRows, productRows, seriesRows] = await runWithConcurrency([
+    () =>
+      salesQuery('summary', () => sql`
       SELECT
         COALESCE(SUM(li.quantity), 0)::int AS total_units_sold,
         COALESCE(SUM(li.line_total), 0)::float AS total_revenue,
@@ -150,7 +168,8 @@ async function aggregateFromLineItems(
         AND li.created_at >= ${from}
         AND li.created_at <= ${to}
     `),
-    salesQuery('by_product', () => sql`
+    () =>
+      salesQuery('by_product', () => sql`
       SELECT
         li.product_id,
         li.product_name,
@@ -172,7 +191,8 @@ async function aggregateFromLineItems(
       ORDER BY revenue DESC
       LIMIT 50
     `),
-    salesQuery('time_series', () => sql`
+    () =>
+      salesQuery('time_series', () => sql`
       SELECT
         ${trunc} AS period_start,
         COUNT(DISTINCT li.order_id)::int AS orders,
@@ -204,12 +224,18 @@ async function aggregateFromLineItems(
     };
   });
 
-  const revenue_time_series = seriesRows.map((r) => ({
-    period_start: new Date(r.period_start as string | Date).toISOString(),
-    orders: Number(r.orders ?? 0),
-    revenue: parseFloat(String(r.revenue ?? 0)),
-    units_sold: Number(r.units_sold ?? 0),
-  }));
+  const revenue_time_series = seriesRows.flatMap((r) => {
+    const periodStart = coerceAnalyticsDate(r.period_start);
+    if (!periodStart) return [];
+    return [
+      {
+        period_start: toIsoString(periodStart),
+        orders: Number(r.orders ?? 0),
+        revenue: parseFloat(String(r.revenue ?? 0)),
+        units_sold: Number(r.units_sold ?? 0),
+      },
+    ];
+  });
 
   let best_period: SalesAnalyticsPayload['best_period'] = null;
   for (const row of revenue_time_series) {
@@ -274,15 +300,17 @@ async function aggregateFromOrdersJson(
   let totalRevenue = 0;
 
   for (const order of orderRows) {
+    const created = coerceAnalyticsDate(order.created_at);
+    if (!created) continue;
+
     const orderTotal = parseFloat(String(order.total ?? 0));
     totalRevenue += orderTotal;
-    const created = new Date(order.created_at as string | Date);
     const periodKey =
       bucket === 'month'
-        ? startOfIstMonth(created).toISOString()
+        ? toIsoString(startOfIstMonth(created))
         : bucket === 'week'
-          ? startOfIstWeek(created).toISOString()
-          : startOfIstDay(created).toISOString();
+          ? toIsoString(startOfIstWeek(created))
+          : toIsoString(startOfIstDay(created));
 
     const period = byPeriod.get(periodKey) ?? { orders: 0, revenue: 0, units_sold: 0 };
     period.orders += 1;
@@ -377,8 +405,8 @@ export async function fetchSalesAnalytics(range: AnalyticsDateRange): Promise<Sa
   return {
     range: {
       period: range.period,
-      from: range.from.toISOString(),
-      to: range.to.toISOString(),
+      from: toIsoString(range.from),
+      to: toIsoString(range.to),
       bucket: range.bucket,
     },
     summary: core.summary,

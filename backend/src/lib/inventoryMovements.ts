@@ -1,6 +1,7 @@
 import type postgres from 'postgres';
 import sql from './db';
 import { logger } from './logger';
+import { LOW_STOCK_THRESHOLD } from './lowStock';
 
 export type InventoryMovementReason =
   | 'sale'
@@ -177,26 +178,23 @@ export async function getLowStockProducts(limit = 50): Promise<
   Array<{
     id: number;
     name: string;
-    sku: string | null;
     stock: number;
-    reorder_point: number;
+    low_stock_threshold: number;
   }>
 > {
   const rows = await sql`
-    SELECT id, name, sku, stock, reorder_point
+    SELECT id, name, stock
     FROM products
-    WHERE reorder_alert_enabled = TRUE
-      AND is_out_of_stock = FALSE
-      AND stock <= reorder_point
+    WHERE is_out_of_stock = FALSE
+      AND stock <= ${LOW_STOCK_THRESHOLD}
     ORDER BY stock ASC, id ASC
     LIMIT ${limit}
   `;
   return rows.map((r) => ({
     id: Number(r.id),
     name: String(r.name),
-    sku: r.sku ? String(r.sku) : null,
     stock: Number(r.stock),
-    reorder_point: Number(r.reorder_point),
+    low_stock_threshold: LOW_STOCK_THRESHOLD,
   }));
 }
 
@@ -222,6 +220,6 @@ export async function runLowStockAlertDigest(): Promise<{ count: number; emailed
     return { count: 0, emailed: false };
   }
 
-  logger.info(`Low stock alert: ${lowStock.length} product(s) at or below reorder point`);
+  logger.info(`Low stock alert: ${lowStock.length} product(s) at or below threshold (${LOW_STOCK_THRESHOLD} units)`);
   return { count: lowStock.length, emailed: false };
 }

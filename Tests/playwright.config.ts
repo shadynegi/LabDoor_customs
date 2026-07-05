@@ -12,7 +12,7 @@ const reporters: Parameters<typeof defineConfig>[0]['reporter'] = jsonOutput
     : 'list';
 
 export default defineConfig({
-  testDir: './frontend',
+  testDir: './e2e/specs',
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   retries: 1,
@@ -29,17 +29,7 @@ export default defineConfig({
         /mobile-ui\.spec\.ts/,
         /responsive-ui\.spec\.ts/,
         /responsive-pages-ui\.spec\.ts/,
-        /checkout-total-mismatch-ui\.spec\.ts/,
-        /checkout-create-payment-ui\.spec\.ts/,
       ],
-      use: { ...devices['Desktop Chrome'] },
-    },
-    {
-      name: 'chromium-checkout-serial',
-      testMatch: /checkout-total-mismatch-ui\.spec\.ts|checkout-create-payment-ui\.spec\.ts/,
-      fullyParallel: false,
-      workers: 1,
-      timeout: 120_000,
       use: { ...devices['Desktop Chrome'] },
     },
     {
@@ -52,10 +42,11 @@ export default defineConfig({
     command: 'npm run preview -- --port 4173 --host 127.0.0.1',
     cwd: '../frontend',
     url: 'http://127.0.0.1:4173',
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: process.env.PLAYWRIGHT_FORCE_NEW_SERVER !== 'true',
     timeout: 120_000,
     env: {
       PLAYWRIGHT: 'true',
+      VITE_WHATSAPP_CONTACT_NUMBER: process.env.VITE_WHATSAPP_CONTACT_NUMBER || '+919888514572',
     },
   },
 });
