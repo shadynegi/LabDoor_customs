@@ -23,8 +23,8 @@
 | Admin | Server product search; order search by **id UUID**, order number, email, name; products paginated (**one product per shoe**; no SKU/size/color fields); **out-of-stock toggle** per product (`ToggleSwitch`); **Settings** tab (activity export, sessions, customer recompute); coupon scope (`all` / product IDs); estimated delivery; **no customer refunds** (cancel unpaid pending only) |
 | Contact | Client-side WhatsApp only (`/contact` → prefilled `wa.me`; Mohali store address on page; no `POST /api/contact`) |
 | Store policy | All sales final; manufacturing-defect replacements within 30 days; `/returns-policy` + `/replacement-policy`; **Terms of Service** governed by **Punjab, India** (`/terms-of-service`) |
-| Mobile | Sticky CTAs, visualViewport keyboard offset, **document scroll** (`html` scrollport; `#root` block layout; Home `overflow-x` only), home carousel `object-fit: contain`, cart policy spacer, LAN checkout idempotency (`createClientId`), non-home nav (**Orders** + **Cart** only; catalog via home **View All Products**), **responsive-pages-ui** Playwright matrix (193 mobile-chrome); **528** automated tests total — see [`test_guidelines.md`](test_guidelines.md) |
-| Testing | **528** automated (138 unit + 86 API + 13 frontend unit + 286 Playwright + 5 viewport) + viewport audit; **107** manual QA cases — [`Tests/README.md`](../Tests/README.md), [`manual-qa-test-cases.md`](manual-qa-test-cases.md) |
+| Mobile | Sticky CTAs, visualViewport keyboard offset, **document scroll** (`html` scrollport; `#root` block layout; Home `overflow-x` only), home carousel `object-fit: contain`, cart policy spacer, LAN checkout idempotency (`createClientId`), non-home nav (**Orders** + **Cart** only; catalog via home **View All Products**), **responsive-pages-ui** Playwright matrix (193 mobile-chrome); **529** automated tests total — see [`test_guidelines.md`](test_guidelines.md) |
+| Testing | **529** automated (141 unit + 88 API + 13 frontend unit + 286 Playwright + 1 viewport) + viewport audit; **107** manual QA cases — [`Tests/README.md`](../Tests/README.md), [`manual-qa-test-cases.md`](manual-qa-test-cases.md) |
 
 ---
 

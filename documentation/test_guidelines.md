@@ -41,14 +41,14 @@ If the user did not mention testing, **skip** `npm test`, `npm run test:all`, Pl
 | Suite | Tool | Location | Count | Needs live DB? |
 |-------|------|----------|-------|----------------|
 | Backend unit | Vitest | `Tests/unit/backend/` | 35 files, 141 tests | No (mocked) |
-| API integration | Vitest + Supertest | `Tests/integration/api/` | 21 files, 86 tests | No (mocked) |
+| API integration | Vitest + Supertest | `Tests/integration/api/` | 21 files, 88 tests | No (mocked) |
 | Frontend unit | Vitest + RTL | `Tests/unit/frontend/` | 3 files, 13 tests | No |
 | Frontend E2E / UI | Playwright | `Tests/e2e/specs/` | 24 files, 286 tests (93 desktop + 193 mobile project) | No (mocked `/api` + static preview) |
 | Viewport overflow audit | Playwright script | `Tests/scripts/audit-viewport-overflow.mjs` | 12 widths × 16 routes | No (static preview) |
 | Link checker | Custom script | repo root | — | No |
 | Codebase audit | `scripts/audit-codebase.mjs` | `documentation/OPTIMIZATION_BASELINE.md` | — | No |
 
-**Total:** 528 automated tests — 138 backend unit + 86 API + 13 frontend unit + 286 Playwright UI (93 desktop chromium + 193 mobile-chrome) + 5 viewport. **`npm test`** also runs the viewport overflow audit (mandatory in CI).
+**Total:** 529 automated tests — 141 backend unit + 88 API + 13 frontend unit + 286 Playwright UI (93 desktop chromium + 193 mobile-chrome) + 1 viewport. **`npm test`** also runs the viewport overflow audit (mandatory in CI).
 
 **Layout reference:** [`Tests/README.md`](../Tests/README.md)
 
@@ -233,7 +233,7 @@ See `Tests/unit/backend/` for the full list (35 files, 141 tests).
 
 Organized by domain: `checkout/` (`place-order.validation.test.ts`, `place-order.whatsapp.test.ts`, `validate-cart.test.ts`), `orders/` (`lookup.test.ts`, `mark-paid.test.ts`, `notify-shipped.test.ts`, `order-policy-admin.test.ts`, `whatsapp-payment-confirmation.test.ts`), `admin/` (`analytics.test.ts`, `enhancements.test.ts`, `login.test.ts`, `session-verify-cache.test.ts`), `products/` (`search.test.ts`, `upload.test.ts`, `upload-persistence.test.ts`), `activity/`, `security/`, plus `health.test.ts`.
 
-See `Tests/integration/api/` for the full list (21 files, 86 tests).
+See `Tests/integration/api/` for the full list (21 files, 88 tests).
 
 API tests use `Tests/shared/helpers/http.ts` for CSRF token flow with Supertest.
 

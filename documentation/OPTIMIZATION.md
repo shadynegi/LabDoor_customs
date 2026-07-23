@@ -24,7 +24,7 @@ Phased plan to audit, sanitize, and optimize Lab Door Customs without speculativ
 |------|--------|-------|
 | PayPal / reviews dead code in `src/` | ✅ Clean | Only tests/comments reference removed features |
 | CI `validate-env` alignment | ✅ Fixed | Pooler `DATABASE_URL`, `WHATSAPP_CONTACT_NUMBER`; removed stale `RESEND_API_KEY` |
-| Test suite alignment | ✅ 528 tests | No obsolete PayPal route tests in tree |
+| Test suite alignment | ✅ 529 tests | No obsolete PayPal route tests in tree |
 | Historical `*_COMPLETE.md` | ✅ Archived | `documentation/archive/milestones/` |
 
 **Verify:** `npm test`; CI validate-env step env matches `validateEnv.test.ts` rules.
@@ -74,7 +74,7 @@ Phased plan to audit, sanitize, and optimize Lab Door Customs without speculativ
 ## Risk management
 
 1. One domain per PR (deps, CI, docs, code).
-2. `npm test` (520 + viewport audit) before merge.
+2. `npm test` (529 + viewport audit) before merge.
 3. Staging deploy + `PRE_LAUNCH_CHECKLIST.md` smoke for infra changes.
 4. Railway rollback for production issues; DB fixes via forward migrations only.
 
@@ -100,4 +100,4 @@ Skim [`COVERAGE_MATRIX.md`](COVERAGE_MATRIX.md) payment/order rows only — not 
 | [`PROJECT_AUDIT.md`](PROJECT_AUDIT.md) | Remediation log (append-only) |
 | [`AUDIT_SUMMARY.md`](AUDIT_SUMMARY.md) | Security controls reference |
 | [`PRE_LAUNCH_CHECKLIST.md`](PRE_LAUNCH_CHECKLIST.md) | Production gates |
-| [`test_guidelines.md`](test_guidelines.md) | Test inventory (520) |
+| [`test_guidelines.md`](test_guidelines.md) | Test inventory (529) |

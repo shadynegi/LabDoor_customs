@@ -318,6 +318,7 @@ Sprint 4 — Admin/storefront polish
 | 2026-06-10 | PAY-POLICY / POL-ADMIN | No-refund store policy — `policy_accepted`, admin refund/cancel 403, storefront policy pages (`1406729`; 150 tests) |
 | 2026-06-26 | TEST-EXPANSION | +35 tests — validate-cart API, admin analytics IST/UI, responsive mobile UI, performance budgets, stability smoke, checkout serial Playwright project (233 tests) |
 | 2026-07-05 | TEST-EXPANSION | Admin module Playwright specs (59), production env validation (`validateEnv.test.ts`), upload volume persistence, pooler `DATABASE_URL` gate — **520** automated tests |
+| 2026-07-24 | TEST-FIX | Full audit pass: fix contact `Sent!` button race, analytics `waitForResponse` ordering, responsive heading bbox race, viewport audit `spawn EINVAL` on Windows, sitemap corruption on test builds, 60s test timeout cap — **529** automated tests (0 failing) |
 
 *Append a line when closing each Critical/High item.*
 
