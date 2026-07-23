@@ -10,11 +10,13 @@ test.describe('Admin environment validation', () => {
   });
 
   test('mocked analytics API returns expected dashboard shape after login', async ({ page }) => {
-    await loginToAdminDashboard(page);
-
-    const analyticsResponse = await page.waitForResponse(
+    // Register listener before login so we catch the analytics request that fires on dashboard load.
+    const analyticsResponsePromise = page.waitForResponse(
       (resp) => resp.url().includes('/api/admin/analytics') && resp.request().method() === 'GET',
     );
+    await loginToAdminDashboard(page);
+
+    const analyticsResponse = await analyticsResponsePromise;
     const body = (await analyticsResponse.json()) as {
       success: boolean;
       data: { orders: { total_orders: number }; products: { total_products: number } };

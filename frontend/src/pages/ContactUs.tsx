@@ -348,7 +348,7 @@ export default function ContactUs() {
                 }}
               >
                 <Send size={18} />
-                {isSubmitting ? "Opening WhatsApp…" : (submitted ? "Sent!" : "Send Message")}
+                {submitted ? "Sent!" : isSubmitting ? "Opening WhatsApp…" : "Send Message"}
               </button>
             </form>
           </div>

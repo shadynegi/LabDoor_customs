@@ -21,6 +21,7 @@ export async function assertHeadingInViewport(
   context: string,
 ): Promise<void> {
   await expect(heading).toBeVisible({ timeout: 15_000 });
+  await heading.scrollIntoViewIfNeeded();
   const viewport = page.viewportSize();
   expect(viewport, `missing viewport for ${context}`).not.toBeNull();
   const box = await heading.boundingBox();

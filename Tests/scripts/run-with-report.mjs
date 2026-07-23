@@ -325,10 +325,17 @@ function ensureFrontendBuild() {
   env.VITE_WHATSAPP_CONTACT_NUMBER = env.VITE_WHATSAPP_CONTACT_NUMBER || '+919888514572';
   // Omit Sentry for Playwright preview — a placeholder DSN bloats the JS bundle past build:budget.
   delete env.VITE_SENTRY_DSN;
-  return runCommand('Frontend build (Playwright preview)', 'npm', ['run', 'build', '-w', 'frontend'], {
+  const buildResult = runCommand('Frontend build (Playwright preview)', 'npm', ['run', 'build', '-w', 'frontend'], {
     cwd: repoRoot,
     env,
   });
+  // The sitemap script writes localhost URLs when VITE_SITE_URL=http://127.0.0.1:4173.
+  // Restore the committed production versions so the working tree stays clean.
+  spawnSync('git', ['restore', 'frontend/public/robots.txt', 'frontend/public/sitemap.xml'], {
+    cwd: repoRoot,
+    shell: process.platform === 'win32',
+  });
+  return buildResult;
 }
 
 function ensurePlaywrightInstalled() {

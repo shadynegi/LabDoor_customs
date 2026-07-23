@@ -40,7 +40,8 @@ async function waitForPreview(url, timeoutMs = 120_000) {
 }
 
 function spawnPreviewServer() {
-  const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+  const isWin = process.platform === 'win32';
+  const npmCmd = isWin ? 'npm.cmd' : 'npm';
   return spawn(npmCmd, ['run', 'preview', '--', '--port', '4173', '--host', '127.0.0.1'], {
     cwd: frontendRoot,
     env: {
@@ -49,7 +50,8 @@ function spawnPreviewServer() {
       VITE_WHATSAPP_CONTACT_NUMBER: process.env.VITE_WHATSAPP_CONTACT_NUMBER || '+919888514572',
     },
     stdio: 'ignore',
-    detached: process.platform !== 'win32',
+    shell: isWin,
+    detached: !isWin,
   });
 }
 
