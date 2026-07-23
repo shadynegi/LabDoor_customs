@@ -25,7 +25,7 @@ export const sanitizeString = (input: string | null | undefined): string => {
 export const sanitizeObject = <T extends Record<string, unknown>>(obj: T): T => {
   if (!obj || typeof obj !== 'object') return obj;
 
-  const sanitized: Record<string, unknown> = Array.isArray(obj) ? [] : {};
+  const sanitized: Record<string, unknown> = Array.isArray(obj) ? ([] as unknown as Record<string, unknown>) : {};
 
   for (const key of Object.keys(obj)) {
     const value = obj[key];
@@ -38,7 +38,7 @@ export const sanitizeObject = <T extends Record<string, unknown>>(obj: T): T => 
         typeof item === 'object' ? sanitizeObject(item) : item
       );
     } else if (value && typeof value === 'object') {
-      sanitized[key] = sanitizeObject(value);
+      sanitized[key] = sanitizeObject(value as Record<string, unknown>);
     } else {
       sanitized[key] = value;
     }

@@ -275,7 +275,7 @@ export const verifyAdmin = async (req: Request, res: Response, next: NextFunctio
       });
     }
 
-    req.admin = { username: result.username };
+    req.admin = { username: result.username! };
     next();
   } catch (error) {
     const code = error instanceof Error ? (error as Error & { code?: string }).code : undefined;
