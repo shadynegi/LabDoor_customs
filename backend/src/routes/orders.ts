@@ -360,6 +360,10 @@ router.get('/:id', verifyAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
+    if (!isValidOrderId(id)) {
+      return res.status(400).json({ success: false, error: 'Invalid order ID format' });
+    }
+
     const order = await dbQuery(() => sql`
       SELECT * FROM orders 
       WHERE id = ${id}

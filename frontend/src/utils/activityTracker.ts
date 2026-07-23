@@ -38,7 +38,7 @@ interface ActivityData {
   entityType?: 'product' | 'order' | 'cart' | 'page';
   entityId?: string | number;
   entityName?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   pageUrl?: string;
   referrer?: string;
 }

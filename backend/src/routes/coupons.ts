@@ -317,8 +317,6 @@ router.post('/', verifyAdmin, async (req: Request, res: Response) => {
 
     invalidateCouponCaches();
 
-    invalidateCouponCaches();
-
     res.status(201).json({
       success: true,
       data: result[0],
@@ -459,17 +457,21 @@ router.delete('/:id', verifyAdmin, async (req: Request, res: Response) => {
 router.get('/:id/usage', verifyAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { limit = 50, offset = 0 } = req.query;
+    const parsed = parsePagination(req.query);
+    if (!parsed.ok) {
+      return res.status(parsed.status).json({ success: false, error: parsed.error });
+    }
+    const { limit, offset } = parsed.params;
 
     const usage = await dbQuery(() => sql`
-      SELECT 
+      SELECT
         cu.*,
         o.order_number
       FROM coupon_usage cu
       LEFT JOIN orders o ON cu.order_id = o.id
       WHERE cu.coupon_id = ${id}
       ORDER BY cu.used_at DESC
-      LIMIT ${Number(limit)} OFFSET ${Number(offset)}
+      LIMIT ${limit} OFFSET ${offset}
     `, 'coupons:q11');
 
     const countResult = await dbQuery(() => sql`

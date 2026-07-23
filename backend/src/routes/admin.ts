@@ -236,18 +236,12 @@ async function validateAdminSession(
   }
 }
 
-/** Read admin session from HttpOnly cookie (preferred) or Authorization bearer (legacy). */
+/** Read admin session token from HttpOnly cookie. */
 export function extractAdminToken(req: Request): string | null {
   const cookieToken = req.cookies?.[ADMIN_SESSION_COOKIE];
   if (typeof cookieToken === 'string' && cookieToken.length > 0) {
     return cookieToken;
   }
-
-  const authHeader = req.headers.authorization;
-  if (authHeader?.startsWith('Bearer ')) {
-    return authHeader.substring(7);
-  }
-
   return null;
 }
 
@@ -281,7 +275,7 @@ export const verifyAdmin = async (req: Request, res: Response, next: NextFunctio
       });
     }
 
-    (req as any).admin = { username: result.username };
+    req.admin = { username: result.username };
     next();
   } catch (error) {
     const code = error instanceof Error ? (error as Error & { code?: string }).code : undefined;
@@ -760,7 +754,7 @@ router.get('/customers/:email', verifyAdmin, async (req: Request, res: Response)
       },
       pagination: paginationMeta(total, parsed.params),
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Customer history error:', error);
     respond500(res, error, "Request failed");
   }
@@ -999,7 +993,7 @@ router.post('/products/bulk-update', verifyAdmin, async (req: Request, res: Resp
       message: `${updatedCount} products updated`,
       updatedCount,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Bulk update error:', error);
     respond500(res, error, "Request failed");
   }
@@ -1108,7 +1102,7 @@ router.post('/orders/bulk-update', verifyAdmin, async (req: Request, res: Respon
       message: `${updatedCount} orders updated`,
       updatedCount,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Bulk update error:', error);
     respond500(res, error, "Request failed");
   }

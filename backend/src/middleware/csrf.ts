@@ -30,7 +30,7 @@ export const csrfTokenSetter = (req: Request, res: Response, next: NextFunction)
   }
   
   // Attach token to request for use in templates/responses
-  (req as any).csrfToken = token;
+  req.csrfToken = token;
   
   next();
 };
@@ -91,7 +91,7 @@ export const csrfProtection = (req: Request, res: Response, next: NextFunction) 
 
 // Endpoint to get CSRF token (for SPA initialization)
 export const getCsrfTokenHandler = (req: Request, res: Response) => {
-  const token = (req as any).csrfToken || req.cookies?.[CSRF_COOKIE_NAME];
+  const token = req.csrfToken || req.cookies?.[CSRF_COOKIE_NAME];
   
   if (!token) {
     // Generate and set new token

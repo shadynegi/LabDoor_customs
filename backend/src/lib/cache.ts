@@ -4,6 +4,7 @@ import {
   redisCacheGet,
   redisCacheSet,
 } from './redis';
+import { logger } from './logger';
 
 interface CacheEntry<T> {
   value: T;
@@ -37,7 +38,7 @@ export async function cached<T>(
 
 export function invalidateCache(key: string): void {
   memoryStore.delete(key);
-  redisCacheDelete(key).catch(() => {});
+  redisCacheDelete(key).catch((err) => logger.warn({ err, key }, 'cache invalidation failed'));
 }
 
 export function invalidateCachePrefix(prefix: string): void {
@@ -46,7 +47,7 @@ export function invalidateCachePrefix(prefix: string): void {
       memoryStore.delete(key);
     }
   }
-  redisCacheDeleteByPrefix(prefix).catch(() => {});
+  redisCacheDeleteByPrefix(prefix).catch((err) => logger.warn({ err, prefix }, 'cache prefix invalidation failed'));
 }
 
 /** Test helper — clears in-memory cache between runs. */

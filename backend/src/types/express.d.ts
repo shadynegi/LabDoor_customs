@@ -6,6 +6,8 @@ declare global {
       requestId?: string;
       requestStartMs?: number;
       log?: Logger;
+      admin?: { username: string };
+      csrfToken?: string;
     }
   }
 }

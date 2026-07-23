@@ -1,5 +1,5 @@
 // AdminDashboard.tsx - Enhanced Admin panel with analytics, bulk actions, and product management
-import { useState, useEffect, useRef, type CSSProperties } from 'react';
+import React, { useState, useEffect, useRef, type CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Package,
@@ -45,6 +45,7 @@ import {
 } from '../lib/adminAnalyticsDates';
 import AdminCouponsTab from '../components/AdminCouponsTab';
 import AdminActionDialog from '../components/AdminActionDialog';
+import ErrorBoundary from '../components/ErrorBoundary';
 import ToggleSwitch from '../components/ToggleSwitch';
 import { clearProductCatalogCache } from '../lib/productCatalogCache';
 import { resolveProductImage } from '../lib/productImageMaps';
@@ -52,13 +53,32 @@ import { DashboardSkeleton, SkeletonStyles } from '../components/Skeletons';
 import { logError } from '../lib/logger';
 
 // Types
+interface ShippingAddress {
+  line1?: string;
+  line2?: string;
+  city?: string;
+  state?: string;
+  postal_code?: string;
+  country?: string;
+  [key: string]: string | undefined;
+}
+
+interface OrderItem {
+  product_id: number;
+  product_name: string;
+  quantity: number;
+  price: number;
+  size_system?: string;
+  size_value?: string;
+}
+
 interface Order {
   id: string;
   order_number: string;
   customer_email: string;
   customer_name: string;
-  shipping_address: any;
-  items: any[];
+  shipping_address: ShippingAddress;
+  items: OrderItem[];
   subtotal: number;
   shipping_cost: number;
   tax: number;
@@ -117,16 +137,35 @@ interface AdminSession {
   is_current?: boolean;
 }
 
+interface AnalyticsOrders {
+  total_orders: number;
+  total_revenue: number;
+  orders_last_30_days: number;
+  revenue_last_30_days: number;
+}
+
+interface AnalyticsProducts {
+  total_products: number;
+  out_of_stock_products: number;
+  total_views: number;
+  total_cart_adds: number;
+}
+
+interface AnalyticsCustomers {
+  total_customers: number;
+  new_customers_30_days: number;
+}
+
 interface Analytics {
-  orders: any;
-  products: any;
-  topViewedProducts: any[];
-  topCartedProducts: any[];
-  customerLocations: any[];
-  countrySummary: any[];
-  recentOrders: any[];
-  dailyTrend: any[];
-  customers: any;
+  orders: AnalyticsOrders;
+  products: AnalyticsProducts;
+  topViewedProducts: Record<string, unknown>[];
+  topCartedProducts: Record<string, unknown>[];
+  customerLocations: Record<string, unknown>[];
+  countrySummary: Record<string, unknown>[];
+  recentOrders: Record<string, unknown>[];
+  dailyTrend: Record<string, unknown>[];
+  customers: AnalyticsCustomers;
   sales?: {
     range: { period: string; from: string; to: string; bucket: string };
     summary: {
@@ -161,6 +200,40 @@ type AdminDialog =
   | { kind: 'deleteCustomer'; customer: Customer }
   | { kind: 'deleteProduct'; product: Product }
   | null;
+
+function StatCard({
+  icon: Icon,
+  title,
+  value,
+  color,
+  subtitle,
+  isMobile,
+}: {
+  icon: React.ElementType;
+  title: string;
+  value: string | number;
+  color: string;
+  subtitle?: string;
+  isMobile: boolean;
+}) {
+  return (
+    <div style={{
+      background: 'white', borderRadius: 16, padding: isMobile ? 16 : 24,
+      boxShadow: '0 2px 8px rgba(0,0,0,0.08)', border: '1px solid #e5e7eb',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
+        <div style={{ background: `${color}15`, padding: 12, borderRadius: 12 }}>
+          <Icon size={24} color={color} />
+        </div>
+        <div style={{ flex: 1 }}>
+          <p style={{ margin: 0, fontSize: 14, color: '#6b7280', marginBottom: 4 }}>{title}</p>
+          <h3 style={{ margin: 0, fontSize: isMobile ? 24 : 32, fontWeight: 800, color: '#1f2937' }}>{value}</h3>
+          {subtitle && <p style={{ margin: 0, fontSize: 12, color: '#9ca3af', marginTop: 4 }}>{subtitle}</p>}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -1263,25 +1336,6 @@ export default function AdminDashboard() {
     return colors[status] || '#6b7280';
   };
 
-  // Tab content components
-  const StatCard = ({ icon: Icon, title, value, color, subtitle }: any) => (
-    <div style={{
-      background: 'white', borderRadius: 16, padding: isMobile ? 16 : 24,
-      boxShadow: '0 2px 8px rgba(0,0,0,0.08)', border: '1px solid #e5e7eb',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
-        <div style={{ background: `${color}15`, padding: 12, borderRadius: 12 }}>
-          <Icon size={24} color={color} />
-        </div>
-        <div style={{ flex: 1 }}>
-          <p style={{ margin: 0, fontSize: 14, color: '#6b7280', marginBottom: 4 }}>{title}</p>
-          <h3 style={{ margin: 0, fontSize: isMobile ? 24 : 32, fontWeight: 800, color: '#1f2937' }}>{value}</h3>
-          {subtitle && <p style={{ margin: 0, fontSize: 12, color: '#9ca3af', marginTop: 4 }}>{subtitle}</p>}
-        </div>
-      </div>
-    </div>
-  );
-
   const renderAnalytics = () => {
     if (analyticsError) {
       return (
@@ -1450,6 +1504,7 @@ export default function AdminDashboard() {
                 value={analytics.sales.summary.total_units_sold}
                 color="#9c6649"
                 subtitle={analytics.sales.range.period}
+                isMobile={isMobile}
               />
               <StatCard
                 icon={DollarSign}
@@ -1461,6 +1516,7 @@ export default function AdminDashboard() {
                     ? `${analytics.sales.compare.revenue_change_pct >= 0 ? '+' : ''}${analytics.sales.compare.revenue_change_pct}% vs prior period`
                     : undefined
                 }
+                isMobile={isMobile}
               />
               <StatCard
                 icon={TrendingUp}
@@ -1468,6 +1524,7 @@ export default function AdminDashboard() {
                 value={`$${analytics.sales.summary.average_order_value.toFixed(2)}`}
                 color="#f59e0b"
                 subtitle={`${analytics.sales.summary.order_count} orders`}
+                isMobile={isMobile}
               />
               {analytics.sales.best_period && (
                 <StatCard
@@ -1476,6 +1533,7 @@ export default function AdminDashboard() {
                   value={`$${analytics.sales.best_period.revenue.toFixed(2)}`}
                   color="#8b5cf6"
                   subtitle={`${new Date(analytics.sales.best_period.period_start).toLocaleDateString()} · ${analytics.sales.best_period.orders} orders`}
+                  isMobile={isMobile}
                 />
               )}
             </div>
@@ -1544,18 +1602,18 @@ export default function AdminDashboard() {
 
         {/* Stats Grid */}
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)', gap: 16, marginBottom: 32 }}>
-          <StatCard icon={Package} title="Total Orders" value={analytics.orders.total_orders} color="#9c6649" subtitle="All time" />
-          <StatCard icon={DollarSign} title="Total Revenue" value={`$${analytics.orders.total_revenue.toFixed(2)}`} color="#10b981" subtitle="All time" />
-          <StatCard icon={TrendingUp} title="Orders (30d)" value={analytics.orders.orders_last_30_days} color="#9c6649" subtitle={`$${analytics.orders.revenue_last_30_days.toFixed(2)} revenue`} />
-          <StatCard icon={Users} title="Customers" value={analytics.customers.total_customers} color="#9c6649" subtitle={`${analytics.customers.new_customers_30_days} new (30d)`} />
+          <StatCard icon={Package} title="Total Orders" value={analytics.orders.total_orders} color="#9c6649" subtitle="All time" isMobile={isMobile} />
+          <StatCard icon={DollarSign} title="Total Revenue" value={`$${analytics.orders.total_revenue.toFixed(2)}`} color="#10b981" subtitle="All time" isMobile={isMobile} />
+          <StatCard icon={TrendingUp} title="Orders (30d)" value={analytics.orders.orders_last_30_days} color="#9c6649" subtitle={`$${analytics.orders.revenue_last_30_days.toFixed(2)} revenue`} isMobile={isMobile} />
+          <StatCard icon={Users} title="Customers" value={analytics.customers.total_customers} color="#9c6649" subtitle={`${analytics.customers.new_customers_30_days} new (30d)`} isMobile={isMobile} />
         </div>
 
         {/* Product Stats */}
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)', gap: 16, marginBottom: 32 }}>
-          <StatCard icon={ShoppingBag} title="Products" value={analytics.products.total_products} color="#f59e0b" />
-          <StatCard icon={AlertTriangle} title="Out of Stock" value={analytics.products.out_of_stock_products} color="#ef4444" />
-          <StatCard icon={Eye} title="Product Views" value={analytics.products.total_views} color="#06b6d4" />
-          <StatCard icon={ShoppingBag} title="Cart Adds" value={analytics.products.total_cart_adds} color="#9c6649" />
+          <StatCard icon={ShoppingBag} title="Products" value={analytics.products.total_products} color="#f59e0b" isMobile={isMobile} />
+          <StatCard icon={AlertTriangle} title="Out of Stock" value={analytics.products.out_of_stock_products} color="#ef4444" isMobile={isMobile} />
+          <StatCard icon={Eye} title="Product Views" value={analytics.products.total_views} color="#06b6d4" isMobile={isMobile} />
+          <StatCard icon={ShoppingBag} title="Cart Adds" value={analytics.products.total_cart_adds} color="#9c6649" isMobile={isMobile} />
         </div>
 
         {/* Top Products */}
@@ -2424,7 +2482,11 @@ export default function AdminDashboard() {
             {activeTab === 'analytics' && renderAnalytics()}
             {activeTab === 'products' && renderProducts()}
             {activeTab === 'orders' && renderOrders()}
-            {activeTab === 'coupons' && <AdminCouponsTab />}
+            {activeTab === 'coupons' && (
+              <ErrorBoundary>
+                <AdminCouponsTab />
+              </ErrorBoundary>
+            )}
             {activeTab === 'customers' && renderCustomers()}
             {activeTab === 'settings' && renderSettings()}
           </div>
@@ -2625,15 +2687,17 @@ export default function AdminDashboard() {
         </LiquidModal>
       )}
 
-      <AdminProductFormModal
-        isOpen={productFormOpen}
-        product={editingProduct}
-        onClose={() => {
-          setProductFormOpen(false);
-          setEditingProduct(null);
-        }}
-        onSaved={() => fetchProducts(1, false)}
-      />
+      <ErrorBoundary>
+        <AdminProductFormModal
+          isOpen={productFormOpen}
+          product={editingProduct}
+          onClose={() => {
+            setProductFormOpen(false);
+            setEditingProduct(null);
+          }}
+          onSaved={() => fetchProducts(1, false)}
+        />
+      </ErrorBoundary>
 
       {/* Bulk stock modal */}
       {bulkStockModalOpen && (

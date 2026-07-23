@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CheckCircle2, MessageCircle } from 'lucide-react';
 import { useResponsive } from '../hooks/useResponsive';
-import { useCart } from './CartContext';
+import { useCart } from '../contexts/CartContext';
 
 interface LastPlacedOrder {
   orderNumber?: string;

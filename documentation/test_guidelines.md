@@ -41,14 +41,14 @@ If the user did not mention testing, **skip** `npm test`, `npm run test:all`, Pl
 | Suite | Tool | Location | Count | Needs live DB? |
 |-------|------|----------|-------|----------------|
 | Backend unit | Vitest | `Tests/unit/backend/` | 35 files, 141 tests | No (mocked) |
-| API integration | Vitest + Supertest | `Tests/integration/api/` | 19 files, 80 tests | No (mocked) |
+| API integration | Vitest + Supertest | `Tests/integration/api/` | 21 files, 86 tests | No (mocked) |
 | Frontend unit | Vitest + RTL | `Tests/unit/frontend/` | 3 files, 13 tests | No |
 | Frontend E2E / UI | Playwright | `Tests/e2e/specs/` | 24 files, 286 tests (93 desktop + 193 mobile project) | No (mocked `/api` + static preview) |
 | Viewport overflow audit | Playwright script | `Tests/scripts/audit-viewport-overflow.mjs` | 12 widths × 16 routes | No (static preview) |
 | Link checker | Custom script | repo root | — | No |
 | Codebase audit | `scripts/audit-codebase.mjs` | `documentation/OPTIMIZATION_BASELINE.md` | — | No |
 
-**Total:** 520 automated tests — 141 backend unit + 80 API + 13 frontend unit + 286 Playwright UI (93 desktop chromium + 193 mobile-chrome). **`npm test`** also runs the viewport overflow audit (mandatory in CI).
+**Total:** 528 automated tests — 138 backend unit + 86 API + 13 frontend unit + 286 Playwright UI (93 desktop chromium + 193 mobile-chrome) + 5 viewport. **`npm test`** also runs the viewport overflow audit (mandatory in CI).
 
 **Layout reference:** [`Tests/README.md`](../Tests/README.md)
 
@@ -115,7 +115,7 @@ npm run test:frontend:install   # first time only — downloads Chromium
 npm run test:frontend
 ```
 
-Playwright starts `vite preview` on `http://127.0.0.1:4173` automatically (see `playwright.config.ts`). Preview sets `PLAYWRIGHT=true` so Vite **does not proxy** `/api` to a live backend — all API traffic is mocked in-browser via `page.route()`. The backend does **not** need to be running. Set `VITE_WHATSAPP_CONTACT_NUMBER` in `frontend/.env` (default `+919888514572`) so local `npm run preview` and contact E2E match the test runner without extra setup.
+Playwright starts `vite preview` on `http://127.0.0.1:4173` automatically (see `playwright.config.ts`). Preview sets `PLAYWRIGHT=true` so Vite **does not proxy** `/api` to a live backend — all API traffic is mocked in-browser via `page.route()`. The backend does **not** need to be running. Set `VITE_WHATSAPP_CONTACT_NUMBER` in `frontend/.env` to your store's WhatsApp number so local `npm run preview` and contact E2E match the test runner without extra setup.
 
 **UI coverage:** products list/detail, cart, checkout shell, contact form, navigation, cookie consent, **admin analytics custom range**, **admin dashboard module E2E** (`Tests/e2e/specs/admin/*.spec.ts` — products, coupons, orders, customers, settings, integration, resilience, env-validation, storage-persistence), **responsive mobile layouts** (`mobile-ui.spec.ts`, `responsive-ui.spec.ts`, and **`responsive-pages-ui.spec.ts`** — all routes × 11 phone viewports in the `mobile-chrome` project), **WhatsApp place-order** (`checkout-place-order-ui.spec.ts`), checkout policy/coupon flows in **deep flows**. Playwright uses `workers: 1` and `retries: 1` for stable checkout flows.
 
@@ -231,9 +231,9 @@ See `Tests/unit/backend/` for the full list (35 files, 141 tests).
 
 ### API tests (`Tests/integration/api/`)
 
-Organized by domain: `checkout/` (`place-order.validation.test.ts`, `place-order.whatsapp.test.ts`, `validate-cart.test.ts`), `orders/` (`lookup.test.ts`, `mark-paid.test.ts`, `order-policy-admin.test.ts`, `whatsapp-payment-confirmation.test.ts`), `admin/` (`analytics.test.ts`, `enhancements.test.ts`, `session-verify-cache.test.ts`), `products/` (`search.test.ts`, `upload.test.ts`, `upload-persistence.test.ts`), `activity/`, `security/`, plus `health.test.ts`.
+Organized by domain: `checkout/` (`place-order.validation.test.ts`, `place-order.whatsapp.test.ts`, `validate-cart.test.ts`), `orders/` (`lookup.test.ts`, `mark-paid.test.ts`, `notify-shipped.test.ts`, `order-policy-admin.test.ts`, `whatsapp-payment-confirmation.test.ts`), `admin/` (`analytics.test.ts`, `enhancements.test.ts`, `login.test.ts`, `session-verify-cache.test.ts`), `products/` (`search.test.ts`, `upload.test.ts`, `upload-persistence.test.ts`), `activity/`, `security/`, plus `health.test.ts`.
 
-See `Tests/integration/api/` for the full list (19 files, 80 tests).
+See `Tests/integration/api/` for the full list (21 files, 86 tests).
 
 API tests use `Tests/shared/helpers/http.ts` for CSRF token flow with Supertest.
 

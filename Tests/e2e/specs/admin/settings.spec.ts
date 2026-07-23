@@ -30,9 +30,9 @@ test.describe('Admin Settings module', () => {
       (req) => req.url().includes('/api/admin/sessions/cleanup') && req.method() === 'POST',
     );
 
-    await page.getByRole('button', { name: /Clean up expired/i }).click();
+    await page.getByRole('button', { name: /Clean up/i }).click();
     await cleanupRequest;
-    await expectToast(page, /Removed 0 expired session/i);
+    await expectToast(page, /Removed|No expired or excess/i);
   });
 
   test('recomputes customer aggregates from completed orders', async ({ page }) => {

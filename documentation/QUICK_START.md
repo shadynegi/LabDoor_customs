@@ -34,7 +34,7 @@ PORT=5000
 NODE_ENV=development
 FRONTEND_URL=http://localhost:5173
 DATABASE_URL=postgresql://postgres:PASSWORD@db.PROJECT.supabase.co:6543/postgres?pgbouncer=true
-WHATSAPP_CONTACT_NUMBER=+919888514572
+WHATSAPP_CONTACT_NUMBER=+91XXXXXXXXXX
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD_HASH=$2b$12$your_bcrypt_hash_here
 JWT_SECRET=your_secure_jwt_secret_at_least_32_characters_long
@@ -73,7 +73,7 @@ Apply the database schema:
 
 ```env
 VITE_API_BASE_URL=/api
-VITE_WHATSAPP_CONTACT_NUMBER=+919888514572
+VITE_WHATSAPP_CONTACT_NUMBER=+91XXXXXXXXXX
 ```
 
 Vite proxies `/api` to the backend during development.
@@ -132,7 +132,7 @@ npm run seed:test-data
 
 Loads 10 customers (`Test*` names, `test` in email) and 20 orders (`GSS-TEST-SEED-*`) across date ranges for analytics filters. Idempotent — re-run anytime.
 
-Copy `frontend/env.template` to `frontend/.env` if missing. **`VITE_WHATSAPP_CONTACT_NUMBER`** defaults to `+919888514572` (matches contact E2E and `Tests/scripts/run-with-report.mjs`).
+Copy `frontend/env.template` to `frontend/.env` if missing. **`VITE_WHATSAPP_CONTACT_NUMBER`** — set to your store's WhatsApp number in E.164 format (e.g. `+91XXXXXXXXXX`). Must match `WHATSAPP_CONTACT_NUMBER` in backend `.env`.
 
 For a **production-like build** locally, set `frontend/.env` with `VITE_API_BASE_URL`, `VITE_SITE_URL`, and `VITE_SENTRY_DSN` (or run with `NODE_ENV=development` to skip strict env checks). Then:
 

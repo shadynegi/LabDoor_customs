@@ -1,7 +1,7 @@
 // src/pages/CartPage.tsx - Mobile Responsive Version
 import { useResponsive } from "../hooks/useResponsive";
 import MobileStickyCta from "../components/MobileStickyCta";
-import { useCart } from "./CartContext";
+import { useCart } from "../contexts/CartContext";
 import { Link, useNavigate } from "react-router-dom";
 import { Trash2, Plus, Minus, ShoppingBag } from "lucide-react";
 import { calculateCheckoutPricing, FREE_SHIPPING_MESSAGE, VOLUME_DISCOUNT_INFO } from "../utils/pricing";

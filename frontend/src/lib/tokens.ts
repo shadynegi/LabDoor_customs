@@ -1,0 +1,22 @@
+/** JS constants mirroring CSS custom properties in styles/tokens.css */
+export const COLORS = {
+  brandPrimary: '#9c6649',
+  brandDark: '#361906',
+  brandGradient: 'linear-gradient(135deg, #361906 0%, #9c6649 100%)',
+  brandLightBg: '#fdf4ef',
+  success: '#10b981',
+  warning: '#f59e0b',
+  error: '#ef4444',
+  errorDark: '#dc2626',
+  info: '#06b6d4',
+  neutral50: '#f9fafb',
+  neutral100: '#f3f4f6',
+  neutral200: '#e5e7eb',
+  neutral300: '#d1d5db',
+  neutral400: '#9ca3af',
+  neutral500: '#6b7280',
+  neutral600: '#4b5563',
+  neutral700: '#374151',
+  neutral800: '#1f2937',
+  neutral900: '#111827',
+} as const;

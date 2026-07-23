@@ -22,10 +22,10 @@ export const sanitizeString = (input: string | null | undefined): string => {
 /**
  * Sanitize an object's string properties recursively
  */
-export const sanitizeObject = <T extends Record<string, any>>(obj: T): T => {
+export const sanitizeObject = <T extends Record<string, unknown>>(obj: T): T => {
   if (!obj || typeof obj !== 'object') return obj;
 
-  const sanitized: Record<string, any> = Array.isArray(obj) ? [] : {};
+  const sanitized: Record<string, unknown> = Array.isArray(obj) ? [] : {};
 
   for (const key of Object.keys(obj)) {
     const value = obj[key];
@@ -53,7 +53,7 @@ export const sanitizeObject = <T extends Record<string, any>>(obj: T): T => {
 export const sanitizeOrderData = (data: {
   customer_email?: string;
   customer_name?: string;
-  shipping_address?: any;
+  shipping_address?: Record<string, unknown>;
   notes?: string;
 }) => {
   return {

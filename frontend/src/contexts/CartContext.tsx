@@ -90,11 +90,11 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
     case 'ADD_ITEM': {
       // Check if item with same ID AND same size already exists
       const existingItem = state.items.find(
-        item => item.id === action.payload.id && 
+        item => item.id === action.payload.id &&
         item.size?.system === action.payload.size?.system &&
         item.size?.value === action.payload.size?.value
       );
-      
+
       if (existingItem) {
         const updatedItems = state.items.map(item =>
           item.id === action.payload.id &&
@@ -118,7 +118,7 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
     }
 
     case 'REMOVE_ITEM': {
-      const updatedItems = state.items.filter(item => 
+      const updatedItems = state.items.filter(item =>
         !(item.id === action.payload.id &&
           item.size?.system === action.payload.size?.system &&
           item.size?.value === action.payload.size?.value)
@@ -164,7 +164,7 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
 
     case 'UPDATE_QUANTITY': {
       if (action.payload.quantity <= 0) {
-        const updatedItems = state.items.filter(item => 
+        const updatedItems = state.items.filter(item =>
           !(item.id === action.payload.id &&
             item.size?.system === action.payload.size?.system &&
             item.size?.value === action.payload.size?.value)
@@ -262,7 +262,7 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Check if BroadcastChannel is supported
     if (typeof BroadcastChannel === 'undefined') {
       logDebug('BroadcastChannel not supported, falling back to storage events');
-      
+
       // Fallback to storage event for older browsers
       const handleStorageChange = (e: StorageEvent) => {
         if (e.key === CART_STORAGE_KEY && e.newValue && !isLocalUpdate.current) {
@@ -274,7 +274,7 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           }
         }
       };
-      
+
       window.addEventListener('storage', handleStorageChange);
       return () => window.removeEventListener('storage', handleStorageChange);
     }

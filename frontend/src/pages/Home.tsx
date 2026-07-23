@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { motion, AnimatePresence, type Variants } from "framer-motion";
 import { ChevronLeft, ChevronRight, ShoppingCart, Check, X, HelpCircle, AlertTriangle } from "lucide-react";
-import { useCart, type SizeSystem } from "./CartContext";
+import { useCart, type SizeSystem } from "../contexts/CartContext";
 import { useNavigate, Link } from "react-router-dom";
 import { useProducts } from "../hooks/useProducts";
 import ErrorMessage from "../components/ErrorMessage";

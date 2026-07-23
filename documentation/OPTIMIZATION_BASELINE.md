@@ -17,7 +17,7 @@ Regenerate: `npm run audit:codebase` from repository root.
 | Frontend unit (`Tests/unit/frontend/`) | 3 |
 | Playwright specs (`Tests/e2e/specs/`) | 24 |
 
-**CI marker:** 520 automated tests (141 + 80 + 13 + 286) — verify with `npm test`.
+**CI marker:** 528 automated tests (138 + 86 + 13 + 286 + 5) — verify with `npm test`.
 
 ---
 

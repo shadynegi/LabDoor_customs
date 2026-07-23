@@ -24,7 +24,7 @@ Phased plan to audit, sanitize, and optimize Lab Door Customs without speculativ
 |------|--------|-------|
 | PayPal / reviews dead code in `src/` | ✅ Clean | Only tests/comments reference removed features |
 | CI `validate-env` alignment | ✅ Fixed | Pooler `DATABASE_URL`, `WHATSAPP_CONTACT_NUMBER`; removed stale `RESEND_API_KEY` |
-| Test suite alignment | ✅ 520 tests | No obsolete PayPal route tests in tree |
+| Test suite alignment | ✅ 528 tests | No obsolete PayPal route tests in tree |
 | Historical `*_COMPLETE.md` | ✅ Archived | `documentation/archive/milestones/` |
 
 **Verify:** `npm test`; CI validate-env step env matches `validateEnv.test.ts` rules.

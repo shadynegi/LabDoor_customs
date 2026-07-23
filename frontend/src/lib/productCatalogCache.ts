@@ -14,11 +14,6 @@ export function clearProductCatalogCache(): void {
 
 export const CATALOG_CLEARED_EVENT = 'ldc:catalog-cleared';
 
-/** @deprecated Full-catalog client cache removed; kept for admin invalidation only. */
-export async function getProductCatalog(_forceRefresh = false): Promise<Product[]> {
-  return [];
-}
-
 export function normalizeProduct(product: Product): Product {
   return {
     ...product,

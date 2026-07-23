@@ -5,7 +5,7 @@
 **Authoritative behavior:** [`info.md`](info.md)  
 **Full audit:** [`PROJECT_AUDIT.md`](PROJECT_AUDIT.md) (2026-06-08 initial + follow-up)
 
-**Test count marker (CI should match):** `<!-- tests: 520 -->` (141 unit + 80 API + 13 frontend unit + 286 Playwright)
+**Test count marker (CI should match):** `<!-- tests: 528 -->` (138 unit + 86 API + 13 frontend unit + 286 Playwright + 5 viewport)
 
 **Test layout:** Domain folders under `Tests/unit/backend/`, `Tests/integration/api/`, `Tests/e2e/specs/`. Inventory: [`Tests/README.md`](../Tests/README.md), [`test_guidelines.md`](test_guidelines.md).
 
@@ -112,7 +112,7 @@
 | CI-ENV | Production env validation in CI | `validate-env.mjs`, `server.ts`, `databaseUrl.ts`, `ci.yml` | `infrastructure/validateEnv.test.ts`, CI job | COVERED |
 | OPS-UPLOAD-VOL | Admin uploads persist on Railway volume (`UPLOAD_DIR`) | `productUpload.ts`, `POST /api/admin/uploads/product-media` | `products/upload-persistence.test.ts`, `products/upload.test.ts`, `e2e/specs/admin/storage-persistence.spec.ts` (mocked UI) | COVERED |
 | SEC-ORDER-SECRETS | `access_token_hash` + `access_token_encrypted` stripped from order JSON | `orderTokens.ts` `stripOrderSecrets` | `orderTokens.test.ts` | COVERED |
-| DOC-TESTS | Test count in `info.md` | `info.md` | `npm test` (520) | COVERED |
+| DOC-TESTS | Test count in `info.md` | `info.md` | `npm test` (528) | COVERED |
 | OPS-AUDIT | Codebase optimization baseline | `scripts/audit-codebase.mjs` | `npm run audit:codebase` | COVERED |
 | UI-SCROLL | Document scroll on tall storefront pages | `frontend/src/index.css`, `App.tsx`, `Home.tsx` | `storefront.spec.ts` | COVERED |
 | UI-POLICY-CONTENT | Shipping policy matches checkout pricing; contact opens WhatsApp with prefilled message | `ShippingPolicy.tsx`, `ContactUs.tsx`, `pricing.ts`, `whatsappContact.ts` | `storefront.spec.ts`, `contact-ui.spec.ts`, `unit/frontend/lib/whatsappContact.test.ts` | COVERED |

@@ -1,0 +1,22 @@
+/* Brand color tokens — single source of truth for all LDC brand colors */
+:root {
+  --color-brand-primary: #9c6649;
+  --color-brand-dark: #361906;
+  --color-brand-gradient: linear-gradient(135deg, #361906 0%, #9c6649 100%);
+  --color-brand-light-bg: #fdf4ef;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+  --color-error-dark: #dc2626;
+  --color-info: #06b6d4;
+  --color-neutral-50: #f9fafb;
+  --color-neutral-100: #f3f4f6;
+  --color-neutral-200: #e5e7eb;
+  --color-neutral-300: #d1d5db;
+  --color-neutral-400: #9ca3af;
+  --color-neutral-500: #6b7280;
+  --color-neutral-600: #4b5563;
+  --color-neutral-700: #374151;
+  --color-neutral-800: #1f2937;
+  --color-neutral-900: #111827;
+}

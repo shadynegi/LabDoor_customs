@@ -34,8 +34,6 @@ export const config = {
   apiTimeoutMs: parseInt(import.meta.env.VITE_API_TIMEOUT_MS || '60000', 10),
   /** Catalog, analytics, activity — slow on cold Supabase pooler links. */
   extendedApiTimeoutMs: parseExtendedApiTimeoutMs(),
-  /** @deprecated Use extendedApiTimeoutMs */
-  catalogTimeoutMs: parseExtendedApiTimeoutMs(),
 } as const;
 
 export interface ApiFetchRetryOptions {

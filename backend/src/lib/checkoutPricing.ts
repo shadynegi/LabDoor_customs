@@ -1,4 +1,4 @@
-import sql from './db';
+import sql, { query as dbQuery } from './db';
 import { InsufficientStockError } from './inventory';
 import { validateCartLineSize } from './cartLineSize';
 
@@ -159,11 +159,14 @@ export async function validateCartItems(
       return sizeCheck;
     }
 
-    const result = await sql`
-      SELECT id, name, price, image, stock, is_out_of_stock
-      FROM products
-      WHERE id = ${item.product_id}
-    `;
+    const result = await dbQuery(
+      () => sql`
+        SELECT id, name, price, image, stock, is_out_of_stock
+        FROM products
+        WHERE id = ${item.product_id}
+      `,
+      'checkoutPricing:validateCartItem'
+    );
 
     if (!result || result.length === 0) {
       return { ok: false, error: 'Product not found', message: `Product ${item.product_id} was not found` };
@@ -241,11 +244,14 @@ export async function resolveCouponDiscount(
     return { discount: 0 };
   }
 
-  const coupons = await sql`
-    SELECT * FROM coupons
-    WHERE UPPER(code) = UPPER(${couponCode.trim()})
-    LIMIT 1
-  `;
+  const coupons = await dbQuery(
+    () => sql`
+      SELECT * FROM coupons
+      WHERE UPPER(code) = UPPER(${couponCode.trim()})
+      LIMIT 1
+    `,
+    'checkoutPricing:fetchCoupon'
+  );
 
   if (!coupons || coupons.length === 0) {
     throw new Error('Invalid coupon code');
@@ -278,10 +284,13 @@ export async function resolveCouponDiscount(
   }
 
   if (customerEmail && coupon.id && coupon.max_uses_per_customer != null) {
-    const usageCount = await sql`
-      SELECT COUNT(*) as count FROM coupon_usage
-      WHERE coupon_id = ${coupon.id} AND customer_email = ${customerEmail}
-    `;
+    const usageCount = await dbQuery(
+      () => sql`
+        SELECT COUNT(*) as count FROM coupon_usage
+        WHERE coupon_id = ${coupon.id} AND customer_email = ${customerEmail}
+      `,
+      'checkoutPricing:couponUsageCount'
+    );
     if (parseInt(usageCount[0].count) >= coupon.max_uses_per_customer) {
       throw new Error('You have already used this coupon the maximum number of times');
     }

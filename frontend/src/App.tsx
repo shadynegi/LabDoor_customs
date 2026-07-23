@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Link, useLocation, Navigate } from "react-router-dom";
 import { ShoppingCart, Package } from "lucide-react";
 import { lazy, Suspense, useEffect } from "react";
-import { CartProvider, useCart } from "./pages/CartContext";
+import { CartProvider, useCart } from "./contexts/CartContext";
 import ErrorBoundary from "./components/ErrorBoundary";
 import RouteErrorBoundary from "./components/RouteErrorBoundary";
 import { AdminAuthProvider, useAdminAuth, ADMIN_DASHBOARD_PATH, ADMIN_LOGIN_PATH } from "./contexts/AdminAuthContext";
@@ -380,31 +380,33 @@ function AppShell() {
             <Route path="/payment/success" element={<RouteErrorBoundary title="Payment error"><PaymentSuccess /></RouteErrorBoundary>} />
             <Route path="/payment/cancel" element={<RouteErrorBoundary title="Payment cancel error"><Cancel /></RouteErrorBoundary>} />
                 <Route path="*" element={
-                <div style={{ 
-                  display: "flex", 
-                  flexDirection: "column", 
-                  alignItems: "center", 
-                  justifyContent: "center", 
-                  minHeight: "60vh",
-                  padding: "20px",
-                  textAlign: "center"
-                }}>
-                  <h1 style={{ fontSize: 48, marginBottom: 16 }}>404</h1>
-                  <p style={{ color: "#6b7280", marginBottom: 24 }}>Page not found</p>
-                  <Link 
-                    to="/" 
-                    style={{ 
-                      padding: "12px 24px", 
-                      background: "#000", 
-                      color: "white", 
-                      textDecoration: "none",
-                      borderRadius: 8,
-                      fontWeight: 600
-                    }}
-                  >
-                    Go Home
-                  </Link>
-                </div>
+                <RouteErrorBoundary title="Page not found">
+                  <div style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    minHeight: "60vh",
+                    padding: "20px",
+                    textAlign: "center"
+                  }}>
+                    <h1 style={{ fontSize: 48, marginBottom: 16 }}>404</h1>
+                    <p style={{ color: "#6b7280", marginBottom: 24 }}>Page not found</p>
+                    <Link
+                      to="/"
+                      style={{
+                        padding: "12px 24px",
+                        background: "#000",
+                        color: "white",
+                        textDecoration: "none",
+                        borderRadius: 8,
+                        fontWeight: 600
+                      }}
+                    >
+                      Go Home
+                    </Link>
+                  </div>
+                </RouteErrorBoundary>
             } />
           </Routes>
         </Suspense>

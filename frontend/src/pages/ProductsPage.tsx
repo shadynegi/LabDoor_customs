@@ -31,7 +31,6 @@ const ProductsPage = () => {
     clearFilters,
     filterOptions,
     activeFilterCount,
-    ensureCatalogLoaded,
     ensureFilterOptionsLoaded,
     error: searchError,
   } = useProductSearch(300);
@@ -44,10 +43,9 @@ const ProductsPage = () => {
     const q = searchParams.get('q')?.trim();
     if (q) {
       setSearchQuery(q);
-      void ensureCatalogLoaded();
       initialQueryApplied.current = true;
     }
-  }, [searchParams, setSearchQuery, ensureCatalogLoaded]);
+  }, [searchParams, setSearchQuery]);
 
   // Determine which products to display - search/filter results or all products
   const isUsingSearchOrFilters = isSearching || isFiltering;
@@ -191,7 +189,7 @@ const ProductsPage = () => {
         <div style={{ maxWidth: 600, margin: '0 auto 24px', padding: '0 20px' }}>
           <ErrorMessage
             message={searchError}
-            onRetry={() => { void ensureCatalogLoaded(); }}
+            onRetry={() => { void ensureFilterOptionsLoaded(); }}
           />
         </div>
       )}
@@ -200,7 +198,7 @@ const ProductsPage = () => {
       <ProductFilters
         filters={filters}
         filterOptions={filterOptions}
-        onPanelOpen={() => { void ensureFilterOptionsLoaded(); void ensureCatalogLoaded(); }}
+        onPanelOpen={() => { void ensureFilterOptionsLoaded(); }}
         onFilterChange={updateFilter}
         onClearFilters={clearFilters}
         activeFilterCount={activeFilterCount}

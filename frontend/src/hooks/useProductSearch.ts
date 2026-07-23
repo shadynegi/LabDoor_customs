@@ -28,7 +28,6 @@ interface UseProductSearchResult {
   filterOptions: FilterOptions | null;
   loadingFilterOptions: boolean;
   activeFilterCount: number;
-  ensureCatalogLoaded: () => Promise<void>;
   ensureFilterOptionsLoaded: () => Promise<void>;
 }
 
@@ -57,10 +56,6 @@ export const useProductSearch = (debounceMs: number = 300): UseProductSearchResu
 
   const isFiltering =
     activeFilterCount > 0 || (filters.sortBy !== undefined && filters.sortBy !== 'default');
-
-  const ensureCatalogLoaded = useCallback(async () => {
-    // No-op: catalog is no longer prefetched client-side
-  }, []);
 
   const ensureFilterOptionsLoaded = useCallback(async () => {
     if (filtersLoadedRef.current) return;
@@ -226,7 +221,6 @@ export const useProductSearch = (debounceMs: number = 300): UseProductSearchResu
     filterOptions,
     loadingFilterOptions,
     activeFilterCount,
-    ensureCatalogLoaded,
     ensureFilterOptionsLoaded,
   };
 };

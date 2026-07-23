@@ -63,13 +63,3 @@ export function calculateCheckoutPricing(
   };
 }
 
-/** @deprecated Prefer calculateCheckoutPricing */
-export const calculatePricing = (subtotal: number): PricingBreakdown =>
-  calculateCheckoutPricing(subtotal, 0, 0);
-
-export const PRICING_CONSTANTS = {
-  FREE_SHIPPING_THRESHOLD,
-  SHIPPING_COST,
-  FREE_SHIPPING_MESSAGE,
-  PROMO_COUPON_CODE,
-} as const;

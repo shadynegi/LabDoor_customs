@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, ShoppingCart, Package, Shield, Truck, Check, RotateCcw, Image, AlertTriangle } from 'lucide-react';
 import { catalogFetch } from '../config';
 import type { Product } from '../hooks/useProducts';
-import { useCart, type SizeSystem } from './CartContext';
+import { useCart, type SizeSystem } from '../contexts/CartContext';
 import ErrorMessage from '../components/ErrorMessage';
 import { generatePlaceholder360Images } from '../utils/product360Images';
 import { resolveProductImage } from '../lib/productImageMaps';

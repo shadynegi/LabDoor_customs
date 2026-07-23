@@ -1,6 +1,6 @@
 // src/pages/Checkout.tsx
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { useCart } from "./CartContext";
+import { useCart } from "../contexts/CartContext";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { apiFetch } from "../config";
@@ -74,7 +74,7 @@ const InputField = React.memo(({
   name: FormField;
   label: string;
   type?: string;
-  icon: any;
+  icon: React.ElementType;
   placeholder: string;
   required?: boolean;
   autoComplete?: string;

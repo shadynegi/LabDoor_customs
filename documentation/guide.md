@@ -53,7 +53,7 @@ PORT=5000
 NODE_ENV=development
 FRONTEND_URL=http://localhost:5173
 DATABASE_URL=postgresql://postgres:PASSWORD@db.PROJECT.supabase.co:6543/postgres?pgbouncer=true
-WHATSAPP_CONTACT_NUMBER=+919888514572
+WHATSAPP_CONTACT_NUMBER=+91XXXXXXXXXX
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD_HASH=$2b$12$your_bcrypt_hash_here
 JWT_SECRET=your_secure_jwt_secret_at_least_32_characters_long
@@ -65,7 +65,7 @@ IP_SALT=random_salt_for_ip_anonymization
 
 ```env
 VITE_API_BASE_URL=/api
-VITE_WHATSAPP_CONTACT_NUMBER=+919888514572
+VITE_WHATSAPP_CONTACT_NUMBER=+91XXXXXXXXXX
 ```
 
 Vite proxies `/api` to the backend during development.

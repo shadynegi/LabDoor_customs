@@ -364,7 +364,7 @@ At place-order, a row in `coupon_usage` reserves the coupon for the pending orde
 
 | Actor | Mechanism |
 |-------|-----------|
-| Admin | Bcrypt password hash (`ADMIN_PASSWORD_HASH` + optional `ADMIN_ADDITIONAL_USERS`); HMAC-signed session token in HttpOnly cookie; **SHA-256 hash** stored in `admin_sessions`; optional `Authorization: Bearer` header |
+| Admin | Bcrypt password hash (`ADMIN_PASSWORD_HASH` + optional `ADMIN_ADDITIONAL_USERS`); HMAC-signed session token in HttpOnly `admin_session` cookie; **SHA-256 hash** stored in `admin_sessions` |
 | Customer orders | Order ID (`orders.id` UUID) + checkout email via `POST /api/orders/lookup` (CSRF); email links use `/orders?orderId=` |
 
 **JWT_SECRET:** used for admin token signing; complexity rules enforced when present (32+ chars, mixed case, number, special character).
@@ -927,7 +927,7 @@ Templates: `backend/env.template`, `frontend/env.template`
 
 | Job | Steps |
 |-----|-------|
-| monorepo | Root `npm ci`, backend `validate-env` (pooler `DATABASE_URL`, `WHATSAPP_CONTACT_NUMBER`, auth secrets), `npm run build` (`VITE_API_BASE_URL=/api`), Vitest + Playwright + viewport audit (**520** tests) |
+| monorepo | Root `npm ci`, backend `validate-env` (pooler `DATABASE_URL`, `WHATSAPP_CONTACT_NUMBER`, auth secrets), `npm run build` (`VITE_API_BASE_URL=/api`), Vitest + Playwright + viewport audit (**528** tests) |
 | sitemap | Requires `PRODUCTION_API_BASE_URL`; generates sitemap with live product URLs |
 | links | Markdown link checker |
 
@@ -1012,11 +1012,11 @@ npm run links:check
 
 | Suite | Tool | Coverage |
 |-------|------|----------|
-| Backend unit/API | Vitest | `Tests/unit/backend/` and `Tests/integration/api/` — place-order validation + WhatsApp integration, admin mark-paid, **admin session verify cache** (`session-verify-cache.test.ts`), admin analytics (invalid date guards), **sql tag wrapper** (`dbSqlWrapper.test.ts`), validate-cart, products search, stability smoke, coupon scope, payment idempotency, order tokens, RLS, order portal URL, merged order lookup (`orders/lookup.test.ts`), contact WhatsApp helpers, DB concurrency semaphore, IST date helpers, performance budgets, `createClientId` LAN fallback, **production env validation** (`infrastructure/validateEnv.test.ts`), **upload volume persistence** (`products/upload-persistence.test.ts`) |
+| Backend unit/API | Vitest | `Tests/unit/backend/` and `Tests/integration/api/` — place-order validation + WhatsApp integration, admin mark-paid, **admin session verify cache** (`session-verify-cache.test.ts`), admin analytics (invalid date guards), **sql tag wrapper** (`dbSqlWrapper.test.ts`), validate-cart, products search, stability smoke, coupon scope, payment idempotency, order tokens, RLS, order portal URL, merged order lookup (`orders/lookup.test.ts`), contact WhatsApp helpers, DB concurrency semaphore, IST date helpers, performance budgets, `createClientId` LAN fallback, **production env validation** (`infrastructure/validateEnv.test.ts`), **upload volume persistence** (`products/upload-persistence.test.ts`), **notify-shipped** (`orders/notify-shipped.test.ts`), **admin login** (`admin/login.test.ts`) |
 | Frontend unit | Vitest + RTL | `Tests/unit/frontend/` — `ToggleSwitch`, `whatsappContact`, `productCatalogCache` (`frontend/vitest.config.ts`) |
 | Frontend E2E / UI | Playwright | `Tests/e2e/specs/` by domain (storefront, checkout, orders, contact, admin, responsive, regression) — document scroll, responsive pages matrix (11 viewports × routes, incl. 320px), contact WhatsApp popup |
 
-**Total automated tests:** 520 (141 backend unit + 80 API + 13 frontend unit + 286 Playwright UI). **`npm test`** also runs the viewport overflow audit (12 widths × 16 routes).
+**Total automated tests:** 528 (138 backend unit + 86 API + 13 frontend unit + 286 Playwright UI + 5 viewport). **`npm test`** also runs the viewport overflow audit (12 widths × 16 routes).
 
 **Suite layout:** [`Tests/README.md`](../Tests/README.md) — directory map, conventions, shared fixtures (`Tests/shared/`).
 

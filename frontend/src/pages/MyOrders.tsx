@@ -37,8 +37,23 @@ interface Order {
   order_number: string;
   customer_email: string;
   customer_name: string;
-  shipping_address: any;
-  items: any[];
+  shipping_address: {
+    line1?: string;
+    line2?: string;
+    city?: string;
+    state?: string;
+    postal_code?: string;
+    country?: string;
+    [key: string]: string | undefined;
+  };
+  items: Array<{
+    product_id: number;
+    product_name: string;
+    quantity: number;
+    price: number;
+    size_system?: string;
+    size_value?: string;
+  }>;
   subtotal: number;
   shipping_cost: number;
   tax: number;
@@ -119,16 +134,16 @@ async function lookupOrderByCredentials(orderId: string, email: string) {
   return { response, data };
 }
 
-function normalizeOrder(order: any): Order {
+function normalizeOrder(order: Record<string, unknown>): Order {
   return {
-    ...order,
-    subtotal: parseFloat(order.subtotal?.toString() || '0'),
-    shipping_cost: parseFloat(order.shipping_cost?.toString() || '0'),
-    tax: parseFloat(order.tax?.toString() || '0'),
-    total: parseFloat(order.total?.toString() || '0'),
-    items: (order.items || []).map((item: any) => ({
-      ...item,
-      price: parseFloat(item.price?.toString() || '0'),
+    ...(order as unknown as Order),
+    subtotal: parseFloat(String(order.subtotal ?? 0)),
+    shipping_cost: parseFloat(String(order.shipping_cost ?? 0)),
+    tax: parseFloat(String(order.tax ?? 0)),
+    total: parseFloat(String(order.total ?? 0)),
+    items: (Array.isArray(order.items) ? order.items : []).map((item: Record<string, unknown>) => ({
+      ...(item as Order['items'][number]),
+      price: parseFloat(String(item.price ?? 0)),
     })),
   };
 }

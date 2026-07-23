@@ -229,7 +229,7 @@ router.get('/:id', async (req: Request, res: Response) => {
       success: true,
       data: row,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Error fetching product:', error);
     respond500(res, error, "Request failed");
   }
@@ -311,7 +311,7 @@ router.post('/', verifyAdmin, async (req: Request, res: Response) => {
       data: result[0],
       message: 'Product created successfully',
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Error creating product:', error);
     respond500(res, error, "Request failed");
   }
@@ -411,7 +411,7 @@ router.put('/:id', verifyAdmin, async (req: Request, res: Response) => {
       data: result[0],
       message: 'Product updated successfully',
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Error updating product:', error);
     respond500(res, error, "Request failed");
   }
@@ -421,6 +421,10 @@ router.put('/:id', verifyAdmin, async (req: Request, res: Response) => {
 router.delete('/:id', verifyAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+
+    if (!Number.isInteger(Number(id)) || Number(id) <= 0) {
+      return res.status(400).json({ success: false, error: 'Invalid product ID' });
+    }
 
     const result = await dbQuery(
       () => sql`
@@ -444,7 +448,7 @@ router.delete('/:id', verifyAdmin, async (req: Request, res: Response) => {
       success: true,
       message: 'Product deleted successfully',
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Error deleting product:', error);
     respond500(res, error, "Request failed");
   }
@@ -546,7 +550,7 @@ router.post('/search', async (req: Request, res: Response) => {
         sortBy: sortOption
       }
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Error searching products:', error);
     respond500(res, error, "Request failed");
   }
