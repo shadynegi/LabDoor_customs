@@ -21,8 +21,8 @@ export default function RouteErrorBoundary({ children, title = 'Something went w
             textAlign: 'center',
           }}
         >
-          <h2 style={{ fontSize: 22, marginBottom: 12 }}>{title}</h2>
-          <p style={{ color: '#6b7280', marginBottom: 20 }}>
+          <h2 style={{ fontSize: 22, marginBottom: 12, color: 'var(--color-text-primary)' }}>{title}</h2>
+          <p style={{ color: 'var(--color-text-secondary)', marginBottom: 20 }}>
             This page encountered an error. You can try again or go back.
           </p>
           <div style={{ display: 'flex', gap: 12 }}>
@@ -31,7 +31,7 @@ export default function RouteErrorBoundary({ children, title = 'Something went w
               onClick={() => window.location.reload()}
               style={{
                 padding: '12px 20px',
-                background: '#000',
+                background: 'linear-gradient(135deg, #361906 0%, #9c6649 100%)',
                 color: '#fff',
                 border: 'none',
                 borderRadius: 8,
@@ -45,8 +45,9 @@ export default function RouteErrorBoundary({ children, title = 'Something went w
               to="/"
               style={{
                 padding: '12px 20px',
-                background: '#f3f4f6',
-                color: '#111',
+                background: 'var(--color-bg-surface)',
+                color: 'var(--color-text-primary)',
+                border: '1px solid var(--color-border)',
                 borderRadius: 8,
                 textDecoration: 'none',
                 minHeight: 44,

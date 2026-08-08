@@ -58,7 +58,7 @@ class ErrorBoundary extends Component<Props, State> {
           <div
             style={{
               maxWidth: 600,
-              background: 'white',
+              background: 'var(--color-bg-elevated)',
               borderRadius: 16,
               padding: 40,
               boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
@@ -84,7 +84,7 @@ class ErrorBoundary extends Component<Props, State> {
               style={{
                 fontSize: 28,
                 fontWeight: 800,
-                color: '#1f2937',
+                color: 'var(--color-text-primary)',
                 marginBottom: 12,
               }}
             >
@@ -93,7 +93,7 @@ class ErrorBoundary extends Component<Props, State> {
             <p
               style={{
                 fontSize: 16,
-                color: '#6b7280',
+                color: 'var(--color-text-secondary)',
                 marginBottom: 24,
                 lineHeight: 1.6,
               }}

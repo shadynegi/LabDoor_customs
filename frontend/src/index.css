@@ -12,7 +12,9 @@
   line-height: 1.6;
   font-weight: 400;
 
-  color-scheme: light dark;
+  /* Default light; [data-theme="dark"] / admin dark override to `dark` so native
+     controls follow the app's theme toggle rather than the OS preference. */
+  color-scheme: light;
   color: var(--color-text-primary);
   background-color: var(--color-bg-base);
 

@@ -42,8 +42,8 @@ export function MobileStickyCta({
       {hint && <div className="mobile-sticky-cta__hint">{hint}</div>}
       {amount && (
         <div className="mobile-sticky-cta__total">
-          <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 2 }}>Total</div>
-          <div style={{ fontSize: 20, fontWeight: 800, color: '#1f2937' }}>{amount}</div>
+          <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 2 }}>Total</div>
+          <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--color-text-primary)' }}>{amount}</div>
         </div>
       )}
       <div className="mobile-sticky-cta__actions">

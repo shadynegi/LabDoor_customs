@@ -133,6 +133,7 @@ const InputField = React.memo(({
             outline: "none",
             transition: "all 0.2s",
             background: "var(--color-bg-surface)",
+            color: "var(--color-text-primary)",
           }}
           onFocus={(e) => {
             if (!hasError) {
@@ -141,7 +142,7 @@ const InputField = React.memo(({
             }
           }}
           onBlur={(e) => {
-            e.target.style.borderColor = hasError ? "#ef4444" : "#d1d5db";
+            e.target.style.borderColor = hasError ? "#ef4444" : "var(--color-border)";
             e.target.style.boxShadow = "none";
             onBlur?.(e);
           }}
@@ -996,6 +997,8 @@ export default function Checkout() {
                         fontSize: 14,
                         textTransform: "uppercase",
                         outline: "none",
+                        background: "var(--color-bg-surface)",
+                        color: "var(--color-text-primary)",
                       }}
                       onKeyDown={(e) => e.key === 'Enter' && handleApplyCoupon()}
                     />

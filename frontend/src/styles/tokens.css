@@ -25,8 +25,12 @@
   --color-bg-surface: #f9fafb;   /* card / panel background */
   --color-bg-elevated: #ffffff;  /* modal / dropdown background */
   --color-text-primary: #1f2937; /* body text */
-  --color-text-secondary: #6b7280; /* muted text */
+  --color-text-secondary: #4b5563; /* muted text — neutral-600 for ~7:1 contrast on light surfaces */
   --color-border: #e5e7eb;       /* dividers and input borders */
+
+  /* Skeleton shimmer stops — light defaults (overridden per theme below) */
+  --color-skeleton-base: #e0e0e0;
+  --color-skeleton-highlight: #f0f0f0;
 }
 
 /* Storefront dark mode — set on <html data-theme="dark"> */
@@ -35,8 +39,12 @@
   --color-bg-surface: #1a1a1a;
   --color-bg-elevated: #242424;
   --color-text-primary: #f3f4f6;
-  --color-text-secondary: #9ca3af;
+  --color-text-secondary: #c3c8d0; /* lighter muted grey — ~8:1 on dark surfaces */
   --color-border: #2d2d2d;
+  --color-skeleton-base: #242424;
+  --color-skeleton-highlight: #333333;
+  /* Make native controls (date pickers, calendar icons, scrollbars) follow the toggle */
+  color-scheme: dark;
 }
 
 /* Admin root — re-assert light defaults so the storefront's <html data-theme>
@@ -46,8 +54,11 @@
   --color-bg-surface: #f9fafb;
   --color-bg-elevated: #ffffff;
   --color-text-primary: #1f2937;
-  --color-text-secondary: #6b7280;
+  --color-text-secondary: #4b5563;
   --color-border: #e5e7eb;
+  --color-skeleton-base: #e0e0e0;
+  --color-skeleton-highlight: #f0f0f0;
+  color-scheme: light;
 }
 
 /* Admin dark mode — scoped to the admin root, warmer darks to match brand */
@@ -56,6 +67,10 @@
   --color-bg-surface: #1c1a14;
   --color-bg-elevated: #252318;
   --color-text-primary: #f3f4f6;
-  --color-text-secondary: #a1a09a;
+  --color-text-secondary: #c8c6bd; /* lighter warm muted grey — ~8:1 on warm dark surfaces */
   --color-border: #2e2c22;
+  --color-skeleton-base: #252318;
+  --color-skeleton-highlight: #322f22;
+  /* Native date pickers / calendar icons follow the admin toggle, not the OS */
+  color-scheme: dark;
 }

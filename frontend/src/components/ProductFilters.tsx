@@ -60,9 +60,9 @@ const ProductFilters: React.FC<ProductFiltersProps> = ({
             setIsExpanded(!isExpanded);
           }}
           style={{
-            background: isExpanded ? 'linear-gradient(135deg, #361906 0%, #9c6649 100%)' : 'white',
-            color: isExpanded ? 'white' : '#374151',
-            border: isExpanded ? 'none' : '2px solid #e5e7eb',
+            background: isExpanded ? 'linear-gradient(135deg, #361906 0%, #9c6649 100%)' : 'var(--color-bg-elevated)',
+            color: isExpanded ? 'white' : 'var(--color-text-primary)',
+            border: isExpanded ? 'none' : '2px solid var(--color-border)',
           }}
         >
           {/* Filter Icon */}
@@ -152,11 +152,11 @@ const ProductFilters: React.FC<ProductFiltersProps> = ({
             style={{ overflow: 'hidden' }}
           >
             <div style={{
-              background: 'white',
+              background: 'var(--color-bg-surface)',
               borderRadius: 16,
               padding: isMobile ? 16 : 24,
               boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-              border: '1px solid #e5e7eb',
+              border: '1px solid var(--color-border)',
             }}>
               <div style={{
                 display: 'grid',
@@ -169,7 +169,7 @@ const ProductFilters: React.FC<ProductFiltersProps> = ({
                     display: 'block',
                     fontSize: 13,
                     fontWeight: 600,
-                    color: '#374151',
+                    color: 'var(--color-text-primary)',
                     marginBottom: 10,
                     textTransform: 'uppercase',
                     letterSpacing: '0.5px',
@@ -187,7 +187,7 @@ const ProductFilters: React.FC<ProductFiltersProps> = ({
                         left: 12,
                         top: '50%',
                         transform: 'translateY(-50%)',
-                        color: '#9ca3af',
+                        color: 'var(--color-text-secondary)',
                         fontSize: 14,
                       }}>$</span>
                       <input
@@ -204,21 +204,23 @@ const ProductFilters: React.FC<ProductFiltersProps> = ({
                           width: '100%',
                           padding: '10px 12px 10px 28px',
                           fontSize: 14,
-                          border: '2px solid #e5e7eb',
+                          border: '2px solid var(--color-border)',
                           borderRadius: 8,
                           outline: 'none',
+                          background: 'var(--color-bg-elevated)',
+                          color: 'var(--color-text-primary)',
                           transition: 'border-color 0.2s ease',
                         }}
                       />
                     </div>
-                    <span style={{ color: '#9ca3af' }}>-</span>
+                    <span style={{ color: 'var(--color-text-secondary)' }}>-</span>
                     <div style={{ position: 'relative', flex: 1 }}>
                       <span style={{
                         position: 'absolute',
                         left: 12,
                         top: '50%',
                         transform: 'translateY(-50%)',
-                        color: '#9ca3af',
+                        color: 'var(--color-text-secondary)',
                         fontSize: 14,
                       }}>$</span>
                       <input
@@ -235,9 +237,11 @@ const ProductFilters: React.FC<ProductFiltersProps> = ({
                           width: '100%',
                           padding: '10px 12px 10px 28px',
                           fontSize: 14,
-                          border: '2px solid #e5e7eb',
+                          border: '2px solid var(--color-border)',
                           borderRadius: 8,
                           outline: 'none',
+                          background: 'var(--color-bg-elevated)',
+                          color: 'var(--color-text-primary)',
                           transition: 'border-color 0.2s ease',
                         }}
                       />
@@ -251,7 +255,7 @@ const ProductFilters: React.FC<ProductFiltersProps> = ({
                 <div style={{
                   marginTop: 20,
                   paddingTop: 16,
-                  borderTop: '1px solid #e5e7eb',
+                  borderTop: '1px solid var(--color-border)',
                   display: 'flex',
                   justifyContent: 'flex-end',
                 }}>

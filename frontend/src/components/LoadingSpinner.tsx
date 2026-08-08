@@ -36,13 +36,13 @@ export default function LoadingSpinner({ size = 'medium', message }: LoadingSpin
         style={{
           width: spinnerSize,
           height: spinnerSize,
-          border: '4px solid #e5e7eb',
+          border: '4px solid var(--color-border)',
           borderTopColor: '#9c6649',
           borderRadius: '50%',
         }}
       />
       {message && (
-        <p style={{ color: '#6b7280', fontSize: 14, fontWeight: 500 }}>
+        <p style={{ color: 'var(--color-text-secondary)', fontSize: 14, fontWeight: 500 }}>
           {message}
         </p>
       )}

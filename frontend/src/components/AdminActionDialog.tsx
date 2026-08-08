@@ -83,7 +83,7 @@ export default function AdminActionDialog({
         aria-labelledby={titleId}
         aria-describedby={descId}
         style={{
-          background: 'white',
+          background: 'var(--color-bg-elevated)',
           borderRadius: 16,
           padding: 24,
           maxWidth: 440,
@@ -92,16 +92,16 @@ export default function AdminActionDialog({
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 id={titleId} style={{ margin: '0 0 8px', fontSize: 20, fontWeight: 700, color: '#1f2937' }}>
+        <h2 id={titleId} style={{ margin: '0 0 8px', fontSize: 20, fontWeight: 700, color: 'var(--color-text-primary)' }}>
           {title}
         </h2>
-        <p id={descId} style={{ margin: '0 0 20px', color: '#6b7280', fontSize: 14, lineHeight: 1.5 }}>
+        <p id={descId} style={{ margin: '0 0 20px', color: 'var(--color-text-secondary)', fontSize: 14, lineHeight: 1.5 }}>
           {message}
         </p>
         <form onSubmit={handleSubmit}>
           {variant === 'prompt' && inputLabel && (
             <label style={{ display: 'block', marginBottom: 16 }}>
-              <span style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6, color: '#374151' }}>
+              <span style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6, color: 'var(--color-text-primary)' }}>
                 {inputLabel}
               </span>
               <input
@@ -118,16 +118,18 @@ export default function AdminActionDialog({
                 style={{
                   width: '100%',
                   padding: '10px 12px',
-                  border: '1px solid #d1d5db',
+                  border: '1px solid var(--color-border)',
                   borderRadius: 8,
                   fontSize: 14,
+                  background: 'var(--color-bg-surface)',
+                  color: 'var(--color-text-primary)',
                 }}
               />
             </label>
           )}
           {variant === 'prompt' && secondInputLabel && (
             <label style={{ display: 'block', marginBottom: 16 }}>
-              <span style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6, color: '#374151' }}>
+              <span style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6, color: 'var(--color-text-primary)' }}>
                 {secondInputLabel}
               </span>
               <input
@@ -142,9 +144,11 @@ export default function AdminActionDialog({
                 style={{
                   width: '100%',
                   padding: '10px 12px',
-                  border: '1px solid #d1d5db',
+                  border: '1px solid var(--color-border)',
                   borderRadius: 8,
                   fontSize: 14,
+                  background: 'var(--color-bg-surface)',
+                  color: 'var(--color-text-primary)',
                 }}
               />
             </label>
@@ -155,9 +159,10 @@ export default function AdminActionDialog({
               onClick={onCancel}
               style={{
                 padding: '10px 16px',
-                border: '1px solid #d1d5db',
+                border: '1px solid var(--color-border)',
                 borderRadius: 8,
-                background: 'white',
+                background: 'var(--color-bg-elevated)',
+                color: 'var(--color-text-primary)',
                 cursor: 'pointer',
                 fontWeight: 600,
               }}

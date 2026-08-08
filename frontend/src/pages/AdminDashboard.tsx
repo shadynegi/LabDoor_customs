@@ -1727,6 +1727,7 @@ function AdminDashboardInner() {
             type="checkbox"
             checked={showLowStockOnly}
             onChange={(e) => setShowLowStockOnly(e.target.checked)}
+            style={{ accentColor: '#9c6649' }}
           />
           Low stock only
         </label>
@@ -1734,7 +1735,7 @@ function AdminDashboardInner() {
           <label htmlFor="admin-product-search" style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0, 0, 0, 0)', whiteSpace: 'nowrap', border: 0 }}>
             Search products
           </label>
-          <Search size={18} color="#9ca3af" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
+          <Search size={18} color="var(--color-text-secondary)" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
           <input
             id="admin-product-search"
             name="productSearch"
@@ -1789,7 +1790,7 @@ function AdminDashboardInner() {
                     e.target.checked ? newSet.add(product.id) : newSet.delete(product.id);
                     setSelectedProducts(newSet);
                   }}
-                  style={{ marginTop: 4, minWidth: 20, minHeight: 20 }}
+                  style={{ marginTop: 4, minWidth: 20, minHeight: 20, accentColor: '#9c6649' }}
                 />
                 {product.image && (
                   <img src={resolveProductImage(product.image)} alt="" style={{ width: 48, height: 48, objectFit: 'contain', borderRadius: 8, background: 'var(--color-bg-surface)' }} />
@@ -1811,7 +1812,7 @@ function AdminDashboardInner() {
                       <History size={16} color="#2563eb" aria-hidden="true" />
                     </button>
                     <button type="button" aria-label="Edit product" onClick={() => openEditProduct(product)} style={{ padding: 8, minHeight: 44, minWidth: 44, background: 'var(--color-bg-surface)', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
-                      <Pencil size={16} color="#374151" aria-hidden="true" />
+                      <Pencil size={16} color="var(--color-text-primary)" aria-hidden="true" />
                     </button>
                     <button type="button" aria-label="Delete product" onClick={() => setAdminDialog({ kind: 'deleteProduct', product })} style={{ padding: 8, minHeight: 44, minWidth: 44, background: '#fee2e2', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
                       <Trash2 size={16} color="#dc2626" aria-hidden="true" />
@@ -1829,7 +1830,7 @@ function AdminDashboardInner() {
             <tr style={{ background: 'var(--color-bg-surface)' }}>
               <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', width: 40 }}>
                 <input id="admin-products-select-all" name="selectAllProducts" type="checkbox" aria-label="Select all products" checked={selectedProducts.size === filteredProducts.length && filteredProducts.length > 0}
-                  onChange={(e) => setSelectedProducts(e.target.checked ? new Set(filteredProducts.map(p => p.id)) : new Set())} />
+                  onChange={(e) => setSelectedProducts(e.target.checked ? new Set(filteredProducts.map(p => p.id)) : new Set())} style={{ accentColor: '#9c6649' }} />
               </th>
               <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>Product</th>
               <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>Price</th>
@@ -1853,7 +1854,7 @@ function AdminDashboardInner() {
                       const newSet = new Set(selectedProducts);
                       e.target.checked ? newSet.add(product.id) : newSet.delete(product.id);
                       setSelectedProducts(newSet);
-                    }} />
+                    }} style={{ accentColor: '#9c6649' }} />
                 </td>
                 <td style={{ padding: 16 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -1907,7 +1908,7 @@ function AdminDashboardInner() {
                       aria-label="Edit product"
                       style={{ padding: 8, background: 'var(--color-bg-surface)', border: 'none', borderRadius: 8, cursor: 'pointer' }}
                     >
-                      <Pencil size={16} color="#374151" aria-hidden="true" />
+                      <Pencil size={16} color="var(--color-text-primary)" aria-hidden="true" />
                     </button>
                     <button
                       type="button"
@@ -1958,7 +1959,7 @@ function AdminDashboardInner() {
           <label htmlFor="admin-order-search" style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0, 0, 0, 0)', whiteSpace: 'nowrap', border: 0 }}>
             Search orders
           </label>
-          <Search size={18} color="#9ca3af" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
+          <Search size={18} color="var(--color-text-secondary)" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
           <input
             id="admin-order-search"
             name="orderSearch"
@@ -2024,7 +2025,7 @@ function AdminDashboardInner() {
                 const newSet = new Set(selectedOrders);
                 e.target.checked ? newSet.add(order.id) : newSet.delete(order.id);
                 setSelectedOrders(newSet);
-              }} />
+              }} style={{ accentColor: '#9c6649' }} />
               <div style={{ flex: 1 }} onClick={() => setSelectedOrder(order)}>
                 <div style={{ fontWeight: 700, fontSize: 16 }}>#{order.order_number}</div>
                 <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>{new Date(order.created_at).toLocaleDateString()}</div>
@@ -2035,7 +2036,7 @@ function AdminDashboardInner() {
                 onClick={() => setSelectedOrder(order)}
                 style={{ background: 'none', border: 'none', padding: 4, cursor: 'pointer', display: 'flex', alignItems: 'center' }}
               >
-                <Eye size={18} color="#6b7280" aria-hidden="true" />
+                <Eye size={18} color="var(--color-text-secondary)" aria-hidden="true" />
               </button>
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
@@ -2067,7 +2068,7 @@ function AdminDashboardInner() {
           <label htmlFor="admin-customer-search" style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0, 0, 0, 0)', whiteSpace: 'nowrap', border: 0 }}>
             Search customers
           </label>
-          <Search size={18} color="#9ca3af" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
+          <Search size={18} color="var(--color-text-secondary)" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
           <input id="admin-customer-search" name="customerSearch" type="text" placeholder="Search customers..." value={customerSearch} onChange={(e) => setCustomerSearch(e.target.value)}
             aria-label="Search customers"
             style={{ width: '100%', padding: '10px 12px 10px 40px', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 14 }} />
@@ -2079,6 +2080,7 @@ function AdminDashboardInner() {
             type="checkbox"
             checked={showDeletedCustomers}
             onChange={(e) => setShowDeletedCustomers(e.target.checked)}
+            style={{ accentColor: '#9c6649' }}
           />
           Show deleted customers
         </label>
@@ -2325,7 +2327,7 @@ function AdminDashboardInner() {
                         borderRadius: 20,
                         fontSize: 12,
                         fontWeight: 600,
-                        background: session.is_active ? '#d1fae5' : '#f3f4f6',
+                        background: session.is_active ? '#d1fae5' : 'var(--color-bg-surface)',
                         color: session.is_active ? '#065f46' : 'var(--color-text-secondary)',
                       }}>
                         {session.is_current ? 'Current' : session.is_active ? 'Active' : 'Expired'}

@@ -4,7 +4,8 @@ import { motion } from 'framer-motion';
 
 // Base skeleton with shimmer animation
 const shimmerStyle: React.CSSProperties = {
-  background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)',
+  background:
+    'linear-gradient(90deg, var(--color-skeleton-highlight) 25%, var(--color-skeleton-base) 50%, var(--color-skeleton-highlight) 75%)',
   backgroundSize: '200% 100%',
   animation: 'shimmer 1.5s infinite',
 };
@@ -61,7 +62,7 @@ interface ProductCardSkeletonProps {
 export const ProductCardSkeleton: React.FC<ProductCardSkeletonProps> = ({ isMobile = false }) => (
   <div
     style={{
-      background: 'white',
+      background: 'var(--color-bg-surface)',
       borderRadius: 16,
       overflow: 'hidden',
       boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
@@ -171,7 +172,7 @@ export const ProductDetailSkeleton: React.FC<ProductDetailSkeletonProps> = ({ is
         display: 'grid',
         gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
         gap: isMobile ? 32 : 60,
-        background: 'white',
+        background: 'var(--color-bg-surface)',
         borderRadius: 24,
         padding: isMobile ? 24 : 48,
         boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
@@ -216,7 +217,7 @@ export const ProductDetailSkeleton: React.FC<ProductDetailSkeletonProps> = ({ is
           <div style={{
             display: 'flex',
             gap: 8,
-            background: '#f3f4f6',
+            background: 'var(--color-bg-surface)',
             padding: 4,
             borderRadius: 10,
             marginBottom: 16,
@@ -247,7 +248,7 @@ export const ProductDetailSkeleton: React.FC<ProductDetailSkeletonProps> = ({ is
             gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
             gap: 16,
             paddingTop: 32,
-            borderTop: '1px solid #e5e7eb',
+            borderTop: '1px solid var(--color-border)',
           }}>
             {[1, 2, 3].map((i) => (
               <div key={i} style={{ textAlign: 'center' }}>
@@ -273,7 +274,7 @@ interface OrderCardSkeletonProps {
 export const OrderCardSkeleton: React.FC<OrderCardSkeletonProps> = ({ isMobile = false }) => (
   <div
     style={{
-      background: 'white',
+      background: 'var(--color-bg-surface)',
       borderRadius: 16,
       padding: isMobile ? 20 : 24,
       marginBottom: 16,
@@ -337,7 +338,7 @@ export const OrderCardSkeleton: React.FC<OrderCardSkeletonProps> = ({ isMobile =
           display: 'flex',
           justifyContent: 'space-between',
           padding: '8px 0',
-          borderBottom: '1px solid #f3f4f6',
+          borderBottom: '1px solid var(--color-border)',
         }}>
           <Skeleton width="60%" height={16} />
           <Skeleton width={60} height={16} />
@@ -509,7 +510,7 @@ export const DashboardSkeleton: React.FC<DashboardSkeletonProps> = ({ isMobile =
       }}>
         {[1, 2, 3, 4].map((i) => (
           <div key={i} style={{
-            background: 'white',
+            background: 'var(--color-bg-surface)',
             borderRadius: 16,
             padding: 20,
             boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
@@ -538,7 +539,7 @@ export const DashboardSkeleton: React.FC<DashboardSkeletonProps> = ({ isMobile =
 
       {/* Table */}
       <div style={{
-        background: 'white',
+        background: 'var(--color-bg-surface)',
         borderRadius: 16,
         padding: 24,
         boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
@@ -549,7 +550,7 @@ export const DashboardSkeleton: React.FC<DashboardSkeletonProps> = ({ isMobile =
           gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr',
           gap: 16,
           paddingBottom: 16,
-          borderBottom: '1px solid #e5e7eb',
+          borderBottom: '1px solid var(--color-border)',
           marginBottom: 16,
         }}>
           {[1, 2, 3, 4, 5].map((i) => (
@@ -564,7 +565,7 @@ export const DashboardSkeleton: React.FC<DashboardSkeletonProps> = ({ isMobile =
             gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr',
             gap: 16,
             padding: '16px 0',
-            borderBottom: i < 4 ? '1px solid #f3f4f6' : 'none',
+            borderBottom: i < 4 ? '1px solid var(--color-border)' : 'none',
           }}>
             {[1, 2, 3, 4, 5].map((j) => (
               <Skeleton key={j} height={20} />
@@ -603,7 +604,7 @@ export const CartSkeleton: React.FC<CartSkeletonProps> = ({ isMobile = false }) 
         <div>
           {[1, 2, 3].map((i) => (
             <div key={i} style={{
-              background: 'white',
+              background: 'var(--color-bg-surface)',
               borderRadius: 16,
               padding: 20,
               marginBottom: 16,
@@ -623,7 +624,7 @@ export const CartSkeleton: React.FC<CartSkeletonProps> = ({ isMobile = false }) 
         
         {/* Summary */}
         <div style={{
-          background: 'white',
+          background: 'var(--color-bg-surface)',
           borderRadius: 16,
           padding: 24,
           height: 'fit-content',
@@ -639,7 +640,7 @@ export const CartSkeleton: React.FC<CartSkeletonProps> = ({ isMobile = false }) 
               <Skeleton width={60} height={16} />
             </div>
           ))}
-          <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 16, marginTop: 16 }}>
+          <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: 16, marginTop: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 24 }}>
               <Skeleton width={60} height={20} />
               <Skeleton width={80} height={24} />

@@ -59,17 +59,19 @@ interface AdminProductFormModalProps {
 const inputStyle: React.CSSProperties = {
   width: '100%',
   padding: '10px 12px',
-  border: '1px solid #e5e7eb',
+  border: '1px solid var(--color-border)',
   borderRadius: 8,
   fontSize: 14,
   boxSizing: 'border-box',
+  background: 'var(--color-bg-surface)',
+  color: 'var(--color-text-primary)',
 };
 
 const labelStyle: React.CSSProperties = {
   display: 'block',
   fontSize: 13,
   fontWeight: 600,
-  color: '#374151',
+  color: 'var(--color-text-primary)',
   marginBottom: 6,
 };
 
@@ -275,16 +277,16 @@ export default function AdminProductFormModal({
       <form data-testid="admin-product-form" onSubmit={handleSubmit} style={{ padding: 24 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
           <div>
-            <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>
+            <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: 'var(--color-text-primary)' }}>
               {isEditing ? 'Edit Product' : 'Add New Shoe'}
             </h2>
-            <p style={{ margin: '6px 0 0', fontSize: 14, color: '#6b7280' }}>
+            <p style={{ margin: '6px 0 0', fontSize: 14, color: 'var(--color-text-secondary)' }}>
               {isEditing
                 ? 'Update listing details, images, and inventory.'
                 : 'Create one catalog listing. All standard sizes are available on the storefront.'}
             </p>
           </div>
-          <button type="button" onClick={onClose} style={{ background: '#f3f4f6', border: 'none', borderRadius: 8, padding: 8, cursor: 'pointer' }}>
+          <button type="button" onClick={onClose} style={{ background: 'var(--color-bg-surface)', color: 'var(--color-text-primary)', border: '1px solid var(--color-border)', borderRadius: 8, padding: 8, cursor: 'pointer' }}>
             <X size={20} />
           </button>
         </div>
@@ -395,7 +397,7 @@ export default function AdminProductFormModal({
               <img
                 src={imagePreviewUrl || previewSrc(form.image)}
                 alt="Preview"
-                style={{ marginTop: 10, width: '100%', maxHeight: 120, objectFit: 'contain', borderRadius: 8, background: '#f3f4f6' }}
+                style={{ marginTop: 10, width: '100%', maxHeight: 120, objectFit: 'contain', borderRadius: 8, background: 'var(--color-bg-surface)' }}
               />
             )}
           </div>
@@ -432,7 +434,7 @@ export default function AdminProductFormModal({
               <img
                 src={backgroundPreviewUrl || previewSrc(form.background || '', 'background')}
                 alt="Background preview"
-                style={{ marginTop: 10, width: '100%', maxHeight: 120, objectFit: 'contain', borderRadius: 8, background: '#f3f4f6' }}
+                style={{ marginTop: 10, width: '100%', maxHeight: 120, objectFit: 'contain', borderRadius: 8, background: 'var(--color-bg-surface)' }}
               />
             )}
           </div>
@@ -473,25 +475,26 @@ export default function AdminProductFormModal({
                     setVideoFile(null);
                     setField('video_360', '');
                   }}
-                  style={{ fontSize: 13, color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+                  style={{ fontSize: 13, color: 'var(--color-text-secondary)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
                 >
                   Remove video
                 </button>
               )}
             </div>
-            <p style={{ margin: '8px 0 0', fontSize: 12, color: '#6b7280' }}>
+            <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--color-text-secondary)' }}>
               Optional. Shown in the product 360° viewer when customers tap Spin/360°.
             </p>
           </div>
 
           <div style={{ gridColumn: '1 / -1' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer', color: 'var(--color-text-primary)' }}>
               <input
                 id="admin-product-out-of-stock"
                 name="is_out_of_stock"
                 type="checkbox"
                 checked={form.is_out_of_stock}
                 onChange={(e) => setField('is_out_of_stock', e.target.checked)}
+                style={{ accentColor: '#9c6649' }}
               />
               Mark as out of stock (hidden from purchase even if stock &gt; 0)
             </label>
@@ -502,7 +505,7 @@ export default function AdminProductFormModal({
           <button
             type="button"
             onClick={onClose}
-            style={{ padding: '12px 20px', background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}
+            style={{ padding: '12px 20px', background: 'var(--color-bg-surface)', color: 'var(--color-text-primary)', border: '1px solid var(--color-border)', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}
           >
             Cancel
           </button>

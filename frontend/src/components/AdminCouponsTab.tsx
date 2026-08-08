@@ -215,13 +215,13 @@ export default function AdminCouponsTab() {
 
   return (
     <div>
-      <div style={{ background: 'white', borderRadius: 12, padding: 20, marginBottom: 16, border: '1px solid #e5e7eb' }}>
-        <h3 style={{ margin: '0 0 12px', fontSize: 18, fontWeight: 700 }}>Create coupon</h3>
-        <p style={{ margin: '0 0 16px', fontSize: 14, color: '#6b7280' }}>
+      <div style={{ background: 'var(--color-bg-surface)', borderRadius: 12, padding: 20, marginBottom: 16, border: '1px solid var(--color-border)' }}>
+        <h3 style={{ margin: '0 0 12px', fontSize: 18, fontWeight: 700, color: 'var(--color-text-primary)' }}>Create coupon</h3>
+        <p style={{ margin: '0 0 16px', fontSize: 14, color: 'var(--color-text-secondary)' }}>
           Percentage discounts apply automatically at checkout via server-side pricing.
         </p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-end' }}>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13 }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: 'var(--color-text-primary)' }}>
             Code
             <input
               id="admin-coupon-custom-code"
@@ -229,38 +229,38 @@ export default function AdminCouponsTab() {
               value={customCode}
               onChange={(e) => setCustomCode(e.target.value.toUpperCase())}
               placeholder="MYCODE"
-              style={{ padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, minWidth: 0, width: '100%', maxWidth: 200 }}
+              style={{ padding: '10px 12px', border: '1px solid var(--color-border)', borderRadius: 8, minWidth: 0, width: '100%', maxWidth: 200, background: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)' }}
             />
           </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13 }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: 'var(--color-text-primary)' }}>
             Discount %
             <select
               id="admin-coupon-custom-percent"
               name="customPercent"
               value={customPercent}
               onChange={(e) => setCustomPercent(Number(e.target.value))}
-              style={{ padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8 }}
+              style={{ padding: '10px 12px', border: '1px solid var(--color-border)', borderRadius: 8, background: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)' }}
             >
               {DISCOUNT_PERCENT_OPTIONS.map((p) => (
                 <option key={p} value={p}>{p}%</option>
               ))}
             </select>
           </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13 }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: 'var(--color-text-primary)' }}>
             Applies to
             <select
               id="admin-coupon-custom-applies-to"
               name="customAppliesTo"
               value={customAppliesTo}
               onChange={(e) => setCustomAppliesTo(e.target.value as typeof customAppliesTo)}
-              style={{ padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8 }}
+              style={{ padding: '10px 12px', border: '1px solid var(--color-border)', borderRadius: 8, background: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)' }}
             >
               <option value="all">Entire order</option>
               <option value="product">Specific products</option>
             </select>
           </label>
           {customAppliesTo === 'product' && (
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, flex: '1 1 100%', minWidth: 0, maxWidth: '100%' }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, flex: '1 1 100%', minWidth: 0, maxWidth: '100%', color: 'var(--color-text-primary)' }}>
               Products
               <AdminProductSearchPicker
                 mode="multi"
@@ -297,8 +297,9 @@ export default function AdminCouponsTab() {
               alignItems: 'center',
               gap: 8,
               padding: '10px 18px',
-              background: '#f3f4f6',
-              border: 'none',
+              background: 'var(--color-bg-surface)',
+              color: 'var(--color-text-primary)',
+              border: '1px solid var(--color-border)',
               borderRadius: 8,
               cursor: 'pointer',
             }}
@@ -308,15 +309,15 @@ export default function AdminCouponsTab() {
         </div>
       </div>
 
-      <div className="responsive-table-wrap" style={{ background: 'white', borderRadius: 12, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
+      <div className="responsive-table-wrap" style={{ background: 'var(--color-bg-surface)', borderRadius: 12, border: '1px solid var(--color-border)', overflow: 'hidden' }}>
         {loading ? (
-          <p style={{ padding: 24, color: '#6b7280' }}>Loading coupons…</p>
+          <p style={{ padding: 24, color: 'var(--color-text-secondary)' }}>Loading coupons…</p>
         ) : coupons.length === 0 ? (
-          <p style={{ padding: 24, color: '#6b7280' }}>No coupons yet. Create one above to get started.</p>
+          <p style={{ padding: 24, color: 'var(--color-text-secondary)' }}>No coupons yet. Create one above to get started.</p>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: isMobile ? 480 : 640 }}>
             <thead>
-              <tr style={{ background: '#f9fafb' }}>
+              <tr style={{ background: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)' }}>
                 <th style={{ padding: 16, textAlign: 'left', fontSize: 13 }}>Code</th>
                 <th style={{ padding: 16, textAlign: 'left', fontSize: 13 }}>Scope</th>
                 <th style={{ padding: 16, textAlign: 'left', fontSize: 13 }}>Discount</th>
@@ -327,14 +328,14 @@ export default function AdminCouponsTab() {
             </thead>
             <tbody>
               {coupons.map((coupon) => (
-                <tr key={coupon.id} style={{ borderTop: '1px solid #e5e7eb' }}>
+                <tr key={coupon.id} style={{ borderTop: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}>
                   <td style={{ padding: 16, fontWeight: 700 }}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                       <Tag size={16} color="#9c6649" />
                       {coupon.code}
                     </span>
                   </td>
-                  <td style={{ padding: 16, fontSize: 13, color: '#6b7280' }}>
+                  <td style={{ padding: 16, fontSize: 13, color: 'var(--color-text-secondary)' }}>
                     {coupon.applies_to === 'product'
                       ? `Products (${(coupon.applies_to_ids || []).length})`
                       : 'All'}
@@ -344,7 +345,7 @@ export default function AdminCouponsTab() {
                       ? `${coupon.discount_value}%`
                       : `$${coupon.discount_value.toFixed(2)}`}
                   </td>
-                  <td style={{ padding: 16, color: '#6b7280' }}>
+                  <td style={{ padding: 16, color: 'var(--color-text-secondary)' }}>
                     {coupon.used_count ?? 0}
                     {coupon.max_uses != null ? ` / ${coupon.max_uses}` : ''}
                   </td>
@@ -376,9 +377,9 @@ export default function AdminCouponsTab() {
                         type="button"
                         onClick={() => toggleActive(coupon)}
                         title={coupon.is_active ? 'Deactivate' : 'Activate'}
-                        style={{ padding: 8, background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: 'pointer' }}
+                        style={{ padding: 8, background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)', borderRadius: 8, cursor: 'pointer' }}
                       >
-                        {coupon.is_active ? <ToggleRight size={18} color="#16a34a" /> : <ToggleLeft size={18} color="#9ca3af" />}
+                        {coupon.is_active ? <ToggleRight size={18} color="#16a34a" /> : <ToggleLeft size={18} color="var(--color-text-secondary)" />}
                       </button>
                       <button
                         type="button"
@@ -403,18 +404,18 @@ export default function AdminCouponsTab() {
             type="button"
             disabled={page <= 1}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
-            style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #e5e7eb', background: 'white', cursor: page <= 1 ? 'not-allowed' : 'pointer', opacity: page <= 1 ? 0.5 : 1 }}
+            style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg-surface)', color: 'var(--color-text-primary)', cursor: page <= 1 ? 'not-allowed' : 'pointer', opacity: page <= 1 ? 0.5 : 1 }}
           >
             Previous
           </button>
-          <span style={{ alignSelf: 'center', fontSize: 14, color: '#6b7280' }}>
+          <span style={{ alignSelf: 'center', fontSize: 14, color: 'var(--color-text-secondary)' }}>
             Page {page} of {totalPages}
           </span>
           <button
             type="button"
             disabled={page >= totalPages}
             onClick={() => setPage((p) => p + 1)}
-            style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #e5e7eb', background: 'white', cursor: page >= totalPages ? 'not-allowed' : 'pointer', opacity: page >= totalPages ? 0.5 : 1 }}
+            style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg-surface)', color: 'var(--color-text-primary)', cursor: page >= totalPages ? 'not-allowed' : 'pointer', opacity: page >= totalPages ? 0.5 : 1 }}
           >
             Next
           </button>
@@ -437,70 +438,70 @@ export default function AdminCouponsTab() {
         >
           <div
             style={{
-              background: 'white',
+              background: 'var(--color-bg-elevated)',
               borderRadius: 12,
               padding: 24,
               width: '100%',
               maxWidth: 480,
-              border: '1px solid #e5e7eb',
+              border: '1px solid var(--color-border)',
             }}
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Edit {editingCoupon.code}</h3>
+              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--color-text-primary)' }}>Edit {editingCoupon.code}</h3>
               <button
                 type="button"
                 onClick={() => setEditingCoupon(null)}
-                style={{ background: '#f3f4f6', border: 'none', borderRadius: 8, padding: 8, cursor: 'pointer' }}
+                style={{ background: 'var(--color-bg-surface)', color: 'var(--color-text-primary)', border: '1px solid var(--color-border)', borderRadius: 8, padding: 8, cursor: 'pointer' }}
               >
                 <X size={18} />
               </button>
             </div>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, marginBottom: 12 }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, marginBottom: 12, color: 'var(--color-text-primary)' }}>
               Description
               <input
                 id="admin-coupon-edit-description"
                 name="description"
                 value={editDescription}
                 onChange={(e) => setEditDescription(e.target.value)}
-                style={{ padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8 }}
+                style={{ padding: '10px 12px', border: '1px solid var(--color-border)', borderRadius: 8, background: 'var(--color-bg-surface)', color: 'var(--color-text-primary)' }}
               />
             </label>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, marginBottom: 12 }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, marginBottom: 12, color: 'var(--color-text-primary)' }}>
               Max uses (blank = unlimited)
               <input
                 id="admin-coupon-edit-max-uses"
                 name="maxUses"
                 type="number"
                 onChange={(e) => setEditMaxUses(e.target.value)}
-                style={{ padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8 }}
+                style={{ padding: '10px 12px', border: '1px solid var(--color-border)', borderRadius: 8, background: 'var(--color-bg-surface)', color: 'var(--color-text-primary)' }}
               />
             </label>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, marginBottom: 12 }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, marginBottom: 12, color: 'var(--color-text-primary)' }}>
               Valid until
               <input
                 id="admin-coupon-edit-valid-until"
                 name="validUntil"
                 type="date"
                 onChange={(e) => setEditValidUntil(e.target.value)}
-                style={{ padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8 }}
+                style={{ padding: '10px 12px', border: '1px solid var(--color-border)', borderRadius: 8, background: 'var(--color-bg-surface)', color: 'var(--color-text-primary)' }}
               />
             </label>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, marginBottom: 12 }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, marginBottom: 12, color: 'var(--color-text-primary)' }}>
               Applies to
               <select
                 id="admin-coupon-edit-applies-to"
                 name="appliesTo"
                 value={editAppliesTo}
                 onChange={(e) => setEditAppliesTo(e.target.value as 'all' | 'product')}
-                style={{ padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8 }}
+                style={{ padding: '10px 12px', border: '1px solid var(--color-border)', borderRadius: 8, background: 'var(--color-bg-surface)', color: 'var(--color-text-primary)' }}
               >
                 <option value="all">All products</option>
                 <option value="product">Specific products</option>
               </select>
             </label>
             {editAppliesTo === 'product' && (
-              <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, marginBottom: 12 }}>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, marginBottom: 12, color: 'var(--color-text-primary)' }}>
                 Products
                 <AdminProductSearchPicker
                   mode="multi"
@@ -510,12 +511,13 @@ export default function AdminCouponsTab() {
                 />
               </label>
             )}
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, marginBottom: 20 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, marginBottom: 20, color: 'var(--color-text-primary)' }}>
               <input
                 id="admin-coupon-edit-active"
                 name="isActive"
                 type="checkbox"
                 onChange={(e) => setEditIsActive(e.target.checked)}
+                style={{ accentColor: '#9c6649' }}
               />
               Active
             </label>
@@ -524,7 +526,7 @@ export default function AdminCouponsTab() {
                 type="button"
                 onClick={() => setEditingCoupon(null)}
                 disabled={savingEdit}
-                style={{ padding: '10px 18px', background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: 'pointer' }}
+                style={{ padding: '10px 18px', background: 'var(--color-bg-surface)', color: 'var(--color-text-primary)', border: '1px solid var(--color-border)', borderRadius: 8, cursor: 'pointer' }}
               >
                 Cancel
               </button>

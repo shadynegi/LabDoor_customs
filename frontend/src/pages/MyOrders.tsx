@@ -712,6 +712,8 @@ export default function MyOrders() {
                   borderRadius: 8,
                   fontSize: 16,
                   outline: 'none',
+                  background: 'var(--color-bg-surface)',
+                  color: 'var(--color-text-primary)',
                   transition: 'border-color 0.2s ease',
                 }}
                 onFocus={(e) => e.target.style.borderColor = '#9c6649'}
@@ -751,6 +753,8 @@ export default function MyOrders() {
                     borderRadius: 8,
                     fontSize: 16,
                     outline: 'none',
+                    background: 'var(--color-bg-surface)',
+                    color: 'var(--color-text-primary)',
                     transition: 'border-color 0.2s ease',
                   }}
                   onFocus={(e) => e.target.style.borderColor = '#9c6649'}
@@ -969,7 +973,7 @@ export default function MyOrders() {
               textAlign: 'center',
             }}
           >
-            <Package size={64} color="#d1d5db" style={{ margin: '0 auto 20px' }} />
+            <Package size={64} color="var(--color-text-secondary)" style={{ margin: '0 auto 20px' }} />
             <h3 style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 8 }}>
               No Orders Found
             </h3>

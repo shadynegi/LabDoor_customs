@@ -126,9 +126,9 @@ export default function CookieConsent() {
       alignItems: 'flex-start',
       gap: 12,
       padding: 16,
-      background: checked ? '#f0fdf4' : '#f9fafb',
+      background: checked ? '#f0fdf4' : 'var(--color-bg-surface)',
       borderRadius: 12,
-      border: checked ? '1px solid #10b981' : '1px solid #e5e7eb',
+      border: checked ? '1px solid #10b981' : '1px solid var(--color-border)',
       marginBottom: 12,
       cursor: disabled ? 'default' : 'pointer',
       transition: 'all 0.2s',
@@ -139,8 +139,8 @@ export default function CookieConsent() {
         width: 24,
         height: 24,
         borderRadius: 6,
-        background: checked ? '#10b981' : 'white',
-        border: checked ? 'none' : '2px solid #d1d5db',
+        background: checked ? '#10b981' : 'var(--color-bg-elevated)',
+        border: checked ? 'none' : '2px solid var(--color-border)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -156,20 +156,20 @@ export default function CookieConsent() {
           gap: 8,
           marginBottom: 4,
         }}>
-          <span style={{ fontWeight: 600, color: '#1f2937' }}>{title}</span>
+          <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{title}</span>
           {disabled && (
             <span style={{
               fontSize: 11,
               padding: '2px 8px',
-              background: '#e5e7eb',
+              background: 'var(--color-border)',
               borderRadius: 4,
-              color: '#6b7280',
+              color: 'var(--color-text-secondary)',
             }}>
               Required
             </span>
           )}
         </div>
-        <p style={{ margin: 0, fontSize: 13, color: '#6b7280', lineHeight: 1.5 }}>
+        <p style={{ margin: 0, fontSize: 13, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
           {description}
         </p>
       </div>
@@ -193,7 +193,7 @@ export default function CookieConsent() {
             width: isMobile ? '100%' : showPreferences ? 480 : 420,
             maxHeight: '90vh',
             overflowY: 'auto',
-            background: 'white',
+            background: 'var(--color-bg-elevated)',
             borderRadius: stickyCtaRoute && isMobile ? '0 0 20px 20px' : isMobile ? '20px 20px 0 0' : 20,
             paddingBottom: isMobile ? 'max(0px, env(safe-area-inset-bottom))' : undefined,
             boxShadow: '0 10px 50px rgba(0,0,0,0.2)',
@@ -203,7 +203,7 @@ export default function CookieConsent() {
           {/* Header */}
           <div style={{
             padding: isMobile ? '20px 20px 16px' : '24px 24px 16px',
-            borderBottom: '1px solid #e5e7eb',
+            borderBottom: '1px solid var(--color-border)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -221,10 +221,10 @@ export default function CookieConsent() {
                 <Cookie size={24} color="white" />
               </div>
               <div>
-                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1f2937' }}>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--color-text-primary)' }}>
                   Cookie Settings
                 </h3>
-                <p style={{ margin: 0, fontSize: 13, color: '#6b7280' }}>
+                <p style={{ margin: 0, fontSize: 13, color: 'var(--color-text-secondary)' }}>
                   Manage your preferences
                 </p>
               </div>
@@ -243,7 +243,7 @@ export default function CookieConsent() {
               }}
               aria-label="Close"
             >
-              <X size={20} color="#6b7280" />
+              <X size={20} color="var(--color-text-secondary)" />
             </button>
           </div>
 
@@ -253,7 +253,7 @@ export default function CookieConsent() {
               <>
                 <p style={{
                   fontSize: 14,
-                  color: '#4b5563',
+                  color: 'var(--color-text-secondary)',
                   lineHeight: 1.7,
                   marginBottom: 20,
                 }}>
@@ -307,9 +307,9 @@ export default function CookieConsent() {
                     style={{
                       flex: 1,
                       padding: '14px 24px',
-                      background: 'white',
-                      color: '#374151',
-                      border: '2px solid #d1d5db',
+                      background: 'var(--color-bg-surface)',
+                      color: 'var(--color-text-primary)',
+                      border: '2px solid var(--color-border)',
                       borderRadius: 12,
                       fontSize: 15,
                       fontWeight: 600,
@@ -333,7 +333,7 @@ export default function CookieConsent() {
                     marginTop: 12,
                     padding: 12,
                     background: 'transparent',
-                    color: '#6b7280',
+                    color: 'var(--color-text-secondary)',
                     border: 'none',
                     fontSize: 14,
                     cursor: 'pointer',
@@ -378,9 +378,9 @@ export default function CookieConsent() {
                     style={{
                       flex: 1,
                       padding: '14px 24px',
-                      background: 'white',
-                      color: '#374151',
-                      border: '2px solid #d1d5db',
+                      background: 'var(--color-bg-surface)',
+                      color: 'var(--color-text-primary)',
+                      border: '2px solid var(--color-border)',
                       borderRadius: 12,
                       fontSize: 15,
                       fontWeight: 600,

@@ -61,7 +61,7 @@ export default function CartPage() {
           background: "var(--color-bg-surface)",
           borderRadius: 16,
         }}>
-          <ShoppingBag size={isMobile ? 48 : 64} color="#9ca3af" style={{ marginBottom: 16 }} />
+          <ShoppingBag size={isMobile ? 48 : 64} color="var(--color-text-secondary)" style={{ marginBottom: 16 }} />
           <p style={{ fontSize: isMobile ? 16 : 18, color: "var(--color-text-secondary)", marginBottom: 20 }}>
             Your cart is empty
           </p>

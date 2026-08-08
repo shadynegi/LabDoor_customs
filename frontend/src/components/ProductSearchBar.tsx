@@ -80,17 +80,17 @@ export default function ProductSearchBar({
       : '#9c6649'
     : isHero
       ? 'rgba(255,255,255,0.35)'
-      : '#e5e7eb';
+      : 'var(--color-border)';
 
-  const inputBg = isHero ? 'rgba(255,255,255,0.12)' : 'white';
-  const inputColor = isHero ? '#ffffff' : '#1f2937';
+  const inputBg = isHero ? 'rgba(255,255,255,0.12)' : 'var(--color-bg-elevated)';
+  const inputColor = isHero ? '#ffffff' : 'var(--color-text-primary)';
   const iconColor = isFocused
     ? isHero
       ? 'rgba(255,255,255,0.95)'
       : '#9c6649'
     : isHero
       ? 'rgba(255,255,255,0.65)'
-      : '#9ca3af';
+      : 'var(--color-text-secondary)';
 
   return (
     <div style={{ position: 'relative', width: '100%' }}>
@@ -193,7 +193,7 @@ export default function ProductSearchBar({
               right: 12,
               top: '50%',
               transform: 'translateY(-50%)',
-              background: isHero ? 'rgba(255,255,255,0.2)' : '#f3f4f6',
+              background: isHero ? 'rgba(255,255,255,0.2)' : 'var(--color-bg-surface)',
               border: 'none',
               borderRadius: '50%',
               width: 28,
@@ -202,7 +202,7 @@ export default function ProductSearchBar({
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'pointer',
-              color: isHero ? 'rgba(255,255,255,0.9)' : '#6b7280',
+              color: isHero ? 'rgba(255,255,255,0.9)' : 'var(--color-text-secondary)',
             }}
           >
             ×
@@ -218,7 +218,7 @@ export default function ProductSearchBar({
             top: '50%',
             transform: 'translateY(-50%)',
             fontSize: 12,
-            color: isHero ? 'rgba(255,255,255,0.7)' : '#9ca3af',
+            color: isHero ? 'rgba(255,255,255,0.7)' : 'var(--color-text-secondary)',
           }}
         >
           …
@@ -237,10 +237,10 @@ export default function ProductSearchBar({
               top: 'calc(100% + 8px)',
               left: 0,
               right: 0,
-              background: 'white',
+              background: 'var(--color-bg-elevated)',
               borderRadius: 12,
               boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
-              border: '1px solid #e5e7eb',
+              border: '1px solid var(--color-border)',
               listStyle: 'none',
               margin: 0,
               padding: 8,
@@ -271,7 +271,7 @@ export default function ProductSearchBar({
                     opacity: outOfStock ? 0.65 : 1,
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.background = '#f3f4f6';
+                    e.currentTarget.style.background = 'var(--color-bg-surface)';
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.background = 'transparent';
@@ -292,7 +292,7 @@ export default function ProductSearchBar({
                     <div
                       style={{
                         fontWeight: 600,
-                        color: '#1f2937',
+                        color: 'var(--color-text-primary)',
                         fontSize: 14,
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
@@ -301,7 +301,7 @@ export default function ProductSearchBar({
                     >
                       {product.name}
                     </div>
-                    <div style={{ fontSize: 13, color: '#6b7280' }}>
+                    <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
                       ${Number(product.price).toFixed(2)}
                       {outOfStock ? ' · Out of Stock' : ''}
                     </div>
@@ -319,7 +319,7 @@ export default function ProductSearchBar({
                   width: '100%',
                   padding: '10px 12px',
                   border: 'none',
-                  background: '#f9fafb',
+                  background: 'var(--color-bg-surface)',
                   borderRadius: 8,
                   cursor: 'pointer',
                   fontWeight: 600,

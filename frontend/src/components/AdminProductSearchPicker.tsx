@@ -171,9 +171,11 @@ export default function AdminProductSearchPicker({
         style={
           inputStyle ?? {
             padding: '10px 12px',
-            border: '1px solid #e5e7eb',
+            border: '1px solid var(--color-border)',
             borderRadius: 8,
             width: '100%',
+            background: 'var(--color-bg-surface)',
+            color: 'var(--color-text-primary)',
           }
         }
       />
@@ -187,8 +189,8 @@ export default function AdminProductSearchPicker({
             left: 0,
             right: 0,
             marginTop: 4,
-            background: 'white',
-            border: '1px solid #e5e7eb',
+            background: 'var(--color-bg-elevated)',
+            border: '1px solid var(--color-border)',
             borderRadius: 8,
             boxShadow: '0 8px 24px rgba(0,0,0,0.08)',
             maxHeight: 220,
@@ -196,10 +198,10 @@ export default function AdminProductSearchPicker({
           }}
         >
           {loading && (
-            <p style={{ margin: 0, padding: 12, fontSize: 13, color: '#6b7280' }}>Searching…</p>
+            <p style={{ margin: 0, padding: 12, fontSize: 13, color: 'var(--color-text-secondary)' }}>Searching…</p>
           )}
           {!loading && results.length === 0 && query.trim().length >= 2 && (
-            <p style={{ margin: 0, padding: 12, fontSize: 13, color: '#6b7280' }}>No products found</p>
+            <p style={{ margin: 0, padding: 12, fontSize: 13, color: 'var(--color-text-secondary)' }}>No products found</p>
           )}
           {!loading &&
             results.map((product) => (
@@ -214,7 +216,8 @@ export default function AdminProductSearchPicker({
                   textAlign: 'left',
                   padding: '10px 12px',
                   border: 'none',
-                  background: 'white',
+                  background: 'var(--color-bg-elevated)',
+                  color: 'var(--color-text-primary)',
                   cursor: 'pointer',
                   fontSize: 13,
                 }}

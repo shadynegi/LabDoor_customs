@@ -16,7 +16,7 @@ Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API
 | **Admin** | Dashboard search includes order id UUID, order number, email, name; **Mark paid** with external `payment_id` + admin note; **Settings** tab. |
 | **Activity** | Consent-gated batch; `contact_submit` on contact success; IPs anonymized with `IP_SALT`. |
 | **Mobile** | Sticky CTAs with keyboard lift on checkout; cookie banner top on purchase routes; cart stacked CTA at 320px; OOS hides product sticky bar; admin product cards on phones. |
-| **Dark mode** | Independent storefront and admin Sun/Moon toggles (44×44); storefront sets `data-theme` on `<html>` (`ldc_storefront_theme`), admin sets `data-admin-theme` on `.admin-root` (`ldc_admin_theme`); CSS custom-property tokens in `tokens.css`, synchronous init from localStorage/`prefers-color-scheme` (no theme flash). |
+| **Dark mode** | Independent storefront and admin Sun/Moon toggles (44×44); storefront sets `data-theme` on `<html>` (`ldc_storefront_theme`), admin sets `data-admin-theme` on `.admin-root` (`ldc_admin_theme`); CSS custom-property tokens in `tokens.css`, synchronous init from localStorage/`prefers-color-scheme` (no theme flash). All text uses theme-aware tokens (secondary text tuned for ~7:1/~8:1 contrast); `color-scheme` pinned per scope so native controls (date pickers, dropdowns, scrollbars) follow the app toggle, not the OS. |
 
 Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_ENCRYPTION_KEY`, `IP_SALT`, `ADMIN_PASSWORD_HASH`.
 
