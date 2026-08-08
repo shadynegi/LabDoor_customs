@@ -103,7 +103,7 @@ See [WHATSAPP_CHECKOUT_GUIDE.md](./WHATSAPP_CHECKOUT_GUIDE.md).
 
 ## Testing
 
-- **666 automated tests** (141 backend unit + 88 API + 13 frontend unit + 423 Playwright UI + 1 viewport) plus viewport overflow audit — layout: [`Tests/README.md`](../Tests/README.md)
+- **668 automated tests** (143 backend unit + 88 API + 13 frontend unit + 423 Playwright UI + 1 viewport) plus viewport overflow audit — layout: [`Tests/README.md`](../Tests/README.md)
 - **Codebase optimization:** [`OPTIMIZATION.md`](./OPTIMIZATION.md); quarterly `npm run audit:codebase`
 - Frontend unit: `Tests/unit/frontend/` (ToggleSwitch, whatsappContact, productCatalogCache)
 - Playwright `Tests/e2e/specs/` — storefront smoke + deep flows, **shipping policy / contact WhatsApp popup / document scroll**, **responsive pages matrix** (`responsive/responsive-pages-ui.spec.ts` — 11 viewports — all routes, incl. 320px), admin login/analytics, **admin module E2E** (`admin/*.spec.ts` — 59 tests: products, coupons, orders, customers, settings, integration, resilience, env-validation, storage-persistence), checkout/contact/admin UI

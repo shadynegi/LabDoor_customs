@@ -936,7 +936,7 @@ Templates: `backend/env.template`, `frontend/env.template`
 
 | Job | Steps |
 |-----|-------|
-| monorepo | Root `npm ci`, backend `validate-env` (pooler `DATABASE_URL`, `WHATSAPP_CONTACT_NUMBER`, auth secrets), `npm run build` (`VITE_API_BASE_URL=/api`), Vitest + Playwright + viewport audit (**666** tests) |
+| monorepo | Root `npm ci`, backend `validate-env` (pooler `DATABASE_URL`, `WHATSAPP_CONTACT_NUMBER`, auth secrets), `npm run build` (`VITE_API_BASE_URL=/api`), Vitest + Playwright + viewport audit (**668** tests) |
 | sitemap | Requires `PRODUCTION_API_BASE_URL`; generates sitemap with live product URLs |
 | links | Markdown link checker |
 
@@ -1025,7 +1025,7 @@ npm run links:check
 | Frontend unit | Vitest + RTL | `Tests/unit/frontend/` — `ToggleSwitch`, `whatsappContact`, `productCatalogCache` (`frontend/vitest.config.ts`) |
 | Frontend E2E / UI | Playwright | `Tests/e2e/specs/` by domain (storefront, checkout, orders, contact, admin, responsive, regression) — document scroll, responsive pages matrix (11 viewports × routes, incl. 320px), contact WhatsApp popup |
 
-**Total automated tests:** 666 (141 backend unit + 88 API + 13 frontend unit + 423 Playwright UI + 1 viewport). **`npm test`** also runs the viewport overflow audit (12 widths × 16 routes).
+**Total automated tests:** 668 (143 backend unit + 88 API + 13 frontend unit + 423 Playwright UI + 1 viewport). **`npm test`** also runs the viewport overflow audit (12 widths × 16 routes).
 
 **Suite layout:** [`Tests/README.md`](../Tests/README.md) — directory map, conventions, shared fixtures (`Tests/shared/`).
 

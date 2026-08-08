@@ -17,7 +17,7 @@ Regenerate: `npm run audit:codebase` from repository root.
 | Frontend unit (`Tests/unit/frontend/`) | 3 |
 | Playwright specs (`Tests/e2e/specs/`) | 26 |
 
-**CI marker:** 666 automated tests (141 + 88 + 13 + 423 + 1) — verify with `npm test`.
+**CI marker:** 668 automated tests (143 + 88 + 13 + 423 + 1) — verify with `npm test`.
 
 ---
 
@@ -105,7 +105,7 @@ Summary:
 ## Recommended quarterly checks
 
 1. `npm run audit:codebase`
-2. `npm test` (666 + viewport audit)
+2. `npm test` (668 + viewport audit)
 3. `npm audit --omit=dev`
 4. Skim [`COVERAGE_MATRIX.md`](COVERAGE_MATRIX.md) payment/order rows only
 5. Supabase verification queries in [`SUPABASE_SQL_TO_RUN.md`](SUPABASE_SQL_TO_RUN.md)

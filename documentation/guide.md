@@ -159,12 +159,12 @@ This single command runs all suites in order:
 
 | Suite | Tool | Tests | Needs live DB? |
 |-------|------|-------|----------------|
-| Backend unit | Vitest | 141 | No (mocked) |
+| Backend unit | Vitest | 143 | No (mocked) |
 | API integration | Vitest | 88 | No (mocked) |
 | Frontend unit | Vitest + RTL | 13 | No |
 | Frontend UI | Playwright | 423 (195 desktop + 228 mobile) | No (mocked API + static preview) |
 | Viewport overflow audit | Playwright script | 12 widths × 16 routes (1 test) | No (static preview) |
-| **Total** | | **666** | |
+| **Total** | | **668** | |
 
 The runner auto-builds the frontend for UI tests if `frontend/dist` is missing, installs Playwright in `Tests/` on first run if needed, and runs the viewport overflow audit after Playwright.
 

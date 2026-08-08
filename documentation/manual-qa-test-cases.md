@@ -1,6 +1,6 @@
 # Lab Door Customs — Manual QA Test Cases
 
-**Purpose:** Full-stack manual QA for release regression. Complements **666** automated tests (141 backend unit + 88 API + 13 frontend unit + 423 Playwright + viewport audit).
+**Purpose:** Full-stack manual QA for release regression. Complements **668** automated tests (143 backend unit + 88 API + 13 frontend unit + 423 Playwright + viewport audit).
 
 **Authoritative system reference:** [`info.md`](info.md)  
 **Automated test runbook:** [`test_guidelines.md`](test_guidelines.md)  
@@ -18,7 +18,7 @@
 
 | Layer | Tool | Location | Count | Live DB? |
 |-------|------|----------|-------|----------|
-| Backend unit | Vitest | `Tests/unit/backend/` | 35 files, 141 tests | No (mocked) |
+| Backend unit | Vitest | `Tests/unit/backend/` | 35 files, 143 tests | No (mocked) |
 | API integration | Vitest + Supertest | `Tests/integration/api/` | 19 files, 80 tests | No (mocked) |
 | Frontend unit | Vitest + RTL | `Tests/unit/frontend/` | 3 files, 13 tests | No |
 | E2E / UI | Playwright | `Tests/e2e/specs/` | 423 tests (195 desktop + 228 mobile-chrome) | No (mocked API + static preview) |
@@ -347,4 +347,4 @@ Quick pass before production deploy. Check each box when verified.
 
 ---
 
-*Last aligned with automated suite: **666 tests**. Update this file when major features or admin workflows change.*
+*Last aligned with automated suite: **668 tests**. Update this file when major features or admin workflows change.*

@@ -24,7 +24,7 @@ Lab Door Customs is a monorepo e-commerce platform for custom footwear:
 - Redis caching, rate limits, CSRF protection (activity batch exempt), Sentry monitoring
 - Supabase RLS: service_role-only; no public PostgREST catalog access
 
-**Testing:** **666** automated tests (Vitest + Playwright) + **107** manual QA cases — see [`test_guidelines.md`](test_guidelines.md) and [`Tests/README.md`](../Tests/README.md).
+**Testing:** **668** automated tests (Vitest + Playwright) + **107** manual QA cases — see [`test_guidelines.md`](test_guidelines.md) and [`Tests/README.md`](../Tests/README.md).
 
 **Optimization:** [`OPTIMIZATION.md`](OPTIMIZATION.md) · baseline: `npm run audit:codebase`
 

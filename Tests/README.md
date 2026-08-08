@@ -1,6 +1,6 @@
 # Lab Door Customs — Test Suite
 
-Organized test layout for the monorepo. **666 automated tests** (141 backend unit + 88 API + 13 frontend unit + 423 Playwright + 1 viewport) plus a **viewport overflow audit** gate — run from repo root with `npm test`.
+Organized test layout for the monorepo. **668 automated tests** (143 backend unit + 88 API + 13 frontend unit + 423 Playwright + 1 viewport) plus a **viewport overflow audit** gate — run from repo root with `npm test`.
 
 ## Directory layout
 

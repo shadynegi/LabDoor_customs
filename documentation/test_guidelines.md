@@ -40,7 +40,7 @@ If the user did not mention testing, **skip** `npm test`, `npm run test:all`, Pl
 
 | Suite | Tool | Location | Count | Needs live DB? |
 |-------|------|----------|-------|----------------|
-| Backend unit | Vitest | `Tests/unit/backend/` | 35 files, 141 tests | No (mocked) |
+| Backend unit | Vitest | `Tests/unit/backend/` | 35 files, 143 tests | No (mocked) |
 | API integration | Vitest + Supertest | `Tests/integration/api/` | 21 files, 88 tests | No (mocked) |
 | Frontend unit | Vitest + RTL | `Tests/unit/frontend/` | 3 files, 13 tests | No |
 | Frontend E2E / UI | Playwright | `Tests/e2e/specs/` | 26 files, 423 tests (195 desktop + 228 mobile project) | No (mocked `/api` + static preview) |
@@ -48,7 +48,7 @@ If the user did not mention testing, **skip** `npm test`, `npm run test:all`, Pl
 | Link checker | Custom script | repo root | — | No |
 | Codebase audit | `scripts/audit-codebase.mjs` | `documentation/OPTIMIZATION_BASELINE.md` | — | No |
 
-**Total:** 666 automated tests — 141 backend unit + 88 API + 13 frontend unit + 423 Playwright UI (195 desktop chromium + 228 mobile-chrome) + 1 viewport. **`npm test`** also runs the viewport overflow audit (mandatory in CI).
+**Total:** 668 automated tests — 143 backend unit + 88 API + 13 frontend unit + 423 Playwright UI (195 desktop chromium + 228 mobile-chrome) + 1 viewport. **`npm test`** also runs the viewport overflow audit (mandatory in CI).
 
 **Layout reference:** [`Tests/README.md`](../Tests/README.md)
 
@@ -227,7 +227,7 @@ Production frontend builds run `optimize-assets` (WebP from source PNGs) and `bu
 
 Organized by domain: `auth/`, `checkout/`, `contact/`, `coupons/`, `orders/`, `products/`, `analytics/`, `infrastructure/` (incl. `validateEnv.test.ts`, `keepAlive.test.ts`, `performanceBudgets.test.ts`). Key files: `checkout/checkoutPricing.test.ts`, `checkout/whatsappCheckout.test.ts`, `contact/contactWhatsAppMessage.test.ts`, `orders/orderPortalUrl.test.ts`, `infrastructure/dbConcurrency.test.ts`.
 
-See `Tests/unit/backend/` for the full list (35 files, 141 tests).
+See `Tests/unit/backend/` for the full list (35 files, 143 tests).
 
 ### API tests (`Tests/integration/api/`)
 
