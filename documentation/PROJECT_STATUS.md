@@ -35,6 +35,7 @@ Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_
 - **`/payment/cancel`** — Checkout Cancelled page (clears pending order storage)
 - Mobile sticky CTAs, checkout keyboard offset, responsive layouts, cart policy clearance, **document scroll on all tall pages** — see [MOBILE_RESPONSIVE.md](./MOBILE_RESPONSIVE.md)
 - **Form accessibility** — storefront and admin controls have `id`/`name`, associated labels (`htmlFor` or `aria-label`); verified via `frontend/scripts/audit-form-labels.mjs` and [FORMS_QA_CHECKLIST.md](./FORMS_QA_CHECKLIST.md)
+- **Dark mode** — storefront Sun/Moon toggle in nav + Home header; sets `data-theme` on `<html>`, persists to `ldc_storefront_theme`, CSS tokens in `frontend/src/styles/tokens.css`; independent of the admin theme
 
 ---
 
@@ -61,6 +62,7 @@ See [WHATSAPP_CHECKOUT_GUIDE.md](./WHATSAPP_CHECKOUT_GUIDE.md).
 - Products: paginated admin list (50/page, load more), error/retry UI; **Multer file upload** (20 MB images, 15 MB MP4 via `POST /api/admin/uploads/product-media`) or hosted URL; optional cost price; one product per shoe; inventory movement history; low-stock filter (=5 units); bulk stock / stock-delta updates
 - Product CRUD and bulk stock updates
 - Customer list with server search/pagination, admin notes, address history; soft delete/restore and **order history modal (10 orders/page)**; `PATCH /admin/customers/:id`
+- **Dark mode** — separate Sun/Moon toggle on `/admin/login` and the dashboard; sets `data-admin-theme` on `.admin-root` (never `<html>`), persists to `ldc_admin_theme`; fully independent of the storefront theme
 ---
 
 ## Infrastructure
@@ -101,7 +103,7 @@ See [WHATSAPP_CHECKOUT_GUIDE.md](./WHATSAPP_CHECKOUT_GUIDE.md).
 
 ## Testing
 
-- **520 automated tests** (141 backend unit + 80 API + 13 frontend unit + 286 Playwright UI) plus viewport overflow audit — layout: [`Tests/README.md`](../Tests/README.md)
+- **666 automated tests** (141 backend unit + 88 API + 13 frontend unit + 423 Playwright UI + 1 viewport) plus viewport overflow audit — layout: [`Tests/README.md`](../Tests/README.md)
 - **Codebase optimization:** [`OPTIMIZATION.md`](./OPTIMIZATION.md); quarterly `npm run audit:codebase`
 - Frontend unit: `Tests/unit/frontend/` (ToggleSwitch, whatsappContact, productCatalogCache)
 - Playwright `Tests/e2e/specs/` — storefront smoke + deep flows, **shipping policy / contact WhatsApp popup / document scroll**, **responsive pages matrix** (`responsive/responsive-pages-ui.spec.ts` — 11 viewports — all routes, incl. 320px), admin login/analytics, **admin module E2E** (`admin/*.spec.ts` — 59 tests: products, coupons, orders, customers, settings, integration, resilience, env-validation, storage-persistence), checkout/contact/admin UI

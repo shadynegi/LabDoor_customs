@@ -75,7 +75,7 @@ export default function AboutUs() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
           style={{
-            background: "white",
+            background: "var(--color-bg-surface)",
             borderRadius: 20,
             padding: isMobile ? 30 : 50,
             marginBottom: 40,
@@ -86,7 +86,7 @@ export default function AboutUs() {
             style={{
               fontSize: isMobile ? 28 : 36,
               fontWeight: 800,
-              color: "#1f2937",
+              color: "var(--color-text-primary)",
               marginBottom: 24,
             }}
           >
@@ -95,7 +95,7 @@ export default function AboutUs() {
           <p
             style={{
               fontSize: isMobile ? 15 : 17,
-              color: "#4b5563",
+              color: "var(--color-text-secondary)",
               lineHeight: 1.8,
               marginBottom: 20,
             }}
@@ -109,7 +109,7 @@ export default function AboutUs() {
           <p
             style={{
               fontSize: isMobile ? 15 : 17,
-              color: "#4b5563",
+              color: "var(--color-text-secondary)",
               lineHeight: 1.8,
             }}
           >
@@ -180,7 +180,7 @@ export default function AboutUs() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: value.delay }}
               style={{
-                background: "white",
+                background: "var(--color-bg-surface)",
                 borderRadius: 16,
                 padding: isMobile ? 24 : 32,
                 textAlign: "center",
@@ -214,7 +214,7 @@ export default function AboutUs() {
                 style={{
                   fontSize: isMobile ? 18 : 20,
                   fontWeight: 700,
-                  color: "#1f2937",
+                  color: "var(--color-text-primary)",
                   marginBottom: 12,
                 }}
               >
@@ -223,7 +223,7 @@ export default function AboutUs() {
               <p
                 style={{
                   fontSize: 14,
-                  color: "#6b7280",
+                  color: "var(--color-text-secondary)",
                   lineHeight: 1.6,
                 }}
               >

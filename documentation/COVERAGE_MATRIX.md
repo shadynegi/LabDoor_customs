@@ -5,7 +5,7 @@
 **Authoritative behavior:** [`info.md`](info.md)  
 **Full audit:** [`PROJECT_AUDIT.md`](PROJECT_AUDIT.md) (2026-06-08 initial + follow-up)
 
-**Test count marker (CI should match):** `<!-- tests: 529 -->` (141 unit + 88 API + 13 frontend unit + 286 Playwright + 1 viewport)
+**Test count marker (CI should match):** `<!-- tests: 666 -->` (141 unit + 88 API + 13 frontend unit + 423 Playwright + 1 viewport)
 
 **Test layout:** Domain folders under `Tests/unit/backend/`, `Tests/integration/api/`, `Tests/e2e/specs/`. Inventory: [`Tests/README.md`](../Tests/README.md), [`test_guidelines.md`](test_guidelines.md).
 
@@ -79,19 +79,21 @@
 
 | ID | Behavior | Implementation | Test(s) | Status |
 |----|----------|----------------|---------|--------|
-| UI-SMOKE | Home, products, cart, checkout shell, contact | `Tests/e2e/specs/**/*.spec.ts` | 93 desktop + 193 mobile tests | COVERED |
+| UI-SMOKE | Home, products, cart, checkout shell, contact | `Tests/e2e/specs/**/*.spec.ts` | 195 desktop + 228 mobile tests | COVERED |
 | UI-ORDER-CONFIRM | Payment success / order received confirmation | `PaymentSuccess.tsx` | `deep-flows-ui.spec.ts` | COVERED |
 | UI-ORDERS | Orders page orderId + email lookup | `MyOrders.tsx` | `orders-ui.spec.ts` | COVERED |
 | UI-ORDERS-SHIP | Shipped order tracking link on orders page | `MyOrders.tsx` | `orders-ui.spec.ts` | COVERED |
 | UI-ADMIN | Admin `/admin` redirect, login, dashboard analytics smoke | `AdminLogin.tsx`, `AdminDashboard.tsx`, `App.tsx` | `admin-ui.spec.ts` | COVERED |
 | UI-ADMIN-ANALYTICS | Custom IST range Apply-before-export + CSV enablement | `AdminDashboard.tsx`, `adminAnalyticsDates.ts` | `admin-analytics-ui.spec.ts` | COVERED |
 | UI-ADMIN-CRUD | Admin Products/Coupons/Orders/Customers/Settings CRUD + order modal + integration/resilience/env/storage | `AdminDashboard.tsx`, `AdminCouponsTab.tsx`, `Tests/e2e/specs/admin/*.spec.ts` | 59 tests in 11 module specs (+ auth/analytics) | COVERED |
+| UI-DARK-STOREFRONT | Storefront dark-mode toggle — presence, `data-theme` toggle, localStorage persistence, no-FOUC, admin-scope isolation, CSS token swap, 44px touch target, mobile overflow | `contexts/StorefrontThemeContext.tsx`, `components/DarkModeToggle.tsx`, `App.tsx`, `Home.tsx` | `storefront/dark-mode-ui.spec.ts` (64 tests) | COVERED |
+| UI-DARK-ADMIN | Admin dark-mode toggle — presence, `data-admin-theme` on `.admin-root`, persistence, storefront-scope isolation (never sets `<html>` theme), CSS token swap, touch target, overflow | `contexts/AdminThemeContext.tsx`, `AdminLogin.tsx`, `AdminDashboard.tsx` | `admin/dark-mode-ui.spec.ts` (38 tests) | COVERED |
 | UI-CHECKOUT-COUNTRY | Checkout country pre-selected (`country-list` US value) | `Checkout.tsx`, `constants/checkoutForm.ts` | `checkout-ui.spec.ts` | COVERED |
 | UI-CHECKOUT-PAY | Place Order after policy + form fill | `Checkout.tsx`, `helpers/checkout.ts` | `checkout-place-order-ui.spec.ts`, `deep-flows-ui.spec.ts` | COVERED |
 | UI-PRODUCT-POLICY | Product detail trust badges match no-refund policy | `ProductDetailPage.tsx`, `constants/returnPolicy.ts` | `deep-flows-ui.spec.ts` | COVERED |
 | UI-DEEP-FLOWS | Search, policy gate, coupon, cart qty, order confirmation | `deep-flows-ui.spec.ts`, `mock-api.ts` | `deep-flows-ui.spec.ts` | COVERED |
-| UI-RESPONSIVE | Mobile checkout/cart sticky CTA, overflow, admin login | `CartPage.tsx`, `MobileStickyCta.tsx`, `responsive.css` | `responsive-ui.spec.ts`, `mobile-ui.spec.ts` | COVERED |
-| UI-RESPONSIVE-PAGES | All storefront routes × 11 phone viewports (incl. 320px); cart policy above sticky bar | `responsive-pages-ui.spec.ts`, `helpers/viewports.ts` | 193 tests (`mobile-chrome`) | COVERED |
+| UI-RESPONSIVE | Mobile checkout/cart sticky CTA, overflow, admin login, 2-decimal price format | `CartPage.tsx`, `MobileStickyCta.tsx`, `responsive.css` | `responsive-ui.spec.ts`, `mobile-ui.spec.ts` | COVERED |
+| UI-RESPONSIVE-PAGES | All storefront routes × 11 phone viewports (incl. 320px); cart policy above sticky bar; checkout/product-detail sticky-hint overlap; long-name hero heading in viewport | `responsive-pages-ui.spec.ts`, `helpers/viewports.ts` | 228 tests (`mobile-chrome`) | COVERED |
 
 ---
 
@@ -112,7 +114,7 @@
 | CI-ENV | Production env validation in CI | `validate-env.mjs`, `server.ts`, `databaseUrl.ts`, `ci.yml` | `infrastructure/validateEnv.test.ts`, CI job | COVERED |
 | OPS-UPLOAD-VOL | Admin uploads persist on Railway volume (`UPLOAD_DIR`) | `productUpload.ts`, `POST /api/admin/uploads/product-media` | `products/upload-persistence.test.ts`, `products/upload.test.ts`, `e2e/specs/admin/storage-persistence.spec.ts` (mocked UI) | COVERED |
 | SEC-ORDER-SECRETS | `access_token_hash` + `access_token_encrypted` stripped from order JSON | `orderTokens.ts` `stripOrderSecrets` | `orderTokens.test.ts` | COVERED |
-| DOC-TESTS | Test count in `info.md` | `info.md` | `npm test` (529) | COVERED |
+| DOC-TESTS | Test count in `info.md` | `info.md` | `npm test` (666) | COVERED |
 | OPS-AUDIT | Codebase optimization baseline | `scripts/audit-codebase.mjs` | `npm run audit:codebase` | COVERED |
 | UI-SCROLL | Document scroll on tall storefront pages | `frontend/src/index.css`, `App.tsx`, `Home.tsx` | `storefront.spec.ts` | COVERED |
 | UI-POLICY-CONTENT | Shipping policy matches checkout pricing; contact opens WhatsApp with prefilled message | `ShippingPolicy.tsx`, `ContactUs.tsx`, `pricing.ts`, `whatsappContact.ts` | `storefront.spec.ts`, `contact-ui.spec.ts`, `unit/frontend/lib/whatsappContact.test.ts` | COVERED |

@@ -15,6 +15,8 @@ import MetaTags from "../components/MetaTags";
 import { DEFAULT_META } from "../lib/site";
 import { SHOE_SIZE_OPTIONS } from "../constants/shoeSizes";
 import { useResponsive } from "../hooks/useResponsive";
+import { useStorefrontTheme } from "../contexts/StorefrontThemeContext";
+import DarkModeToggle from "../components/DarkModeToggle";
 
 const ProductCarousel = lazy(() => import("../components/ProductCarousel"));
 
@@ -81,6 +83,7 @@ export default function Home() {
   const products = apiProducts;  
   const [[index, direction], setIndex] = useState<[number, number]>([0, 0]);
   const { isMobile, isSmallMobile } = useResponsive();
+  const { theme, toggle } = useStorefrontTheme();
   const productsCount = products.length;
   const startX = useRef<number | null>(null);
   const startY = useRef<number | null>(null);
@@ -391,14 +394,22 @@ export default function Home() {
                 </span>
               )}
             </Link>
+            <DarkModeToggle theme={theme} onToggle={toggle} />
           </nav>
         )}
 
-        {/* Mobile: Cart on Right */}
+        {/* Mobile: dark mode toggle + Cart on Right */}
         {isMobile && (
-          <Link to="/cart" aria-label={state.items.length > 0 ? `Cart, ${state.items.reduce((sum, item) => sum + item.quantity, 0)} items` : 'Cart'} style={{
+          <div style={{
             position: "absolute",
             right: 16,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+          }}>
+          <DarkModeToggle theme={theme} onToggle={toggle} />
+          <Link to="/cart" aria-label={state.items.length > 0 ? `Cart, ${state.items.reduce((sum, item) => sum + item.quantity, 0)} items` : 'Cart'} style={{
+            position: "relative",
             display: "inline-block"
           }}>
             <ShoppingCart size={40} color="rgba(255,255,255,0.85)" aria-hidden="true" />
@@ -423,6 +434,7 @@ export default function Home() {
               </span>
             )}
           </Link>
+          </div>
         )}
       </header>
 
@@ -597,6 +609,9 @@ export default function Home() {
                   textShadow: "0 2px 20px rgba(0,0,0,0.3)",
                   marginBottom: isMobile ? 16 : 24,
                   padding: "0 20px",
+                  overflowWrap: "break-word",
+                  wordBreak: "break-word",
+                  maxWidth: "100%",
                 }}
               >
                 {current.name}
@@ -695,7 +710,7 @@ export default function Home() {
                 textShadow: "0 2px 20px rgba(0,0,0,0.5)",
               }}
             >
-              ${current.price}
+              ${Number(current.price).toFixed(2)}
             </div>
             <LiquidButton
               onClick={current.is_out_of_stock || current.stock === 0 ? undefined : handleAddToCartClick}
@@ -786,7 +801,7 @@ export default function Home() {
                   position: "absolute",
                   top: 16,
                   right: 16,
-                  background: "#f3f4f6",
+                  background: "var(--color-bg-surface)",
                   border: "none",
                   padding: 8,
                   borderRadius: 8,
@@ -798,13 +813,13 @@ export default function Home() {
                   minHeight: 44,
                 }}
               >
-                <X size={24} color="#6b7280" />
+                <X size={24} color="var(--color-text-secondary)" />
               </button>
 
               <h2 style={{
                 fontSize: isMobile ? 24 : 28,
                 fontWeight: 800,
-                color: "#1f2937",
+                color: "var(--color-text-primary)",
                 marginBottom: 8,
                 paddingRight: 40,
               }}>
@@ -812,7 +827,7 @@ export default function Home() {
               </h2>
               <p style={{
                 fontSize: 14,
-                color: "#6b7280",
+                color: "var(--color-text-secondary)",
                 marginBottom: 24,
               }}>
                 Choose your size system and size
@@ -823,7 +838,7 @@ export default function Home() {
                   display: "block",
                   fontSize: 14,
                   fontWeight: 600,
-                  color: "#374151",
+                  color: "var(--color-text-primary)",
                   marginBottom: 12,
                 }}>
                   Size System
@@ -831,7 +846,7 @@ export default function Home() {
                 <div style={{
                   display: "flex",
                   gap: 8,
-                  background: "#f3f4f6",
+                  background: "var(--color-bg-surface)",
                   padding: 4,
                   borderRadius: 10,
                 }}>
@@ -854,7 +869,7 @@ export default function Home() {
                         background: selectedSizeSystem === system
                           ? "linear-gradient(135deg, #361906 0%, #9c6649 100%)"
                           : "transparent",
-                        color: selectedSizeSystem === system ? "white" : "#6b7280",
+                        color: selectedSizeSystem === system ? "white" : "var(--color-text-secondary)",
                         fontWeight: selectedSizeSystem === system ? 700 : 600,
                         fontSize: 15,
                         cursor: "pointer",
@@ -871,7 +886,7 @@ export default function Home() {
                   display: "block",
                   fontSize: 14,
                   fontWeight: 600,
-                  color: "#374151",
+                  color: "var(--color-text-primary)",
                   marginBottom: 12,
                 }}>
                   Select Size
@@ -896,10 +911,10 @@ export default function Home() {
                         minHeight: isMobile ? 48 : 44,
                         border: selectedSize === size
                           ? "2px solid #9c6649"
-                          : "1px solid #d1d5db",
+                          : "1px solid var(--color-border)",
                         borderRadius: 10,
-                        background: selectedSize === size ? "#f5e0d5" : "white",
-                        color: selectedSize === size ? "#9c6649" : "#374151",
+                        background: selectedSize === size ? "#f5e0d5" : "var(--color-bg-surface)",
+                        color: selectedSize === size ? "#9c6649" : "var(--color-text-primary)",
                         fontWeight: selectedSize === size ? 700 : 500,
                         fontSize: isMobile ? 15 : 14,
                         cursor: "pointer",

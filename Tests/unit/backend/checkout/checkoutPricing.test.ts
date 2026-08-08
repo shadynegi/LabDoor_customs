@@ -149,4 +149,38 @@ describe('validateCartItems', () => {
       expect(result.error).toBe('Size required');
     }
   });
+
+  it('rejects when two lines of the same product together exceed stock', async () => {
+    // Same product across two sizes: 3 + 3 = 6 requested vs stock of 5.
+    // Aggregated stock check must reject, matching the transactional decrement.
+    const product = { ...TEST_PRODUCTS.checkoutShoe, stock: 5 };
+    mockProductDbLookup(sqlMock, product);
+
+    const result = await validateCartItems([
+      { product_id: product.id, quantity: 3, size_system: 'US', size_value: '9' },
+      { product_id: product.id, quantity: 3, size_system: 'US', size_value: '10' },
+    ]);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toBe('Insufficient stock');
+    }
+  });
+
+  it('accepts two lines of the same product when the summed quantity fits stock', async () => {
+    // 2 + 2 = 4 requested vs stock of 5 — allowed, and both lines are returned.
+    const product = { ...TEST_PRODUCTS.checkoutShoe, stock: 5 };
+    mockProductDbLookup(sqlMock, product);
+
+    const result = await validateCartItems([
+      { product_id: product.id, quantity: 2, size_system: 'US', size_value: '9' },
+      { product_id: product.id, quantity: 2, size_system: 'US', size_value: '10' },
+    ]);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.lineItems).toHaveLength(2);
+      expect(result.lineItems.map((li) => li.size_value).sort()).toEqual(['10', '9']);
+    }
+  });
 });

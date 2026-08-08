@@ -194,7 +194,11 @@ const ProductDetailPage: React.FC = () => {
 
   return (
     <div
-      className={isMobile && !isOutOfStock ? 'has-mobile-sticky-cta' : undefined}
+      className={
+        isMobile && !isOutOfStock
+          ? `has-mobile-sticky-cta${!sizeSelected ? ' has-sticky-hint' : ''}`
+          : undefined
+      }
       style={{
       minHeight: '100dvh',
       background: 'linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)',
@@ -231,14 +235,14 @@ const ProductDetailPage: React.FC = () => {
             display: 'flex',
             alignItems: 'center',
             gap: 8,
-            background: 'white',
+            background: 'var(--color-bg-surface)',
             border: 'none',
             padding: '12px 20px',
             borderRadius: 10,
             cursor: 'pointer',
             fontSize: 14,
             fontWeight: 600,
-            color: '#374151',
+            color: 'var(--color-text-primary)',
             boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
           }}
         >
@@ -257,7 +261,7 @@ const ProductDetailPage: React.FC = () => {
           display: 'grid',
           gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
           gap: isMobile ? 32 : 60,
-          background: 'white',
+          background: 'var(--color-bg-surface)',
           borderRadius: 24,
           padding: isMobile ? 24 : 48,
           boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
@@ -396,7 +400,7 @@ const ProductDetailPage: React.FC = () => {
             <h1 style={{
               fontSize: isMobile ? 28 : 42,
               fontWeight: 900,
-              color: '#1f2937',
+              color: 'var(--color-text-primary)',
               marginBottom: 16,
               lineHeight: 1.2,
             }}>
@@ -410,14 +414,14 @@ const ProductDetailPage: React.FC = () => {
               color: '#9c6649',
               marginBottom: 24,
             }}>
-              ${product.price}
+              ${Number(product.price).toFixed(2)}
             </div>
 
             {/* Description */}
             {product.description && (
               <p style={{
                 fontSize: isMobile ? 15 : 16,
-                color: '#6b7280',
+                color: 'var(--color-text-secondary)',
                 lineHeight: 1.6,
                 marginBottom: 32,
               }}>
@@ -431,7 +435,7 @@ const ProductDetailPage: React.FC = () => {
                 display: 'block',
                 fontSize: 14,
                 fontWeight: 700,
-                color: '#374151',
+                color: 'var(--color-text-primary)',
                 marginBottom: 12,
                 textTransform: 'uppercase',
                 letterSpacing: '0.5px'
@@ -443,7 +447,7 @@ const ProductDetailPage: React.FC = () => {
               <div style={{
                 display: 'flex',
                 gap: 8,
-                background: '#f3f4f6',
+                background: 'var(--color-bg-surface)',
                 padding: 4,
                 borderRadius: 10,
                 marginBottom: 16,
@@ -467,7 +471,7 @@ const ProductDetailPage: React.FC = () => {
                       background: selectedSizeSystem === system
                         ? "linear-gradient(135deg, #361906 0%, #9c6649 100%)"
                         : "transparent",
-                      color: selectedSizeSystem === system ? "white" : "#6b7280",
+                      color: selectedSizeSystem === system ? "white" : "var(--color-text-secondary)",
                       fontWeight: selectedSizeSystem === system ? 700 : 600,
                       fontSize: 15,
                       cursor: "pointer",
@@ -502,10 +506,10 @@ const ProductDetailPage: React.FC = () => {
                       minHeight: isMobile ? 48 : 44,
                       border: selectedSize === size
                         ? "2px solid #9c6649"
-                        : "1px solid #d1d5db",
+                        : "1px solid var(--color-border)",
                       borderRadius: 10,
-                      background: selectedSize === size ? "#f5e0d5" : "white",
-                      color: selectedSize === size ? "#9c6649" : "#374151",
+                      background: selectedSize === size ? "#f5e0d5" : "var(--color-bg-surface)",
+                      color: selectedSize === size ? "#9c6649" : "var(--color-text-primary)",
                       fontWeight: selectedSize === size ? 700 : 500,
                       fontSize: isMobile ? 15 : 14,
                       cursor: "pointer",
@@ -599,21 +603,21 @@ const ProductDetailPage: React.FC = () => {
               gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
               gap: 16,
               paddingTop: 32,
-              borderTop: '1px solid #e5e7eb',
+              borderTop: '1px solid var(--color-border)',
             }}>
               <div style={{ textAlign: 'center' }}>
                 <Truck size={24} color="#9c6649" style={{ margin: '0 auto 8px' }} />
-                <div style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>Free Shipping</div>
-                <div style={{ fontSize: 11, color: '#9ca3af' }}>{FREE_SHIPPING_MESSAGE}</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Free Shipping</div>
+                <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{FREE_SHIPPING_MESSAGE}</div>
               </div>
               <div style={{ textAlign: 'center' }}>
                 <Shield size={24} color="#9c6649" style={{ margin: '0 auto 8px' }} />
-                <div style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>Secure Payment</div>
-                <div style={{ fontSize: 11, color: '#9ca3af' }}>100% protected</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Secure Payment</div>
+                <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>100% protected</div>
               </div>
               <div style={{ textAlign: 'center' }}>
                 <Package size={24} color="#9c6649" style={{ margin: '0 auto 8px' }} />
-                <div style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>All Sales Final</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>All Sales Final</div>
                 <Link
                   to={REPLACEMENT_POLICY_PATH}
                   style={{ fontSize: 11, color: '#9c6649', textDecoration: 'underline' }}

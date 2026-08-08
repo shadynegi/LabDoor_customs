@@ -52,17 +52,17 @@ export default function CartPage() {
         fontSize: isMobile ? 24 : 32, 
         fontWeight: 800,
         marginBottom: isMobile ? 16 : 24,
-        color: "#1f2937"
+        color: "var(--color-text-primary)"
       }}>Your Cart</h2>
       {state.items.length === 0 ? (
         <div style={{
           textAlign: "center",
           padding: isMobile ? "40px 20px" : "60px 40px",
-          background: "#f9fafb",
+          background: "var(--color-bg-surface)",
           borderRadius: 16,
         }}>
           <ShoppingBag size={isMobile ? 48 : 64} color="#9ca3af" style={{ marginBottom: 16 }} />
-          <p style={{ fontSize: isMobile ? 16 : 18, color: "#6b7280", marginBottom: 20 }}>
+          <p style={{ fontSize: isMobile ? 16 : 18, color: "var(--color-text-secondary)", marginBottom: 20 }}>
             Your cart is empty
           </p>
           <Link 
@@ -88,9 +88,9 @@ export default function CartPage() {
               <li key={`${item.id}-${item.size?.system}-${item.size?.value}-${index}`} style={{ 
                 marginBottom: isMobile ? 12 : 16, 
                 padding: isMobile ? 12 : 16, 
-                border: "1px solid #e5e7eb", 
+                border: "1px solid var(--color-border)", 
                 borderRadius: 12,
-                background: "white",
+                background: "var(--color-bg-surface)",
                 boxShadow: "0 1px 3px rgba(0,0,0,0.05)"
               }}>
                 <div style={{ 
@@ -122,7 +122,7 @@ export default function CartPage() {
                         height: isMobile ? 70 : 90, 
                         objectFit: "contain", 
                         borderRadius: 8,
-                        background: "#f9fafb",
+                        background: "var(--color-bg-surface)",
                         padding: 8
                       }}
                     />
@@ -132,13 +132,13 @@ export default function CartPage() {
                         fontSize: isMobile ? 14 : 16, 
                         display: "block",
                         marginBottom: 4,
-                        color: "#1f2937"
+                        color: "var(--color-text-primary)"
                       }}>
                         {item.name}
                       </strong>
                       {item.size && (
                         <div style={{ 
-                          color: "#6b7280", 
+                          color: "var(--color-text-secondary)", 
                           fontSize: isMobile ? 12 : 13,
                           marginTop: 4,
                           fontWeight: 500,
@@ -147,14 +147,14 @@ export default function CartPage() {
                         </div>
                       )}
                       <div style={{ 
-                        color: "#6b7280", 
+                        color: "var(--color-text-secondary)", 
                         fontSize: isMobile ? 13 : 14,
                         marginTop: 4
                       }}>
                         ${item.price.toFixed(2)} each
                       </div>
                       <div style={{
-                        color: "#374151",
+                        color: "var(--color-text-primary)",
                         fontSize: isMobile ? 14 : 15,
                         fontWeight: 600,
                         marginTop: 6
@@ -176,10 +176,10 @@ export default function CartPage() {
                       display: "flex", 
                       gap: 4, 
                       alignItems: "center",
-                      background: "#f9fafb",
+                      background: "var(--color-bg-surface)",
                       padding: isMobile ? "4px" : "6px 10px",
                       borderRadius: 10,
-                      border: "1px solid #e5e7eb"
+                      border: "1px solid var(--color-border)"
                     }}>
                       <button 
                         type="button"
@@ -190,13 +190,13 @@ export default function CartPage() {
                           height: isMobile ? 44 : 36,
                           padding: 0,
                           cursor: "pointer",
-                          background: "white",
-                          border: "1px solid #d1d5db",
+                          background: "var(--color-bg-surface)",
+                          border: "1px solid var(--color-border)",
                           borderRadius: 8,
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          color: "#374151",
+                          color: "var(--color-text-primary)",
                           fontSize: 16,
                           fontWeight: 600,
                           transition: "all 0.2s"
@@ -209,7 +209,7 @@ export default function CartPage() {
                         textAlign: "center",
                         fontSize: isMobile ? 16 : 15,
                         fontWeight: 600,
-                        color: "#1f2937"
+                        color: "var(--color-text-primary)"
                       }}>
                         {item.quantity}
                       </span>
@@ -222,13 +222,13 @@ export default function CartPage() {
                           height: isMobile ? 44 : 36,
                           padding: 0,
                           cursor: "pointer",
-                          background: "white",
-                          border: "1px solid #d1d5db",
+                          background: "var(--color-bg-surface)",
+                          border: "1px solid var(--color-border)",
                           borderRadius: 8,
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          color: "#374151",
+                          color: "var(--color-text-primary)",
                           fontSize: 16,
                           fontWeight: 600,
                           transition: "all 0.2s"
@@ -276,8 +276,8 @@ export default function CartPage() {
           <div style={{ 
             marginTop: isMobile ? 24 : 30, 
             padding: isMobile ? 16 : 24, 
-            background: "white",
-            border: "2px solid #e5e7eb",
+            background: "var(--color-bg-surface)",
+            border: "2px solid var(--color-border)",
             borderRadius: 16,
             boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05)"
           }}>
@@ -285,7 +285,7 @@ export default function CartPage() {
               fontSize: isMobile ? 18 : 20,
               fontWeight: 700,
               marginBottom: isMobile ? 16 : 20,
-              color: "#1f2937"
+              color: "var(--color-text-primary)"
             }}>
               Order Summary
             </h3>
@@ -294,10 +294,10 @@ export default function CartPage() {
               justifyContent: "space-between", 
               marginBottom: 12,
               fontSize: isMobile ? 14 : 15,
-              color: "#6b7280"
+              color: "var(--color-text-secondary)"
             }}>
               <span>Subtotal:</span>
-              <span style={{ fontWeight: 600, color: "#374151" }}>${subtotal.toFixed(2)}</span>
+              <span style={{ fontWeight: 600, color: "var(--color-text-primary)" }}>${subtotal.toFixed(2)}</span>
             </div>
             {volumeDiscount > 0 && (
               <div style={{
@@ -312,7 +312,7 @@ export default function CartPage() {
                 <span>-${volumeDiscount.toFixed(2)}</span>
               </div>
             )}
-            <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 12px", lineHeight: 1.5 }}>
+            <p style={{ fontSize: 12, color: "var(--color-text-secondary)", margin: "0 0 12px", lineHeight: 1.5 }}>
               {VOLUME_DISCOUNT_INFO.twoPlus}. {VOLUME_DISCOUNT_INFO.fivePlus}.
             </p>
             <div style={{ 
@@ -320,12 +320,12 @@ export default function CartPage() {
               justifyContent: "space-between", 
               marginBottom: 12,
               fontSize: isMobile ? 14 : 15,
-              color: "#6b7280"
+              color: "var(--color-text-secondary)"
             }}>
               <span>Shipping:</span>
               <span style={{ 
                 fontWeight: 600, 
-                color: shipping === 0 ? "#10b981" : "#374151"
+                color: shipping === 0 ? "#10b981" : "var(--color-text-primary)"
               }}>
                 {shipping === 0 ? FREE_SHIPPING_MESSAGE : `$${shipping.toFixed(2)}`}
               </span>
@@ -335,9 +335,9 @@ export default function CartPage() {
               justifyContent: "space-between", 
               fontSize: isMobile ? 18 : 22, 
               fontWeight: 800, 
-              borderTop: "2px solid #e5e7eb", 
+              borderTop: "2px solid var(--color-border)", 
               paddingTop: 16,
-              color: "#1f2937"
+              color: "var(--color-text-primary)"
             }}>
               <span>Total:</span>
               <span>${total.toFixed(2)}</span>
@@ -441,9 +441,9 @@ export default function CartPage() {
               onClick={() => navigate("/products")}
               style={{ 
                 padding: isMobile ? "14px 24px" : "16px 32px",
-                background: "white", 
-                color: "#374151", 
-                border: "2px solid #d1d5db", 
+                background: "var(--color-bg-surface)", 
+                color: "var(--color-text-primary)", 
+                border: "2px solid var(--color-border)", 
                 borderRadius: 12, 
                 fontSize: isMobile ? 15 : 16, 
                 fontWeight: 700, 
@@ -451,12 +451,12 @@ export default function CartPage() {
                 transition: "all 0.2s"
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = "#9ca3af";
-                e.currentTarget.style.background = "#f9fafb";
+                e.currentTarget.style.borderColor = "var(--color-text-secondary)";
+                e.currentTarget.style.background = "var(--color-bg-surface)";
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = "#d1d5db";
-                e.currentTarget.style.background = "white";
+                e.currentTarget.style.borderColor = "var(--color-border)";
+                e.currentTarget.style.background = "var(--color-bg-base)";
               }}
             >
               Continue Shopping

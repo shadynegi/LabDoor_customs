@@ -623,14 +623,14 @@ export default function MyOrders() {
           <h1 style={{
             fontSize: isMobile ? 32 : 42,
             fontWeight: 900,
-            color: '#1f2937',
+            color: 'var(--color-text-primary)',
             marginBottom: 12,
           }}>
             Track Your Orders
           </h1>
           <p style={{
             fontSize: 16,
-            color: '#6b7280',
+            color: 'var(--color-text-secondary)',
             maxWidth: 600,
             margin: '0 auto',
           }}>
@@ -672,7 +672,7 @@ export default function MyOrders() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
           style={{
-            background: 'white',
+            background: 'var(--color-bg-surface)',
             borderRadius: 16,
             padding: isMobile ? 24 : 32,
             marginBottom: 32,
@@ -684,7 +684,7 @@ export default function MyOrders() {
               display: 'block',
               fontSize: 14,
               fontWeight: 600,
-              color: '#374151',
+              color: 'var(--color-text-primary)',
               marginBottom: 8,
             }}>
               Order ID
@@ -695,7 +695,7 @@ export default function MyOrders() {
                 left: 12,
                 top: '50%',
                 transform: 'translateY(-50%)',
-                color: '#9ca3af',
+                color: 'var(--color-text-secondary)',
               }} size={20} />
               <input
                 id="order-lookup-id"
@@ -708,14 +708,14 @@ export default function MyOrders() {
                   width: '100%',
                   boxSizing: 'border-box',
                   padding: '12px 12px 12px 44px',
-                  border: '2px solid #e5e7eb',
+                  border: '2px solid var(--color-border)',
                   borderRadius: 8,
                   fontSize: 16,
                   outline: 'none',
                   transition: 'border-color 0.2s ease',
                 }}
                 onFocus={(e) => e.target.style.borderColor = '#9c6649'}
-                onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
+                onBlur={(e) => e.target.style.borderColor = 'var(--color-border)'}
               />
             </div>
 
@@ -723,7 +723,7 @@ export default function MyOrders() {
               display: 'block',
               fontSize: 14,
               fontWeight: 600,
-              color: '#374151',
+              color: 'var(--color-text-primary)',
               marginBottom: 8,
             }}>
               Email
@@ -735,7 +735,7 @@ export default function MyOrders() {
                   left: 12,
                   top: '50%',
                   transform: 'translateY(-50%)',
-                  color: '#9ca3af',
+                  color: 'var(--color-text-secondary)',
                 }} size={20} />
                 <input
                   id="order-lookup-email"
@@ -747,14 +747,14 @@ export default function MyOrders() {
                   style={{
                     width: '100%',
                     padding: '12px 12px 12px 44px',
-                    border: '2px solid #e5e7eb',
+                    border: '2px solid var(--color-border)',
                     borderRadius: 8,
                     fontSize: 16,
                     outline: 'none',
                     transition: 'border-color 0.2s ease',
                   }}
                   onFocus={(e) => e.target.style.borderColor = '#9c6649'}
-                  onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
+                  onBlur={(e) => e.target.style.borderColor = 'var(--color-border)'}
                 />
               </div>
               <button
@@ -827,7 +827,7 @@ export default function MyOrders() {
               alignItems: 'center', 
               gap: 8,
               fontSize: 14,
-              color: '#6b7280',
+              color: 'var(--color-text-secondary)',
             }}>
               <span style={{
                 display: 'inline-flex',
@@ -861,7 +861,7 @@ export default function MyOrders() {
                 gap: 8,
                 cursor: 'pointer',
                 fontSize: 14,
-                color: '#6b7280',
+                color: 'var(--color-text-secondary)',
               }}>
                 <input
                   id="orders-auto-refresh"
@@ -917,8 +917,8 @@ export default function MyOrders() {
                 disabled={refreshing}
                 style={{
                   padding: '8px 16px',
-                  background: 'white',
-                  border: '1px solid #e5e7eb',
+                  background: 'var(--color-bg-surface)',
+                  border: '1px solid var(--color-border)',
                   borderRadius: 8,
                   fontSize: 14,
                   fontWeight: 500,
@@ -926,18 +926,18 @@ export default function MyOrders() {
                   display: 'flex',
                   alignItems: 'center',
                   gap: 6,
-                  color: refreshing ? '#9ca3af' : '#374151',
+                  color: refreshing ? 'var(--color-text-secondary)' : 'var(--color-text-primary)',
                   transition: 'all 0.2s ease',
                 }}
                 onMouseEnter={(e) => {
                   if (!refreshing) {
-                    e.currentTarget.style.background = '#f9fafb';
-                    e.currentTarget.style.borderColor = '#d1d5db';
+                    e.currentTarget.style.background = 'var(--color-bg-surface)';
+                    e.currentTarget.style.borderColor = 'var(--color-border)';
                   }
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'white';
-                  e.currentTarget.style.borderColor = '#e5e7eb';
+                  e.currentTarget.style.background = 'var(--color-bg-surface)';
+                  e.currentTarget.style.borderColor = 'var(--color-border)';
                 }}
               >
                 <motion.div
@@ -963,17 +963,17 @@ export default function MyOrders() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             style={{
-              background: 'white',
+              background: 'var(--color-bg-surface)',
               borderRadius: 16,
               padding: 60,
               textAlign: 'center',
             }}
           >
             <Package size={64} color="#d1d5db" style={{ margin: '0 auto 20px' }} />
-            <h3 style={{ fontSize: 20, fontWeight: 700, color: '#1f2937', marginBottom: 8 }}>
+            <h3 style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 8 }}>
               No Orders Found
             </h3>
-            <p style={{ fontSize: 14, color: '#6b7280' }}>
+            <p style={{ fontSize: 14, color: 'var(--color-text-secondary)' }}>
               We couldn't find an order with those credentials. Check your confirmation email.
             </p>
           </motion.div>
@@ -989,7 +989,7 @@ export default function MyOrders() {
               exit={{ opacity: 0, y: -20 }}
               transition={{ delay: index * 0.1 }}
               style={{
-                background: 'white',
+                background: 'var(--color-bg-surface)',
                 borderRadius: 16,
                 padding: isMobile ? 20 : 24,
                 marginBottom: 16,
@@ -1007,13 +1007,13 @@ export default function MyOrders() {
                 gap: 12,
               }}>
                 <div>
-                  <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>
+                  <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 4 }}>
                     Order #{order.order_number.slice(-12)}
                   </div>
-                  <div style={{ fontSize: 24, fontWeight: 700, color: '#1f2937' }}>
+                  <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--color-text-primary)' }}>
                     ${order.total.toFixed(2)}
                   </div>
-                  <div style={{ fontSize: 14, color: '#6b7280', marginTop: 4 }}>
+                  <div style={{ fontSize: 14, color: 'var(--color-text-secondary)', marginTop: 4 }}>
                     Placed on {formatDate(order.created_at)}
                   </div>
                 </div>
@@ -1035,7 +1035,7 @@ export default function MyOrders() {
                   </div>
                   <div style={{
                     fontSize: 12,
-                    color: '#9ca3af',
+                    color: 'var(--color-text-secondary)',
                     marginTop: 6,
                   }}>
                     {getStatusDescription(order.status)}
@@ -1082,7 +1082,7 @@ export default function MyOrders() {
                     <div>
                       <div style={{ 
                         fontSize: 12, 
-                        color: '#6b7280', 
+                        color: 'var(--color-text-secondary)', 
                         marginBottom: 4,
                         textTransform: 'uppercase',
                         letterSpacing: '0.05em',
@@ -1092,7 +1092,7 @@ export default function MyOrders() {
                       <div className="text-break-safe" style={{ 
                         fontSize: 18, 
                         fontWeight: 700, 
-                        color: '#1f2937',
+                        color: 'var(--color-text-primary)',
                         fontFamily: 'monospace',
                         letterSpacing: '0.1em',
                       }}>
@@ -1152,8 +1152,8 @@ export default function MyOrders() {
                     }}>
                       <Calendar size={18} color="#7c3aed" />
                       <div>
-                        <span style={{ fontSize: 13, color: '#6b7280' }}>Expected Delivery: </span>
-                        <span style={{ fontSize: 14, fontWeight: 600, color: '#1f2937' }}>
+                        <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>Expected Delivery: </span>
+                        <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>
                           {formatDate(order.estimated_delivery)}
                         </span>
                       </div>
@@ -1173,7 +1173,7 @@ export default function MyOrders() {
                     }}>
                       <CheckCircle size={18} color="#10b981" />
                       <div>
-                        <span style={{ fontSize: 13, color: '#6b7280' }}>Delivered on: </span>
+                        <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>Delivered on: </span>
                         <span style={{ fontSize: 14, fontWeight: 600, color: '#059669' }}>
                           {formatDate(order.delivered_at)}
                         </span>
@@ -1185,7 +1185,7 @@ export default function MyOrders() {
 
               {/* Items Preview */}
               <div style={{ marginBottom: 12 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 8 }}>
                   Items ({order.items.length})
                 </div>
                 {order.items.slice(0, expandedOrder === order.id ? undefined : 2).map((item, idx) => (
@@ -1193,9 +1193,9 @@ export default function MyOrders() {
                     display: 'flex',
                     justifyContent: 'space-between',
                     padding: '8px 0',
-                    borderBottom: '1px solid #f3f4f6',
+                    borderBottom: '1px solid var(--color-border)',
                   }}>
-                    <div style={{ fontSize: 14, color: '#6b7280' }}>
+                    <div style={{ fontSize: 14, color: 'var(--color-text-secondary)' }}>
                       {item.product_name} × {item.quantity}
                       {item.size_system && (
                         <span style={{ fontSize: 12, marginLeft: 8 }}>
@@ -1203,7 +1203,7 @@ export default function MyOrders() {
                         </span>
                       )}
                     </div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: '#1f2937' }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>
                       ${(item.price * item.quantity).toFixed(2)}
                     </div>
                   </div>
@@ -1242,13 +1242,13 @@ export default function MyOrders() {
                 <div style={{
                   marginTop: 16,
                   padding: 16,
-                  background: '#f9fafb',
+                  background: 'var(--color-bg-surface)',
                   borderRadius: 8,
                 }}>
                   <div style={{
                     fontSize: 14,
                     fontWeight: 600,
-                    color: '#374151',
+                    color: 'var(--color-text-primary)',
                     marginBottom: 8,
                     display: 'flex',
                     alignItems: 'center',
@@ -1257,7 +1257,7 @@ export default function MyOrders() {
                     <MapPin size={16} />
                     Shipping Address
                   </div>
-                  <div style={{ fontSize: 14, color: '#6b7280', lineHeight: 1.6 }}>
+                  <div style={{ fontSize: 14, color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>
                     {order.shipping_address.fullName || order.shipping_address.full_name}<br />
                     {order.shipping_address.address}<br />
                     {order.shipping_address.city}, {order.shipping_address.state} {order.shipping_address.zipCode || order.shipping_address.zip_code}<br />

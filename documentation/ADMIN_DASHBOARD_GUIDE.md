@@ -19,6 +19,8 @@ Login with admin username and password. The primary account uses `ADMIN_USERNAME
 
 Generate a production password hash locally with `node backend/scripts/generate-admin-hash.mjs "your-password"` and set `ADMIN_PASSWORD_HASH` (or add an entry to `ADMIN_ADDITIONAL_USERS`). The `/api/admin/generate-hash` route is development-only.
 
+**Dark mode:** A Sun/Moon toggle on the login page and dashboard header switches the admin UI between light and dark. This preference is separate from the storefront theme — it persists to the `ldc_admin_theme` browser key and applies only to `/admin/login` and the dashboard.
+
 ---
 
 ## Analytics tab

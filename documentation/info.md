@@ -160,6 +160,15 @@ Global CSS in `frontend/src/index.css` (see [MOBILE_RESPONSIVE.md](MOBILE_RESPON
 - **Home product carousel** (`ProductCarousel`): scrolling thumbnail cards use `object-fit: contain` (not `cover`) so shoe photos are not cropped; images are centered on the brand gradient with the product name in a dedicated footer; centered **View All Products** button navigates to `/products`.
 - **Global navigation** (non-home routes): sticky header with logo, **Orders**, and **Cart** only — no standalone Products icon. Home uses its own header (About + Cart) and optional mobile bottom nav (Contact, About, Help). Catalog entry points: home carousel, search, cart **Continue Shopping**, and direct `/products` URLs.
 
+### Theming (dark mode)
+
+Two **fully independent** dark-mode toggles, each with its own scope and persistence:
+
+- **Storefront toggle** — a 44×44 Sun/Moon button in the global nav (and the Home header) controls every customer-facing page (`/`, `/products`, `/product/:id`, `/cart`, `/checkout`, `/orders`, `/about`, `/contact`, `/help`, policy pages, `/payment/*`). State lives in `StorefrontThemeContext` (`frontend/src/contexts/StorefrontThemeContext.tsx`), persists to localStorage key **`ldc_storefront_theme`**, and sets **`data-theme`** on `<html>`.
+- **Admin toggle** — a matching button on `/admin/login` and `/adminshivamdashboard` only. State lives in `AdminThemeContext` (`frontend/src/contexts/AdminThemeContext.tsx`), persists to **`ldc_admin_theme`**, and sets **`data-admin-theme`** on the page's `.admin-root` element via a `rootRef` — it **never touches `<html>`**, so the storefront and admin themes cannot bleed into each other.
+- **Tokens** (`frontend/src/styles/tokens.css`): light surface/text/border defaults on `:root`, dark overrides under `[data-theme="dark"]` (storefront) and `.admin-root[data-admin-theme="dark"]` (admin). A `.admin-root` block re-asserts light defaults so the storefront's `<html data-theme="dark">` can never affect admin surfaces.
+- Each context initializes synchronously from localStorage, falling back to the OS `prefers-color-scheme` — no flash of the wrong theme on load. Brand gradients/browns, status colors, and white-on-gradient text stay fixed in both themes; only neutral surfaces adapt. No new dependencies (Sun/Moon from existing `lucide-react`).
+
 ---
 
 ## Admin dashboard
@@ -927,7 +936,7 @@ Templates: `backend/env.template`, `frontend/env.template`
 
 | Job | Steps |
 |-----|-------|
-| monorepo | Root `npm ci`, backend `validate-env` (pooler `DATABASE_URL`, `WHATSAPP_CONTACT_NUMBER`, auth secrets), `npm run build` (`VITE_API_BASE_URL=/api`), Vitest + Playwright + viewport audit (**529** tests) |
+| monorepo | Root `npm ci`, backend `validate-env` (pooler `DATABASE_URL`, `WHATSAPP_CONTACT_NUMBER`, auth secrets), `npm run build` (`VITE_API_BASE_URL=/api`), Vitest + Playwright + viewport audit (**666** tests) |
 | sitemap | Requires `PRODUCTION_API_BASE_URL`; generates sitemap with live product URLs |
 | links | Markdown link checker |
 
@@ -1016,7 +1025,7 @@ npm run links:check
 | Frontend unit | Vitest + RTL | `Tests/unit/frontend/` — `ToggleSwitch`, `whatsappContact`, `productCatalogCache` (`frontend/vitest.config.ts`) |
 | Frontend E2E / UI | Playwright | `Tests/e2e/specs/` by domain (storefront, checkout, orders, contact, admin, responsive, regression) — document scroll, responsive pages matrix (11 viewports × routes, incl. 320px), contact WhatsApp popup |
 
-**Total automated tests:** 529 (141 backend unit + 88 API + 13 frontend unit + 286 Playwright UI + 1 viewport). **`npm test`** also runs the viewport overflow audit (12 widths × 16 routes).
+**Total automated tests:** 666 (141 backend unit + 88 API + 13 frontend unit + 423 Playwright UI + 1 viewport). **`npm test`** also runs the viewport overflow audit (12 widths × 16 routes).
 
 **Suite layout:** [`Tests/README.md`](../Tests/README.md) — directory map, conventions, shared fixtures (`Tests/shared/`).
 

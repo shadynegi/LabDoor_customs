@@ -25,9 +25,9 @@ export default function TermsOfService() {
         }}>
           <Icon size={20} color="white" />
         </div>
-        <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1f2937', margin: 0 }}>{title}</h2>
+        <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-text-primary)', margin: 0 }}>{title}</h2>
       </div>
-      <div style={{ paddingLeft: isMobile ? 0 : 52, color: '#4b5563', lineHeight: 1.8 }}>
+      <div style={{ paddingLeft: isMobile ? 0 : 52, color: 'var(--color-text-secondary)', lineHeight: 1.8 }}>
         {children}
       </div>
     </div>
@@ -48,14 +48,14 @@ export default function TermsOfService() {
             alignItems: 'center',
             gap: 8,
             padding: '12px 20px',
-            background: 'white',
+            background: 'var(--color-bg-surface)',
             border: 'none',
             borderRadius: 10,
             cursor: 'pointer',
             marginBottom: 24,
             fontSize: 14,
             fontWeight: 600,
-            color: '#374151',
+            color: 'var(--color-text-primary)',
             boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
           }}
         >
@@ -83,12 +83,12 @@ export default function TermsOfService() {
 
         {/* Content */}
         <div style={{
-          background: 'white',
+          background: 'var(--color-bg-surface)',
           borderRadius: 20,
           padding: isMobile ? 24 : 48,
           boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
         }}>
-          <p style={{ fontSize: 16, color: '#6b7280', lineHeight: 1.8, marginBottom: 32 }}>
+          <p style={{ fontSize: 16, color: 'var(--color-text-secondary)', lineHeight: 1.8, marginBottom: 32 }}>
             Welcome to Lab Door Customs. By accessing and using our website and services, you agree to 
             be bound by these Terms of Service. Please read them carefully before making a purchase.
           </p>
@@ -188,11 +188,11 @@ export default function TermsOfService() {
           <div style={{
             marginTop: 32,
             padding: 20,
-            background: '#f9fafb',
+            background: 'var(--color-bg-surface)',
             borderRadius: 12,
             borderLeft: '4px solid #9c6649',
           }}>
-            <p style={{ margin: 0, color: '#4b5563', fontSize: 14 }}>
+            <p style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: 14 }}>
               For questions about these Terms of Service, please contact us at{' '}
               <strong>legal@labdoorcustoms.com</strong>
             </p>

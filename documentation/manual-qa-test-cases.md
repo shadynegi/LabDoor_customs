@@ -1,6 +1,6 @@
 # Lab Door Customs — Manual QA Test Cases
 
-**Purpose:** Full-stack manual QA for release regression. Complements **520** automated tests (141 backend unit + 80 API + 13 frontend unit + 286 Playwright + viewport audit).
+**Purpose:** Full-stack manual QA for release regression. Complements **666** automated tests (141 backend unit + 88 API + 13 frontend unit + 423 Playwright + viewport audit).
 
 **Authoritative system reference:** [`info.md`](info.md)  
 **Automated test runbook:** [`test_guidelines.md`](test_guidelines.md)  
@@ -21,7 +21,7 @@
 | Backend unit | Vitest | `Tests/unit/backend/` | 35 files, 141 tests | No (mocked) |
 | API integration | Vitest + Supertest | `Tests/integration/api/` | 19 files, 80 tests | No (mocked) |
 | Frontend unit | Vitest + RTL | `Tests/unit/frontend/` | 3 files, 13 tests | No |
-| E2E / UI | Playwright | `Tests/e2e/specs/` | 24 files, 286 tests | No (mocked API + static preview) |
+| E2E / UI | Playwright | `Tests/e2e/specs/` | 423 tests (195 desktop + 228 mobile-chrome) | No (mocked API + static preview) |
 | Viewport audit | Script | `Tests/scripts/audit-viewport-overflow.mjs` | 12 widths × 16 routes | No |
 
 **Run:** `npm test` from repo root (CI runs on push/PR to `main`/`master`).
@@ -66,7 +66,7 @@
 | Observation | Detail |
 |-------------|--------|
 | **Playwright stability** | `workers: 1`, `retries: 1` — checkout/deep-flow specs can flake on slow CI; investigate retries before blaming product bugs |
-| **Responsive overlap** | `responsive-pages-ui` (193 tests) overlaps `responsive-ui` + `mobile-ui` for core routes — intentional matrix, not duplicate bugs |
+| **Responsive overlap** | `responsive-pages-ui` (228 tests) overlaps `responsive-ui` + `mobile-ui` for core routes — intentional matrix, not duplicate bugs |
 | **Policy / place-order overlap** | `deep-flows-ui` and `checkout-place-order-ui` both exercise policy acceptance — acceptable regression guard |
 | **Mocked E2E catalog** | Product IDs come from `Tests/e2e/fixtures/mock-data.ts`, not production DB — manual QA must use real catalog |
 | **No Quick Presets UI tests** | Coupon preset buttons removed; automated coupon coverage is server + checkout apply only |
@@ -347,4 +347,4 @@ Quick pass before production deploy. Check each box when verified.
 
 ---
 
-*Last aligned with automated suite: **520 tests**. Update this file when major features or admin workflows change.*
+*Last aligned with automated suite: **666 tests**. Update this file when major features or admin workflows change.*

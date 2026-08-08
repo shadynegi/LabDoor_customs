@@ -462,8 +462,10 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const getItemQuantity = (id: number): number => {
-    const item = state.items.find(item => item.id === id);
-    return item ? item.quantity : 0;
+    // A product can occupy multiple cart lines (one per size) — sum them all.
+    return state.items
+      .filter(item => item.id === id)
+      .reduce((sum, item) => sum + item.quantity, 0);
   };
 
   return (

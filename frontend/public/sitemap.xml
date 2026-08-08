@@ -2,56 +2,92 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://www.labdoorcustoms.com/</loc>
-    <lastmod>2026-07-23</lastmod>
+    <lastmod>2026-08-08</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
     <loc>https://www.labdoorcustoms.com/products</loc>
-    <lastmod>2026-07-23</lastmod>
+    <lastmod>2026-08-08</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>https://www.labdoorcustoms.com/about</loc>
-    <lastmod>2026-07-23</lastmod>
+    <lastmod>2026-08-08</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
     <loc>https://www.labdoorcustoms.com/contact</loc>
-    <lastmod>2026-07-23</lastmod>
+    <lastmod>2026-08-08</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
     <loc>https://www.labdoorcustoms.com/help</loc>
-    <lastmod>2026-07-23</lastmod>
+    <lastmod>2026-08-08</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
     <loc>https://www.labdoorcustoms.com/privacy-policy</loc>
-    <lastmod>2026-07-23</lastmod>
+    <lastmod>2026-08-08</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
     <loc>https://www.labdoorcustoms.com/terms-of-service</loc>
-    <lastmod>2026-07-23</lastmod>
+    <lastmod>2026-08-08</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
     <loc>https://www.labdoorcustoms.com/returns-policy</loc>
-    <lastmod>2026-07-23</lastmod>
+    <lastmod>2026-08-08</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
     <loc>https://www.labdoorcustoms.com/shipping-policy</loc>
-    <lastmod>2026-07-23</lastmod>
+    <lastmod>2026-08-08</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://www.labdoorcustoms.com/product/e63c1058-34e6-400c-90a9-a81baada6986</loc>
+    <lastmod>2026-08-08</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.labdoorcustoms.com/product/6dad5303-091e-4c4b-be18-c0b6a7ea4b26</loc>
+    <lastmod>2026-07-06</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.labdoorcustoms.com/product/55325d41-ffca-4827-a406-233af4855d38</loc>
+    <lastmod>2026-07-06</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.labdoorcustoms.com/product/238cf636-e713-4618-a48c-395fa2a266e4</loc>
+    <lastmod>2026-07-23</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.labdoorcustoms.com/product/8481ebaf-b3fd-46f5-97fd-5ef3e47cc5a4</loc>
+    <lastmod>2026-07-06</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.labdoorcustoms.com/product/c6d78434-f9f0-41c8-922c-98121d43aadb</loc>
+    <lastmod>2026-07-23</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
   </url>
 </urlset>

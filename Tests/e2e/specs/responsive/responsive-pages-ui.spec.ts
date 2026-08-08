@@ -91,6 +91,41 @@ for (const device of POPULAR_MOBILE_VIEWPORTS) {
       await assertNoHorizontalOverflow(page, `${ctx} cart`);
     });
 
+    test('/checkout sticky bar with policy hint does not cover final content', async ({ page }) => {
+      const product = PRIMARY_MOCK_PRODUCT;
+      await seedCart(page, [
+        {
+          id: product.id,
+          name: product.name,
+          price: product.price,
+          image: product.image,
+          quantity: 1,
+        },
+      ]);
+
+      await page.goto('/checkout');
+      await expect(page.getByRole('heading', { name: 'Secure Checkout' })).toBeVisible({
+        timeout: 15_000,
+      });
+
+      // Policy is unaccepted on load, so the sticky CTA renders its taller hint band.
+      const finalContent = page.getByText('Secure 256-bit SSL encryption');
+      const sticky = page.getByRole('region', { name: 'Place order' });
+      await assertVisibleAboveStickyRegion(page, finalContent, sticky, `${ctx} checkout hint`);
+    });
+
+    test('/product sticky bar with size hint does not cover final content', async ({ page }) => {
+      await page.goto(`/product/${TEST_PRODUCT_IDS.nikeBlue}`);
+      await expect(page.getByRole('heading', { name: PRIMARY_MOCK_PRODUCT.name })).toBeVisible({
+        timeout: 15_000,
+      });
+
+      // No size selected on load, so the sticky CTA renders its taller "choose a size" hint.
+      const finalContent = page.getByText('All Sales Final', { exact: true });
+      const sticky = page.getByRole('region', { name: 'Product purchase actions' });
+      await assertVisibleAboveStickyRegion(page, finalContent, sticky, `${ctx} product hint`);
+    });
+
     test('/checkout form is usable on mobile', async ({ page }) => {
       const product = PRIMARY_MOCK_PRODUCT;
       await seedCart(page, [
@@ -113,6 +148,27 @@ for (const device of POPULAR_MOBILE_VIEWPORTS) {
     });
   });
 }
+
+test.describe('Home hero — long product name', () => {
+  // Single unbroken token: exercises the hero <h1> overflow-wrap guard (uppercase + letter-spacing).
+  const LONG_NAME = 'SupercalifragilisticEspialidociousLimitedEditionDrops';
+  const longNameProduct = {
+    ...PRIMARY_MOCK_PRODUCT,
+    name: LONG_NAME,
+  };
+  test.use({ mockProducts: [longNameProduct] });
+
+  for (const device of POPULAR_MOBILE_VIEWPORTS.filter((d) => d.viewport.width <= 412)) {
+    test(`hero heading stays within viewport on ${device.label}`, async ({ page }) => {
+      await useDevice(page, device);
+      await page.goto('/');
+      const heading = page.getByRole('heading', { name: LONG_NAME });
+      await heading.scrollIntoViewIfNeeded();
+      await assertHeadingInViewport(page, heading, `${device.label} home hero`);
+      await assertNoHorizontalOverflow(page, `${device.label} home hero long name`);
+    });
+  }
+});
 
 test.describe('Responsive products sort — narrow devices', () => {
   for (const device of POPULAR_MOBILE_VIEWPORTS.filter((d) => d.viewport.width <= 412)) {

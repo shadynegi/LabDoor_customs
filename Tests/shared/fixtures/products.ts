@@ -75,7 +75,16 @@ function isProductByIdQuery(strings: TemplateStringsArray): boolean {
   return query.includes('FROM products') && query.includes('WHERE id');
 }
 
-/** Mock one product lookup (as `validateCartItems` does) and return the DB id. */
+/** `validateCartItems` batches lookups: `WHERE id = ANY(${ids})` (single array param). */
+function isProductByIdsBatchQuery(strings: TemplateStringsArray): boolean {
+  const query = strings.join(' ');
+  return query.includes('FROM products') && query.includes('id = ANY');
+}
+
+/**
+ * Mock the batched product lookup performed by `validateCartItems`
+ * (`SELECT ... WHERE id = ANY(${ids})`) and return the DB id.
+ */
 export function mockProductDbLookup(sqlMock: SqlMockFn, product: ProductDbRow): number {
   sqlMock.mockResolvedValueOnce([{ ...product }]);
   return product.id;
@@ -107,6 +116,12 @@ export function installProductCatalogMock(
   const byId = new Map(catalog.map((row) => [row.id, row]));
 
   sqlMock.mockImplementation(async (strings, ...values) => {
+    // Batched lookup: WHERE id = ANY(${ids}) — first value is an array of ids.
+    if (isProductByIdsBatchQuery(strings)) {
+      const ids = (values[0] as number[]) || [];
+      return ids.map((id) => byId.get(id)).filter(Boolean).map((row) => ({ ...row! }));
+    }
+    // Single-id lookup: WHERE id = ${id}.
     if (isProductByIdQuery(strings)) {
       const id = values[0] as number;
       const row = byId.get(id);

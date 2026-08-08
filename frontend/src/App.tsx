@@ -1,7 +1,9 @@
-import { BrowserRouter, Routes, Route, Link, useLocation, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Link, useLocation, useNavigationType, Navigate } from "react-router-dom";
 import { ShoppingCart, Package } from "lucide-react";
 import { lazy, Suspense, useEffect } from "react";
 import { CartProvider, useCart } from "./contexts/CartContext";
+import { StorefrontThemeProvider, useStorefrontTheme } from "./contexts/StorefrontThemeContext";
+import DarkModeToggle from "./components/DarkModeToggle";
 import ErrorBoundary from "./components/ErrorBoundary";
 import RouteErrorBoundary from "./components/RouteErrorBoundary";
 import { AdminAuthProvider, useAdminAuth, ADMIN_DASHBOARD_PATH, ADMIN_LOGIN_PATH } from "./contexts/AdminAuthContext";
@@ -117,11 +119,20 @@ function AdminEntryRedirect() {
 // Page view tracker component
 function PageViewTracker() {
   const location = useLocation();
+  const navigationType = useNavigationType();
 
   useEffect(() => {
     trackPageView(location.pathname);
     trackGaPageView(location.pathname);
   }, [location.pathname]);
+
+  // Reset scroll to top on forward navigation (PUSH/REPLACE). Leave POP
+  // (browser back/forward) alone so the native scroll position is restored.
+  useEffect(() => {
+    if (navigationType === 'POP') return;
+    const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    window.scrollTo({ top: 0, left: 0, behavior: prefersReducedMotion ? 'auto' : 'smooth' });
+  }, [location.pathname, navigationType]);
 
   return null;
 }
@@ -129,6 +140,7 @@ function PageViewTracker() {
 function Navigation() {
   const location = useLocation();
   const { isMobile, isSmallMobile } = useResponsive();
+  const { theme, toggle } = useStorefrontTheme();
   const { state } = useCart();
   const cartCount = state.items.reduce((sum, item) => sum + item.quantity, 0);
 
@@ -138,13 +150,13 @@ function Navigation() {
   }
 
   return (
-    <div 
-      style={{ 
-        borderBottom: "1px solid #e5e7eb", 
-        display: "flex", 
+    <div
+      style={{
+        borderBottom: "1px solid var(--color-border)",
+        display: "flex",
         justifyContent: "space-between",
         alignItems: "center",
-        background: "white",
+        background: "var(--color-bg-base)",
         position: "sticky",
         top: 0,
         zIndex: 100,
@@ -230,11 +242,11 @@ function Navigation() {
         alignItems: "center",
         flexShrink: 0,
       }}>
-        <Link 
-          to="/orders" 
-          style={{ 
+        <Link
+          to="/orders"
+          style={{
             textDecoration: "none",
-            color: location.pathname === '/orders' ? "#9c6649" : "#6b7280",
+            color: location.pathname === '/orders' ? "#9c6649" : "var(--color-text-secondary)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -246,7 +258,7 @@ function Navigation() {
             borderRadius: 10,
             minWidth: isMobile ? 44 : "auto",
             minHeight: isMobile ? 44 : "auto",
-            background: location.pathname === '/orders' ? "#f3f4f6" : "transparent",
+            background: location.pathname === '/orders' ? "var(--color-bg-surface)" : "transparent",
           }}
         >
           <Package size={isMobile ? 22 : 20} />
@@ -255,9 +267,9 @@ function Navigation() {
         <Link 
           to="/cart"
           aria-label={cartCount > 0 ? `Cart, ${cartCount} item${cartCount === 1 ? '' : 's'}` : 'Cart'}
-          style={{ 
+          style={{
             textDecoration: "none",
-            color: location.pathname === '/cart' ? "#9c6649" : "#6b7280",
+            color: location.pathname === '/cart' ? "#9c6649" : "var(--color-text-secondary)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -270,7 +282,7 @@ function Navigation() {
             borderRadius: 10,
             minWidth: isMobile ? 44 : "auto",
             minHeight: isMobile ? 44 : "auto",
-            background: location.pathname === '/cart' ? "#f3f4f6" : "transparent",
+            background: location.pathname === '/cart' ? "var(--color-bg-surface)" : "transparent",
           }}
         >
           <ShoppingCart size={isMobile ? 22 : 20} />
@@ -296,6 +308,7 @@ function Navigation() {
             </span>
           )}
         </Link>
+        <DarkModeToggle theme={theme} onToggle={toggle} />
       </nav>
     </div>
   );
@@ -417,10 +430,10 @@ function AppShell() {
           textAlign: "center",
           padding: "24px 16px",
           paddingBottom: "max(24px, env(safe-area-inset-bottom))",
-          borderTop: "1px solid #e5e7eb",
-          background: "#f9fafb",
+          borderTop: "1px solid var(--color-border)",
+          background: "var(--color-bg-surface)",
           fontSize: 14,
-          color: "#6b7280",
+          color: "var(--color-text-secondary)",
           flexShrink: 0,
         }}>
           <p style={{ margin: 0 }}>
@@ -461,6 +474,7 @@ function AppShell() {
 export default function App() {
   return (
     <ErrorBoundary>
+      <StorefrontThemeProvider>
       <CartProvider>
         <BrowserRouter>
           <AdminAuthProvider>
@@ -470,6 +484,7 @@ export default function App() {
           <CookieConsent />
         </BrowserRouter>
       </CartProvider>
+      </StorefrontThemeProvider>
     </ErrorBoundary>
   );
 }

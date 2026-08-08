@@ -84,7 +84,7 @@ export default function ContactUs() {
       <div style={{
         maxWidth: 1200,
         margin: "0 auto",
-        background: "white",
+        background: "var(--color-bg-surface)",
         borderRadius: 20,
         padding: isMobile ? (isSmallMobile ? 20 : 24) : 50,
         boxSizing: "border-box",
@@ -103,7 +103,7 @@ export default function ContactUs() {
           }}>
             Contact Us
           </h1>
-          <p style={{ color: "#6b7280", fontSize: isMobile ? 14 : 16 }}>
+          <p style={{ color: "var(--color-text-secondary)", fontSize: isMobile ? 14 : 16 }}>
             We'd love to hear from you. Send us a message and we'll respond as soon as possible.
           </p>
         </div>
@@ -115,7 +115,7 @@ export default function ContactUs() {
         }}>
           {/* Contact Information */}
           <div>
-            <h2 style={{ fontSize: 24, fontWeight: 700, marginBottom: 24, color: "#1f2937" }}>
+            <h2 style={{ fontSize: 24, fontWeight: 700, marginBottom: 24, color: "var(--color-text-primary)" }}>
               Get In Touch
             </h2>
             
@@ -132,7 +132,7 @@ export default function ContactUs() {
                   <MessageCircle size={24} color="white" />
                 </div>
                 <div>
-                  <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 4, color: "#374151" }}>
+                  <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 4, color: "var(--color-text-primary)" }}>
                     WhatsApp
                   </h3>
                   <a
@@ -144,7 +144,7 @@ export default function ContactUs() {
                   >
                     {getWhatsAppContactDisplay()}
                   </a>
-                  <p style={{ color: "#6b7280", margin: "8px 0 0", fontSize: 14 }}>
+                  <p style={{ color: "var(--color-text-secondary)", margin: "8px 0 0", fontSize: 14 }}>
                     Chat with us for orders, support, and custom requests.
                   </p>
                 </div>
@@ -162,10 +162,10 @@ export default function ContactUs() {
                   <MapPin size={24} color="white" />
                 </div>
                 <div>
-                  <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 4, color: "#374151" }}>
+                  <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 4, color: "var(--color-text-primary)" }}>
                     Address
                   </h3>
-                  <p style={{ color: "#6b7280", margin: 0 }}>
+                  <p style={{ color: "var(--color-text-secondary)", margin: 0 }}>
                     415, Sector 78<br />
                     Mohali, Punjab<br />
                     India<br />
@@ -178,14 +178,14 @@ export default function ContactUs() {
             <div style={{
               marginTop: 40,
               padding: 20,
-              background: "#f9fafb",
+              background: "var(--color-bg-surface)",
               borderRadius: 12,
               borderLeft: "4px solid #9c6649"
             }}>
-              <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8, color: "#374151" }}>
+              <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8, color: "var(--color-text-primary)" }}>
                 Business Hours
               </h3>
-              <p style={{ color: "#6b7280", margin: 0, fontSize: 14 }}>
+              <p style={{ color: "var(--color-text-secondary)", margin: 0, fontSize: 14 }}>
                 Monday - Friday: 9:00 AM - 6:00 PM<br />
                 Saturday: 10:00 AM - 4:00 PM<br />
                 Sunday: Closed
@@ -195,13 +195,13 @@ export default function ContactUs() {
 
           {/* Contact Form */}
           <div>
-            <h2 style={{ fontSize: 24, fontWeight: 700, marginBottom: 24, color: "#1f2937" }}>
+            <h2 style={{ fontSize: 24, fontWeight: 700, marginBottom: 24, color: "var(--color-text-primary)" }}>
               Send a Message
             </h2>
             
             <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 20 }}>
               <div>
-                <label htmlFor="contact-name" style={{ display: "block", fontSize: 14, fontWeight: 600, color: "#374151", marginBottom: 8 }}>
+                <label htmlFor="contact-name" style={{ display: "block", fontSize: 14, fontWeight: 600, color: "var(--color-text-primary)", marginBottom: 8 }}>
                   Your Name
                 </label>
                 <input
@@ -214,19 +214,19 @@ export default function ContactUs() {
                   style={{
                     width: "100%",
                     padding: "12px 16px",
-                    border: "2px solid #e5e7eb",
+                    border: "2px solid var(--color-border)",
                     borderRadius: 10,
                     fontSize: 15,
                     transition: "all 0.2s",
                     outline: "none"
                   }}
                   onFocus={(e) => e.currentTarget.style.borderColor = "#9c6649"}
-                  onBlur={(e) => e.currentTarget.style.borderColor = "#e5e7eb"}
+                  onBlur={(e) => e.currentTarget.style.borderColor = "var(--color-border)"}
                 />
               </div>
 
               <div>
-                <label htmlFor="contact-email" style={{ display: "block", fontSize: 14, fontWeight: 600, color: "#374151", marginBottom: 8 }}>
+                <label htmlFor="contact-email" style={{ display: "block", fontSize: 14, fontWeight: 600, color: "var(--color-text-primary)", marginBottom: 8 }}>
                   Email Address
                 </label>
                 <input
@@ -239,19 +239,19 @@ export default function ContactUs() {
                   style={{
                     width: "100%",
                     padding: "12px 16px",
-                    border: "2px solid #e5e7eb",
+                    border: "2px solid var(--color-border)",
                     borderRadius: 10,
                     fontSize: 15,
                     transition: "all 0.2s",
                     outline: "none"
                   }}
                   onFocus={(e) => e.currentTarget.style.borderColor = "#9c6649"}
-                  onBlur={(e) => e.currentTarget.style.borderColor = "#e5e7eb"}
+                  onBlur={(e) => e.currentTarget.style.borderColor = "var(--color-border)"}
                 />
               </div>
 
               <div>
-                <label htmlFor="contact-subject" style={{ display: "block", fontSize: 14, fontWeight: 600, color: "#374151", marginBottom: 8 }}>
+                <label htmlFor="contact-subject" style={{ display: "block", fontSize: 14, fontWeight: 600, color: "var(--color-text-primary)", marginBottom: 8 }}>
                   Subject
                 </label>
                 <input
@@ -264,19 +264,19 @@ export default function ContactUs() {
                   style={{
                     width: "100%",
                     padding: "12px 16px",
-                    border: "2px solid #e5e7eb",
+                    border: "2px solid var(--color-border)",
                     borderRadius: 10,
                     fontSize: 15,
                     transition: "all 0.2s",
                     outline: "none"
                   }}
                   onFocus={(e) => e.currentTarget.style.borderColor = "#9c6649"}
-                  onBlur={(e) => e.currentTarget.style.borderColor = "#e5e7eb"}
+                  onBlur={(e) => e.currentTarget.style.borderColor = "var(--color-border)"}
                 />
               </div>
 
               <div>
-                <label htmlFor="contact-message" style={{ display: "block", fontSize: 14, fontWeight: 600, color: "#374151", marginBottom: 8 }}>
+                <label htmlFor="contact-message" style={{ display: "block", fontSize: 14, fontWeight: 600, color: "var(--color-text-primary)", marginBottom: 8 }}>
                   Message
                 </label>
                 <textarea
@@ -289,7 +289,7 @@ export default function ContactUs() {
                   style={{
                     width: "100%",
                     padding: "12px 16px",
-                    border: "2px solid #e5e7eb",
+                    border: "2px solid var(--color-border)",
                     borderRadius: 10,
                     fontSize: 15,
                     transition: "all 0.2s",
@@ -298,7 +298,7 @@ export default function ContactUs() {
                     resize: "vertical"
                   }}
                   onFocus={(e) => e.currentTarget.style.borderColor = "#9c6649"}
-                  onBlur={(e) => e.currentTarget.style.borderColor = "#e5e7eb"}
+                  onBlur={(e) => e.currentTarget.style.borderColor = "var(--color-border)"}
                 />
               </div>
 

@@ -49,7 +49,7 @@ function parseOrderItems(items: unknown): ValidatedLineItem[] {
  */
 export async function createPendingOrderAtomic(input: PendingOrderInput) {
   const customerInfo = sanitizeCustomerInfo(input.customerInfo);
-  const orderNumber = `GSS-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+  const orderNumber = `GSS-${Date.now()}-${Math.random().toString(36).substring(2, 11).toUpperCase()}`;
 
   const shippingAddress = {
     full_name: customerInfo.fullName,

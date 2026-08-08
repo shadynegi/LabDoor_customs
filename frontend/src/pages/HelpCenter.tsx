@@ -52,7 +52,7 @@ export default function HelpCenter() {
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
           {/* Shipping & Tracking */}
           <div style={{
-            background: "white",
+            background: "var(--color-bg-surface)",
             borderRadius: 16,
             overflow: "hidden",
             boxShadow: "0 10px 30px rgba(0,0,0,0.15)"
@@ -64,8 +64,8 @@ export default function HelpCenter() {
                 padding: isMobile ? "20px" : "24px 32px",
                 background: activeSection === "shipping" 
                   ? "linear-gradient(135deg, #361906 0%, #9c6649 100%)" 
-                  : "white",
-                color: activeSection === "shipping" ? "white" : "#1f2937",
+                  : "var(--color-bg-surface)",
+                color: activeSection === "shipping" ? "white" : "var(--color-text-primary)",
                 border: "none",
                 display: "flex",
                 alignItems: "center",
@@ -84,16 +84,16 @@ export default function HelpCenter() {
             </button>
             
             {activeSection === "shipping" && (
-              <div style={{ padding: isMobile ? "20px" : "32px", color: "#374151" }}>
-                <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 16, color: "#1f2937" }}>
+              <div style={{ padding: isMobile ? "20px" : "32px", color: "var(--color-text-primary)" }}>
+                <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 16, color: "var(--color-text-primary)" }}>
                   Shipping Information
                 </h3>
 
                 <div style={{ marginBottom: 24 }}>
-                  <h4 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8, color: "#4b5563" }}>
+                  <h4 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8, color: "var(--color-text-secondary)" }}>
                     Shipping rates
                   </h4>
-                  <ul style={{ paddingLeft: 20, lineHeight: 1.8, color: "#6b7280" }}>
+                  <ul style={{ paddingLeft: 20, lineHeight: 1.8, color: "var(--color-text-secondary)" }}>
                     <li>
                       <strong>Standard shipping:</strong> ${SHIPPING_COST} flat rate on all orders
                     </li>
@@ -101,31 +101,31 @@ export default function HelpCenter() {
                       <strong>Free shipping:</strong> {FREE_SHIPPING_MESSAGE}
                     </li>
                   </ul>
-                  <p style={{ lineHeight: 1.8, color: "#6b7280", marginTop: 12, marginBottom: 0 }}>
+                  <p style={{ lineHeight: 1.8, color: "var(--color-text-secondary)", marginTop: 12, marginBottom: 0 }}>
                     Shipping is calculated at checkout from your cart subtotal (before volume or coupon
                     discounts). Cart and checkout show the exact shipping charge before you place your order.
                   </p>
                 </div>
 
                 <div style={{ marginBottom: 24 }}>
-                  <h4 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8, color: "#4b5563" }}>
+                  <h4 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8, color: "var(--color-text-secondary)" }}>
                     Processing & delivery
                   </h4>
-                  <p style={{ lineHeight: 1.8, color: "#6b7280", marginBottom: 12 }}>
+                  <p style={{ lineHeight: 1.8, color: "var(--color-text-secondary)", marginBottom: 12 }}>
                     After you complete checkout, our team confirms payment and prepares your custom order for
                     shipment. You will receive email updates when your order status changes.
                   </p>
-                  <p style={{ lineHeight: 1.8, color: "#6b7280", margin: 0 }}>
+                  <p style={{ lineHeight: 1.8, color: "var(--color-text-secondary)", margin: 0 }}>
                     Delivery times depend on your location and carrier service once the package ships. Estimated
                     delivery dates may appear on your order when available.
                   </p>
                 </div>
 
                 <div style={{ marginBottom: 24 }}>
-                  <h4 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8, color: "#4b5563" }}>
+                  <h4 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8, color: "var(--color-text-secondary)" }}>
                     Order tracking
                   </h4>
-                  <p style={{ lineHeight: 1.8, color: "#6b7280", marginBottom: 12 }}>
+                  <p style={{ lineHeight: 1.8, color: "var(--color-text-secondary)", marginBottom: 12 }}>
                     Track your order anytime on the{" "}
                     <Link to="/orders" style={{ color: "#9c6649", fontWeight: 600 }}>
                       My Orders
@@ -133,22 +133,22 @@ export default function HelpCenter() {
                     page with your <strong>order ID</strong> (UUID from your confirmation WhatsApp
                     message) and the <strong>email address used at checkout</strong>.
                   </p>
-                  <p style={{ lineHeight: 1.8, color: "#6b7280", marginBottom: 12 }}>
+                  <p style={{ lineHeight: 1.8, color: "var(--color-text-secondary)", marginBottom: 12 }}>
                     Order confirmation and shipping updates are sent via WhatsApp when configured — use
                     the tracking link in your message or enter your order ID and checkout email on My
                     Orders, then click <strong>Search</strong>.
                   </p>
-                  <p style={{ lineHeight: 1.8, color: "#6b7280", margin: 0 }}>
+                  <p style={{ lineHeight: 1.8, color: "var(--color-text-secondary)", margin: 0 }}>
                     When your order ships, tracking number and carrier information appear on My Orders. If you
                     shipped but do not see tracking within a few days, contact us with your order ID.
                   </p>
                 </div>
 
                 <div style={{ marginBottom: 24 }}>
-                  <h4 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8, color: "#4b5563" }}>
+                  <h4 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8, color: "var(--color-text-secondary)" }}>
                     Shipping address
                   </h4>
-                  <p style={{ lineHeight: 1.8, color: "#6b7280", margin: 0 }}>
+                  <p style={{ lineHeight: 1.8, color: "var(--color-text-secondary)", margin: 0 }}>
                     Enter your full shipping address at checkout. We ship to the address you provide; please
                     double-check it before placing your order. For questions about a specific destination,
                     contact our support team.
@@ -157,11 +157,11 @@ export default function HelpCenter() {
 
                 <div style={{
                   padding: 16,
-                  background: "#f9fafb",
+                  background: "var(--color-bg-surface)",
                   borderRadius: 10,
                   borderLeft: "4px solid #9c6649"
                 }}>
-                  <p style={{ margin: 0, color: "#4b5563", fontSize: 14, lineHeight: 1.7 }}>
+                  <p style={{ margin: 0, color: "var(--color-text-secondary)", fontSize: 14, lineHeight: 1.7 }}>
                     <strong>Note:</strong> Shipping times are estimates and may vary due to production,
                     carrier delays, weather, or holidays. See our{" "}
                     <Link to="/shipping-policy" style={{ color: "#9c6649", fontWeight: 600 }}>
@@ -176,7 +176,7 @@ export default function HelpCenter() {
 
           {/* Privacy Policy */}
           <div style={{
-            background: "white",
+            background: "var(--color-bg-surface)",
             borderRadius: 16,
             overflow: "hidden",
             boxShadow: "0 10px 30px rgba(0,0,0,0.15)"
@@ -188,8 +188,8 @@ export default function HelpCenter() {
                 padding: isMobile ? "20px" : "24px 32px",
                 background: activeSection === "privacy" 
                   ? "linear-gradient(135deg, #361906 0%, #9c6649 100%)" 
-                  : "white",
-                color: activeSection === "privacy" ? "white" : "#1f2937",
+                  : "var(--color-bg-surface)",
+                color: activeSection === "privacy" ? "white" : "var(--color-text-primary)",
                 border: "none",
                 display: "flex",
                 alignItems: "center",
@@ -208,8 +208,8 @@ export default function HelpCenter() {
             </button>
             
             {activeSection === "privacy" && (
-              <div style={{ padding: isMobile ? "20px" : "32px", color: "#374151" }}>
-                <p style={{ fontSize: 13, color: "#9ca3af", marginBottom: 24, fontStyle: "italic" }}>
+              <div style={{ padding: isMobile ? "20px" : "32px", color: "var(--color-text-primary)" }}>
+                <p style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 24, fontStyle: "italic" }}>
                   Summary — see our full{" "}
                   <Link to="/privacy-policy" style={{ color: "#9c6649", fontWeight: 600 }}>
                     Privacy Policy
@@ -218,29 +218,29 @@ export default function HelpCenter() {
                 </p>
 
                 <div style={{ marginBottom: 24 }}>
-                  <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12, color: "#1f2937" }}>
+                  <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12, color: "var(--color-text-primary)" }}>
                     Information we collect
                   </h3>
-                  <p style={{ lineHeight: 1.8, color: "#6b7280", marginBottom: 12 }}>
+                  <p style={{ lineHeight: 1.8, color: "var(--color-text-secondary)", marginBottom: 12 }}>
                     We collect information you provide when you:
                   </p>
-                  <ul style={{ paddingLeft: 20, lineHeight: 1.8, color: "#6b7280" }}>
+                  <ul style={{ paddingLeft: 20, lineHeight: 1.8, color: "var(--color-text-secondary)" }}>
                     <li>Place an order (name, email, phone, shipping address, cart items, size selections)</li>
                     <li>Look up an order on My Orders (order ID and checkout email)</li>
                     <li>Submit the contact form</li>
                     <li>Accept optional analytics cookies (page views and storefront actions, when consented)</li>
                   </ul>
-                  <p style={{ lineHeight: 1.8, color: "#6b7280", marginTop: 12, marginBottom: 0 }}>
+                  <p style={{ lineHeight: 1.8, color: "var(--color-text-secondary)", marginTop: 12, marginBottom: 0 }}>
                     Checkout completes payment via WhatsApp — we do not store card numbers on this website.
                     Order and cart data may be saved in your browser (localStorage / sessionStorage) for convenience.
                   </p>
                 </div>
 
                 <div style={{ marginBottom: 24 }}>
-                  <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12, color: "#1f2937" }}>
+                  <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12, color: "var(--color-text-primary)" }}>
                     How we use your information
                   </h3>
-                  <ul style={{ paddingLeft: 20, lineHeight: 1.8, color: "#6b7280" }}>
+                  <ul style={{ paddingLeft: 20, lineHeight: 1.8, color: "var(--color-text-secondary)" }}>
                     <li>Process and fulfill orders (pricing validation, inventory, shipping)</li>
                     <li>Send order confirmation and shipping updates via WhatsApp (when configured)</li>
                     <li>Respond to contact messages and support requests</li>
@@ -250,10 +250,10 @@ export default function HelpCenter() {
                 </div>
 
                 <div style={{ marginBottom: 24 }}>
-                  <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12, color: "#1f2937" }}>
+                  <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12, color: "var(--color-text-primary)" }}>
                     Information sharing
                   </h3>
-                  <p style={{ lineHeight: 1.8, color: "#6b7280", margin: 0 }}>
+                  <p style={{ lineHeight: 1.8, color: "var(--color-text-secondary)", margin: 0 }}>
                     We do not sell your personal information. We share data only with service providers
                     that help us operate the store (hosting, database, WhatsApp messaging
                     when configured) under confidentiality obligations.
@@ -261,10 +261,10 @@ export default function HelpCenter() {
                 </div>
 
                 <div style={{ marginBottom: 24 }}>
-                  <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12, color: "#1f2937" }}>
+                  <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12, color: "var(--color-text-primary)" }}>
                     Data security & your rights
                   </h3>
-                  <p style={{ lineHeight: 1.8, color: "#6b7280", marginBottom: 12 }}>
+                  <p style={{ lineHeight: 1.8, color: "var(--color-text-secondary)", marginBottom: 12 }}>
                     We use industry-standard protections including HTTPS, HttpOnly admin sessions, and
                     server-side validation. You may request access, correction, or deletion of your data
                     where applicable, and you can reject non-essential cookies via the cookie banner.
@@ -273,11 +273,11 @@ export default function HelpCenter() {
 
                 <div style={{
                   padding: 16,
-                  background: "#f9fafb",
+                  background: "var(--color-bg-surface)",
                   borderRadius: 10,
                   borderLeft: "4px solid #9c6649"
                 }}>
-                  <p style={{ margin: 0, color: "#4b5563", fontSize: 14, lineHeight: 1.7 }}>
+                  <p style={{ margin: 0, color: "var(--color-text-secondary)", fontSize: 14, lineHeight: 1.7 }}>
                     For privacy-related questions or to exercise your rights, message us on WhatsApp at{" "}
                     <a
                       href={buildWhatsAppContactUrl()}
@@ -295,7 +295,7 @@ export default function HelpCenter() {
 
           {/* Terms & Conditions */}
           <div style={{
-            background: "white",
+            background: "var(--color-bg-surface)",
             borderRadius: 16,
             overflow: "hidden",
             boxShadow: "0 10px 30px rgba(0,0,0,0.15)"
@@ -307,8 +307,8 @@ export default function HelpCenter() {
                 padding: isMobile ? "20px" : "24px 32px",
                 background: activeSection === "terms" 
                   ? "linear-gradient(135deg, #361906 0%, #9c6649 100%)" 
-                  : "white",
-                color: activeSection === "terms" ? "white" : "#1f2937",
+                  : "var(--color-bg-surface)",
+                color: activeSection === "terms" ? "white" : "var(--color-text-primary)",
                 border: "none",
                 display: "flex",
                 alignItems: "center",
@@ -327,8 +327,8 @@ export default function HelpCenter() {
             </button>
             
             {activeSection === "terms" && (
-              <div style={{ padding: isMobile ? "20px" : "32px", color: "#374151" }}>
-                <p style={{ fontSize: 13, color: "#9ca3af", marginBottom: 24, fontStyle: "italic" }}>
+              <div style={{ padding: isMobile ? "20px" : "32px", color: "var(--color-text-primary)" }}>
+                <p style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 24, fontStyle: "italic" }}>
                   Summary — see our full{" "}
                   <Link to="/terms-of-service" style={{ color: "#9c6649", fontWeight: 600 }}>
                     Terms of Service
@@ -337,27 +337,27 @@ export default function HelpCenter() {
                 </p>
 
                 <div style={{ marginBottom: 24 }}>
-                  <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12, color: "#1f2937" }}>
+                  <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12, color: "var(--color-text-primary)" }}>
                     Acceptance of terms
                   </h3>
-                  <p style={{ lineHeight: 1.8, color: "#6b7280" }}>
+                  <p style={{ lineHeight: 1.8, color: "var(--color-text-secondary)" }}>
                     By using Lab Door Customs (browsing, checkout, or order lookup), you agree to these
                     terms and our store policies. If you do not agree, please do not use the site.
                   </p>
                 </div>
 
                 <div style={{ marginBottom: 24 }}>
-                  <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12, color: "#1f2937" }}>
+                  <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12, color: "var(--color-text-primary)" }}>
                     Orders & pricing
                   </h3>
-                  <p style={{ lineHeight: 1.8, color: "#6b7280", marginBottom: 12 }}>
+                  <p style={{ lineHeight: 1.8, color: "var(--color-text-secondary)", marginBottom: 12 }}>
                     Product prices, shipping (${SHIPPING_COST} standard; {FREE_SHIPPING_MESSAGE.toLowerCase()}),
                     volume discounts (10% off 2+ items, 20% off 5+ items), and coupons are calculated on
                     the server at checkout. You must select a size before adding to cart. Placing an order
                     opens WhatsApp to complete payment — your order stays pending until our team confirms
                     payment.
                   </p>
-                  <ul style={{ paddingLeft: 20, lineHeight: 1.8, color: "#6b7280" }}>
+                  <ul style={{ paddingLeft: 20, lineHeight: 1.8, color: "var(--color-text-secondary)" }}>
                     <li>Colors and images may vary slightly from your screen</li>
                     <li>We may limit quantities or refuse orders at our discretion</li>
                     <li>Server totals must match checkout before the order is saved</li>
@@ -365,14 +365,14 @@ export default function HelpCenter() {
                 </div>
 
                 <div style={{ marginBottom: 24 }}>
-                  <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12, color: "#1f2937" }}>
+                  <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12, color: "var(--color-text-primary)" }}>
                     No refund & replacement policy
                   </h3>
-                  <p style={{ lineHeight: 1.8, color: "#6b7280", marginBottom: 12 }}>
+                  <p style={{ lineHeight: 1.8, color: "var(--color-text-secondary)", marginBottom: 12 }}>
                     <strong>All sales are final.</strong> We do not offer refunds or returns for fit, size,
                     color, or change of mind. Checkout requires accepting this policy.
                   </p>
-                  <ul style={{ paddingLeft: 20, lineHeight: 1.8, color: "#6b7280" }}>
+                  <ul style={{ paddingLeft: 20, lineHeight: 1.8, color: "var(--color-text-secondary)" }}>
                     <li>Replacements are available only for verified manufacturing defects</li>
                     <li>
                       Message us on{" "}
@@ -397,20 +397,20 @@ export default function HelpCenter() {
                 </div>
 
                 <div style={{ marginBottom: 24 }}>
-                  <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12, color: "#1f2937" }}>
+                  <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12, color: "var(--color-text-primary)" }}>
                     Intellectual property
                   </h3>
-                  <p style={{ lineHeight: 1.8, color: "#6b7280" }}>
+                  <p style={{ lineHeight: 1.8, color: "var(--color-text-secondary)" }}>
                     Site content, logos, and product imagery are owned by Lab Door Customs and may not be
                     used without permission.
                   </p>
                 </div>
 
                 <div style={{ marginBottom: 24 }}>
-                  <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12, color: "#1f2937" }}>
+                  <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12, color: "var(--color-text-primary)" }}>
                     Limitation of liability
                   </h3>
-                  <p style={{ lineHeight: 1.8, color: "#6b7280" }}>
+                  <p style={{ lineHeight: 1.8, color: "var(--color-text-secondary)" }}>
                     Lab Door Customs is not liable for indirect or consequential damages from use of the
                     site or products. Our liability is limited to the amount you paid for the product in
                     question, to the extent permitted by law.
@@ -419,11 +419,11 @@ export default function HelpCenter() {
 
                 <div style={{
                   padding: 16,
-                  background: "#f9fafb",
+                  background: "var(--color-bg-surface)",
                   borderRadius: 10,
                   borderLeft: "4px solid #9c6649"
                 }}>
-                  <p style={{ margin: 0, color: "#4b5563", fontSize: 14, lineHeight: 1.7 }}>
+                  <p style={{ margin: 0, color: "var(--color-text-secondary)", fontSize: 14, lineHeight: 1.7 }}>
                     For questions about these terms, message us on WhatsApp at{" "}
                     <a
                       href={buildWhatsAppContactUrl()}

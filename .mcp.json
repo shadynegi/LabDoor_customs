@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@playwright/mcp@latest",
+        "--browser=chromium",
+        "--device=Pixel 5",
+        "--isolated",
+        "--output-dir=Tests/test-results/mcp"
+      ]
+    }
+  }
+}

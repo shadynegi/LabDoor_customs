@@ -19,4 +19,43 @@
   --color-neutral-700: #374151;
   --color-neutral-800: #1f2937;
   --color-neutral-900: #111827;
+
+  /* Surface tokens — light defaults (overridden in dark mode below) */
+  --color-bg-base: #ffffff;      /* page background */
+  --color-bg-surface: #f9fafb;   /* card / panel background */
+  --color-bg-elevated: #ffffff;  /* modal / dropdown background */
+  --color-text-primary: #1f2937; /* body text */
+  --color-text-secondary: #6b7280; /* muted text */
+  --color-border: #e5e7eb;       /* dividers and input borders */
+}
+
+/* Storefront dark mode — set on <html data-theme="dark"> */
+[data-theme="dark"] {
+  --color-bg-base: #0f0f0f;
+  --color-bg-surface: #1a1a1a;
+  --color-bg-elevated: #242424;
+  --color-text-primary: #f3f4f6;
+  --color-text-secondary: #9ca3af;
+  --color-border: #2d2d2d;
+}
+
+/* Admin root — re-assert light defaults so the storefront's <html data-theme>
+   can never bleed in (keeps the two toggles fully independent). */
+.admin-root {
+  --color-bg-base: #ffffff;
+  --color-bg-surface: #f9fafb;
+  --color-bg-elevated: #ffffff;
+  --color-text-primary: #1f2937;
+  --color-text-secondary: #6b7280;
+  --color-border: #e5e7eb;
+}
+
+/* Admin dark mode — scoped to the admin root, warmer darks to match brand */
+.admin-root[data-admin-theme="dark"] {
+  --color-bg-base: #111009;
+  --color-bg-surface: #1c1a14;
+  --color-bg-elevated: #252318;
+  --color-text-primary: #f3f4f6;
+  --color-text-secondary: #a1a09a;
+  --color-border: #2e2c22;
 }

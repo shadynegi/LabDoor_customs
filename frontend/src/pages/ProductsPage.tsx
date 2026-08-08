@@ -289,7 +289,7 @@ const ProductsPage = () => {
               transition={{ delay: index * 0.05 }}
               onClick={() => navigate(getProductDetailPath(product))}
               style={{
-                background: 'white',
+                background: 'var(--color-bg-surface)',
                 borderRadius: 16,
                 overflow: 'hidden',
                 cursor: 'pointer',
@@ -369,7 +369,7 @@ const ProductsPage = () => {
                   style={{
                   fontSize: isMobile ? 14 : 16,
                   fontWeight: 700,
-                  color: '#1f2937',
+                  color: 'var(--color-text-primary)',
                   marginBottom: 8,
                   ...(isMobile
                     ? {}

@@ -1,6 +1,6 @@
 # Lab Door Customs — Test Suite
 
-Organized test layout for the monorepo. **529 automated tests** (141 backend unit + 88 API + 13 frontend unit + 286 Playwright + 1 viewport) plus a **viewport overflow audit** gate — run from repo root with `npm test`.
+Organized test layout for the monorepo. **666 automated tests** (141 backend unit + 88 API + 13 frontend unit + 423 Playwright + 1 viewport) plus a **viewport overflow audit** gate — run from repo root with `npm test`.
 
 ## Directory layout
 
@@ -100,8 +100,33 @@ Reports: `documentation/test-results/` — see [`documentation/test_guidelines.m
 
 | Project | Files | Tests | Purpose |
 |---------|-------|-------|---------|
-| `chromium` | 21 specs | 93 | Desktop smoke and flows (incl. **59** admin module tests in `e2e/specs/admin/`) |
-| `mobile-chrome` | 3 specs | 193 | 11 viewports × routes matrix (`responsive-pages-ui`, `responsive-ui`, `mobile-ui`) |
+| `chromium` | 23 specs | 195 | Desktop smoke and flows (incl. **59** admin module tests in `e2e/specs/admin/`) |
+| `mobile-chrome` | 3 specs | 228 | 11 viewports × routes matrix (`responsive-pages-ui`, `responsive-ui`, `mobile-ui`) — incl. sticky-CTA hint overlap + long-name hero overflow guards |
+
+## Playwright MCP (interactive exploration)
+
+`.mcp.json` at the repo root registers the [Playwright MCP](https://github.com/microsoft/playwright-mcp) server so an agent can drive a **real Chromium browser** to explore scenarios the static specs don't yet cover — reproducing a mobile layout bug live, snapshotting the accessibility tree, or scripting a new flow before committing it as a spec.
+
+```jsonc
+// .mcp.json
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest", "--browser=chromium",
+               "--device=Pixel 5", "--isolated", "--output-dir=Tests/test-results/mcp"]
+    }
+  }
+}
+```
+
+- `--device=Pixel 5` mirrors the `mobile-chrome` project so exploration matches the automated matrix.
+- `--isolated` keeps no browser profile on disk between runs.
+- Screenshots / traces land in `Tests/test-results/mcp/`.
+
+**Workflow:** start the preview server (`npm run build -w frontend && npm run preview -w frontend -- --port 4173 --host 127.0.0.1`), navigate the MCP browser to `http://127.0.0.1:4173`, reproduce the scenario, then codify anything worth keeping as a spec in `e2e/specs/` (reusing `seedCart`, `assertVisibleAboveStickyRegion`, and `POPULAR_MOBILE_VIEWPORTS`). MCP is for discovery; the committed Playwright specs remain the source of truth for CI.
+
+> The server tools become available after the MCP server is approved in a new agent session; they are not part of the `npm test` gate.
 
 ## Related docs
 

@@ -43,12 +43,12 @@ If the user did not mention testing, **skip** `npm test`, `npm run test:all`, Pl
 | Backend unit | Vitest | `Tests/unit/backend/` | 35 files, 141 tests | No (mocked) |
 | API integration | Vitest + Supertest | `Tests/integration/api/` | 21 files, 88 tests | No (mocked) |
 | Frontend unit | Vitest + RTL | `Tests/unit/frontend/` | 3 files, 13 tests | No |
-| Frontend E2E / UI | Playwright | `Tests/e2e/specs/` | 24 files, 286 tests (93 desktop + 193 mobile project) | No (mocked `/api` + static preview) |
+| Frontend E2E / UI | Playwright | `Tests/e2e/specs/` | 26 files, 423 tests (195 desktop + 228 mobile project) | No (mocked `/api` + static preview) |
 | Viewport overflow audit | Playwright script | `Tests/scripts/audit-viewport-overflow.mjs` | 12 widths × 16 routes | No (static preview) |
 | Link checker | Custom script | repo root | — | No |
 | Codebase audit | `scripts/audit-codebase.mjs` | `documentation/OPTIMIZATION_BASELINE.md` | — | No |
 
-**Total:** 529 automated tests — 141 backend unit + 88 API + 13 frontend unit + 286 Playwright UI (93 desktop chromium + 193 mobile-chrome) + 1 viewport. **`npm test`** also runs the viewport overflow audit (mandatory in CI).
+**Total:** 666 automated tests — 141 backend unit + 88 API + 13 frontend unit + 423 Playwright UI (195 desktop chromium + 228 mobile-chrome) + 1 viewport. **`npm test`** also runs the viewport overflow audit (mandatory in CI).
 
 **Layout reference:** [`Tests/README.md`](../Tests/README.md)
 
@@ -251,9 +251,9 @@ Run: `npm run test:frontend-unit` (13 tests across 3 files).
 
 ### Frontend E2E / UI (`Tests/e2e/specs/`)
 
-Organized by domain: `storefront/`, `checkout/`, `orders/`, `contact/`, `admin/`, `responsive/`, `regression/`. Key specs: `storefront/storefront.spec.ts`, `contact/contact-ui.spec.ts`, `responsive/responsive-pages-ui.spec.ts` (193 mobile-chrome tests).
+Organized by domain: `storefront/`, `checkout/`, `orders/`, `contact/`, `admin/`, `responsive/`, `regression/`. Key specs: `storefront/storefront.spec.ts`, `contact/contact-ui.spec.ts`, `responsive/responsive-pages-ui.spec.ts` (228 mobile-chrome tests).
 
-See `Tests/e2e/specs/` for the full list (24 files, 286 tests across desktop + mobile Playwright projects).
+See `Tests/e2e/specs/` for the full list (423 tests across desktop + mobile Playwright projects).
 
 Individual smoke cases (`storefront.spec.ts`):
 

@@ -23,9 +23,9 @@ export default function PrivacyPolicy() {
         }}>
           <Icon size={20} color="white" />
         </div>
-        <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1f2937', margin: 0 }}>{title}</h2>
+        <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-text-primary)', margin: 0 }}>{title}</h2>
       </div>
-      <div style={{ paddingLeft: isMobile ? 0 : 52, color: '#4b5563', lineHeight: 1.8 }}>
+      <div style={{ paddingLeft: isMobile ? 0 : 52, color: 'var(--color-text-secondary)', lineHeight: 1.8 }}>
         {children}
       </div>
     </div>
@@ -46,14 +46,14 @@ export default function PrivacyPolicy() {
             alignItems: 'center',
             gap: 8,
             padding: '12px 20px',
-            background: 'white',
+            background: 'var(--color-bg-surface)',
             border: 'none',
             borderRadius: 10,
             cursor: 'pointer',
             marginBottom: 24,
             fontSize: 14,
             fontWeight: 600,
-            color: '#374151',
+            color: 'var(--color-text-primary)',
             boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
           }}
         >
@@ -81,12 +81,12 @@ export default function PrivacyPolicy() {
 
         {/* Content */}
         <div style={{
-          background: 'white',
+          background: 'var(--color-bg-surface)',
           borderRadius: 20,
           padding: isMobile ? 24 : 48,
           boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
         }}>
-          <p style={{ fontSize: 16, color: '#6b7280', lineHeight: 1.8, marginBottom: 32 }}>
+          <p style={{ fontSize: 16, color: 'var(--color-text-secondary)', lineHeight: 1.8, marginBottom: 32 }}>
             At Lab Door Customs, we are committed to protecting your privacy and ensuring the security 
             of your personal information. This Privacy Policy explains how we collect, use, and safeguard 
             your data when you visit our website or make a purchase.
@@ -152,11 +152,11 @@ export default function PrivacyPolicy() {
             <div style={{
               marginTop: 16,
               padding: 20,
-              background: '#f9fafb',
+              background: 'var(--color-bg-surface)',
               borderRadius: 12,
               borderLeft: '4px solid #9c6649',
             }}>
-              <p style={{ margin: 0, fontWeight: 600, color: '#1f2937' }}>
+              <p style={{ margin: 0, fontWeight: 600, color: 'var(--color-text-primary)' }}>
                 <a href={buildWhatsAppContactUrl()} target="_blank" rel="noopener noreferrer" style={{ color: '#9c6649' }}>
                   {getWhatsAppContactDisplay()}
                 </a>

@@ -196,11 +196,13 @@ const helmetCommon = {
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'"],
+      // No 'unsafe-inline' — the Vite build emits external module scripts only.
+      // GA4 (gtag) is loaded from googletagmanager at runtime when analytics consent is granted.
+      scriptSrc: ["'self'", "https://www.googletagmanager.com"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       imgSrc: ["'self'", "data:", "https:", "blob:"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      connectSrc: ["'self'", frontendOrigin],
+      connectSrc: ["'self'", frontendOrigin, "https://www.google-analytics.com"],
       frameSrc: ["'self'"],
       objectSrc: ["'none'"],
       upgradeInsecureRequests: isProduction ? [] : null,
@@ -312,7 +314,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 });
 
 app.use(express.json({ limit: '1mb' }));
-app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use(cookieParser());
 
 // Response compression for better performance
@@ -504,32 +506,16 @@ app.use('/api', (req: Request, res: Response) => {
   });
 });
 
-const frontendMounted = mountFrontend(app, isProduction);
+mountFrontend(app, isProduction);
 
-if (!frontendMounted) {
-  app.use((req: Request, res: Response) => {
-    res.status(404).json({
-      success: false,
-      error: 'Route not found',
-      path: req.path,
-    });
+// Final 404 — any request that reached here matched no API route or static asset.
+app.use((req: Request, res: Response) => {
+  res.status(404).json({
+    success: false,
+    error: 'Route not found',
+    path: req.path,
   });
-} else {
-  app.use((req: Request, res: Response) => {
-    if (req.path.startsWith('/api')) {
-      return res.status(404).json({
-        success: false,
-        error: 'Route not found',
-        path: req.path,
-      });
-    }
-    res.status(404).json({
-      success: false,
-      error: 'Route not found',
-      path: req.path,
-    });
-  });
-}
+});
 
 // Error handling middleware - MUST have 4 parameters
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {

@@ -95,7 +95,7 @@ const InputField = React.memo(({
           display: "block",
           fontSize: 14,
           fontWeight: 600,
-          color: "#374151",
+          color: "var(--color-text-primary)",
           marginBottom: 8,
         }}
       >
@@ -108,7 +108,7 @@ const InputField = React.memo(({
             left: 12,
             top: "50%",
             transform: "translateY(-50%)",
-            color: "#9ca3af",
+            color: "var(--color-text-secondary)",
           }}
         >
           <Icon size={18} />
@@ -127,12 +127,12 @@ const InputField = React.memo(({
           style={{
             width: "100%",
             padding: "12px 12px 12px 44px",
-            border: hasError ? "2px solid #ef4444" : "1px solid #d1d5db",
+            border: hasError ? "2px solid #ef4444" : "1px solid var(--color-border)",
             borderRadius: 8,
             fontSize: 14,
             outline: "none",
             transition: "all 0.2s",
-            background: "white",
+            background: "var(--color-bg-surface)",
           }}
           onFocus={(e) => {
             if (!hasError) {
@@ -172,7 +172,7 @@ const InputField = React.memo(({
 InputField.displayName = 'InputField';
 
 export default function Checkout() {
-  const { state, cartValidationError, isCartValidating, retryCartValidation } = useCart();
+  const { state, cartValidationError, isCartValidating, retryCartValidation, clearCart } = useCart();
   const navigate = useNavigate();
   const { isMobile } = useResponsive();
   const [isProcessing, setIsProcessing] = useState(false);
@@ -504,7 +504,12 @@ export default function Checkout() {
         total: serverTotal ?? total,
         timestamp: new Date().toISOString(),
       }));
+      // Order is already persisted server-side; clear the cart now so it isn't
+      // left behind if the buyer completes the handoff in WhatsApp and never
+      // returns to this tab. The sessionStorage flag remains as a fallback for
+      // the next app load.
       sessionStorage.setItem('ldc_clear_cart_after_order', '1');
+      clearCart();
       window.location.href = data.whatsappUrl;
     } catch (error) {
       logError('Place order error:', error);
@@ -537,7 +542,9 @@ export default function Checkout() {
         background: "linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)",
         padding: isMobile ? "20px" : "40px 20px",
         paddingBottom: isMobile
-          ? `calc(var(--sticky-footer-height) + var(--safe-bottom) + 16px + ${keyboardOffset}px)`
+          ? `calc(var(--sticky-footer-height) + ${
+              cartValidationError || !policyAccepted ? "120px + " : ""
+            }var(--safe-bottom) + 16px + ${keyboardOffset}px)`
           : "20px",
       }}
     >
@@ -618,7 +625,7 @@ export default function Checkout() {
           >
             <div
               style={{
-                background: "white",
+                background: "var(--color-bg-surface)",
                 borderRadius: 16,
                 padding: isMobile ? 20 : 32,
                 boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1)",
@@ -628,7 +635,7 @@ export default function Checkout() {
                 style={{
                   fontSize: 20,
                   fontWeight: 700,
-                  color: "#1f2937",
+                  color: "var(--color-text-primary)",
                   marginBottom: 24,
                 }}
               >
@@ -752,7 +759,7 @@ export default function Checkout() {
                         display: "block",
                         fontSize: 14,
                         fontWeight: 600,
-                        color: "#374151",
+                        color: "var(--color-text-primary)",
                         marginBottom: 8,
                       }}
                     >
@@ -770,9 +777,9 @@ export default function Checkout() {
                         padding: "12px 14px",
                         fontSize: 15,
                         borderRadius: 8,
-                        border: countryHasError ? "2px solid #ef4444" : "1px solid #d1d5db",
-                        background: "white",
-                        color: "#1f2937",
+                        border: countryHasError ? "2px solid #ef4444" : "1px solid var(--color-border)",
+                        background: "var(--color-bg-surface)",
+                        color: "var(--color-text-primary)",
                       }}
                     >
                       <option value="">Select a country...</option>
@@ -818,7 +825,7 @@ export default function Checkout() {
           >
             <div
               style={{
-                background: "white",
+                background: "var(--color-bg-surface)",
                 borderRadius: 16,
                 padding: 24,
                 boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1)",
@@ -828,7 +835,7 @@ export default function Checkout() {
                 style={{
                   fontSize: 20,
                   fontWeight: 700,
-                  color: "#1f2937",
+                  color: "var(--color-text-primary)",
                   marginBottom: 20,
                 }}
               >
@@ -844,7 +851,7 @@ export default function Checkout() {
                       gap: 12,
                       marginBottom: 16,
                       paddingBottom: 16,
-                      borderBottom: "1px solid #e5e7eb",
+                      borderBottom: "1px solid var(--color-border)",
                     }}
                   >
                     <div
@@ -852,7 +859,7 @@ export default function Checkout() {
                         width: 60,
                         height: 60,
                         borderRadius: 8,
-                        background: "#f3f4f6",
+                        background: "var(--color-bg-surface)",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
@@ -878,18 +885,18 @@ export default function Checkout() {
                         style={{
                           fontSize: 14,
                           fontWeight: 600,
-                          color: "#1f2937",
+                          color: "var(--color-text-primary)",
                           marginBottom: 4,
                         }}
                       >
                         {item.name}
                       </div>
                       {item.size && (
-                        <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 2 }}>
+                        <div style={{ fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 2 }}>
                           Size: {item.size.system} {item.size.value}
                         </div>
                       )}
-                      <div style={{ fontSize: 13, color: "#6b7280" }}>
+                      <div style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>
                         Qty: {item.quantity}
                       </div>
                     </div>
@@ -897,7 +904,7 @@ export default function Checkout() {
                       style={{
                         fontSize: 14,
                         fontWeight: 600,
-                        color: "#1f2937",
+                        color: "var(--color-text-primary)",
                       }}
                     >
                       ${(item.price * item.quantity).toFixed(2)}
@@ -916,7 +923,7 @@ export default function Checkout() {
                     gap: 6,
                     fontSize: 14,
                     fontWeight: 600,
-                    color: "#374151",
+                    color: "var(--color-text-primary)",
                     marginBottom: 8,
                   }}
                 >
@@ -984,7 +991,7 @@ export default function Checkout() {
                       style={{
                         flex: 1,
                         padding: "12px 14px",
-                        border: couponError ? "2px solid #ef4444" : "2px solid #e5e7eb",
+                        border: couponError ? "2px solid #ef4444" : "2px solid var(--color-border)",
                         borderRadius: 8,
                         fontSize: 14,
                         textTransform: "uppercase",
@@ -1024,7 +1031,7 @@ export default function Checkout() {
                   <p
                     style={{
                       fontSize: 13,
-                      color: "#6b7280",
+                      color: "var(--color-text-secondary)",
                       marginTop: 10,
                       marginBottom: 0,
                       lineHeight: 1.5,
@@ -1040,13 +1047,13 @@ export default function Checkout() {
                 <div
                   style={{
                     fontSize: 13,
-                    color: "#6b7280",
+                    color: "var(--color-text-secondary)",
                     marginBottom: 12,
                     lineHeight: 1.5,
                     padding: "10px 12px",
-                    background: "#f9fafb",
+                    background: "var(--color-bg-surface)",
                     borderRadius: 8,
-                    border: "1px solid #e5e7eb",
+                    border: "1px solid var(--color-border)",
                   }}
                 >
                   <div>{VOLUME_DISCOUNT_INFO.twoPlus}</div>
@@ -1065,7 +1072,7 @@ export default function Checkout() {
                     justifyContent: "space-between",
                     marginBottom: 12,
                     fontSize: 14,
-                    color: "#6b7280",
+                    color: "var(--color-text-secondary)",
                   }}
                 >
                   <span>Subtotal</span>
@@ -1092,7 +1099,7 @@ export default function Checkout() {
                     justifyContent: "space-between",
                     marginBottom: 12,
                     fontSize: 14,
-                    color: "#6b7280",
+                    color: "var(--color-text-secondary)",
                   }}
                 >
                   <span>Shipping</span>
@@ -1122,13 +1129,13 @@ export default function Checkout() {
                 
                 <div
                   style={{
-                    borderTop: "2px solid #e5e7eb",
+                    borderTop: "2px solid var(--color-border)",
                     paddingTop: 16,
                     display: "flex",
                     justifyContent: "space-between",
                     fontSize: 18,
                     fontWeight: 700,
-                    color: "#1f2937",
+                    color: "var(--color-text-primary)",
                   }}
                 >
                   <span>Total</span>
@@ -1196,7 +1203,7 @@ export default function Checkout() {
                   gap: 10,
                   marginBottom: 16,
                   fontSize: 13,
-                  color: '#374151',
+                  color: 'var(--color-text-primary)',
                   lineHeight: 1.5,
                   cursor: 'pointer',
                 }}
@@ -1281,7 +1288,7 @@ export default function Checkout() {
                   justifyContent: "center",
                   gap: 8,
                   fontSize: 12,
-                  color: "#6b7280",
+                  color: "var(--color-text-secondary)",
                 }}
               >
                 <Lock size={14} />

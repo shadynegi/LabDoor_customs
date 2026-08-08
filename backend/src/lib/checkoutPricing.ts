@@ -147,7 +147,17 @@ export async function validateCartItems(
     return { ok: false, error: 'Empty cart', message: 'Your cart is empty' };
   }
 
-  const lineItems: ValidatedLineItem[] = [];
+  // Validate each line's shape/size, then aggregate requested quantity per product.
+  // The same product can appear on multiple lines (e.g. two different sizes); stock
+  // must be checked against the summed quantity to match the transactional decrement
+  // in createPendingOrderAtomic — otherwise two lines can each pass while together
+  // they exceed available stock.
+  const requestedByProduct = new Map<number, number>();
+  const validatedLines: Array<{
+    input: CheckoutCartItemInput;
+    size_system?: string;
+    size_value?: string;
+  }> = [];
 
   for (const item of items) {
     if (!item.product_id || !item.quantity || item.quantity < 1) {
@@ -159,38 +169,60 @@ export async function validateCartItems(
       return sizeCheck;
     }
 
-    const result = await dbQuery(
-      () => sql`
-        SELECT id, name, price, image, stock, is_out_of_stock
-        FROM products
-        WHERE id = ${item.product_id}
-      `,
-      'checkoutPricing:validateCartItem'
+    requestedByProduct.set(
+      item.product_id,
+      (requestedByProduct.get(item.product_id) || 0) + item.quantity
     );
+    validatedLines.push({
+      input: item,
+      size_system: sizeCheck.size_system,
+      size_value: sizeCheck.size_value,
+    });
+  }
 
-    if (!result || result.length === 0) {
-      return { ok: false, error: 'Product not found', message: `Product ${item.product_id} was not found` };
+  // Single batched lookup for all distinct products (avoids N sequential round-trips).
+  const productIds = [...requestedByProduct.keys()];
+  const rows = await dbQuery(
+    () => sql`
+      SELECT id, name, price, image, stock, is_out_of_stock
+      FROM products
+      WHERE id = ANY(${productIds})
+    `,
+    'checkoutPricing:validateCartItems'
+  );
+
+  const productById = new Map<number, (typeof rows)[number]>();
+  for (const row of rows) {
+    productById.set(Number(row.id), row);
+  }
+
+  // Stock check per distinct product, against the aggregated requested quantity.
+  for (const [productId, requestedQty] of requestedByProduct) {
+    const product = productById.get(productId);
+    if (!product) {
+      return { ok: false, error: 'Product not found', message: `Product ${productId} was not found` };
     }
-
-    const product = result[0];
-    if (product.is_out_of_stock || product.stock < item.quantity) {
+    if (product.is_out_of_stock || product.stock < requestedQty) {
       return {
         ok: false,
         error: 'Insufficient stock',
         message: `${product.name} is out of stock or has insufficient quantity`,
       };
     }
+  }
 
-    lineItems.push({
-      product_id: product.id,
+  const lineItems: ValidatedLineItem[] = validatedLines.map(({ input, size_system, size_value }) => {
+    const product = productById.get(input.product_id)!;
+    return {
+      product_id: Number(product.id),
       product_name: product.name,
       product_image: product.image || undefined,
-      quantity: item.quantity,
+      quantity: input.quantity,
       price: parseFloat(product.price?.toString() || '0'),
-      size_system: sizeCheck.size_system,
-      size_value: sizeCheck.size_value,
-    });
-  }
+      size_system,
+      size_value,
+    };
+  });
 
   return { ok: true, lineItems };
 }

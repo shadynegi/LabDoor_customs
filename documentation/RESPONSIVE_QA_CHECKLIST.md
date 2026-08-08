@@ -21,7 +21,7 @@ Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API
 
 Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_ENCRYPTION_KEY`, `IP_SALT`, `ADMIN_PASSWORD_HASH`.
 
-**Automated baseline (not a substitute for manual QA):** `Tests/e2e/specs/responsive/responsive-pages-ui.spec.ts` (193 tests, 11 viewports including 320px), `responsive-ui.spec.ts`, and `mobile-ui.spec.ts` run in Playwright’s `mobile-chrome` project.
+**Automated baseline (not a substitute for manual QA):** `Tests/e2e/specs/responsive/responsive-pages-ui.spec.ts` (228 tests, 11 viewports including 320px), `responsive-ui.spec.ts`, and `mobile-ui.spec.ts` run in Playwright’s `mobile-chrome` project.
 
 ---
 

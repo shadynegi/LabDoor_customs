@@ -31,6 +31,8 @@ import {
 } from 'lucide-react';
 import { apiFetch, catalogFetch, slowApiFetch, config, getApiHeaders, ensureCsrfToken } from '../config';
 import { useAdminAuth, ADMIN_LOGIN_PATH } from '../contexts/AdminAuthContext';
+import { AdminThemeProvider, useAdminTheme } from '../contexts/AdminThemeContext';
+import DarkModeToggle from '../components/DarkModeToggle';
 import { useResponsive } from '../hooks/useResponsive';
 import { toast } from 'sonner';
 import LiquidModal from '../components/LiquidModal';
@@ -218,26 +220,27 @@ function StatCard({
 }) {
   return (
     <div style={{
-      background: 'white', borderRadius: 16, padding: isMobile ? 16 : 24,
-      boxShadow: '0 2px 8px rgba(0,0,0,0.08)', border: '1px solid #e5e7eb',
+      background: 'var(--color-bg-surface)', borderRadius: 16, padding: isMobile ? 16 : 24,
+      boxShadow: '0 2px 8px rgba(0,0,0,0.08)', border: '1px solid var(--color-border)',
     }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
         <div style={{ background: `${color}15`, padding: 12, borderRadius: 12 }}>
           <Icon size={24} color={color} />
         </div>
         <div style={{ flex: 1 }}>
-          <p style={{ margin: 0, fontSize: 14, color: '#6b7280', marginBottom: 4 }}>{title}</p>
-          <h3 style={{ margin: 0, fontSize: isMobile ? 24 : 32, fontWeight: 800, color: '#1f2937' }}>{value}</h3>
-          {subtitle && <p style={{ margin: 0, fontSize: 12, color: '#9ca3af', marginTop: 4 }}>{subtitle}</p>}
+          <p style={{ margin: 0, fontSize: 14, color: 'var(--color-text-secondary)', marginBottom: 4 }}>{title}</p>
+          <h3 style={{ margin: 0, fontSize: isMobile ? 24 : 32, fontWeight: 800, color: 'var(--color-text-primary)' }}>{value}</h3>
+          {subtitle && <p style={{ margin: 0, fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 4 }}>{subtitle}</p>}
         </div>
       </div>
     </div>
   );
 }
 
-export default function AdminDashboard() {
+function AdminDashboardInner() {
   const navigate = useNavigate();
   const { logout: adminLogout } = useAdminAuth();
+  const { theme, toggle, rootRef } = useAdminTheme();
   const [activeTab, setActiveTab] = useState<Tab>('analytics');
   const { isMobile } = useResponsive();
   const adminHeaderRef = useRef<HTMLDivElement>(null);
@@ -1342,7 +1345,7 @@ export default function AdminDashboard() {
         <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 12, padding: 32, textAlign: 'center' }}>
           <AlertTriangle size={40} color="#dc2626" style={{ marginBottom: 16 }} />
           <h3 style={{ margin: '0 0 8px', color: '#991b1b' }}>Analytics unavailable</h3>
-          <p style={{ margin: '0 0 20px', color: '#6b7280' }}>{analyticsError}</p>
+          <p style={{ margin: '0 0 20px', color: 'var(--color-text-secondary)' }}>{analyticsError}</p>
           <button
             type="button"
             onClick={() => void loadTabData('analytics', { force: true })}
@@ -1366,9 +1369,9 @@ export default function AdminDashboard() {
     return (
       <div>
         {/* Period selector + export */}
-        <div style={{ background: 'white', borderRadius: 12, padding: 16, marginBottom: 24, border: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ background: 'var(--color-bg-surface)', borderRadius: 12, padding: 16, marginBottom: 24, border: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', width: '100%' }}>
-            <span style={{ fontSize: 14, fontWeight: 600, color: '#374151' }}>Sales period:</span>
+            <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>Sales period:</span>
             {analyticsPeriods.map(({ id, label }) => (
               <button
                 key={id}
@@ -1377,9 +1380,9 @@ export default function AdminDashboard() {
                 style={{
                   padding: '8px 14px',
                   borderRadius: 8,
-                  border: `1px solid ${analyticsPeriod === id ? '#9c6649' : '#e5e7eb'}`,
-                  background: analyticsPeriod === id ? '#fdf4ef' : 'white',
-                  color: analyticsPeriod === id ? '#9c6649' : '#374151',
+                  border: `1px solid ${analyticsPeriod === id ? '#9c6649' : 'var(--color-border)'}`,
+                  background: analyticsPeriod === id ? '#fdf4ef' : 'var(--color-bg-surface)',
+                  color: analyticsPeriod === id ? '#9c6649' : 'var(--color-text-primary)',
                   fontWeight: analyticsPeriod === id ? 700 : 500,
                   fontSize: 13,
                   cursor: 'pointer',
@@ -1424,12 +1427,12 @@ export default function AdminDashboard() {
                 gap: 12,
                 alignItems: 'flex-end',
                 width: '100%',
-                borderTop: '1px solid #e5e7eb',
+                borderTop: '1px solid var(--color-border)',
                 paddingTop: 12,
               }}
             >
               <CalendarDays size={18} color="#9c6649" aria-hidden style={{ marginBottom: 10 }} />
-              <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: '#6b7280', fontWeight: 600 }}>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: 'var(--color-text-secondary)', fontWeight: 600 }}>
                 From
                 <input
                   id="admin-analytics-from"
@@ -1441,14 +1444,14 @@ export default function AdminDashboard() {
                   style={{
                     padding: '8px 10px',
                     borderRadius: 8,
-                    border: '1px solid #e5e7eb',
+                    border: '1px solid var(--color-border)',
                     fontSize: 14,
-                    color: '#374151',
+                    color: 'var(--color-text-primary)',
                     minWidth: isMobile ? '100%' : 160,
                   }}
                 />
               </label>
-              <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: '#6b7280', fontWeight: 600 }}>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: 'var(--color-text-secondary)', fontWeight: 600 }}>
                 To
                 <input
                   id="admin-analytics-to"
@@ -1461,9 +1464,9 @@ export default function AdminDashboard() {
                   style={{
                     padding: '8px 10px',
                     borderRadius: 8,
-                    border: '1px solid #e5e7eb',
+                    border: '1px solid var(--color-border)',
                     fontSize: 14,
-                    color: '#374151',
+                    color: 'var(--color-text-primary)',
                     minWidth: isMobile ? '100%' : 160,
                   }}
                 />
@@ -1486,7 +1489,7 @@ export default function AdminDashboard() {
                 Apply range
               </button>
               {!customRangeApplied && (
-                <p style={{ margin: 0, width: '100%', fontSize: 12, color: '#6b7280' }}>
+                <p style={{ margin: 0, width: '100%', fontSize: 12, color: 'var(--color-text-secondary)' }}>
                   Apply the date range to refresh the dashboard and enable CSV export. Dates use IST (Asia/Kolkata).
                 </p>
               )}
@@ -1560,33 +1563,33 @@ export default function AdminDashboard() {
               </div>
             )}
 
-            <div style={{ background: 'white', borderRadius: 16, padding: 24, border: '1px solid #e5e7eb', marginBottom: 32 }}>
+            <div style={{ background: 'var(--color-bg-surface)', borderRadius: 16, padding: 24, border: '1px solid var(--color-border)', marginBottom: 32 }}>
               <h3 style={{ margin: 0, marginBottom: 16, fontSize: 18, fontWeight: 700 }}>Top sellers</h3>
               {isMobile ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {analytics.sales.top_sellers_by_units.slice(0, 10).map((p, i) => (
-                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: 12, background: '#f9fafb', borderRadius: 8 }}>
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: 12, background: 'var(--color-bg-surface)', borderRadius: 8 }}>
                       <span style={{ fontWeight: 500 }}>{p.product_name}</span>
-                      <span style={{ color: '#6b7280', fontSize: 13 }}>{p.units_sold} sold</span>
+                      <span style={{ color: 'var(--color-text-secondary)', fontSize: 13 }}>{p.units_sold} sold</span>
                     </div>
                   ))}
                 </div>
               ) : (
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
-                    <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
-                      <th style={{ padding: '10px 0', textAlign: 'left', fontSize: 13, color: '#6b7280' }}>Product</th>
-                      <th style={{ padding: '10px 0', textAlign: 'right', fontSize: 13, color: '#6b7280' }}>Units</th>
-                      <th style={{ padding: '10px 0', textAlign: 'right', fontSize: 13, color: '#6b7280' }}>Revenue</th>
+                    <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
+                      <th style={{ padding: '10px 0', textAlign: 'left', fontSize: 13, color: 'var(--color-text-secondary)' }}>Product</th>
+                      <th style={{ padding: '10px 0', textAlign: 'right', fontSize: 13, color: 'var(--color-text-secondary)' }}>Units</th>
+                      <th style={{ padding: '10px 0', textAlign: 'right', fontSize: 13, color: 'var(--color-text-secondary)' }}>Revenue</th>
                     </tr>
                   </thead>
                   <tbody>
                     {analytics.sales.top_sellers_by_units.slice(0, 10).map((p, i) => {
                       const rev = analytics.sales!.top_sellers_by_revenue.find((r) => r.product_id === p.product_id && r.product_name === p.product_name);
                       return (
-                        <tr key={i} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                        <tr key={i} style={{ borderBottom: '1px solid var(--color-border)' }}>
                           <td style={{ padding: '12px 0', fontWeight: 500 }}>{p.product_name}</td>
-                          <td style={{ padding: '12px 0', textAlign: 'right', color: '#374151' }}>{p.units_sold}</td>
+                          <td style={{ padding: '12px 0', textAlign: 'right', color: 'var(--color-text-primary)' }}>{p.units_sold}</td>
                           <td style={{ padding: '12px 0', textAlign: 'right', color: '#10b981', fontWeight: 600 }}>
                             ${(rev?.revenue ?? 0).toFixed(2)}
                           </td>
@@ -1618,39 +1621,39 @@ export default function AdminDashboard() {
 
         {/* Top Products */}
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 24, marginBottom: 32 }}>
-          <div style={{ background: 'white', borderRadius: 16, padding: 24, border: '1px solid #e5e7eb' }}>
+          <div style={{ background: 'var(--color-bg-surface)', borderRadius: 16, padding: 24, border: '1px solid var(--color-border)' }}>
             <h3 style={{ margin: 0, marginBottom: 16, fontSize: 18, fontWeight: 700 }}>Top Viewed Products</h3>
             {analytics.topViewedProducts.map((p: any, i: number) => (
-              <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: i < analytics.topViewedProducts.length - 1 ? '1px solid #f3f4f6' : 'none' }}>
+              <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: i < analytics.topViewedProducts.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
                 <span style={{ fontWeight: 500 }}>{p.name}</span>
-                <span style={{ color: '#6b7280' }}>{p.view_count} views</span>
+                <span style={{ color: 'var(--color-text-secondary)' }}>{p.view_count} views</span>
               </div>
             ))}
           </div>
-          <div style={{ background: 'white', borderRadius: 16, padding: 24, border: '1px solid #e5e7eb' }}>
+          <div style={{ background: 'var(--color-bg-surface)', borderRadius: 16, padding: 24, border: '1px solid var(--color-border)' }}>
             <h3 style={{ margin: 0, marginBottom: 16, fontSize: 18, fontWeight: 700 }}>Most Added to Cart</h3>
             {analytics.topCartedProducts.map((p: any, i: number) => (
-              <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: i < analytics.topCartedProducts.length - 1 ? '1px solid #f3f4f6' : 'none' }}>
+              <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: i < analytics.topCartedProducts.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
                 <span style={{ fontWeight: 500 }}>{p.name}</span>
-                <span style={{ color: '#6b7280' }}>{p.cart_count} adds</span>
+                <span style={{ color: 'var(--color-text-secondary)' }}>{p.cart_count} adds</span>
               </div>
             ))}
           </div>
         </div>
 
         {/* Customer Locations */}
-        <div style={{ background: 'white', borderRadius: 16, padding: 24, border: '1px solid #e5e7eb', marginBottom: 32 }}>
+        <div style={{ background: 'var(--color-bg-surface)', borderRadius: 16, padding: 24, border: '1px solid var(--color-border)', marginBottom: 32 }}>
           <h3 style={{ margin: 0, marginBottom: 16, fontSize: 18, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
             <Globe size={20} /> Customer Locations
           </h3>
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
             {analytics.countrySummary.map((loc: any, i: number) => (
-              <div key={i} style={{ background: '#f9fafb', padding: 16, borderRadius: 12 }}>
+              <div key={i} style={{ background: 'var(--color-bg-surface)', padding: 16, borderRadius: 12 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                   <MapPinned size={16} color="#9c6649" />
                   <span style={{ fontWeight: 600 }}>{loc.country || 'Unknown'}</span>
                 </div>
-                <div style={{ fontSize: 14, color: '#6b7280' }}>
+                <div style={{ fontSize: 14, color: 'var(--color-text-secondary)' }}>
                   {loc.order_count} orders • ${parseFloat(loc.total_revenue).toFixed(2)}
                 </div>
               </div>
@@ -1660,12 +1663,12 @@ export default function AdminDashboard() {
 
         {/* External analytics integrations */}
         {analytics.integrations && (
-          <div style={{ background: 'white', borderRadius: 16, padding: 24, border: '1px solid #e5e7eb' }}>
+          <div style={{ background: 'var(--color-bg-surface)', borderRadius: 16, padding: 24, border: '1px solid var(--color-border)' }}>
             <h3 style={{ margin: 0, marginBottom: 16, fontSize: 18, fontWeight: 700 }}>External Analytics</h3>
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16 }}>
-              <div style={{ background: '#f9fafb', padding: 16, borderRadius: 12 }}>
+              <div style={{ background: 'var(--color-bg-surface)', padding: 16, borderRadius: 12 }}>
                 <div style={{ fontWeight: 600, marginBottom: 8 }}>Google Analytics 4</div>
-                <div style={{ fontSize: 14, color: analytics.integrations.ga4?.configured ? '#059669' : '#6b7280', marginBottom: 12 }}>
+                <div style={{ fontSize: 14, color: analytics.integrations.ga4?.configured ? '#059669' : 'var(--color-text-secondary)', marginBottom: 12 }}>
                   {analytics.integrations.ga4?.configured
                     ? `Configured (${analytics.integrations.ga4.measurementId})`
                     : 'Not configured — set VITE_GA4_MEASUREMENT_ID and GA4_MEASUREMENT_ID'}
@@ -1679,9 +1682,9 @@ export default function AdminDashboard() {
                   Open GA4 Console →
                 </a>
               </div>
-              <div style={{ background: '#f9fafb', padding: 16, borderRadius: 12 }}>
+              <div style={{ background: 'var(--color-bg-surface)', padding: 16, borderRadius: 12 }}>
                 <div style={{ fontWeight: 600, marginBottom: 8 }}>Google Search Console</div>
-                <div style={{ fontSize: 14, color: analytics.integrations.searchConsole?.configured ? '#059669' : '#6b7280', marginBottom: 12 }}>
+                <div style={{ fontSize: 14, color: analytics.integrations.searchConsole?.configured ? '#059669' : 'var(--color-text-secondary)', marginBottom: 12 }}>
                   {analytics.integrations.searchConsole?.configured
                     ? `Site: ${analytics.integrations.searchConsole.siteUrl}`
                     : 'Set VITE_GSC_VERIFICATION and GSC_SITE_URL'}
@@ -1713,11 +1716,11 @@ export default function AdminDashboard() {
         </div>
       )}
       {/* Toolbar */}
-      <div style={{ background: 'white', borderRadius: 12, padding: 16, marginBottom: 16, border: '1px solid #e5e7eb', display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
-        <span style={{ fontSize: 13, color: '#6b7280' }}>
+      <div style={{ background: 'var(--color-bg-surface)', borderRadius: 12, padding: 16, marginBottom: 16, border: '1px solid var(--color-border)', display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
+        <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
           Showing {filteredProducts.length}{showLowStockOnly ? ' low-stock' : ` of ${productsTotal}`} products
         </span>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#374151', cursor: 'pointer', fontWeight: 500 }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--color-text-primary)', cursor: 'pointer', fontWeight: 500 }}>
           <input
             id="admin-products-low-stock-only"
             name="showLowStockOnly"
@@ -1737,13 +1740,13 @@ export default function AdminDashboard() {
             name="productSearch"
             type="text" placeholder="Search products..." value={productSearch} onChange={(e) => setProductSearch(e.target.value)}
             aria-label="Search products"
-            style={{ width: '100%', padding: '10px 12px 10px 40px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14 }}
+            style={{ width: '100%', padding: '10px 12px 10px 40px', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 14 }}
           />
         </div>
-        <button onClick={() => setSelectedProducts(new Set(filteredProducts.map(p => p.id)))} style={{ padding: '10px 16px', background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14, fontWeight: 500 }}>
+        <button onClick={() => setSelectedProducts(new Set(filteredProducts.map(p => p.id)))} style={{ padding: '10px 16px', background: 'var(--color-bg-surface)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14, fontWeight: 500 }}>
           Select All
         </button>
-        <button onClick={() => setSelectedProducts(new Set())} style={{ padding: '10px 16px', background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14, fontWeight: 500 }}>
+        <button onClick={() => setSelectedProducts(new Set())} style={{ padding: '10px 16px', background: 'var(--color-bg-surface)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14, fontWeight: 500 }}>
           Clear
         </button>
         {selectedProducts.size > 0 && (
@@ -1769,11 +1772,11 @@ export default function AdminDashboard() {
 
       {/* Products — cards on mobile, table on desktop */}
       {showLowStockOnly && lowStockLoading ? (
-        <p style={{ textAlign: 'center', color: '#6b7280', padding: 32 }}>Loading low stock products…</p>
+        <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)', padding: 32 }}>Loading low stock products…</p>
       ) : isMobile ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {filteredProducts.map((product) => (
-            <div key={product.id} style={{ background: 'white', borderRadius: 12, border: '1px solid #e5e7eb', padding: 16 }}>
+            <div key={product.id} style={{ background: 'var(--color-bg-surface)', borderRadius: 12, border: '1px solid var(--color-border)', padding: 16 }}>
               <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                 <input
                   id={`admin-product-select-${product.id}`}
@@ -1789,11 +1792,11 @@ export default function AdminDashboard() {
                   style={{ marginTop: 4, minWidth: 20, minHeight: 20 }}
                 />
                 {product.image && (
-                  <img src={resolveProductImage(product.image)} alt="" style={{ width: 48, height: 48, objectFit: 'contain', borderRadius: 8, background: '#f3f4f6' }} />
+                  <img src={resolveProductImage(product.image)} alt="" style={{ width: 48, height: 48, objectFit: 'contain', borderRadius: 8, background: 'var(--color-bg-surface)' }} />
                 )}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, color: '#1f2937' }}>{product.name}</div>
-                  <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>
+                  <div style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>{product.name}</div>
+                  <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 4 }}>
                     ${product.price.toFixed(2)} · Stock {product.stock}
                   </div>
                   <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -1807,7 +1810,7 @@ export default function AdminDashboard() {
                     <button type="button" aria-label="Stock history" onClick={() => void openInventoryHistory(product)} style={{ padding: 8, minHeight: 44, minWidth: 44, background: '#eff6ff', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
                       <History size={16} color="#2563eb" aria-hidden="true" />
                     </button>
-                    <button type="button" aria-label="Edit product" onClick={() => openEditProduct(product)} style={{ padding: 8, minHeight: 44, minWidth: 44, background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
+                    <button type="button" aria-label="Edit product" onClick={() => openEditProduct(product)} style={{ padding: 8, minHeight: 44, minWidth: 44, background: 'var(--color-bg-surface)', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
                       <Pencil size={16} color="#374151" aria-hidden="true" />
                     </button>
                     <button type="button" aria-label="Delete product" onClick={() => setAdminDialog({ kind: 'deleteProduct', product })} style={{ padding: 8, minHeight: 44, minWidth: 44, background: '#fee2e2', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
@@ -1820,25 +1823,25 @@ export default function AdminDashboard() {
           ))}
         </div>
       ) : (
-      <div className="responsive-table-wrap" style={{ background: 'white', borderRadius: 12, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
+      <div className="responsive-table-wrap" style={{ background: 'var(--color-bg-surface)', borderRadius: 12, border: '1px solid var(--color-border)', overflow: 'hidden' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 720 }}>
           <thead>
-            <tr style={{ background: '#f9fafb' }}>
-              <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#374151', width: 40 }}>
+            <tr style={{ background: 'var(--color-bg-surface)' }}>
+              <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', width: 40 }}>
                 <input id="admin-products-select-all" name="selectAllProducts" type="checkbox" aria-label="Select all products" checked={selectedProducts.size === filteredProducts.length && filteredProducts.length > 0}
                   onChange={(e) => setSelectedProducts(e.target.checked ? new Set(filteredProducts.map(p => p.id)) : new Set())} />
               </th>
-              <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#374151' }}>Product</th>
-              <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#374151' }}>Price</th>
-              <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#374151' }}>Stock</th>
-              <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#374151' }}>Views</th>
-              <th style={{ padding: 16, textAlign: 'center', fontSize: 13, fontWeight: 600, color: '#374151' }}>Status</th>
-              <th style={{ padding: 16, textAlign: 'center', fontSize: 13, fontWeight: 600, color: '#374151' }}>Actions</th>
+              <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>Product</th>
+              <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>Price</th>
+              <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>Stock</th>
+              <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>Views</th>
+              <th style={{ padding: 16, textAlign: 'center', fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>Status</th>
+              <th style={{ padding: 16, textAlign: 'center', fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
             {filteredProducts.map((product) => (
-              <tr key={product.id} style={{ borderTop: '1px solid #e5e7eb' }}>
+              <tr key={product.id} style={{ borderTop: '1px solid var(--color-border)' }}>
                 <td style={{ padding: 16 }}>
                   <input
                     id={`admin-product-select-${product.id}`}
@@ -1858,12 +1861,12 @@ export default function AdminDashboard() {
                       <img
                         src={resolveProductImage(product.image)}
                         alt=""
-                        style={{ width: 40, height: 40, objectFit: 'contain', borderRadius: 8, background: '#f3f4f6' }}
+                        style={{ width: 40, height: 40, objectFit: 'contain', borderRadius: 8, background: 'var(--color-bg-surface)' }}
                         onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                       />
                     )}
                     <div>
-                      <div style={{ fontWeight: 600, color: '#1f2937' }}>{product.name}</div>
+                      <div style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{product.name}</div>
                     </div>
                   </div>
                 </td>
@@ -1875,7 +1878,7 @@ export default function AdminDashboard() {
                     {product.stock}
                   </span>
                 </td>
-                <td style={{ padding: 16, color: '#6b7280' }}>{product.view_count || 0}</td>
+                <td style={{ padding: 16, color: 'var(--color-text-secondary)' }}>{product.view_count || 0}</td>
                 <td style={{ padding: 16, textAlign: 'center' }}>
                   <div style={{ display: 'inline-flex', justifyContent: 'center' }}>
                     <ToggleSwitch
@@ -1902,7 +1905,7 @@ export default function AdminDashboard() {
                       onClick={() => openEditProduct(product)}
                       title="Edit"
                       aria-label="Edit product"
-                      style={{ padding: 8, background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: 'pointer' }}
+                      style={{ padding: 8, background: 'var(--color-bg-surface)', border: 'none', borderRadius: 8, cursor: 'pointer' }}
                     >
                       <Pencil size={16} color="#374151" aria-hidden="true" />
                     </button>
@@ -1929,7 +1932,7 @@ export default function AdminDashboard() {
             type="button"
             disabled={productsLoadingMore}
             onClick={() => fetchProducts(productsPage + 1, true)}
-            style={{ padding: '10px 20px', background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: productsLoadingMore ? 'not-allowed' : 'pointer', fontWeight: 600 }}
+            style={{ padding: '10px 20px', background: 'var(--color-bg-surface)', border: 'none', borderRadius: 8, cursor: productsLoadingMore ? 'not-allowed' : 'pointer', fontWeight: 600 }}
           >
             {productsLoadingMore ? 'Loading…' : `Load more (${products.length} of ${productsTotal})`}
           </button>
@@ -1944,13 +1947,13 @@ export default function AdminDashboard() {
         <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 12, padding: 16, marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
           <span style={{ color: '#b91c1c', fontSize: 14 }}>{ordersError}</span>
           <button type="button" onClick={() => void loadTabData('orders', { force: true })}
-            style={{ padding: '8px 14px', background: 'white', border: '1px solid #fecaca', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
+            style={{ padding: '8px 14px', background: 'var(--color-bg-surface)', border: '1px solid #fecaca', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
             Retry
           </button>
         </div>
       )}
       {/* Toolbar */}
-      <div style={{ background: 'white', borderRadius: 12, padding: 16, marginBottom: 16, border: '1px solid #e5e7eb', display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
+      <div style={{ background: 'var(--color-bg-surface)', borderRadius: 12, padding: 16, marginBottom: 16, border: '1px solid var(--color-border)', display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
         <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
           <label htmlFor="admin-order-search" style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0, 0, 0, 0)', whiteSpace: 'nowrap', border: 0 }}>
             Search orders
@@ -1964,11 +1967,11 @@ export default function AdminDashboard() {
             value={orderSearch}
             onChange={(e) => setOrderSearch(e.target.value)}
             aria-label="Search orders"
-            style={{ width: '100%', padding: '10px 12px 10px 40px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14 }}
+            style={{ width: '100%', padding: '10px 12px 10px 40px', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 14 }}
           />
         </div>
         <select id="admin-order-status-filter" name="orderStatusFilter" aria-label="Filter orders by status" value={orderStatusFilter} onChange={(e) => { setOrderStatusFilter(e.target.value); setOrdersPage(1); fetchOrders(1, orderSearch, e.target.value); }}
-          style={{ padding: '10px 16px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14 }}>
+          style={{ padding: '10px 16px', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 14 }}>
           <option value="all">All Status</option>
           <option value="pending">Pending</option>
           <option value="processing">Processing</option>
@@ -1976,8 +1979,8 @@ export default function AdminDashboard() {
           <option value="delivered">Delivered</option>
           <option value="cancelled">Cancelled</option>
         </select>
-        <button onClick={() => setSelectedOrders(new Set(filteredOrders.map(o => o.id)))} style={{ padding: '10px 16px', background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: 'pointer' }}>Select All</button>
-        <button onClick={() => setSelectedOrders(new Set())} style={{ padding: '10px 16px', background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: 'pointer' }}>Clear</button>
+        <button onClick={() => setSelectedOrders(new Set(filteredOrders.map(o => o.id)))} style={{ padding: '10px 16px', background: 'var(--color-bg-surface)', border: 'none', borderRadius: 8, cursor: 'pointer' }}>Select All</button>
+        <button onClick={() => setSelectedOrders(new Set())} style={{ padding: '10px 16px', background: 'var(--color-bg-surface)', border: 'none', borderRadius: 8, cursor: 'pointer' }}>Clear</button>
         {selectedOrders.size > 0 && (
           <select id="admin-order-bulk-status" name="bulkOrderStatus" aria-label="Bulk update order status" onChange={(e) => { if (e.target.value) handleBulkOrderUpdate({ status: e.target.value }); e.target.value = ''; }}
             style={{ padding: '10px 16px', background: '#9c6649', color: 'white', border: 'none', borderRadius: 8, fontWeight: 600 }}>
@@ -1987,14 +1990,14 @@ export default function AdminDashboard() {
             <option value="delivered">Mark Delivered</option>
           </select>
         )}
-        <span style={{ fontSize: 13, color: '#6b7280' }}>
+        <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
           {ordersTotal} orders · page {ordersPage} of {ordersTotalPages}
         </span>
         <button
           type="button"
           disabled={ordersPage <= 1}
           onClick={() => fetchOrders(ordersPage - 1)}
-          style={{ padding: '10px 16px', background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: ordersPage <= 1 ? 'not-allowed' : 'pointer', opacity: ordersPage <= 1 ? 0.5 : 1 }}
+          style={{ padding: '10px 16px', background: 'var(--color-bg-surface)', border: 'none', borderRadius: 8, cursor: ordersPage <= 1 ? 'not-allowed' : 'pointer', opacity: ordersPage <= 1 ? 0.5 : 1 }}
         >
           Previous
         </button>
@@ -2002,7 +2005,7 @@ export default function AdminDashboard() {
           type="button"
           disabled={ordersPage >= ordersTotalPages}
           onClick={() => fetchOrders(ordersPage + 1)}
-          style={{ padding: '10px 16px', background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: ordersPage >= ordersTotalPages ? 'not-allowed' : 'pointer', opacity: ordersPage >= ordersTotalPages ? 0.5 : 1 }}
+          style={{ padding: '10px 16px', background: 'var(--color-bg-surface)', border: 'none', borderRadius: 8, cursor: ordersPage >= ordersTotalPages ? 'not-allowed' : 'pointer', opacity: ordersPage >= ordersTotalPages ? 0.5 : 1 }}
         >
           Next
         </button>
@@ -2014,7 +2017,7 @@ export default function AdminDashboard() {
       {/* Orders Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(350px, 1fr))', gap: 16 }}>
         {filteredOrders.map((order) => (
-          <div key={order.id} style={{ background: 'white', borderRadius: 12, padding: 16, border: `2px solid ${selectedOrders.has(order.id) ? '#9c6649' : '#e5e7eb'}`, cursor: 'pointer' }}>
+          <div key={order.id} style={{ background: 'var(--color-bg-surface)', borderRadius: 12, padding: 16, border: `2px solid ${selectedOrders.has(order.id) ? '#9c6649' : 'var(--color-border)'}`, cursor: 'pointer' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
               <input id={`admin-order-select-${order.id}`} name="selectedOrders" type="checkbox" aria-label={`Select order ${order.order_number}`} checked={selectedOrders.has(order.id)} onChange={(e) => {
                 e.stopPropagation();
@@ -2024,7 +2027,7 @@ export default function AdminDashboard() {
               }} />
               <div style={{ flex: 1 }} onClick={() => setSelectedOrder(order)}>
                 <div style={{ fontWeight: 700, fontSize: 16 }}>#{order.order_number}</div>
-                <div style={{ fontSize: 13, color: '#6b7280' }}>{new Date(order.created_at).toLocaleDateString()}</div>
+                <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>{new Date(order.created_at).toLocaleDateString()}</div>
               </div>
               <button
                 type="button"
@@ -2043,9 +2046,9 @@ export default function AdminDashboard() {
                 {order.payment_status}
               </span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f3f4f6', paddingTop: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--color-border)', paddingTop: 12 }}>
               <div>
-                <div style={{ fontSize: 14, color: '#6b7280' }}>{order.customer_name}</div>
+                <div style={{ fontSize: 14, color: 'var(--color-text-secondary)' }}>{order.customer_name}</div>
                 {order.tracking_number && <div style={{ fontSize: 12, color: '#9c6649' }}><Truck size={12} style={{ display: 'inline', marginRight: 4 }} />{order.tracking_number}</div>}
               </div>
               <div style={{ fontSize: 20, fontWeight: 700, color: '#10b981' }}>${order.total.toFixed(2)}</div>
@@ -2059,7 +2062,7 @@ export default function AdminDashboard() {
   const renderCustomers = () => (
     <div>
       {/* Search */}
-      <div style={{ background: 'white', borderRadius: 12, padding: 16, marginBottom: 16, border: '1px solid #e5e7eb', display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
+      <div style={{ background: 'var(--color-bg-surface)', borderRadius: 12, padding: 16, marginBottom: 16, border: '1px solid var(--color-border)', display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
         <div style={{ position: 'relative', flex: 1, minWidth: 200, maxWidth: 400 }}>
           <label htmlFor="admin-customer-search" style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0, 0, 0, 0)', whiteSpace: 'nowrap', border: 0 }}>
             Search customers
@@ -2067,9 +2070,9 @@ export default function AdminDashboard() {
           <Search size={18} color="#9ca3af" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
           <input id="admin-customer-search" name="customerSearch" type="text" placeholder="Search customers..." value={customerSearch} onChange={(e) => setCustomerSearch(e.target.value)}
             aria-label="Search customers"
-            style={{ width: '100%', padding: '10px 12px 10px 40px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14 }} />
+            style={{ width: '100%', padding: '10px 12px 10px 40px', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 14 }} />
         </div>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: '#374151', cursor: 'pointer' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: 'var(--color-text-primary)', cursor: 'pointer' }}>
           <input
             id="admin-show-deleted-customers"
             name="showDeletedCustomers"
@@ -2079,14 +2082,14 @@ export default function AdminDashboard() {
           />
           Show deleted customers
         </label>
-        <span style={{ fontSize: 13, color: '#6b7280' }}>
+        <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
           {customersTotal} customers · page {customersPage} of {customersTotalPages}
         </span>
         <button
           type="button"
           disabled={customersPage <= 1}
           onClick={() => fetchCustomers(customersPage - 1)}
-          style={{ padding: '10px 16px', background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: customersPage <= 1 ? 'not-allowed' : 'pointer', opacity: customersPage <= 1 ? 0.5 : 1 }}
+          style={{ padding: '10px 16px', background: 'var(--color-bg-surface)', border: 'none', borderRadius: 8, cursor: customersPage <= 1 ? 'not-allowed' : 'pointer', opacity: customersPage <= 1 ? 0.5 : 1 }}
         >
           Previous
         </button>
@@ -2094,7 +2097,7 @@ export default function AdminDashboard() {
           type="button"
           disabled={customersPage >= customersTotalPages}
           onClick={() => fetchCustomers(customersPage + 1)}
-          style={{ padding: '10px 16px', background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: customersPage >= customersTotalPages ? 'not-allowed' : 'pointer', opacity: customersPage >= customersTotalPages ? 0.5 : 1 }}
+          style={{ padding: '10px 16px', background: 'var(--color-bg-surface)', border: 'none', borderRadius: 8, cursor: customersPage >= customersTotalPages ? 'not-allowed' : 'pointer', opacity: customersPage >= customersTotalPages ? 0.5 : 1 }}
         >
           Next
         </button>
@@ -2104,19 +2107,19 @@ export default function AdminDashboard() {
       {isMobile ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {customers.map((customer) => (
-            <div key={customer.id} style={{ background: 'white', borderRadius: 12, border: '1px solid #e5e7eb', padding: 16 }}>
-              <div style={{ fontWeight: 700, color: '#1f2937' }}>{customer.name || 'N/A'}</div>
-              <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4, wordBreak: 'break-all' }}>{customer.email}</div>
-              {customer.phone && <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>{customer.phone}</div>}
+            <div key={customer.id} style={{ background: 'var(--color-bg-surface)', borderRadius: 12, border: '1px solid var(--color-border)', padding: 16 }}>
+              <div style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>{customer.name || 'N/A'}</div>
+              <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 4, wordBreak: 'break-all' }}>{customer.email}</div>
+              {customer.phone && <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 4 }}>{customer.phone}</div>}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12, fontSize: 13 }}>
-                <div><span style={{ color: '#6b7280' }}>Orders</span><br /><strong>{customer.total_orders}</strong></div>
-                <div><span style={{ color: '#6b7280' }}>Spent</span><br /><strong style={{ color: '#10b981' }}>${customer.total_spent.toFixed(2)}</strong></div>
-                <div><span style={{ color: '#6b7280' }}>First order</span><br /><strong>{customer.first_order_date ? new Date(customer.first_order_date).toLocaleDateString() : 'N/A'}</strong></div>
-                <div><span style={{ color: '#6b7280' }}>Last order</span><br /><strong>{customer.last_order_date ? new Date(customer.last_order_date).toLocaleDateString() : 'N/A'}</strong></div>
+                <div><span style={{ color: 'var(--color-text-secondary)' }}>Orders</span><br /><strong>{customer.total_orders}</strong></div>
+                <div><span style={{ color: 'var(--color-text-secondary)' }}>Spent</span><br /><strong style={{ color: '#10b981' }}>${customer.total_spent.toFixed(2)}</strong></div>
+                <div><span style={{ color: 'var(--color-text-secondary)' }}>First order</span><br /><strong>{customer.first_order_date ? new Date(customer.first_order_date).toLocaleDateString() : 'N/A'}</strong></div>
+                <div><span style={{ color: 'var(--color-text-secondary)' }}>Last order</span><br /><strong>{customer.last_order_date ? new Date(customer.last_order_date).toLocaleDateString() : 'N/A'}</strong></div>
               </div>
               <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
                 <button type="button" onClick={() => openEditCustomer(customer)}
-                  style={{ padding: '10px 14px', minHeight: 44, background: '#f3f4f6', color: '#374151', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  style={{ padding: '10px 14px', minHeight: 44, background: 'var(--color-bg-surface)', color: 'var(--color-text-primary)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
                   <Pencil size={14} /> Edit
                 </button>
                 <button type="button" onClick={() => void openCustomerHistory(customer)}
@@ -2139,35 +2142,35 @@ export default function AdminDashboard() {
           ))}
         </div>
       ) : (
-      <div className="responsive-table-wrap" style={{ background: 'white', borderRadius: 12, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
+      <div className="responsive-table-wrap" style={{ background: 'var(--color-bg-surface)', borderRadius: 12, border: '1px solid var(--color-border)', overflow: 'hidden' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 640 }}>
           <thead>
-            <tr style={{ background: '#f9fafb' }}>
-              <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#374151' }}>Customer</th>
-              <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#374151' }}>Phone</th>
-              <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#374151' }}>Orders</th>
-              <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#374151' }}>Total Spent</th>
-              <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#374151' }}>First Order</th>
-              <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#374151' }}>Last Order</th>
-              <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#374151' }}>Actions</th>
+            <tr style={{ background: 'var(--color-bg-surface)' }}>
+              <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>Customer</th>
+              <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>Phone</th>
+              <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>Orders</th>
+              <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>Total Spent</th>
+              <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>First Order</th>
+              <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>Last Order</th>
+              <th style={{ padding: 16, textAlign: 'left', fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
             {customers.map((customer) => (
-              <tr key={customer.id} style={{ borderTop: '1px solid #e5e7eb' }}>
+              <tr key={customer.id} style={{ borderTop: '1px solid var(--color-border)' }}>
                 <td style={{ padding: 16 }}>
-                  <div style={{ fontWeight: 600, color: '#1f2937' }}>{customer.name || 'N/A'}</div>
-                  <div style={{ fontSize: 13, color: '#6b7280' }}>{customer.email}</div>
+                  <div style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{customer.name || 'N/A'}</div>
+                  <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>{customer.email}</div>
                 </td>
-                <td style={{ padding: 16, color: '#6b7280', fontSize: 13 }}>{customer.phone || '—'}</td>
+                <td style={{ padding: 16, color: 'var(--color-text-secondary)', fontSize: 13 }}>{customer.phone || '—'}</td>
                 <td style={{ padding: 16, fontWeight: 600 }}>{customer.total_orders}</td>
                 <td style={{ padding: 16, fontWeight: 600, color: '#10b981' }}>${customer.total_spent.toFixed(2)}</td>
-                <td style={{ padding: 16, color: '#6b7280' }}>{customer.first_order_date ? new Date(customer.first_order_date).toLocaleDateString() : 'N/A'}</td>
-                <td style={{ padding: 16, color: '#6b7280' }}>{customer.last_order_date ? new Date(customer.last_order_date).toLocaleDateString() : 'N/A'}</td>
+                <td style={{ padding: 16, color: 'var(--color-text-secondary)' }}>{customer.first_order_date ? new Date(customer.first_order_date).toLocaleDateString() : 'N/A'}</td>
+                <td style={{ padding: 16, color: 'var(--color-text-secondary)' }}>{customer.last_order_date ? new Date(customer.last_order_date).toLocaleDateString() : 'N/A'}</td>
                 <td style={{ padding: 16 }}>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     <button type="button" onClick={() => openEditCustomer(customer)}
-                      style={{ padding: '8px 12px', background: '#f3f4f6', color: '#374151', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                      style={{ padding: '8px 12px', background: 'var(--color-bg-surface)', color: 'var(--color-text-primary)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
                       Edit
                     </button>
                     <button onClick={() => void openCustomerHistory(customer)}
@@ -2197,22 +2200,22 @@ export default function AdminDashboard() {
   );
 
   const settingsCardStyle: CSSProperties = {
-    background: 'white',
+    background: 'var(--color-bg-surface)',
     borderRadius: 12,
     padding: 24,
     marginBottom: 16,
-    border: '1px solid #e5e7eb',
+    border: '1px solid var(--color-border)',
   };
 
   const renderSettings = () => (
     <div>
       <div style={settingsCardStyle}>
-        <h3 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 700, color: '#1f2937' }}>Activity log export</h3>
-        <p style={{ margin: '0 0 16px', fontSize: 14, color: '#6b7280' }}>
+        <h3 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 700, color: 'var(--color-text-primary)' }}>Activity log export</h3>
+        <p style={{ margin: '0 0 16px', fontSize: 14, color: 'var(--color-text-secondary)' }}>
           Download all storefront activity as NDJSON. Optional date filters limit the export range.
         </p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-end', marginBottom: 16 }}>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13, color: '#374151' }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13, color: 'var(--color-text-primary)' }}>
             From (optional)
             <input
               id="admin-activity-export-start"
@@ -2220,10 +2223,10 @@ export default function AdminDashboard() {
               type="date"
               value={activityExportStart}
               onChange={(e) => setActivityExportStart(e.target.value)}
-              style={{ padding: '8px 12px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14 }}
+              style={{ padding: '8px 12px', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 14 }}
             />
           </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13, color: '#374151' }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13, color: 'var(--color-text-primary)' }}>
             To (optional)
             <input
               id="admin-activity-export-end"
@@ -2231,7 +2234,7 @@ export default function AdminDashboard() {
               type="date"
               value={activityExportEnd}
               onChange={(e) => setActivityExportEnd(e.target.value)}
-              style={{ padding: '8px 12px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14 }}
+              style={{ padding: '8px 12px', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 14 }}
             />
           </label>
           <button
@@ -2261,8 +2264,8 @@ export default function AdminDashboard() {
       <div style={settingsCardStyle}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
           <div>
-            <h3 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 700, color: '#1f2937' }}>Admin sessions</h3>
-            <p style={{ margin: 0, fontSize: 14, color: '#6b7280' }}>
+            <h3 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 700, color: 'var(--color-text-primary)' }}>Admin sessions</h3>
+            <p style={{ margin: 0, fontSize: 14, color: 'var(--color-text-secondary)' }}>
               Recent admin login sessions (last 50). Clean up removes expired sessions and keeps only the 5 newest per user. Revoke individual sessions to sign out other devices.
             </p>
           </div>
@@ -2271,7 +2274,7 @@ export default function AdminDashboard() {
               type="button"
               onClick={() => void fetchAdminSessions()}
               disabled={sessionsLoading}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 16px', background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 14 }}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 16px', background: 'var(--color-bg-surface)', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 14 }}
             >
               <RefreshCw size={16} /> Refresh
             </button>
@@ -2286,36 +2289,36 @@ export default function AdminDashboard() {
           </div>
         </div>
         {sessionStats && (
-          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 16, fontSize: 14, color: '#374151' }}>
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 16, fontSize: 14, color: 'var(--color-text-primary)' }}>
             <span><strong>{sessionStats.total_sessions}</strong> total</span>
             <span><strong>{sessionStats.active_sessions}</strong> active</span>
             <span><strong>{sessionStats.expired_sessions}</strong> expired</span>
           </div>
         )}
         {sessionsLoading ? (
-          <p style={{ margin: 0, color: '#6b7280', fontSize: 14 }}>Loading sessions…</p>
+          <p style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: 14 }}>Loading sessions…</p>
         ) : adminSessions.length === 0 ? (
-          <p style={{ margin: 0, color: '#6b7280', fontSize: 14 }}>No admin sessions found.</p>
+          <p style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: 14 }}>No admin sessions found.</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
-                <tr style={{ borderBottom: '1px solid #e5e7eb', textAlign: 'left' }}>
-                  <th style={{ padding: '8px 12px', color: '#6b7280', fontWeight: 600 }}>User</th>
-                  <th style={{ padding: '8px 12px', color: '#6b7280', fontWeight: 600 }}>IP</th>
-                  <th style={{ padding: '8px 12px', color: '#6b7280', fontWeight: 600 }}>Created</th>
-                  <th style={{ padding: '8px 12px', color: '#6b7280', fontWeight: 600 }}>Expires</th>
-                  <th style={{ padding: '8px 12px', color: '#6b7280', fontWeight: 600 }}>Status</th>
-                  <th style={{ padding: '8px 12px', color: '#6b7280', fontWeight: 600 }}>Actions</th>
+                <tr style={{ borderBottom: '1px solid var(--color-border)', textAlign: 'left' }}>
+                  <th style={{ padding: '8px 12px', color: 'var(--color-text-secondary)', fontWeight: 600 }}>User</th>
+                  <th style={{ padding: '8px 12px', color: 'var(--color-text-secondary)', fontWeight: 600 }}>IP</th>
+                  <th style={{ padding: '8px 12px', color: 'var(--color-text-secondary)', fontWeight: 600 }}>Created</th>
+                  <th style={{ padding: '8px 12px', color: 'var(--color-text-secondary)', fontWeight: 600 }}>Expires</th>
+                  <th style={{ padding: '8px 12px', color: 'var(--color-text-secondary)', fontWeight: 600 }}>Status</th>
+                  <th style={{ padding: '8px 12px', color: 'var(--color-text-secondary)', fontWeight: 600 }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {adminSessions.map((session) => (
-                  <tr key={session.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                  <tr key={session.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
                     <td style={{ padding: '10px 12px' }}>{session.username}</td>
-                    <td style={{ padding: '10px 12px', color: '#6b7280' }}>{session.ip_address || '—'}</td>
-                    <td style={{ padding: '10px 12px', color: '#6b7280' }}>{new Date(session.created_at).toLocaleString()}</td>
-                    <td style={{ padding: '10px 12px', color: '#6b7280' }}>{new Date(session.expires_at).toLocaleString()}</td>
+                    <td style={{ padding: '10px 12px', color: 'var(--color-text-secondary)' }}>{session.ip_address || '—'}</td>
+                    <td style={{ padding: '10px 12px', color: 'var(--color-text-secondary)' }}>{new Date(session.created_at).toLocaleString()}</td>
+                    <td style={{ padding: '10px 12px', color: 'var(--color-text-secondary)' }}>{new Date(session.expires_at).toLocaleString()}</td>
                     <td style={{ padding: '10px 12px' }}>
                       <span style={{
                         padding: '2px 10px',
@@ -2323,14 +2326,14 @@ export default function AdminDashboard() {
                         fontSize: 12,
                         fontWeight: 600,
                         background: session.is_active ? '#d1fae5' : '#f3f4f6',
-                        color: session.is_active ? '#065f46' : '#6b7280',
+                        color: session.is_active ? '#065f46' : 'var(--color-text-secondary)',
                       }}>
                         {session.is_current ? 'Current' : session.is_active ? 'Active' : 'Expired'}
                       </span>
                     </td>
                     <td style={{ padding: '10px 12px' }}>
                       {session.is_current ? (
-                        <span style={{ fontSize: 12, color: '#9ca3af' }}>This device</span>
+                        <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>This device</span>
                       ) : (
                         <button
                           type="button"
@@ -2361,8 +2364,8 @@ export default function AdminDashboard() {
       </div>
 
       <div style={settingsCardStyle}>
-        <h3 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 700, color: '#1f2937' }}>Customer aggregates</h3>
-        <p style={{ margin: '0 0 16px', fontSize: 14, color: '#6b7280' }}>
+        <h3 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 700, color: 'var(--color-text-primary)' }}>Customer aggregates</h3>
+        <p style={{ margin: '0 0 16px', fontSize: 14, color: 'var(--color-text-secondary)' }}>
           Rebuild customer order counts and spend totals from completed orders. Use after bulk data fixes or imports.
         </p>
         <button
@@ -2400,7 +2403,7 @@ export default function AdminDashboard() {
   ];
 
   return (
-    <div style={{ minHeight: '100dvh', background: '#f9fafb' }}>
+    <div ref={rootRef} className="admin-root" data-admin-theme={theme} style={{ minHeight: '100dvh', background: 'var(--color-bg-base)' }}>
       {/* Header */}
       <div ref={adminHeaderRef} style={{
         background: 'linear-gradient(135deg, #361906 0%, #9c6649 100%)',
@@ -2414,14 +2417,17 @@ export default function AdminDashboard() {
       }}>
         <div style={{ maxWidth: 1400, margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h1 style={{ margin: 0, fontSize: isMobile ? 24 : 32, fontWeight: 800, color: 'white' }}>Admin Dashboard</h1>
-          <button onClick={handleLogout} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', background: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 8, cursor: 'pointer', fontSize: 14, fontWeight: 600 }}>
-            <LogOut size={18} /> Logout
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 12 }}>
+            <button onClick={handleLogout} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', background: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 8, cursor: 'pointer', fontSize: 14, fontWeight: 600 }}>
+              <LogOut size={18} /> Logout
+            </button>
+            <DarkModeToggle theme={theme} onToggle={toggle} />
+          </div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div style={{ background: 'white', borderBottom: '1px solid #e5e7eb', position: 'sticky', top: adminHeaderHeight, zIndex: 99 }}>
+      <div style={{ background: 'var(--color-bg-surface)', borderBottom: '1px solid var(--color-border)', position: 'sticky', top: adminHeaderHeight, zIndex: 99 }}>
         <div
           role="tablist"
           aria-label="Admin sections"
@@ -2453,7 +2459,7 @@ export default function AdminDashboard() {
                 background: 'none',
                 border: 'none',
                 borderBottom: activeTab === id ? '3px solid #9c6649' : '3px solid transparent',
-                color: activeTab === id ? '#9c6649' : '#6b7280',
+                color: activeTab === id ? '#9c6649' : 'var(--color-text-secondary)',
                 fontSize: 14,
                 fontWeight: 600,
                 cursor: 'pointer',
@@ -2500,22 +2506,22 @@ export default function AdminDashboard() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
               <div>
                 <h2 style={{ margin: 0, fontSize: isMobile ? 20 : 24, fontWeight: 800 }}>#{selectedOrder.order_number}</h2>
-                <p style={{ margin: 0, fontSize: 14, color: '#6b7280', marginTop: 4 }}>{new Date(selectedOrder.created_at).toLocaleString()}</p>
+                <p style={{ margin: 0, fontSize: 14, color: 'var(--color-text-secondary)', marginTop: 4 }}>{new Date(selectedOrder.created_at).toLocaleString()}</p>
               </div>
-              <button type="button" aria-label="Close" onClick={() => setSelectedOrder(null)} style={{ background: '#f3f4f6', border: 'none', borderRadius: 8, padding: 8, cursor: 'pointer' }}><X size={20} aria-hidden="true" /></button>
+              <button type="button" aria-label="Close" onClick={() => setSelectedOrder(null)} style={{ background: 'var(--color-bg-surface)', border: 'none', borderRadius: 8, padding: 8, cursor: 'pointer' }}><X size={20} aria-hidden="true" /></button>
             </div>
             <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
               <span style={{ padding: '6px 16px', borderRadius: 20, fontSize: 13, fontWeight: 600, background: `${getStatusColor(selectedOrder.status)}15`, color: getStatusColor(selectedOrder.status) }}>{selectedOrder.status}</span>
               <span style={{ padding: '6px 16px', borderRadius: 20, fontSize: 13, fontWeight: 600, background: `${getStatusColor(selectedOrder.payment_status)}15`, color: getStatusColor(selectedOrder.payment_status) }}>{selectedOrder.payment_status}</span>
             </div>
-            <div style={{ background: '#f9fafb', borderRadius: 12, padding: 20, marginBottom: 20 }}>
+            <div style={{ background: 'var(--color-bg-surface)', borderRadius: 12, padding: 20, marginBottom: 20 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                 <h3 style={{ margin: 0, fontWeight: 700 }}>Customer</h3>
                 {selectedOrder.status !== 'cancelled' && (
                   <button
                     type="button"
                     onClick={() => setOrderCustomerEdit((v) => !v)}
-                    style={{ padding: '6px 12px', background: orderCustomerEdit ? '#e5e7eb' : '#9c6649', color: orderCustomerEdit ? '#374151' : 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}
+                    style={{ padding: '6px 12px', background: orderCustomerEdit ? 'var(--color-border)' : '#9c6649', color: orderCustomerEdit ? 'var(--color-text-primary)' : 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}
                   >
                     <Pencil size={14} /> {orderCustomerEdit ? 'Cancel edit' : 'Edit details'}
                   </button>
@@ -2523,46 +2529,46 @@ export default function AdminDashboard() {
               </div>
               {orderCustomerEdit && selectedOrder.status !== 'cancelled' ? (
                 <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12 }}>
-                  <label style={{ fontSize: 13, color: '#374151' }}>
+                  <label style={{ fontSize: 13, color: 'var(--color-text-primary)' }}>
                     Name
                     <input id="admin-order-customer-name" name="customer_name" value={orderCustomerForm.customer_name} onChange={(e) => setOrderCustomerForm((f) => ({ ...f, customer_name: e.target.value }))}
-                      style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, boxSizing: 'border-box' }} />
+                      style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid var(--color-border)', borderRadius: 8, boxSizing: 'border-box' }} />
                   </label>
-                  <label style={{ fontSize: 13, color: '#374151' }}>
+                  <label style={{ fontSize: 13, color: 'var(--color-text-primary)' }}>
                     Email
                     <input id="admin-order-customer-email" name="customer_email" type="email" value={orderCustomerForm.customer_email} onChange={(e) => setOrderCustomerForm((f) => ({ ...f, customer_email: e.target.value }))}
-                      style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, boxSizing: 'border-box' }} />
+                      style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid var(--color-border)', borderRadius: 8, boxSizing: 'border-box' }} />
                   </label>
-                  <label style={{ fontSize: 13, color: '#374151', gridColumn: isMobile ? 'auto' : '1 / -1' }}>
+                  <label style={{ fontSize: 13, color: 'var(--color-text-primary)', gridColumn: isMobile ? 'auto' : '1 / -1' }}>
                     Street address
                     <input id="admin-order-customer-address" name="address" value={orderCustomerForm.address} onChange={(e) => setOrderCustomerForm((f) => ({ ...f, address: e.target.value }))}
-                      style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, boxSizing: 'border-box' }} />
+                      style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid var(--color-border)', borderRadius: 8, boxSizing: 'border-box' }} />
                   </label>
-                  <label style={{ fontSize: 13, color: '#374151' }}>
+                  <label style={{ fontSize: 13, color: 'var(--color-text-primary)' }}>
                     City
                     <input id="admin-order-customer-city" name="city" value={orderCustomerForm.city} onChange={(e) => setOrderCustomerForm((f) => ({ ...f, city: e.target.value }))}
-                      style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, boxSizing: 'border-box' }} />
+                      style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid var(--color-border)', borderRadius: 8, boxSizing: 'border-box' }} />
                   </label>
-                  <label style={{ fontSize: 13, color: '#374151' }}>
+                  <label style={{ fontSize: 13, color: 'var(--color-text-primary)' }}>
                     State
                     <input id="admin-order-customer-state" name="state" value={orderCustomerForm.state} onChange={(e) => setOrderCustomerForm((f) => ({ ...f, state: e.target.value }))}
-                      style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, boxSizing: 'border-box' }} />
+                      style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid var(--color-border)', borderRadius: 8, boxSizing: 'border-box' }} />
                   </label>
-                  <label style={{ fontSize: 13, color: '#374151' }}>
+                  <label style={{ fontSize: 13, color: 'var(--color-text-primary)' }}>
                     ZIP
                     <input id="admin-order-customer-zip" name="zipCode" value={orderCustomerForm.zipCode} onChange={(e) => setOrderCustomerForm((f) => ({ ...f, zipCode: e.target.value }))}
-                      style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, boxSizing: 'border-box' }} />
+                      style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid var(--color-border)', borderRadius: 8, boxSizing: 'border-box' }} />
                   </label>
-                  <label style={{ fontSize: 13, color: '#374151' }}>
+                  <label style={{ fontSize: 13, color: 'var(--color-text-primary)' }}>
                     Country
                     <input id="admin-order-customer-country" name="country" value={orderCustomerForm.country} onChange={(e) => setOrderCustomerForm((f) => ({ ...f, country: e.target.value }))}
-                      style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, boxSizing: 'border-box' }} />
+                      style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid var(--color-border)', borderRadius: 8, boxSizing: 'border-box' }} />
                   </label>
-                  <label style={{ fontSize: 13, color: '#374151', gridColumn: isMobile ? 'auto' : '1 / -1' }}>
+                  <label style={{ fontSize: 13, color: 'var(--color-text-primary)', gridColumn: isMobile ? 'auto' : '1 / -1' }}>
                     Admin notes
                     <textarea id="admin-order-customer-notes" name="admin_notes" value={orderCustomerForm.admin_notes} onChange={(e) => setOrderCustomerForm((f) => ({ ...f, admin_notes: e.target.value }))}
                       rows={2}
-                      style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, boxSizing: 'border-box', fontFamily: 'inherit', resize: 'vertical' }} />
+                      style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid var(--color-border)', borderRadius: 8, boxSizing: 'border-box', fontFamily: 'inherit', resize: 'vertical' }} />
                   </label>
                   <div style={{ gridColumn: isMobile ? 'auto' : '1 / -1' }}>
                     <button type="button" disabled={orderActionLoading} onClick={() => void handleSaveOrderCustomerDetails(selectedOrder.id)}
@@ -2574,12 +2580,12 @@ export default function AdminDashboard() {
               ) : (
                 <>
                   <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16 }}>
-                    <div><span style={{ color: '#6b7280', fontSize: 12 }}>Name</span><p style={{ margin: 0, fontWeight: 600 }}>{selectedOrder.customer_name}</p></div>
-                    <div><span style={{ color: '#6b7280', fontSize: 12 }}>Email</span><p style={{ margin: 0, fontWeight: 600 }}>{selectedOrder.customer_email}</p></div>
+                    <div><span style={{ color: 'var(--color-text-secondary)', fontSize: 12 }}>Name</span><p style={{ margin: 0, fontWeight: 600 }}>{selectedOrder.customer_name}</p></div>
+                    <div><span style={{ color: 'var(--color-text-secondary)', fontSize: 12 }}>Email</span><p style={{ margin: 0, fontWeight: 600 }}>{selectedOrder.customer_email}</p></div>
                   </div>
                   {selectedOrder.shipping_address && (
                     <div style={{ marginTop: 16 }}>
-                      <span style={{ color: '#6b7280', fontSize: 12 }}>Shipping Address</span>
+                      <span style={{ color: 'var(--color-text-secondary)', fontSize: 12 }}>Shipping Address</span>
                       <p style={{ margin: 0, fontWeight: 600 }}>{selectedOrder.shipping_address.address}, {selectedOrder.shipping_address.city}, {selectedOrder.shipping_address.state} {selectedOrder.shipping_address.zipCode}, {selectedOrder.shipping_address.country}</p>
                     </div>
                   )}
@@ -2595,8 +2601,8 @@ export default function AdminDashboard() {
             <div style={{ marginBottom: 20 }}>
               <h3 style={{ margin: 0, marginBottom: 16, fontWeight: 700 }}>Items ({selectedOrder.items.length})</h3>
               {selectedOrder.items.map((item: any, i: number) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: 12, background: '#f9fafb', borderRadius: 8, marginBottom: 8 }}>
-                  <div><p style={{ margin: 0, fontWeight: 600 }}>{item.product_name}</p><p style={{ margin: 0, fontSize: 13, color: '#6b7280' }}>Qty: {item.quantity} {item.size_value && `• Size: ${item.size_value}`}</p></div>
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: 12, background: 'var(--color-bg-surface)', borderRadius: 8, marginBottom: 8 }}>
+                  <div><p style={{ margin: 0, fontWeight: 600 }}>{item.product_name}</p><p style={{ margin: 0, fontSize: 13, color: 'var(--color-text-secondary)' }}>Qty: {item.quantity} {item.size_value && `• Size: ${item.size_value}`}</p></div>
                   <div style={{ fontWeight: 700 }}>${(item.price * item.quantity).toFixed(2)}</div>
                 </div>
               ))}
@@ -2608,26 +2614,26 @@ export default function AdminDashboard() {
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 20, fontWeight: 800 }}><span>Total</span><span style={{ color: '#10b981' }}>${selectedOrder.total.toFixed(2)}</span></div>
             </div>
 
-            <div style={{ background: '#f9fafb', borderRadius: 12, padding: 20, marginBottom: 20 }}>
+            <div style={{ background: 'var(--color-bg-surface)', borderRadius: 12, padding: 20, marginBottom: 20 }}>
               <h3 style={{ margin: '0 0 16px', fontWeight: 700 }}>Fulfillment</h3>
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12, marginBottom: 12 }}>
-                <label style={{ fontSize: 13, color: '#374151' }}>
+                <label style={{ fontSize: 13, color: 'var(--color-text-primary)' }}>
                   Tracking number
                   <input id="admin-order-tracking-number" name="tracking_number" value={orderTrackingNumber} onChange={(e) => setOrderTrackingNumber(e.target.value)}
-                    style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8 }} />
+                    style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid var(--color-border)', borderRadius: 8 }} />
                 </label>
-                <label style={{ fontSize: 13, color: '#374151' }}>
+                <label style={{ fontSize: 13, color: 'var(--color-text-primary)' }}>
                   Carrier
                   <input id="admin-order-carrier" name="carrier" value={orderCarrier} onChange={(e) => setOrderCarrier(e.target.value)}
-                    style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8 }} />
+                    style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid var(--color-border)', borderRadius: 8 }} />
                 </label>
               </div>
-              <label style={{ fontSize: 13, color: '#374151', display: 'block', marginBottom: 12 }}>
+              <label style={{ fontSize: 13, color: 'var(--color-text-primary)', display: 'block', marginBottom: 12 }}>
                 Tracking URL (optional)
                 <input id="admin-order-tracking-url" name="tracking_url" value={orderTrackingUrl} onChange={(e) => setOrderTrackingUrl(e.target.value)}
-                  style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8 }} />
+                  style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid var(--color-border)', borderRadius: 8 }} />
               </label>
-              <label style={{ fontSize: 13, color: '#374151', display: 'block', marginBottom: 12 }}>
+              <label style={{ fontSize: 13, color: 'var(--color-text-primary)', display: 'block', marginBottom: 12 }}>
                 Estimated delivery
                 <input
                   id="admin-order-estimated-delivery"
@@ -2635,7 +2641,7 @@ export default function AdminDashboard() {
                   type="date"
                   value={orderEstimatedDelivery}
                   onChange={(e) => setOrderEstimatedDelivery(e.target.value)}
-                  style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8 }}
+                  style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 12px', border: '1px solid var(--color-border)', borderRadius: 8 }}
                 />
               </label>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -2704,20 +2710,20 @@ export default function AdminDashboard() {
         <LiquidModal isOpen onClose={() => setBulkStockModalOpen(false)} maxWidth={420} ariaLabel="Bulk stock update">
           <div style={{ padding: 24 }}>
             <h2 style={{ margin: '0 0 8px', fontSize: 20, fontWeight: 800 }}>Adjust stock</h2>
-            <p style={{ margin: '0 0 20px', fontSize: 14, color: '#6b7280' }}>
+            <p style={{ margin: '0 0 20px', fontSize: 14, color: 'var(--color-text-secondary)' }}>
               Update stock for {selectedProducts.size} selected product{selectedProducts.size !== 1 ? 's' : ''}.
             </p>
             <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
               <button type="button" onClick={() => setBulkStockMode('set')}
-                style={{ flex: 1, padding: '10px 12px', borderRadius: 8, border: `1px solid ${bulkStockMode === 'set' ? '#9c6649' : '#e5e7eb'}`, background: bulkStockMode === 'set' ? '#fdf4ef' : 'white', fontWeight: 600, cursor: 'pointer' }}>
+                style={{ flex: 1, padding: '10px 12px', borderRadius: 8, border: `1px solid ${bulkStockMode === 'set' ? '#9c6649' : 'var(--color-border)'}`, background: bulkStockMode === 'set' ? '#fdf4ef' : 'var(--color-bg-surface)', fontWeight: 600, cursor: 'pointer' }}>
                 Set to value
               </button>
               <button type="button" onClick={() => setBulkStockMode('delta')}
-                style={{ flex: 1, padding: '10px 12px', borderRadius: 8, border: `1px solid ${bulkStockMode === 'delta' ? '#9c6649' : '#e5e7eb'}`, background: bulkStockMode === 'delta' ? '#fdf4ef' : 'white', fontWeight: 600, cursor: 'pointer' }}>
+                style={{ flex: 1, padding: '10px 12px', borderRadius: 8, border: `1px solid ${bulkStockMode === 'delta' ? '#9c6649' : 'var(--color-border)'}`, background: bulkStockMode === 'delta' ? '#fdf4ef' : 'var(--color-bg-surface)', fontWeight: 600, cursor: 'pointer' }}>
                 Add / subtract
               </button>
             </div>
-            <label htmlFor="admin-bulk-stock-value" style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+            <label htmlFor="admin-bulk-stock-value" style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 6 }}>
               {bulkStockMode === 'set' ? 'New stock level' : 'Stock change (+/-)'}
             </label>
             <input
@@ -2726,11 +2732,11 @@ export default function AdminDashboard() {
               type="number"
               value={bulkStockValue}
               onChange={(e) => setBulkStockValue(parseInt(e.target.value, 10) || 0)}
-              style={{ width: '100%', padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14, boxSizing: 'border-box', marginBottom: 20 }}
+              style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 14, boxSizing: 'border-box', marginBottom: 20 }}
             />
             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
               <button type="button" onClick={() => setBulkStockModalOpen(false)}
-                style={{ padding: '10px 16px', background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
+                style={{ padding: '10px 16px', background: 'var(--color-bg-surface)', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
                 Cancel
               </button>
               <button type="button" onClick={handleBulkStockSubmit}
@@ -2749,27 +2755,27 @@ export default function AdminDashboard() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
               <div>
                 <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800 }}>Stock history</h2>
-                <p style={{ margin: '6px 0 0', fontSize: 14, color: '#6b7280' }}>{inventoryProduct.name}</p>
+                <p style={{ margin: '6px 0 0', fontSize: 14, color: 'var(--color-text-secondary)' }}>{inventoryProduct.name}</p>
               </div>
               <button type="button" aria-label="Close" onClick={() => { setInventoryProduct(null); setInventoryMovements([]); }}
-                style={{ background: '#f3f4f6', border: 'none', borderRadius: 8, padding: 8, cursor: 'pointer' }}>
+                style={{ background: 'var(--color-bg-surface)', border: 'none', borderRadius: 8, padding: 8, cursor: 'pointer' }}>
                 <X size={20} />
               </button>
             </div>
             {inventoryLoading ? (
-              <p style={{ textAlign: 'center', color: '#6b7280', padding: 24 }}>Loading movements…</p>
+              <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)', padding: 24 }}>Loading movements…</p>
             ) : inventoryMovements.length === 0 ? (
-              <p style={{ textAlign: 'center', color: '#6b7280', padding: 24 }}>No inventory movements recorded.</p>
+              <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)', padding: 24 }}>No inventory movements recorded.</p>
             ) : isMobile ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 400, overflowY: 'auto' }}>
                 {inventoryMovements.map((m) => (
-                  <div key={m.id} style={{ padding: 12, background: '#f9fafb', borderRadius: 8 }}>
+                  <div key={m.id} style={{ padding: 12, background: 'var(--color-bg-surface)', borderRadius: 8 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600 }}>
                       <span style={{ color: m.delta >= 0 ? '#16a34a' : '#dc2626' }}>{m.delta >= 0 ? '+' : ''}{m.delta}</span>
-                      <span style={{ color: '#6b7280', fontSize: 13 }}>→ {m.quantity_after}</span>
+                      <span style={{ color: 'var(--color-text-secondary)', fontSize: 13 }}>→ {m.quantity_after}</span>
                     </div>
-                    <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>{m.reason} · {new Date(m.created_at).toLocaleString()}</div>
-                    {m.admin_username && <div style={{ fontSize: 12, color: '#9ca3af' }}>by {m.admin_username}</div>}
+                    <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 4 }}>{m.reason} · {new Date(m.created_at).toLocaleString()}</div>
+                    {m.admin_username && <div style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>by {m.admin_username}</div>}
                   </div>
                 ))}
               </div>
@@ -2777,22 +2783,22 @@ export default function AdminDashboard() {
               <div className="responsive-table-wrap" style={{ maxHeight: 400, overflowY: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 480 }}>
                   <thead>
-                    <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
-                      <th style={{ padding: '10px 8px', textAlign: 'left', fontSize: 12, color: '#6b7280' }}>Date</th>
-                      <th style={{ padding: '10px 8px', textAlign: 'right', fontSize: 12, color: '#6b7280' }}>Change</th>
-                      <th style={{ padding: '10px 8px', textAlign: 'right', fontSize: 12, color: '#6b7280' }}>After</th>
-                      <th style={{ padding: '10px 8px', textAlign: 'left', fontSize: 12, color: '#6b7280' }}>Reason</th>
-                      <th style={{ padding: '10px 8px', textAlign: 'left', fontSize: 12, color: '#6b7280' }}>Admin</th>
+                    <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
+                      <th style={{ padding: '10px 8px', textAlign: 'left', fontSize: 12, color: 'var(--color-text-secondary)' }}>Date</th>
+                      <th style={{ padding: '10px 8px', textAlign: 'right', fontSize: 12, color: 'var(--color-text-secondary)' }}>Change</th>
+                      <th style={{ padding: '10px 8px', textAlign: 'right', fontSize: 12, color: 'var(--color-text-secondary)' }}>After</th>
+                      <th style={{ padding: '10px 8px', textAlign: 'left', fontSize: 12, color: 'var(--color-text-secondary)' }}>Reason</th>
+                      <th style={{ padding: '10px 8px', textAlign: 'left', fontSize: 12, color: 'var(--color-text-secondary)' }}>Admin</th>
                     </tr>
                   </thead>
                   <tbody>
                     {inventoryMovements.map((m) => (
-                      <tr key={m.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                      <tr key={m.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
                         <td style={{ padding: '10px 8px', fontSize: 13 }}>{new Date(m.created_at).toLocaleString()}</td>
                         <td style={{ padding: '10px 8px', textAlign: 'right', fontWeight: 600, color: m.delta >= 0 ? '#16a34a' : '#dc2626' }}>{m.delta >= 0 ? '+' : ''}{m.delta}</td>
                         <td style={{ padding: '10px 8px', textAlign: 'right' }}>{m.quantity_after}</td>
-                        <td style={{ padding: '10px 8px', fontSize: 13, color: '#6b7280' }}>{m.reason}</td>
-                        <td style={{ padding: '10px 8px', fontSize: 13, color: '#9ca3af' }}>{m.admin_username || '—'}</td>
+                        <td style={{ padding: '10px 8px', fontSize: 13, color: 'var(--color-text-secondary)' }}>{m.reason}</td>
+                        <td style={{ padding: '10px 8px', fontSize: 13, color: 'var(--color-text-secondary)' }}>{m.admin_username || '—'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -2808,20 +2814,20 @@ export default function AdminDashboard() {
         <LiquidModal isOpen onClose={() => setEditingCustomer(null)} maxWidth={480} ariaLabel="Edit customer">
           <div style={{ padding: 24 }}>
             <h2 style={{ margin: '0 0 4px', fontSize: 20, fontWeight: 800 }}>Edit customer</h2>
-            <p style={{ margin: '0 0 20px', fontSize: 14, color: '#6b7280' }}>{editingCustomer.email}</p>
-            <label htmlFor="admin-customer-edit-name" style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Name</label>
+            <p style={{ margin: '0 0 20px', fontSize: 14, color: 'var(--color-text-secondary)' }}>{editingCustomer.email}</p>
+            <label htmlFor="admin-customer-edit-name" style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 6 }}>Name</label>
             <input id="admin-customer-edit-name" name="name" value={customerEditForm.name} onChange={(e) => setCustomerEditForm((f) => ({ ...f, name: e.target.value }))}
-              style={{ width: '100%', padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14, boxSizing: 'border-box', marginBottom: 16 }} />
-            <label htmlFor="admin-customer-edit-phone" style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Phone</label>
+              style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 14, boxSizing: 'border-box', marginBottom: 16 }} />
+            <label htmlFor="admin-customer-edit-phone" style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 6 }}>Phone</label>
             <input id="admin-customer-edit-phone" name="phone" value={customerEditForm.phone} onChange={(e) => setCustomerEditForm((f) => ({ ...f, phone: e.target.value }))}
-              style={{ width: '100%', padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14, boxSizing: 'border-box', marginBottom: 16 }} />
-            <label htmlFor="admin-customer-edit-notes" style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Admin notes</label>
+              style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 14, boxSizing: 'border-box', marginBottom: 16 }} />
+            <label htmlFor="admin-customer-edit-notes" style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 6 }}>Admin notes</label>
             <textarea id="admin-customer-edit-notes" name="admin_notes" value={customerEditForm.admin_notes} onChange={(e) => setCustomerEditForm((f) => ({ ...f, admin_notes: e.target.value }))}
               rows={3}
-              style={{ width: '100%', padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14, boxSizing: 'border-box', fontFamily: 'inherit', resize: 'vertical', marginBottom: 20 }} />
+              style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 14, boxSizing: 'border-box', fontFamily: 'inherit', resize: 'vertical', marginBottom: 20 }} />
             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
               <button type="button" onClick={() => setEditingCustomer(null)}
-                style={{ padding: '10px 16px', background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
+                style={{ padding: '10px 16px', background: 'var(--color-bg-surface)', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
                 Cancel
               </button>
               <button type="button" disabled={customerSaveLoading} onClick={() => void handleSaveCustomer()}
@@ -2840,28 +2846,28 @@ export default function AdminDashboard() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
               <div>
                 <h2 style={{ margin: 0, fontSize: 24, fontWeight: 800 }}>{selectedCustomer.name || 'Customer'}</h2>
-                <p style={{ margin: 0, fontSize: 14, color: '#6b7280', marginTop: 4 }}>{selectedCustomer.email}</p>
+                <p style={{ margin: 0, fontSize: 14, color: 'var(--color-text-secondary)', marginTop: 4 }}>{selectedCustomer.email}</p>
               </div>
-              <button type="button" aria-label="Close" onClick={closeCustomerHistory} style={{ background: '#f3f4f6', border: 'none', borderRadius: 8, padding: 8, cursor: 'pointer' }}><X size={20} aria-hidden="true" /></button>
+              <button type="button" aria-label="Close" onClick={closeCustomerHistory} style={{ background: 'var(--color-bg-surface)', border: 'none', borderRadius: 8, padding: 8, cursor: 'pointer' }}><X size={20} aria-hidden="true" /></button>
             </div>
             <div className="admin-stats-row" style={{ marginBottom: 24 }}>
-              <div style={{ background: '#f9fafb', padding: 16, borderRadius: 12, textAlign: 'center' }}>
+              <div style={{ background: 'var(--color-bg-surface)', padding: 16, borderRadius: 12, textAlign: 'center' }}>
                 <p style={{ margin: 0, fontSize: 28, fontWeight: 800, color: '#9c6649' }}>{selectedCustomer.total_orders}</p>
-                <p style={{ margin: 0, fontSize: 14, color: '#6b7280' }}>Total Orders</p>
+                <p style={{ margin: 0, fontSize: 14, color: 'var(--color-text-secondary)' }}>Total Orders</p>
               </div>
-              <div style={{ background: '#f9fafb', padding: 16, borderRadius: 12, textAlign: 'center' }}>
+              <div style={{ background: 'var(--color-bg-surface)', padding: 16, borderRadius: 12, textAlign: 'center' }}>
                 <p style={{ margin: 0, fontSize: 28, fontWeight: 800, color: '#10b981' }}>${selectedCustomer.total_spent.toFixed(2)}</p>
-                <p style={{ margin: 0, fontSize: 14, color: '#6b7280' }}>Total Spent</p>
+                <p style={{ margin: 0, fontSize: 14, color: 'var(--color-text-secondary)' }}>Total Spent</p>
               </div>
-              <div style={{ background: '#f9fafb', padding: 16, borderRadius: 12, textAlign: 'center' }}>
-                <p style={{ margin: 0, fontSize: 18, fontWeight: 600, color: '#1f2937' }}>{selectedCustomer.first_order_date ? new Date(selectedCustomer.first_order_date).toLocaleDateString() : 'N/A'}</p>
-                <p style={{ margin: 0, fontSize: 14, color: '#6b7280' }}>First Order</p>
+              <div style={{ background: 'var(--color-bg-surface)', padding: 16, borderRadius: 12, textAlign: 'center' }}>
+                <p style={{ margin: 0, fontSize: 18, fontWeight: 600, color: 'var(--color-text-primary)' }}>{selectedCustomer.first_order_date ? new Date(selectedCustomer.first_order_date).toLocaleDateString() : 'N/A'}</p>
+                <p style={{ margin: 0, fontSize: 14, color: 'var(--color-text-secondary)' }}>First Order</p>
               </div>
             </div>
             <h3 style={{ margin: 0, marginBottom: 16, fontWeight: 700 }}>Order History</h3>
             {customerHistoryTotalPages > 1 && (
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
-                <span style={{ fontSize: 13, color: '#6b7280' }}>
+                <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
                   Page {customerHistoryPage} of {customerHistoryTotalPages}
                 </span>
                 <div style={{ display: 'flex', gap: 8 }}>
@@ -2869,7 +2875,7 @@ export default function AdminDashboard() {
                     type="button"
                     disabled={customerHistoryPage <= 1 || customerHistoryLoading}
                     onClick={() => void fetchCustomerHistory(selectedCustomer.email, customerHistoryPage - 1)}
-                    style={{ padding: '8px 14px', background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: customerHistoryPage <= 1 ? 'not-allowed' : 'pointer', opacity: customerHistoryPage <= 1 ? 0.5 : 1, fontSize: 13, fontWeight: 600 }}
+                    style={{ padding: '8px 14px', background: 'var(--color-bg-surface)', border: 'none', borderRadius: 8, cursor: customerHistoryPage <= 1 ? 'not-allowed' : 'pointer', opacity: customerHistoryPage <= 1 ? 0.5 : 1, fontSize: 13, fontWeight: 600 }}
                   >
                     Previous
                   </button>
@@ -2877,7 +2883,7 @@ export default function AdminDashboard() {
                     type="button"
                     disabled={customerHistoryPage >= customerHistoryTotalPages || customerHistoryLoading}
                     onClick={() => void fetchCustomerHistory(selectedCustomer.email, customerHistoryPage + 1)}
-                    style={{ padding: '8px 14px', background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: customerHistoryPage >= customerHistoryTotalPages ? 'not-allowed' : 'pointer', opacity: customerHistoryPage >= customerHistoryTotalPages ? 0.5 : 1, fontSize: 13, fontWeight: 600 }}
+                    style={{ padding: '8px 14px', background: 'var(--color-bg-surface)', border: 'none', borderRadius: 8, cursor: customerHistoryPage >= customerHistoryTotalPages ? 'not-allowed' : 'pointer', opacity: customerHistoryPage >= customerHistoryTotalPages ? 0.5 : 1, fontSize: 13, fontWeight: 600 }}
                   >
                     Next
                   </button>
@@ -2886,14 +2892,14 @@ export default function AdminDashboard() {
             )}
             <div style={{ maxHeight: 400, overflowY: 'auto' }}>
               {customerHistoryLoading ? (
-                <p style={{ padding: 16, color: '#6b7280', textAlign: 'center' }}>Loading order history…</p>
+                <p style={{ padding: 16, color: 'var(--color-text-secondary)', textAlign: 'center' }}>Loading order history…</p>
               ) : customerOrders.length === 0 ? (
-                <p style={{ padding: 16, color: '#6b7280', textAlign: 'center' }}>No orders found for this customer.</p>
+                <p style={{ padding: 16, color: 'var(--color-text-secondary)', textAlign: 'center' }}>No orders found for this customer.</p>
               ) : customerOrders.map((order) => (
-                <div key={order.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 16, background: '#f9fafb', borderRadius: 8, marginBottom: 8 }}>
+                <div key={order.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 16, background: 'var(--color-bg-surface)', borderRadius: 8, marginBottom: 8 }}>
                   <div>
                     <p style={{ margin: 0, fontWeight: 600 }}>#{order.order_number}</p>
-                    <p style={{ margin: 0, fontSize: 13, color: '#6b7280' }}>{new Date(order.created_at).toLocaleDateString()}</p>
+                    <p style={{ margin: 0, fontSize: 13, color: 'var(--color-text-secondary)' }}>{new Date(order.created_at).toLocaleDateString()}</p>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     <span style={{ padding: '4px 12px', borderRadius: 12, fontSize: 12, fontWeight: 600, background: `${getStatusColor(order.status)}15`, color: getStatusColor(order.status) }}>{order.status}</span>
@@ -2981,5 +2987,13 @@ export default function AdminDashboard() {
 
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
+  );
+}
+
+export default function AdminDashboard() {
+  return (
+    <AdminThemeProvider>
+      <AdminDashboardInner />
+    </AdminThemeProvider>
   );
 }

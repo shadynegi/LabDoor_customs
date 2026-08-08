@@ -32,7 +32,7 @@ export default function Cancel() {
         animate={{ opacity: 1, scale: 1 }}
         style={{
           maxWidth: 600,
-          background: "white",
+          background: "var(--color-bg-surface)",
           borderRadius: 16,
           padding: isMobile ? 24 : 40,
           boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1)",
@@ -61,7 +61,7 @@ export default function Cancel() {
           style={{
             fontSize: 32,
             fontWeight: 800,
-            color: "#1f2937",
+            color: "var(--color-text-primary)",
             marginBottom: 12,
           }}
         >
@@ -71,7 +71,7 @@ export default function Cancel() {
         <p
           style={{
             fontSize: 16,
-            color: "#6b7280",
+            color: "var(--color-text-secondary)",
             marginBottom: 32,
             lineHeight: 1.6,
           }}
@@ -122,9 +122,9 @@ export default function Cancel() {
               alignItems: "center",
               gap: 8,
               padding: "14px 28px",
-              background: "white",
-              color: "#374151",
-              border: "2px solid #d1d5db",
+              background: "var(--color-bg-surface)",
+              color: "var(--color-text-primary)",
+              border: "2px solid var(--color-border)",
               borderRadius: 12,
               fontSize: 16,
               fontWeight: 600,

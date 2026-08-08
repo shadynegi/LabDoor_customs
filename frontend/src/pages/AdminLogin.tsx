@@ -8,22 +8,25 @@ import { toast } from 'sonner';
 import LiquidButton from '../components/LiquidButton';
 import { useResponsive } from '../hooks/useResponsive';
 import { useAdminAuth, ADMIN_DASHBOARD_PATH } from '../contexts/AdminAuthContext';
+import { AdminThemeProvider, useAdminTheme } from '../contexts/AdminThemeContext';
+import DarkModeToggle from '../components/DarkModeToggle';
 
 const adminInputStyle: CSSProperties = {
   width: '100%',
-  background: 'rgba(255, 255, 255, 0.05)',
-  border: '1px solid rgba(255, 255, 255, 0.1)',
+  background: 'var(--color-bg-surface)',
+  border: '1px solid var(--color-border)',
   borderRadius: 12,
-  color: '#ffffff',
-  WebkitTextFillColor: '#ffffff',
-  caretColor: '#ffffff',
+  color: 'var(--color-text-primary)',
+  WebkitTextFillColor: 'var(--color-text-primary)',
+  caretColor: 'var(--color-text-primary)',
   fontSize: 15,
   outline: 'none',
   transition: 'border-color 0.2s, background 0.2s',
 };
 
-export default function AdminLogin() {
+function AdminLoginInner() {
   const { isMobile } = useResponsive();
+  const { theme, toggle, rootRef } = useAdminTheme();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -72,11 +75,15 @@ export default function AdminLogin() {
 
   return (
     <div
+      ref={rootRef}
+      className="admin-root"
+      data-admin-theme={theme}
       style={{
         minHeight: '100dvh',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
+        position: 'relative',
         background: 'linear-gradient(135deg, #361906 0%, #9c6649 50%, #361906 100%)',
         padding: isMobile
           ? 'max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left))'
@@ -88,16 +95,20 @@ export default function AdminLogin() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
         style={{
-          background: 'rgba(255, 255, 255, 0.05)',
+          background: 'var(--color-bg-elevated)',
           backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
+          border: '1px solid var(--color-border)',
           borderRadius: 24,
           padding: isMobile ? 24 : 40,
           width: '100%',
           maxWidth: 420,
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+          position: 'relative',
         }}
       >
+        <div style={{ position: 'absolute', top: 16, right: 16 }}>
+          <DarkModeToggle theme={theme} onToggle={toggle} />
+        </div>
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
           <motion.div
@@ -122,13 +133,13 @@ export default function AdminLogin() {
             style={{
               fontSize: 28,
               fontWeight: 800,
-              color: '#ffffff',
+              color: 'var(--color-text-primary)',
               marginBottom: 8,
             }}
           >
             Admin Portal
           </h1>
-          <p style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: 14 }}>
+          <p style={{ color: 'var(--color-text-secondary)', fontSize: 14 }}>
             Sign in to access the dashboard
           </p>
         </div>
@@ -162,7 +173,7 @@ export default function AdminLogin() {
               htmlFor={usernameId}
               style={{
                 display: 'block',
-                color: 'rgba(255, 255, 255, 0.7)',
+                color: 'var(--color-text-secondary)',
                 fontSize: 14,
                 fontWeight: 500,
                 marginBottom: 8,
@@ -173,7 +184,7 @@ export default function AdminLogin() {
             <div style={{ position: 'relative' }}>
               <User
                 size={20}
-                color="rgba(255, 255, 255, 0.4)"
+                color="var(--color-text-secondary)"
                 style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)' }}
                 aria-hidden="true"
               />
@@ -192,12 +203,12 @@ export default function AdminLogin() {
                   padding: '14px 14px 14px 44px',
                 }}
                 onFocus={(e) => {
-                  e.target.style.borderColor = 'rgba(156, 102, 73, 0.5)';
-                  e.target.style.background = 'rgba(255, 255, 255, 0.08)';
+                  e.target.style.borderColor = 'rgba(156, 102, 73, 0.6)';
+                  e.target.style.background = 'var(--color-bg-elevated)';
                 }}
                 onBlur={(e) => {
-                  e.target.style.borderColor = 'rgba(255, 255, 255, 0.1)';
-                  e.target.style.background = 'rgba(255, 255, 255, 0.05)';
+                  e.target.style.borderColor = 'var(--color-border)';
+                  e.target.style.background = 'var(--color-bg-surface)';
                 }}
               />
             </div>
@@ -209,7 +220,7 @@ export default function AdminLogin() {
               htmlFor={passwordId}
               style={{
                 display: 'block',
-                color: 'rgba(255, 255, 255, 0.7)',
+                color: 'var(--color-text-secondary)',
                 fontSize: 14,
                 fontWeight: 500,
                 marginBottom: 8,
@@ -220,7 +231,7 @@ export default function AdminLogin() {
             <div style={{ position: 'relative' }}>
               <Lock
                 size={20}
-                color="rgba(255, 255, 255, 0.4)"
+                color="var(--color-text-secondary)"
                 style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)' }}
                 aria-hidden="true"
               />
@@ -239,12 +250,12 @@ export default function AdminLogin() {
                   padding: '14px 44px 14px 44px',
                 }}
                 onFocus={(e) => {
-                  e.target.style.borderColor = 'rgba(156, 102, 73, 0.5)';
-                  e.target.style.background = 'rgba(255, 255, 255, 0.08)';
+                  e.target.style.borderColor = 'rgba(156, 102, 73, 0.6)';
+                  e.target.style.background = 'var(--color-bg-elevated)';
                 }}
                 onBlur={(e) => {
-                  e.target.style.borderColor = 'rgba(255, 255, 255, 0.1)';
-                  e.target.style.background = 'rgba(255, 255, 255, 0.05)';
+                  e.target.style.borderColor = 'var(--color-border)';
+                  e.target.style.background = 'var(--color-bg-surface)';
                 }}
               />
               <button
@@ -263,9 +274,9 @@ export default function AdminLogin() {
                 }}
               >
                 {showPassword ? (
-                  <EyeOff size={20} color="rgba(255, 255, 255, 0.4)" />
+                  <EyeOff size={20} color="var(--color-text-secondary)" />
                 ) : (
-                  <Eye size={20} color="rgba(255, 255, 255, 0.4)" />
+                  <Eye size={20} color="var(--color-text-secondary)" />
                 )}
               </button>
             </div>
@@ -337,7 +348,7 @@ export default function AdminLogin() {
         <p
           style={{
             textAlign: 'center',
-            color: 'rgba(255, 255, 255, 0.4)',
+            color: 'var(--color-text-secondary)',
             fontSize: 12,
             marginTop: 24,
           }}
@@ -348,22 +359,30 @@ export default function AdminLogin() {
       <style>{`
         .admin-login-input::placeholder,
         .admin-login-input::-webkit-input-placeholder {
-          color: #c9c9c9;
+          color: var(--color-text-secondary);
           opacity: 1;
         }
         .admin-login-input::-moz-placeholder {
-          color: #c9c9c9;
+          color: var(--color-text-secondary);
           opacity: 1;
         }
         .admin-login-input:-webkit-autofill,
         .admin-login-input:-webkit-autofill:hover,
         .admin-login-input:-webkit-autofill:focus {
-          -webkit-text-fill-color: #ffffff !important;
-          caret-color: #ffffff;
-          box-shadow: 0 0 0 1000px rgba(255, 255, 255, 0.08) inset;
+          -webkit-text-fill-color: var(--color-text-primary) !important;
+          caret-color: var(--color-text-primary);
+          box-shadow: 0 0 0 1000px var(--color-bg-surface) inset;
           transition: background-color 9999s ease-out 0s;
         }
       `}</style>
     </div>
+  );
+}
+
+export default function AdminLogin() {
+  return (
+    <AdminThemeProvider>
+      <AdminLoginInner />
+    </AdminThemeProvider>
   );
 }

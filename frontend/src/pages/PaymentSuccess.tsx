@@ -44,7 +44,7 @@ export default function PaymentSuccess() {
     >
       <div
         style={{
-          background: 'white',
+          background: 'var(--color-bg-surface)',
           borderRadius: 20,
           padding: isMobile ? 24 : 40,
           maxWidth: 520,
@@ -54,25 +54,25 @@ export default function PaymentSuccess() {
         }}
       >
         <CheckCircle2 size={56} color="#10b981" style={{ marginBottom: 16 }} />
-        <h1 style={{ margin: '0 0 12px', fontSize: isMobile ? 24 : 28, fontWeight: 800, color: '#1f2937' }}>
+        <h1 style={{ margin: '0 0 12px', fontSize: isMobile ? 24 : 28, fontWeight: 800, color: 'var(--color-text-primary)' }}>
           Order received
         </h1>
-        <p style={{ margin: '0 0 20px', color: '#6b7280', lineHeight: 1.6, fontSize: 15 }}>
+        <p style={{ margin: '0 0 20px', color: 'var(--color-text-secondary)', lineHeight: 1.6, fontSize: 15 }}>
           Your order has been saved. Complete your purchase by sending the pre-filled message in WhatsApp.
           We will confirm payment and processing after we receive your message.
         </p>
         {order?.serverOrderId && (
-          <p style={{ margin: '0 0 8px', fontWeight: 700, color: '#374151' }}>
+          <p style={{ margin: '0 0 8px', fontWeight: 700, color: 'var(--color-text-primary)' }}>
             Order ID: {order.serverOrderId}
           </p>
         )}
         {order?.orderNumber && (
-          <p style={{ margin: '0 0 8px', color: '#6b7280', fontSize: 14 }}>
+          <p style={{ margin: '0 0 8px', color: 'var(--color-text-secondary)', fontSize: 14 }}>
             Order number: {order.orderNumber}
           </p>
         )}
         {order?.total != null && (
-          <p style={{ margin: '0 0 20px', color: '#6b7280' }}>Total: ${order.total.toFixed(2)}</p>
+          <p style={{ margin: '0 0 20px', color: 'var(--color-text-secondary)' }}>Total: ${order.total.toFixed(2)}</p>
         )}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <Link

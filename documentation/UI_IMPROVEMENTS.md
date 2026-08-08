@@ -16,6 +16,7 @@ Lab Door Customs is a monorepo: React/Vite storefront (`frontend/`), Express API
 | **Admin** | Dashboard search includes order id UUID, order number, email, name; **Mark paid** with external `payment_id` + admin note; **Settings** tab. |
 | **Activity** | Consent-gated batch; `contact_submit` on contact success; IPs anonymized with `IP_SALT`. |
 | **Mobile** | Sticky CTAs with keyboard lift on checkout; cookie banner top on purchase routes; cart stacked CTA at 320px; OOS hides product sticky bar; admin product cards on phones. |
+| **Dark mode** | Independent storefront and admin Sun/Moon toggles (44×44); storefront sets `data-theme` on `<html>` (`ldc_storefront_theme`), admin sets `data-admin-theme` on `.admin-root` (`ldc_admin_theme`); CSS custom-property tokens in `tokens.css`, synchronous init from localStorage/`prefers-color-scheme` (no theme flash). |
 
 Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_ENCRYPTION_KEY`, `IP_SALT`, `ADMIN_PASSWORD_HASH`.
 
@@ -29,6 +30,7 @@ Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_
 - Sonner toast notifications
 - Product carousel, filters, 360° viewer
 - Accessible navigation and forms
+- Dark-mode toggle (own scope + persistence, isolated from admin)
 
 ## Admin
 
@@ -36,3 +38,4 @@ Authoritative reference: [`info.md`](info.md). Production requires `ORDER_TOKEN_
 - Data tables with search/filter
 - Modal forms for CRUD operations
 - Status badges for orders and payments
+- Dark-mode toggle scoped to login + dashboard (isolated from storefront)
