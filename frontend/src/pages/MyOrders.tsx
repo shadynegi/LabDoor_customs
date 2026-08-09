@@ -193,16 +193,16 @@ function OrderTimeline({ order, isMobile }: { order: Order; isMobile: boolean })
 
   return (
     <div style={{
-      background: 'linear-gradient(135deg, #f5e0d5 0%, #9c6649 100%)',
+      background: 'var(--color-bg-surface)',
       borderRadius: 12,
       padding: isMobile ? 16 : 24,
       marginBottom: 16,
-      border: '1px solid #e8c9b8',
+      border: '1px solid var(--color-border)',
     }}>
       <div style={{
         fontSize: 14,
         fontWeight: 600,
-        color: '#0369a1',
+        color: 'var(--color-text-primary)',
         marginBottom: 16,
         display: 'flex',
         alignItems: 'center',
@@ -229,7 +229,7 @@ function OrderTimeline({ order, isMobile }: { order: Order; isMobile: boolean })
             left: 40,
             right: 40,
             height: 4,
-            background: '#e2e8f0',
+            background: 'var(--color-border)',
             borderRadius: 2,
             zIndex: 0,
           }}>
@@ -277,7 +277,7 @@ function OrderTimeline({ order, isMobile }: { order: Order; isMobile: boolean })
                   top: 40,
                   width: 3,
                   height: 'calc(100% - 20px)',
-                  background: isCompleted ? '#10b981' : '#e2e8f0',
+                  background: isCompleted ? '#10b981' : 'var(--color-border)',
                   borderRadius: 2,
                 }} />
               )}
@@ -297,13 +297,13 @@ function OrderTimeline({ order, isMobile }: { order: Order; isMobile: boolean })
                   width: 40,
                   height: 40,
                   borderRadius: '50%',
-                  background: isCompleted 
+                  background: isCompleted
                     ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-                    : '#e2e8f0',
+                    : 'var(--color-border)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: isCompleted ? 'white' : '#94a3b8',
+                  color: isCompleted ? 'white' : 'var(--color-text-secondary)',
                   flexShrink: 0,
                   transition: 'all 0.3s ease',
                 }}
@@ -319,14 +319,14 @@ function OrderTimeline({ order, isMobile }: { order: Order; isMobile: boolean })
                 <div style={{
                   fontSize: 13,
                   fontWeight: 600,
-                  color: isCompleted ? '#059669' : '#64748b',
+                  color: isCompleted ? '#059669' : 'var(--color-text-secondary)',
                   marginBottom: 2,
                 }}>
                   {step.label}
                 </div>
                 <div style={{
                   fontSize: 11,
-                  color: '#94a3b8',
+                  color: 'var(--color-text-secondary)',
                 }}>
                   {step.description}
                 </div>
@@ -1056,11 +1056,11 @@ export default function MyOrders() {
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
                   style={{
-                    background: 'linear-gradient(135deg, #f5e0d5 0%, #e8c9b8 100%)',
+                    background: 'var(--color-bg-surface)',
                     borderRadius: 12,
                     padding: isMobile ? 16 : 20,
                     marginBottom: 16,
-                    border: '1px solid #9c6649',
+                    border: '1px solid var(--color-border)',
                   }}
                 >
                   <div style={{
@@ -1148,7 +1148,8 @@ export default function MyOrders() {
                     <div style={{
                       marginTop: 16,
                       padding: '12px 16px',
-                      background: 'rgba(255, 255, 255, 0.6)',
+                      background: 'var(--color-bg-elevated)',
+                      border: '1px solid var(--color-border)',
                       borderRadius: 8,
                       display: 'flex',
                       alignItems: 'center',

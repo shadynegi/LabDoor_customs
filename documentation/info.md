@@ -625,9 +625,17 @@ A **correct** `DATABASE_URL` can still produce occasional maintenance warnings w
 
 ### On-page SEO
 
-- `MetaTags` component — title, description, OG tags, canonical URL via `VITE_SITE_URL`
+- `MetaTags` component — title, description, OG tags, canonical URL via `VITE_SITE_URL`; default social image is **`/icon-512.png`** (square brand icon) when a page passes no `image`.
 - `ProductJsonLd` — structured data on product pages
 - Google Search Console verification meta tag
+- **Static head fallbacks** in `index.html`: `og:site_name`/`og:type`/`og:title`/`og:description`/`og:image` + `twitter:card`/`twitter:image` (per-page values are overwritten at runtime by `MetaTags`).
+
+### Branding assets (PWA + icons)
+
+- **Favicon:** `frontend/public/favicon.png` (colorful shoe).
+- **App icons:** square `icon-192.png`, `icon-512.png`, and `apple-touch-icon.png` (180px) — the shoe padded onto the brand-brown gradient (`#361906 → #9c6649`), generated in `frontend/public/`.
+- **PWA manifest:** `frontend/public/site.webmanifest` — `name` "Lab Door Customs", `short_name` "Lab Door", `display: standalone`, `theme_color`/`background_color` `#361906`, icons marked `any maskable`.
+- **`index.html`** links the manifest + `apple-touch-icon` and sets `<meta name="theme-color">` and `apple-mobile-web-app-title`.
 
 ---
 

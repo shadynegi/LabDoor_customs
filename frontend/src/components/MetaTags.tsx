@@ -33,7 +33,7 @@ function upsertLink(rel: string, href: string): void {
 }
 
 function resolveImage(siteUrl: string, image?: string): string {
-  if (!image) return `${siteUrl}/favicon.png`;
+  if (!image) return `${siteUrl}/icon-512.png`;
   if (image.startsWith('http://') || image.startsWith('https://')) return image;
   return `${siteUrl}${image.startsWith('/') ? image : `/${image}`}`;
 }
