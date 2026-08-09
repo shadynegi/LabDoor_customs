@@ -21,7 +21,7 @@ export default function HelpCenter() {
   return (
     <div style={{ 
       minHeight: "100dvh",
-      background: "linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)",
+      background: "var(--color-page-gradient)",
       padding: isMobile ? "40px 20px" : "60px 40px",
       paddingBottom: isMobile ? "max(40px, env(safe-area-inset-bottom))" : "40px"
     }}>

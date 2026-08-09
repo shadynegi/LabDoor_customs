@@ -1,6 +1,6 @@
 # WhatsApp checkout guide
 
-Orders are placed through **`POST /api/checkout/place-order`**. There is no online payment processor — the customer completes checkout on the site, the order is saved with `payment_status=pending`, and the browser redirects to WhatsApp with a pre-filled message.
+Orders are placed through **`POST /api/checkout/place-order`**. There is no online payment processor — the customer completes checkout on the site, the order is saved with `payment_status=pending`, and the browser opens WhatsApp in a new tab with a pre-filled message.
 
 See [`info.md`](info.md) for the full API reference.
 
@@ -9,7 +9,7 @@ See [`info.md`](info.md) for the full API reference.
 1. Fill checkout form and accept the no-refund policy.
 2. Click **Place Order**.
 3. Server validates cart, reserves stock, creates a pending order (`payment_method=WhatsApp`).
-4. Browser redirects to `https://wa.me/{phone}?text=...` with order details.
+4. Browser opens `https://wa.me/{phone}?text=...` with order details in a **new tab**, and the current tab moves to `/payment/success`. If the browser blocks the popup, it falls back to a same-tab redirect. The success page also shows an **Open WhatsApp** button to re-launch the pre-filled message.
 
 Checkout sends `X-Idempotency-Key` from `createClientId()` (`frontend/src/lib/clientId.ts`) — `crypto.randomUUID()` when the browser allows it, otherwise an RFC-4122 v4 fallback for phones on **HTTP LAN** (`http://192.168.x.x`).
 

@@ -11,7 +11,8 @@ import { Toaster } from "sonner";
 import { trackPageView } from "./utils/activityTracker";
 import CookieConsent, { openCookiePreferences } from "./components/CookieConsent";
 import { trackGaPageView } from "./lib/analytics";
-import { logo_all_pages, logo_all_pages_text } from "./lib/productImageMaps";
+import { logo_all_pages } from "./lib/productImageMaps";
+import BrandWordmark from "./components/BrandWordmark";
 import { useResponsive } from "./hooks/useResponsive";
 import { stickyHeaderPad } from "./lib/responsive";
 
@@ -175,7 +176,7 @@ function Navigation() {
           flexShrink: 0,
         }}
       >
-        <img 
+        <img
           src={logo_all_pages.default}
           srcSet={logo_all_pages.srcSet}
           sizes="50px"
@@ -184,7 +185,7 @@ function Navigation() {
           height={50}
           loading="eager"
           decoding="async"
-          style={{ 
+          style={{
             height: isSmallMobile ? 36 : (isMobile ? 40 : 50),
             width: "auto",
             transition: "transform 0.2s ease"
@@ -211,20 +212,10 @@ function Navigation() {
             transform: "translateX(-50%)"
           }}
         >
-          <img 
-            src={logo_all_pages_text.default}
-            srcSet={logo_all_pages_text.srcSet}
-            sizes="200px"
-            alt="Lab Door Customs"
-            width={160}
-            height={48}
-            loading="lazy"
-            decoding="async"
-            style={{ 
-              height: isMobile ? 36 : 48,
-              width: "auto",
-              transition: "transform 0.2s ease"
-            }}
+          <BrandWordmark
+            height={isMobile ? 36 : 48}
+            color="var(--color-text-primary)"
+            style={{ transition: "transform 0.2s ease" }}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = "scale(1.05)";
             }}

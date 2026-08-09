@@ -503,6 +503,7 @@ export default function Checkout() {
         orderNumber: data.orderNumber,
         serverOrderId: data.serverOrderId,
         total: serverTotal ?? total,
+        whatsappUrl: data.whatsappUrl,
         timestamp: new Date().toISOString(),
       }));
       // Order is already persisted server-side; clear the cart now so it isn't
@@ -511,7 +512,15 @@ export default function Checkout() {
       // the next app load.
       sessionStorage.setItem('ldc_clear_cart_after_order', '1');
       clearCart();
-      window.location.href = data.whatsappUrl;
+      // Open WhatsApp in a new tab so this tab stays on the app and can show the
+      // order confirmation. If the browser blocks the popup, fall back to a
+      // same-tab redirect so the handoff still completes.
+      const waTab = window.open(data.whatsappUrl, '_blank', 'noopener,noreferrer');
+      if (waTab) {
+        navigate('/payment/success');
+      } else {
+        window.location.href = data.whatsappUrl;
+      }
     } catch (error) {
       logError('Place order error:', error);
       paymentIdempotencyKey.current = createClientId();
@@ -540,7 +549,7 @@ export default function Checkout() {
       }
       style={{
         minHeight: "100dvh",
-        background: "linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)",
+        background: "var(--color-page-gradient)",
         padding: isMobile ? "20px" : "40px 20px",
         paddingBottom: isMobile
           ? `calc(var(--sticky-footer-height) + ${
@@ -568,7 +577,7 @@ export default function Checkout() {
               gap: 8,
               background: "transparent",
               border: "none",
-              color: "#374151",
+              color: "var(--color-text-primary)",
               cursor: "pointer",
               fontSize: 14,
               fontWeight: 500,
@@ -599,13 +608,13 @@ export default function Checkout() {
                 style={{
                   fontSize: isMobile ? 28 : 36,
                   fontWeight: 800,
-                  color: "#1f2937",
+                  color: "var(--color-text-primary)",
                   margin: 0,
                 }}
               >
                 Secure Checkout
               </h1>
-              <p style={{ margin: 0, color: "#6b7280", fontSize: 14 }}>
+              <p style={{ margin: 0, color: "var(--color-text-secondary)", fontSize: 14 }}>
                 Complete your purchase
               </p>
             </div>

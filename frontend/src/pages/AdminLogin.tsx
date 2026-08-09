@@ -84,7 +84,7 @@ function AdminLoginInner() {
         alignItems: 'center',
         justifyContent: 'center',
         position: 'relative',
-        background: 'linear-gradient(135deg, #361906 0%, #9c6649 50%, #361906 100%)',
+        background: 'var(--color-page-gradient)',
         padding: isMobile
           ? 'max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left))'
           : 20,

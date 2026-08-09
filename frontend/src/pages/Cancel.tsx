@@ -18,7 +18,7 @@ export default function Cancel() {
     <div
       style={{
         minHeight: "100dvh",
-        background: "linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)",
+        background: "var(--color-page-gradient)",
         padding: isMobile
           ? "max(20px, env(safe-area-inset-top)) 16px max(20px, env(safe-area-inset-bottom))"
           : "40px 20px",

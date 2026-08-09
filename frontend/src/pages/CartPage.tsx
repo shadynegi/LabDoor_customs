@@ -30,6 +30,7 @@ export default function CartPage() {
   const checkoutBlocked = Boolean(cartValidationError) || isCartValidating;
 
   return (
+    <div style={{ background: "var(--color-page-gradient)", minHeight: "calc(100dvh - 126px)" }}>
     <div
       className={
         isMobile && hasItems ? "has-mobile-sticky-cta has-mobile-sticky-cta--stacked" : undefined
@@ -477,6 +478,7 @@ export default function CartPage() {
           ariaLabel="Cart checkout actions"
         />
       )}
+    </div>
     </div>
   );
 }

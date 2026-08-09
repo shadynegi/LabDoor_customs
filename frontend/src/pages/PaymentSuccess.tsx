@@ -9,6 +9,7 @@ interface LastPlacedOrder {
   orderNumber?: string;
   serverOrderId?: string;
   total?: number;
+  whatsappUrl?: string;
 }
 
 export default function PaymentSuccess() {
@@ -39,7 +40,7 @@ export default function PaymentSuccess() {
         alignItems: 'center',
         justifyContent: 'center',
         padding: isMobile ? 20 : 40,
-        background: 'linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)',
+        background: 'var(--color-page-gradient)',
       }}
     >
       <div
@@ -75,6 +76,28 @@ export default function PaymentSuccess() {
           <p style={{ margin: '0 0 20px', color: 'var(--color-text-secondary)' }}>Total: ${order.total.toFixed(2)}</p>
         )}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {order?.whatsappUrl && (
+            <a
+              href={order.whatsappUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                padding: '14px 20px',
+                background: '#25d366',
+                color: 'white',
+                textDecoration: 'none',
+                borderRadius: 12,
+                fontWeight: 700,
+              }}
+            >
+              <MessageCircle size={18} />
+              Open WhatsApp
+            </a>
+          )}
           <Link
             to="/"
             style={{
@@ -83,7 +106,7 @@ export default function PaymentSuccess() {
               justifyContent: 'center',
               gap: 8,
               padding: '14px 20px',
-              background: 'linear-gradient(135deg, #361906 0%, #9c6649 100%)',
+              background: 'var(--color-header-gradient)',
               color: 'white',
               textDecoration: 'none',
               borderRadius: 12,

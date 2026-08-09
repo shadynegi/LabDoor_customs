@@ -3,6 +3,12 @@
   --color-brand-primary: #9c6649;
   --color-brand-dark: #361906;
   --color-brand-gradient: linear-gradient(135deg, #361906 0%, #9c6649 100%);
+  /* Full-page brown background gradient. Light theme = a soft, light cream→tan
+     ramp; dark theme (below) swaps to a much darker gradient of the same warm hue. */
+  --color-page-gradient: linear-gradient(135deg, #fdf4ef 0%, #f0d9c9 45%, #d9b499 100%);
+  /* Dark brand header/banner gradient (white text sits on top, so it stays dark
+     in both themes; dark mode below goes deeper to match the darker page body). */
+  --color-header-gradient: linear-gradient(135deg, #361906 0%, #9c6649 100%);
   --color-brand-light-bg: #fdf4ef;
   --color-success: #10b981;
   --color-warning: #f59e0b;
@@ -43,6 +49,10 @@
   --color-border: #2d2d2d;
   --color-skeleton-base: #242424;
   --color-skeleton-highlight: #333333;
+  /* Much darker gradient of the same warm brown family — near-black espresso →
+     deep brown so pages read genuinely dark while staying on-brand. */
+  --color-page-gradient: linear-gradient(135deg, #0d0602 0%, #1f1206 55%, #35200f 100%);
+  --color-header-gradient: linear-gradient(135deg, #1c0d02 0%, #5a3826 100%);
   /* Make native controls (date pickers, calendar icons, scrollbars) follow the toggle */
   color-scheme: dark;
 }
@@ -58,6 +68,8 @@
   --color-border: #e5e7eb;
   --color-skeleton-base: #e0e0e0;
   --color-skeleton-highlight: #f0f0f0;
+  --color-page-gradient: linear-gradient(135deg, #fdf4ef 0%, #f0d9c9 45%, #d9b499 100%);
+  --color-header-gradient: linear-gradient(135deg, #361906 0%, #9c6649 100%);
   color-scheme: light;
 }
 
@@ -71,6 +83,8 @@
   --color-border: #2e2c22;
   --color-skeleton-base: #252318;
   --color-skeleton-highlight: #322f22;
+  --color-page-gradient: linear-gradient(135deg, #0d0602 0%, #1f1206 55%, #35200f 100%);
+  --color-header-gradient: linear-gradient(135deg, #1c0d02 0%, #5a3826 100%);
   /* Native date pickers / calendar icons follow the admin toggle, not the OS */
   color-scheme: dark;
 }

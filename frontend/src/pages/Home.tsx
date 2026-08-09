@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { motion, AnimatePresence, type Variants } from "framer-motion";
-import { ChevronLeft, ChevronRight, ShoppingCart, Check, X, HelpCircle, AlertTriangle } from "lucide-react";
+import { ChevronLeft, ChevronRight, ShoppingCart, Check, X, HelpCircle, AlertTriangle, Package } from "lucide-react";
 import { useCart, type SizeSystem } from "../contexts/CartContext";
 import { useNavigate, Link } from "react-router-dom";
 import { useProducts } from "../hooks/useProducts";
@@ -20,7 +20,8 @@ import DarkModeToggle from "../components/DarkModeToggle";
 
 const ProductCarousel = lazy(() => import("../components/ProductCarousel"));
 
-import { logo_all_pages, logo_home_text } from "../lib/productImageMaps";
+import { logo_all_pages } from "../lib/productImageMaps";
+import BrandWordmark from "../components/BrandWordmark";
 
 const imageVariants: Variants = {
   enter: (direction: number) => ({
@@ -180,7 +181,7 @@ export default function Home() {
   // Show error state with retry
   if (error && products.length === 0) {
     return (
-      <div style={{ minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)" }}>
+      <div style={{ minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--color-page-gradient)" }}>
         <ErrorMessage message={error} onRetry={refetch} />
       </div>
     );
@@ -189,7 +190,7 @@ export default function Home() {
   // Show empty state
   if (products.length === 0) {
     return (
-      <div style={{ minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", background: "linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)" }}>
+      <div style={{ minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", background: "var(--color-page-gradient)" }}>
         <div style={{ textAlign: "center", maxWidth: 500 }}>
           <h2 style={{ fontSize: 32, fontWeight: 800, color: "#1f2937", marginBottom: 16 }}>No Products Available</h2>
           <p style={{ fontSize: 16, color: "#6b7280", marginBottom: 24 }}>Check back soon for our latest collection!</p>
@@ -307,7 +308,7 @@ export default function Home() {
           left: isMobile ? 16 : 24,
           textDecoration: "none",
         }}>
-          <img 
+          <img
             src={logo_all_pages.default}
             srcSet={logo_all_pages.srcSet}
             sizes="135px"
@@ -316,7 +317,7 @@ export default function Home() {
             height={68}
             loading="eager"
             decoding="async"
-            style={{ 
+            style={{
               height: isSmallMobile ? 36 : (isMobile ? 50.625 : 67.5),
               width: "auto",
               filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.3))",
@@ -334,18 +335,10 @@ export default function Home() {
         {/* Centered Logo — hidden on very small screens to avoid overlap */}
         {!isSmallMobile && (
         <Link to="/" style={{ display: "flex", alignItems: "center", textDecoration: "none" }}>
-          <img 
-            src={logo_home_text.default}
-            srcSet={logo_home_text.srcSet}
-            sizes="200px"
-            alt="Lab Door Customs"
-            width={200}
-            height={68}
-            loading="eager"
-            decoding="async"
-            style={{ 
-              height: isMobile ? 50.625 : 67.5,
-              width: "auto",
+          <BrandWordmark
+            height={isMobile ? 50.625 : 67.5}
+            color="#ffffff"
+            style={{
               filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.3))",
               transition: "transform 0.2s ease"
             }}
@@ -370,6 +363,10 @@ export default function Home() {
           }}>
             <Link to="/about" style={{ color: "rgba(255,255,255,0.85)", textDecoration: "none", transition: "color 0.2s", whiteSpace: "nowrap" }}>
               About Us
+            </Link>
+            <Link to="/orders" style={{ color: "rgba(255,255,255,0.85)", textDecoration: "none", transition: "color 0.2s", whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <Package size={20} aria-hidden="true" />
+              Orders
             </Link>
             <Link to="/cart" aria-label={state.items.length > 0 ? `Cart, ${state.items.reduce((sum, item) => sum + item.quantity, 0)} items` : 'Cart'} style={{ position: "relative", display: "inline-block" }}>
               <ShoppingCart size={40} color="rgba(255,255,255,0.85)" style={{ transition: "color 0.2s" }} aria-hidden="true" />
@@ -972,11 +969,11 @@ export default function Home() {
             right: 0,
             background: "#000000",
             backdropFilter: "blur(10px)",
-            padding: "12px max(20px, env(safe-area-inset-right, 0px))",
-            paddingLeft: "max(20px, env(safe-area-inset-left, 0px))",
+            padding: "12px max(8px, env(safe-area-inset-right, 0px))",
+            paddingLeft: "max(8px, env(safe-area-inset-left, 0px))",
             paddingBottom: "max(12px, env(safe-area-inset-bottom))",
             display: "flex",
-            justifyContent: "space-between",
+            justifyContent: "space-around",
             alignItems: "center",
             borderTop: "1px solid rgba(255,255,255,0.1)",
             zIndex: 20,
@@ -986,14 +983,15 @@ export default function Home() {
             to="/contact"
             style={{
               color: "#ffffff",
-              fontSize: 14,
+              fontSize: 13,
               textDecoration: "none",
               minHeight: 44,
               minWidth: 44,
               display: "inline-flex",
               alignItems: "center",
               justifyContent: "center",
-              padding: "10px 12px",
+              padding: "10px 8px",
+              whiteSpace: "nowrap",
             }}
           >
             Contact Us
@@ -1002,17 +1000,37 @@ export default function Home() {
             to="/about"
             style={{
               color: "#ffffff",
-              fontSize: 14,
+              fontSize: 13,
               textDecoration: "none",
               minHeight: 44,
               minWidth: 44,
               display: "inline-flex",
               alignItems: "center",
               justifyContent: "center",
-              padding: "10px 12px",
+              padding: "10px 8px",
+              whiteSpace: "nowrap",
             }}
           >
             About Us
+          </Link>
+          <Link
+            to="/orders"
+            style={{
+              color: "#ffffff",
+              fontSize: 13,
+              textDecoration: "none",
+              minHeight: 44,
+              minWidth: 44,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              padding: "10px 8px",
+              whiteSpace: "nowrap",
+            }}
+          >
+            <Package size={16} aria-hidden="true" />
+            Orders
           </Link>
           <button
             type="button"
@@ -1021,14 +1039,15 @@ export default function Home() {
               background: "transparent",
               border: "none",
               color: "#ffffff",
-              fontSize: 14,
+              fontSize: 13,
               cursor: "pointer",
               display: "flex",
               alignItems: "center",
               gap: 6,
               minHeight: 44,
               minWidth: 44,
-              padding: "10px 12px",
+              padding: "10px 8px",
+              whiteSpace: "nowrap",
             }}
           >
             <HelpCircle size={16} />

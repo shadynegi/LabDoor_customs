@@ -149,7 +149,7 @@ interface ProductDetailSkeletonProps {
 export const ProductDetailSkeleton: React.FC<ProductDetailSkeletonProps> = ({ isMobile = false }) => (
   <div style={{
     minHeight: '100dvh',
-    background: 'linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)',
+    background: 'var(--color-page-gradient)',
   }}>
     <SkeletonStyles />
     
@@ -480,7 +480,7 @@ interface DashboardSkeletonProps {
 export const DashboardSkeleton: React.FC<DashboardSkeletonProps> = ({ isMobile = false }) => (
   <div style={{
     minHeight: '100dvh',
-    background: 'linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)',
+    background: 'var(--color-page-gradient)',
     padding: isMobile ? 16 : 32,
   }}>
     <SkeletonStyles />
@@ -587,7 +587,7 @@ interface CartSkeletonProps {
 export const CartSkeleton: React.FC<CartSkeletonProps> = ({ isMobile = false }) => (
   <div style={{
     minHeight: '100dvh',
-    background: 'linear-gradient(135deg, #f5e0d5 0%, #9c6649 55%, #361906 100%)',
+    background: 'var(--color-page-gradient)',
     padding: isMobile ? 20 : 40,
   }}>
     <SkeletonStyles />

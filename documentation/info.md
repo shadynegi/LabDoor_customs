@@ -107,7 +107,7 @@
 | `/product/:id` | Product detail — `:id` = product `public_id` UUID (legacy numeric `products.id` still resolves); size selection required before **Add to Cart**; disabled when out of stock; 360° viewer, JSON-LD, meta tags |
 | `/cart` | Shopping cart (localStorage via `CartContext`) |
 | `/checkout` | Customer/shipping form, coupon validation, no-refund policy checkbox, **Place Order** → WhatsApp redirect |
-| `/payment/success` | Optional confirmation page after WhatsApp redirect (order stored in sessionStorage) |
+| `/payment/success` | Confirmation page shown after place-order (WhatsApp opens in a new tab); order stored in sessionStorage; **Open WhatsApp** button re-launches the pre-filled message |
 | `/payment/cancel` | Abandoned checkout — **Checkout Cancelled** page; clears pending order storage; cart preserved |
 | `/orders` | Customer order lookup — order ID + checkout email (`POST /api/orders/lookup`); email links pre-fill `?orderId=`; **no status/date filters** (lookup form only) |
 | `/contact` | Contact form — opens WhatsApp (`wa.me`) with prefilled message; Mohali store address; number from `VITE_WHATSAPP_CONTACT_NUMBER` |
@@ -170,7 +170,8 @@ Two **fully independent** dark-mode toggles, each with its own scope and persist
 - **Native controls follow the app toggle, not the OS.** `color-scheme` is pinned per scope — `light` on `:root`/`.admin-root`, `dark` on `[data-theme="dark"]` and `.admin-root[data-admin-theme="dark"]` — so date pickers, calendar icons, native dropdowns, and scrollbars render in the theme the user/admin selected. `prefers-color-scheme` is used only as the **first-run default** in each context; once toggled, the persisted choice always wins.
 - **Overlay surfaces adapt too.** The shared `LiquidModal` panel (`frontend/src/components/LiquidModal.tsx`) uses `--color-bg-elevated`/`--color-border`/`--color-text-primary`, so every modal built on it flips with the theme (Add New Shoe / Edit Product, order detail, stock history, customer history, bulk-stock, edit-customer, the Home size modal). Hand-rolled dialogs (`AdminActionDialog`, coupon edit) and popovers (search suggestions, filter dropdowns) use the same tokens; the cookie-consent panel adapts as well. Tooltips are native `title=` attributes (browser-rendered, theme-agnostic). Disabled primary buttons use `--color-bg-surface`/`--color-text-secondary` so they read as muted in both themes rather than staying light grey.
 - **Media-overlay controls stay readable in both themes.** The product image's Photo/Spin (360°) toggle and the in-viewer `.p360-btn` chips sit over imagery/media that doesn't flip with the theme, so their inactive state uses a dark translucent fill with white text (not translucent-white) to stay visible over light and dark product backgrounds alike.
-- Each context initializes synchronously from localStorage, falling back to the OS `prefers-color-scheme` — no flash of the wrong theme on load. Brand gradients/browns, status colors, and white-on-gradient text stay fixed in both themes; only neutral surfaces adapt. No new dependencies (Sun/Moon from existing `lucide-react`).
+- **Page background gradients are theme-aware.** `tokens.css` defines `--color-page-gradient` per scope — a **light** warm cream→tan ramp (`#fdf4ef → #f0d9c9 → #d9b499`) on `:root`/`.admin-root` and a **dark** near-black espresso→deep-brown ramp (`#0d0602 → #1f1206 → #35200f`) under `[data-theme="dark"]`/`.admin-root[data-admin-theme="dark"]`. Every full-page brown background references this token (storefront pages, cart, checkout, policy/help/about, `/payment/*`, error/loading skeletons) plus the **admin login** background and **admin dashboard** body, so the whole app (storefront + admin) flips between a lighter and darker brown gradient of the same hue family. A companion `--color-header-gradient` keeps white-text banners dark in both themes (brand brown in light, deeper brown in dark) — used by the admin dashboard header. The 2-stop brand-action gradient (`--color-brand-gradient`, `#361906 → #9c6649`) stays fixed as a button/badge color.
+- Each context initializes synchronously from localStorage, falling back to the OS `prefers-color-scheme` — no flash of the wrong theme on load. Status colors and white-on-gradient text stay fixed in both themes; neutral surfaces and page gradients adapt. No new dependencies (Sun/Moon from existing `lucide-react`).
 
 ---
 
@@ -216,7 +217,8 @@ POST /api/checkout/place-order
   • Build WhatsApp message with order details
         │
         ▼
-Browser redirects to wa.me/{phone}?text=...
+Browser opens wa.me/{phone}?text=... in a new tab
+(current tab → /payment/success; popup-blocked → same-tab redirect)
         │
         ▼
 Admin confirms payment → Mark paid in dashboard
@@ -235,7 +237,8 @@ Admin confirms payment → Mark paid in dashboard
 7. Reserves coupon usage when applicable.
 8. Returns `orderNumber`, `serverOrderId`, `total`, and `whatsappUrl`. The WhatsApp message **Order ID** line is `serverOrderId` (`orders.id` UUID), not `orderNumber`.
 9. On failure after order creation: rolls back pending order and restores stock; if rollback fails returns **503** (idempotency left in progress to block duplicate retries). Stock races return **409** `Insufficient stock`.
-10. Storefront sets `ldc_clear_cart_after_order` in sessionStorage before WhatsApp redirect; cart clears on next page load (or `/payment/success`), not before redirect.
+10. Storefront sets `ldc_clear_cart_after_order` in sessionStorage before the WhatsApp handoff; cart clears on next page load (or `/payment/success`).
+11. Storefront opens WhatsApp in a **new browser tab** (`window.open(whatsappUrl, '_blank')`) and navigates the current tab to `/payment/success`. If the popup is blocked, it falls back to a same-tab `wa.me` redirect. The `whatsappUrl` is also stored in `lastPlacedOrder`, so `/payment/success` shows an **Open WhatsApp** button to re-launch the pre-filled message.
 
 **WhatsApp phone:** `WHATSAPP_CONTACT_NUMBER` env var (E.164, e.g. `+919888514572`).
 
@@ -570,7 +573,7 @@ Store contact number: **`WHATSAPP_CONTACT_NUMBER`** (backend) and **`VITE_WHATSA
 |--------------|---------|
 | WhatsApp payment confirmation | After admin marks order paid — outbound text to customer phone via Cloud API (`WHATSAPP_CLOUD_*`) |
 | WhatsApp shipping notification | Status → shipped (with tracking) or admin `POST /api/orders/:id/notify-shipped` |
-| Checkout place-order | `whatsappCheckout.ts` — `wa.me` redirect after pending order |
+| Checkout place-order | `whatsappCheckout.ts` — opens `wa.me` in a **new tab** after pending order (current tab → `/payment/success`; same-tab redirect fallback if popup blocked) |
 | Contact form | `frontend/src/lib/whatsappContact.ts` — prefilled `wa.me` from form fields (no backend API) |
 
 Optional **WhatsApp Cloud API** (`WHATSAPP_CLOUD_ACCESS_TOKEN`, `WHATSAPP_CLOUD_PHONE_NUMBER_ID`) sends automated texts to the customer mobile from checkout. Without Cloud API, checkout still redirects to the store WhatsApp number; automated customer texts are skipped with a server log warning.
@@ -817,7 +820,7 @@ Any unmatched `/api/*` path returns **404** JSON `{ error: "Route not found" }`.
 | `/cart` | `CartPage` | Shopping cart |
 | `/checkout` | `Checkout` | Checkout form + WhatsApp place-order |
 | `/orders` | `MyOrders` | Order lookup via POST body (`orderId` + email); email links pre-fill `?orderId=` only |
-| `/payment/success` | `PaymentSuccess` | Optional return after WhatsApp redirect; shows UUID Order ID + GSS order number from sessionStorage |
+| `/payment/success` | `PaymentSuccess` | Confirmation after place-order (WhatsApp opens in a new tab); shows UUID Order ID + GSS order number from sessionStorage and an **Open WhatsApp** button (re-launches the pre-filled message) |
 | `/payment/cancel` | `Cancel` | **Checkout Cancelled** — clears pending order storage |
 
 ### Admin routes

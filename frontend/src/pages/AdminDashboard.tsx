@@ -2405,10 +2405,10 @@ function AdminDashboardInner() {
   ];
 
   return (
-    <div ref={rootRef} className="admin-root" data-admin-theme={theme} style={{ minHeight: '100dvh', background: 'var(--color-bg-base)' }}>
+    <div ref={rootRef} className="admin-root" data-admin-theme={theme} style={{ minHeight: '100dvh', background: 'var(--color-page-gradient)' }}>
       {/* Header */}
       <div ref={adminHeaderRef} style={{
-        background: 'linear-gradient(135deg, #361906 0%, #9c6649 100%)',
+        background: 'var(--color-header-gradient)',
         padding: isMobile ? '16px' : '24px 40px',
         paddingTop: isMobile ? 'max(16px, env(safe-area-inset-top, 0px))' : 'max(24px, env(safe-area-inset-top, 0px))',
         paddingLeft: isMobile ? 'max(16px, env(safe-area-inset-left, 0px))' : 'max(40px, env(safe-area-inset-left, 0px))',
