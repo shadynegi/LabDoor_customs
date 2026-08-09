@@ -412,9 +412,9 @@ export default function CartPage() {
                 flex: 1, 
                 padding: isMobile ? "14px 24px" : "16px 32px",
                 background: checkoutBlocked
-                  ? "#9ca3af"
+                  ? "var(--color-bg-surface)"
                   : "linear-gradient(135deg, #361906 0%, #9c6649 100%)",
-                color: "white", 
+                color: checkoutBlocked ? "var(--color-text-secondary)" : "white",
                 border: "none", 
                 borderRadius: 12, 
                 fontSize: isMobile ? 15 : 16, 

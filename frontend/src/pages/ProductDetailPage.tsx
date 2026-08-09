@@ -303,7 +303,7 @@ const ProductDetailPage: React.FC = () => {
                   minHeight: 44,
                   borderRadius: 10,
                   border: 'none',
-                  background: !show360View ? 'white' : 'rgba(255,255,255,0.3)',
+                  background: !show360View ? 'white' : 'rgba(0,0,0,0.45)',
                   color: !show360View ? '#374151' : 'white',
                   fontSize: 13,
                   fontWeight: 600,
@@ -312,7 +312,7 @@ const ProductDetailPage: React.FC = () => {
                   alignItems: 'center',
                   gap: 6,
                   backdropFilter: 'blur(8px)',
-                  boxShadow: !show360View ? '0 2px 8px rgba(0,0,0,0.15)' : 'none',
+                  boxShadow: !show360View ? '0 2px 8px rgba(0,0,0,0.15)' : '0 2px 8px rgba(0,0,0,0.25)',
                 }}
               >
                 <Image size={16} />
@@ -327,7 +327,7 @@ const ProductDetailPage: React.FC = () => {
                   minHeight: 44,
                   borderRadius: 10,
                   border: 'none',
-                  background: show360View ? 'white' : 'rgba(255,255,255,0.3)',
+                  background: show360View ? 'white' : 'rgba(0,0,0,0.45)',
                   color: show360View ? '#374151' : 'white',
                   fontSize: 13,
                   fontWeight: 600,
@@ -336,7 +336,7 @@ const ProductDetailPage: React.FC = () => {
                   alignItems: 'center',
                   gap: 6,
                   backdropFilter: 'blur(8px)',
-                  boxShadow: show360View ? '0 2px 8px rgba(0,0,0,0.15)' : 'none',
+                  boxShadow: show360View ? '0 2px 8px rgba(0,0,0,0.15)' : '0 2px 8px rgba(0,0,0,0.25)',
                 }}
               >
                 <RotateCcw size={16} />
@@ -554,11 +554,11 @@ const ProductDetailPage: React.FC = () => {
                 background: isOutOfStock
                   ? '#fee2e2'
                   : !sizeSelected
-                  ? '#e5e7eb'
+                  ? 'var(--color-bg-surface)'
                   : addedToCart
                   ? "linear-gradient(90deg, #10b981, #059669)"
                   : "linear-gradient(135deg, #361906 0%, #9c6649 100%)",
-                color: isOutOfStock ? '#dc2626' : !sizeSelected ? '#9ca3af' : 'white',
+                color: isOutOfStock ? '#dc2626' : !sizeSelected ? 'var(--color-text-secondary)' : 'white',
                 border: isOutOfStock ? '2px solid #fca5a5' : 'none',
                 borderRadius: 12,
                 fontSize: isMobile ? 16 : 18,

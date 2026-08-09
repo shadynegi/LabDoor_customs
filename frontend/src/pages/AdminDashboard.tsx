@@ -1403,8 +1403,8 @@ function AdminDashboardInner() {
               style={{
                 marginLeft: isMobile ? 0 : 'auto',
                 padding: '10px 16px',
-                background: canExportAnalytics ? '#9c6649' : '#9ca3af',
-                color: 'white',
+                background: canExportAnalytics ? '#9c6649' : 'var(--color-bg-surface)',
+                color: canExportAnalytics ? 'white' : 'var(--color-text-secondary)',
                 border: 'none',
                 borderRadius: 8,
                 cursor: analyticsExporting || !canExportAnalytics ? 'not-allowed' : 'pointer',
@@ -2734,11 +2734,11 @@ function AdminDashboardInner() {
               type="number"
               value={bulkStockValue}
               onChange={(e) => setBulkStockValue(parseInt(e.target.value, 10) || 0)}
-              style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 14, boxSizing: 'border-box', marginBottom: 20 }}
+              style={{ width: '100%', padding: '10px 12px', background: 'var(--color-bg-surface)', color: 'var(--color-text-primary)', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 14, boxSizing: 'border-box', marginBottom: 20 }}
             />
             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
               <button type="button" onClick={() => setBulkStockModalOpen(false)}
-                style={{ padding: '10px 16px', background: 'var(--color-bg-surface)', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
+                style={{ padding: '10px 16px', background: 'var(--color-bg-surface)', color: 'var(--color-text-primary)', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
                 Cancel
               </button>
               <button type="button" onClick={handleBulkStockSubmit}
@@ -2815,21 +2815,21 @@ function AdminDashboardInner() {
       {editingCustomer && (
         <LiquidModal isOpen onClose={() => setEditingCustomer(null)} maxWidth={480} ariaLabel="Edit customer">
           <div style={{ padding: 24 }}>
-            <h2 style={{ margin: '0 0 4px', fontSize: 20, fontWeight: 800 }}>Edit customer</h2>
+            <h2 style={{ margin: '0 0 4px', fontSize: 20, fontWeight: 800, color: 'var(--color-text-primary)' }}>Edit customer</h2>
             <p style={{ margin: '0 0 20px', fontSize: 14, color: 'var(--color-text-secondary)' }}>{editingCustomer.email}</p>
             <label htmlFor="admin-customer-edit-name" style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 6 }}>Name</label>
             <input id="admin-customer-edit-name" name="name" value={customerEditForm.name} onChange={(e) => setCustomerEditForm((f) => ({ ...f, name: e.target.value }))}
-              style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 14, boxSizing: 'border-box', marginBottom: 16 }} />
+              style={{ width: '100%', padding: '10px 12px', background: 'var(--color-bg-surface)', color: 'var(--color-text-primary)', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 14, boxSizing: 'border-box', marginBottom: 16 }} />
             <label htmlFor="admin-customer-edit-phone" style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 6 }}>Phone</label>
             <input id="admin-customer-edit-phone" name="phone" value={customerEditForm.phone} onChange={(e) => setCustomerEditForm((f) => ({ ...f, phone: e.target.value }))}
-              style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 14, boxSizing: 'border-box', marginBottom: 16 }} />
+              style={{ width: '100%', padding: '10px 12px', background: 'var(--color-bg-surface)', color: 'var(--color-text-primary)', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 14, boxSizing: 'border-box', marginBottom: 16 }} />
             <label htmlFor="admin-customer-edit-notes" style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 6 }}>Admin notes</label>
             <textarea id="admin-customer-edit-notes" name="admin_notes" value={customerEditForm.admin_notes} onChange={(e) => setCustomerEditForm((f) => ({ ...f, admin_notes: e.target.value }))}
               rows={3}
-              style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 14, boxSizing: 'border-box', fontFamily: 'inherit', resize: 'vertical', marginBottom: 20 }} />
+              style={{ width: '100%', padding: '10px 12px', background: 'var(--color-bg-surface)', color: 'var(--color-text-primary)', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 14, boxSizing: 'border-box', fontFamily: 'inherit', resize: 'vertical', marginBottom: 20 }} />
             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
               <button type="button" onClick={() => setEditingCustomer(null)}
-                style={{ padding: '10px 16px', background: 'var(--color-bg-surface)', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
+                style={{ padding: '10px 16px', background: 'var(--color-bg-surface)', color: 'var(--color-text-primary)', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
                 Cancel
               </button>
               <button type="button" disabled={customerSaveLoading} onClick={() => void handleSaveCustomer()}

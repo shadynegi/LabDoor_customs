@@ -1008,9 +1008,9 @@ export default function Checkout() {
                       style={{
                         padding: "12px 20px",
                         background: couponLoading || !couponCode.trim()
-                          ? "#d1d5db"
+                          ? "var(--color-bg-surface)"
                           : "linear-gradient(135deg, #361906 0%, #9c6649 100%)",
-                        color: "white",
+                        color: couponLoading || !couponCode.trim() ? "var(--color-text-secondary)" : "white",
                         border: "none",
                         borderRadius: 8,
                         fontSize: 14,
@@ -1243,9 +1243,9 @@ export default function Checkout() {
                   width: "100%",
                   padding: "16px",
                   background: isProcessing || checkoutBlocked
-                    ? "#9ca3af"
+                    ? "var(--color-bg-surface)"
                     : "linear-gradient(135deg, #361906 0%, #9c6649 100%)",
-                  color: "white",
+                  color: isProcessing || checkoutBlocked ? "var(--color-text-secondary)" : "white",
                   border: "none",
                   borderRadius: 12,
                   fontSize: 16,

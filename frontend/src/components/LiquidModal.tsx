@@ -82,17 +82,19 @@ const LiquidModal: React.FC<LiquidModalProps> = ({
       style={
         plain
           ? {
-              background: '#ffffff',
+              background: 'var(--color-bg-elevated)',
+              color: 'var(--color-text-primary)',
               borderRadius: 20,
               padding: 'clamp(16px, 4vw, 32px)',
               boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
-              border: '1px solid #e5e7eb',
+              border: '1px solid var(--color-border)',
             }
           : {
-              background: 'rgba(255, 255, 255, 0.95)',
+              background: 'var(--color-bg-elevated)',
+              color: 'var(--color-text-primary)',
               backdropFilter: 'blur(20px)',
               WebkitBackdropFilter: 'blur(20px)',
-              border: '1px solid rgba(255, 255, 255, 0.3)',
+              border: '1px solid var(--color-border)',
               borderRadius: 20,
               padding: 'clamp(16px, 4vw, 32px)',
               boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)',
