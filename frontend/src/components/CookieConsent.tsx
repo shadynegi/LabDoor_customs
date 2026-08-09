@@ -126,7 +126,7 @@ export default function CookieConsent() {
       alignItems: 'flex-start',
       gap: 12,
       padding: 16,
-      background: checked ? '#f0fdf4' : 'var(--color-bg-surface)',
+      background: checked ? 'rgba(16, 185, 129, 0.12)' : 'var(--color-bg-surface)',
       borderRadius: 12,
       border: checked ? '1px solid #10b981' : '1px solid var(--color-border)',
       marginBottom: 12,
@@ -213,7 +213,7 @@ export default function CookieConsent() {
                 width: 44,
                 height: 44,
                 borderRadius: 12,
-                background: 'linear-gradient(135deg, #361906 0%, #9c6649 100%)',
+                background: 'var(--color-header-gradient)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -266,12 +266,12 @@ export default function CookieConsent() {
                   alignItems: 'center',
                   gap: 8,
                   padding: 12,
-                  background: '#f5e0d5',
+                  background: 'rgba(156, 102, 73, 0.12)',
                   borderRadius: 10,
                   marginBottom: 20,
                 }}>
                   <Shield size={18} color="#9c6649" />
-                  <span style={{ fontSize: 13, color: '#1e40af' }}>
+                  <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
                     Your privacy is important to us.{' '}
                     <Link to="/privacy-policy" style={{ color: '#9c6649', textDecoration: 'underline' }}>
                       Learn more

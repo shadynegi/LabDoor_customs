@@ -383,7 +383,7 @@ interface HomePageSkeletonProps {
 export const HomePageSkeleton: React.FC<HomePageSkeletonProps> = ({ isMobile = false }) => (
   <div style={{
     minHeight: '100dvh',
-    background: 'linear-gradient(135deg, #361906 0%, #9c6649 100%)',
+    background: 'var(--color-header-gradient)',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',

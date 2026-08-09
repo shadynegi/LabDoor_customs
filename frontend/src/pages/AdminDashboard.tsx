@@ -2592,9 +2592,9 @@ function AdminDashboardInner() {
                     </div>
                   )}
                   {selectedOrder.admin_notes && (
-                    <div style={{ marginTop: 16, padding: 12, background: '#fffbeb', borderRadius: 8, border: '1px solid #fcd34d' }}>
-                      <span style={{ color: '#92400e', fontSize: 12, fontWeight: 600 }}>Admin notes</span>
-                      <p style={{ margin: '6px 0 0', fontSize: 14, color: '#78350f', whiteSpace: 'pre-wrap' }}>{selectedOrder.admin_notes}</p>
+                    <div style={{ marginTop: 16, padding: 12, background: 'rgba(245, 158, 11, 0.12)', borderRadius: 8, border: '1px solid #f59e0b' }}>
+                      <span style={{ color: '#d97706', fontSize: 12, fontWeight: 600 }}>Admin notes</span>
+                      <p style={{ margin: '6px 0 0', fontSize: 14, color: 'var(--color-text-primary)', whiteSpace: 'pre-wrap' }}>{selectedOrder.admin_notes}</p>
                     </div>
                   )}
                 </>
@@ -2609,10 +2609,10 @@ function AdminDashboardInner() {
                 </div>
               ))}
             </div>
-            <div style={{ background: '#ecfdf5', borderRadius: 12, padding: 20, border: '1px solid #10b981', marginBottom: 20 }}>
+            <div style={{ background: 'rgba(16, 185, 129, 0.12)', borderRadius: 12, padding: 20, border: '1px solid #10b981', marginBottom: 20, color: 'var(--color-text-primary)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}><span>Subtotal</span><span>${selectedOrder.subtotal.toFixed(2)}</span></div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}><span>Shipping</span><span>${selectedOrder.shipping_cost.toFixed(2)}</span></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid #d1fae5' }}><span>Tax</span><span>${selectedOrder.tax.toFixed(2)}</span></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid rgba(16, 185, 129, 0.3)' }}><span>Tax</span><span>${selectedOrder.tax.toFixed(2)}</span></div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 20, fontWeight: 800 }}><span>Total</span><span style={{ color: '#10b981' }}>${selectedOrder.total.toFixed(2)}</span></div>
             </div>
 

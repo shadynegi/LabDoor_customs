@@ -30,20 +30,19 @@ export default function HelpCenter() {
         margin: "0 auto",
       }}>
         {/* Header */}
-        <div style={{ 
-          textAlign: "center", 
+        <div style={{
+          textAlign: "center",
           marginBottom: 50,
-          color: "white"
+          color: "var(--color-text-primary)"
         }}>
           <h1 style={{
             fontSize: isMobile ? 36 : 48,
             fontWeight: 900,
             marginBottom: 16,
-            textShadow: "0 4px 20px rgba(0,0,0,0.2)"
           }}>
             Help Center
           </h1>
-          <p style={{ fontSize: isMobile ? 14 : 16, opacity: 0.95 }}>
+          <p style={{ fontSize: isMobile ? 14 : 16, color: "var(--color-text-secondary)" }}>
             Find answers to common questions and learn more about our policies
           </p>
         </div>

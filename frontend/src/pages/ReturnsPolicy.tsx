@@ -37,7 +37,7 @@ export default function ReturnsPolicy() {
             width: 40,
             height: 40,
             borderRadius: 10,
-            background: 'linear-gradient(135deg, #361906 0%, #9c6649 100%)',
+            background: 'var(--color-header-gradient)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -87,7 +87,7 @@ export default function ReturnsPolicy() {
 
         <div
           style={{
-            background: 'linear-gradient(135deg, #361906 0%, #9c6649 100%)',
+            background: 'var(--color-header-gradient)',
             borderRadius: 20,
             padding: isMobile ? '32px 24px' : '48px',
             marginBottom: 32,

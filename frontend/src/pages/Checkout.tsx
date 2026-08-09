@@ -595,7 +595,7 @@ export default function Checkout() {
                 width: 48,
                 height: 48,
                 borderRadius: "50%",
-                background: "linear-gradient(135deg, #361906 0%, #9c6649 100%)",
+                background: "var(--color-header-gradient)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",

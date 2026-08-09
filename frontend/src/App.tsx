@@ -46,7 +46,7 @@ const PageLoader = () => (
     display: 'flex', 
     alignItems: 'center', 
     justifyContent: 'center',
-    background: 'linear-gradient(135deg, #361906 0%, #9c6649 100%)'
+    background: 'var(--color-header-gradient)'
   }}>
     <div style={{ textAlign: 'center', color: 'white' }}>
       <div style={{ 
@@ -77,7 +77,7 @@ function ProtectedAdminRoute({ children }: { children: React.ReactNode }) {
         display: 'flex', 
         alignItems: 'center', 
         justifyContent: 'center',
-        background: 'linear-gradient(135deg, #361906 0%, #9c6649 100%)'
+        background: 'var(--color-header-gradient)'
       }}>
         <div style={{ color: 'white', fontSize: 18 }}>Verifying authentication...</div>
       </div>
@@ -102,7 +102,7 @@ function AdminEntryRedirect() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'linear-gradient(135deg, #361906 0%, #9c6649 100%)',
+        background: 'var(--color-header-gradient)',
       }}>
         <div style={{ color: 'white', fontSize: 18 }}>Verifying authentication...</div>
       </div>

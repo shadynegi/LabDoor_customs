@@ -71,7 +71,7 @@ export default function ContactUs() {
   return (
     <div style={{ 
       minHeight: "100dvh",
-      background: "linear-gradient(135deg, #361906 0%, #9c6649 100%)",
+      background: "var(--color-page-gradient)",
       padding: isMobile ? `${isSmallMobile ? 24 : 32}px 0` : "60px 0",
       paddingBottom: isMobile ? "max(32px, env(safe-area-inset-bottom))" : "60px",
       ...safeHorizontalPad(),
@@ -122,7 +122,7 @@ export default function ContactUs() {
             <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
               <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
                 <div style={{
-                  background: "linear-gradient(135deg, #361906 0%, #9c6649 100%)",
+                  background: "var(--color-header-gradient)",
                   padding: 12,
                   borderRadius: 12,
                   display: "flex",
@@ -152,7 +152,7 @@ export default function ContactUs() {
 
               <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
                 <div style={{
-                  background: "linear-gradient(135deg, #361906 0%, #9c6649 100%)",
+                  background: "var(--color-header-gradient)",
                   padding: 12,
                   borderRadius: 12,
                   display: "flex",
@@ -217,6 +217,8 @@ export default function ContactUs() {
                     border: "2px solid var(--color-border)",
                     borderRadius: 10,
                     fontSize: 15,
+                    background: "var(--color-bg-elevated)",
+                    color: "var(--color-text-primary)",
                     transition: "all 0.2s",
                     outline: "none"
                   }}
@@ -242,6 +244,8 @@ export default function ContactUs() {
                     border: "2px solid var(--color-border)",
                     borderRadius: 10,
                     fontSize: 15,
+                    background: "var(--color-bg-elevated)",
+                    color: "var(--color-text-primary)",
                     transition: "all 0.2s",
                     outline: "none"
                   }}
@@ -267,6 +271,8 @@ export default function ContactUs() {
                     border: "2px solid var(--color-border)",
                     borderRadius: 10,
                     fontSize: 15,
+                    background: "var(--color-bg-elevated)",
+                    color: "var(--color-text-primary)",
                     transition: "all 0.2s",
                     outline: "none"
                   }}
@@ -292,6 +298,8 @@ export default function ContactUs() {
                     border: "2px solid var(--color-border)",
                     borderRadius: 10,
                     fontSize: 15,
+                    background: "var(--color-bg-elevated)",
+                    color: "var(--color-text-primary)",
                     transition: "all 0.2s",
                     outline: "none",
                     fontFamily: "inherit",
